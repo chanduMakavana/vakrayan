@@ -1,0 +1,269 @@
+.flex-container{
+    display: flex;
+    
+}
+body{
+    margin: 0;
+    padding: 0;
+}
+
+
+.navabar{
+    display: flex;
+    justify-content: space-between;
+    margin: 0 15px;
+    align-items: center;
+}
+.links{
+    display: flex;
+    gap: 40px;
+}
+.logo{
+    font-size: 30px;
+    color: #ff7f50;
+}
+.logo-sub{
+    color: #5f5a58;
+}
+
+.hero{
+    background-image: url(/images/Hotel-Lobby.jpg);
+    background-position: center;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero-title{
+    background-color: white;
+    padding: 5px;
+}
+
+.hero button{
+    background-color: #ff7f50;
+    padding: 5px 10px;
+}
+.hero button a{
+    color: white;
+    text-decoration: none;
+    
+}
+.choose-us h2{
+    text-align: center;
+    font-size: 30px;
+}
+
+.choose-div{
+    justify-content: space-between;
+    margin: 20px;
+    
+}
+
+.choose-div div{
+   
+    padding: 10px;
+    border-radius: 10px;
+    width: 300px;
+    box-shadow: 2px 2px 5px #5f5a58;
+}
+.choose-div img{
+    width: 50px;
+}
+
+.Guests-reviews h2{
+    text-align: center;
+}
+
+.Guests-reviews div{
+    justify-content: space-around;
+}
+
+.Guests-reviews div div{
+    width: 300px;
+    box-shadow: 2px 2px 5px #5f5a58;
+    padding: 10px;
+    border-radius: 10px;
+}
+.footer{
+    justify-content: space-between;
+    margin-top: 20px;
+    background-color: #333;
+    color: white;
+    padding: 20px;
+}
+
+.footer div{
+    width: 300px;
+}
+
+.list{
+    list-style: none;
+}
+.list a{
+    color: white;
+}
+.list li{
+    margin-bottom: 10px;
+}   
+
+
+.room-hero{
+    background-color: #393432;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+
+.room-hero h1{
+    font-size: 50px;
+}
+
+.room-icons{
+    color: #ff7f50;
+    padding: 0 5px;
+}
+.room-fesilities{
+    margin: 20px;
+    justify-content: space-around;
+}
+.room-fesilities div{
+    width: 300px;
+    box-shadow: 5px 5px 15px 5px rgba(0,0,0,0.21);
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.Room-Amenities{
+    text-align: center;
+    justify-content: space-between;
+    
+}
+.Room-Amenities div div{
+    width: 300px;
+    box-shadow: 5px 5px 1px 1px rgba(0,0,0,0.21);
+    padding: 10px;
+    border-radius: 10px;
+    margin: 20px;
+}
+.Room-Amenities i{
+    font-size: 50px;
+}
+
+.facilitie-hero{
+    background-image: url(/images/XXL_height.webp);
+    height: 500px;
+    text-align: center;
+    color: white;
+    background-size: cover;
+    background-position: bottom;
+
+}
+
+.facilitie-hero div{
+    width: 100%;
+    height: 100%;
+    background-color: rgba(52, 52, 52, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.facilitie-hero h1{
+    font-size: 50px;
+}
+
+.facilitie-cards div{
+    width: 300px;
+    box-shadow: 5px 5px 15px 5px rgba(0,0,0,0.21);
+    padding: 10px;
+    border-radius: 10px;
+    margin: 20px;
+    text-align: center;
+}
+.facilitie-cards i{
+    font-size: 50px;
+    width: 100%;
+    margin: auto;
+}
+
+.photo-gellery{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.photo-gellery img{
+    width: 250px;
+    height: 200px;
+    box-shadow: 5px 5px 15px 5px rgba(0,0,0,0.21);
+    padding: 10px;
+    border-radius: 10px;
+    margin: 20px;
+    text-align: center;
+}
+
+.suggest-hero{
+    background-image: url(/images/suugest_hero.png);
+    color: black;
+    text-align: center;
+    padding: 20px;
+  
+}
+.suggest-hero h1{
+    font-size: 50px;
+}
+
+.suggest{
+    margin: 10px 50px;
+    border: 2px solid black;
+    padding: 20px;
+}
+.suggest h1{
+    text-align: center;
+}
+
+.suggest-recent{
+    background-color: #ececec;
+    padding: 20px;
+}
+.suggest-form input{
+    width: 99%;
+    padding: 10px;
+    margin: 5px 0;
+}
+.suggest-form h2{
+    text-align: center;
+    color: #ff7f50;
+    font-size: 40px;
+}   
+.suggest-form select{
+    width: 99%;
+    padding: 10px;
+    margin: 5px 0;
+}
+.suggest-form textarea{
+    width: 99%;
+    padding: 10px;
+    margin: 5px 0;
+    max-width: 99%;
+    min-width: 99%;
+}
+.suggest-form button{
+    width: 99%;
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #ff7f50;
+    color: white;
+    font-size: large;
+    font-weight: 600;
+}
+.content-cards{
+    justify-content: space-around;
+}
+.content-cards div{
+    box-shadow: 2px 2px 5px 5px rgba(0,0,0,0.21);
+    padding: 20px;
+    margin: 20px;
+    width: 300px;   
+}
