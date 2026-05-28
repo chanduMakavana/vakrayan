@@ -1,4 +1,5 @@
 import React from 'react'
+import AddToCartButton from './AddToCartButton'
 
 function BestSellers() {
   const products = [
@@ -26,7 +27,7 @@ function BestSellers() {
   ]
 
   return (
-    <section className="bg-[#0f0f11] py-16 px-4 md:px-12 border-t border-white/5">
+    <section id="drops" className="bg-[#0f0f11] py-16 px-4 md:px-12 border-t border-white/5 scroll-mt-20">
       {/* Section Header */}
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between max-w-7xl mx-auto">
         <div>
@@ -44,26 +45,20 @@ function BestSellers() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
         {products.map((product) => (
           <div key={product.id} className="group relative flex flex-col bg-neutral-950/40 rounded-2xl p-3 border border-white/5 transition-all duration-300 hover:border-white/10 shadow-xl">
-            
-            {/* Product Image Container */}
+
+            {/* Product Image */}
             <div className="w-full aspect-3/4 rounded-xl overflow-hidden bg-neutral-900 relative">
-              
-              {/* Status Tag (New Drop, Best Seller etc.) */}
               <span className="absolute top-3 left-3 z-10 bg-white text-black font-black text-[10px] tracking-widest px-2.5 py-1 rounded-sm uppercase shadow-md">
                 {product.tag}
               </span>
-
-              <img 
-                src={product.image} 
-                alt={product.name} 
+              <img
+                src={product.image}
+                alt={product.name}
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
-
-              {/* Quick Add To Cart Overlay on Hover */}
+              {/* Overlay Add To Cart */}
               <div className="absolute inset-0 bg-black/60 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center z-10">
-                <button className="bg-white text-black font-bold text-xs tracking-widest uppercase py-3 px-6 rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 shadow-2xl hover:bg-neutral-200">
-                  Add To Cart
-                </button>
+                <AddToCartButton product={product} variant="overlay" />
               </div>
             </div>
 
@@ -75,9 +70,9 @@ function BestSellers() {
                 </h3>
                 <p className="text-xs text-gray-500 font-medium tracking-wider mt-1">Streetwear Co.</p>
               </div>
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+              <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-4">
                 <span className="text-base font-black text-white tracking-wide">{product.price}</span>
-                <span className="text-[11px] font-bold text-red-500 tracking-wider group-hover:underline cursor-pointer">Buy Now</span>
+                <AddToCartButton product={product} />
               </div>
             </div>
 

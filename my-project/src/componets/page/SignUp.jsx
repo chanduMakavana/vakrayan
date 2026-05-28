@@ -30,7 +30,6 @@ function SignUp() {
             message: "This email is already registered with us."
           })
         } else {
-          // Koi aur random server down error ho toh
           setServerError(error?.message || "Something went wrong. Try again.")
         }
     }
