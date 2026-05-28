@@ -91,6 +91,17 @@ function Navbar() {
                       <p className="text-sm text-white font-black uppercase tracking-wide truncate mt-0.5">
                         {accountDetail?.name || "GUEST"}
                       </p>
+                      {
+                        localStorageData.find(data => data.email==="makwanachandu480@gmail.com")?
+                        <p>
+                          <Link to="/admin" className="text-[10px] text-red-400 hover:text-white hover:bg-red-500/10 px-3 py-2">
+                            Admin Panel
+                          </Link>
+                        </p>
+                    :
+                    ""
+
+                      }
                     </div>
                     <div className="p-1">
                       <button
