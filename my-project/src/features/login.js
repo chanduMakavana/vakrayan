@@ -44,7 +44,7 @@ export const loginSlice = createSlice({
                 
                 // Update localStorage
                 localStorage.setItem("loginData", JSON.stringify(state));
-                localStorage.setItem("isLogin", "true");
+                
             } else {
                throw new Error("Invalid email or password");
             }
