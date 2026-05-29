@@ -1,30 +1,13 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import AddToCartButton from './AddToCartButton'
 
 function BestSellers() {
-  const products = [
-    {
-      id: 1,
-      name: 'GOTHIC PRINT OVERSIZED TEE',
-      price: '₹1,499',
-      tag: 'NEW DROP',
-      image: 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg'
-    },
-    {
-      id: 2,
-      name: 'VINTAGE WASH ACID TEE',
-      price: '₹1,699',
-      tag: 'BEST SELLER',
-      image: 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg'
-    },
-    {
-      id: 3,
-      name: 'CLASSIC BOX CORDUROY SHIRT',
-      price: '₹2,299',
-      tag: 'FEW LEFT',
-      image: 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg'
-    }
-  ]
+  const [products, setProducts] = useState([])
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('products')) || []
+    setProducts(stored)
+  }, [])
 
   return (
     <section id="drops" className="bg-[#0f0f11] py-16 px-4 md:px-12 border-t border-white/5 scroll-mt-20">
@@ -41,7 +24,10 @@ function BestSellers() {
         </button>
       </div>
 
-      {/* Product Cards Grid */}
+      {products.length === 0 && (
+        <p className="text-center text-gray-600 text-xs tracking-widest uppercase py-20">No products yet — Admin se add karwao.</p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
         {products.map((product) => (
           <div key={product.id} className="group relative flex flex-col bg-neutral-950/40 rounded-2xl p-3 border border-white/5 transition-all duration-300 hover:border-white/10 shadow-xl">
