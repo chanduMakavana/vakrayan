@@ -197,6 +197,7 @@ function AdminPanel() {
                   className="px-6 bg-neutral-700 hover:bg-neutral-600 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-lg transition-all active:scale-[0.99] cursor-pointer"
                 >
                   CANCEL
+                  lo
                 </button>
               )}
             </div>
