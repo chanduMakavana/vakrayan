@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useDispatch } from 'react-redux'
-import { Link } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
-import { login } from '../../features/login'
+import { Link, useNavigate } from 'react-router-dom'
+import { login as loginAction } from '../../features/login' // Alias used to avoid naming collision with local submit function
+import authService from '../../appwrite/auth'
+
 function Login() {
   const {
     register,
@@ -12,37 +13,85 @@ function Login() {
     reset,
   } = useForm()
 
-    const dispatch = useDispatch();
-    const navigate = useNavigate();
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+
+  // Local states for form handling and error management
+  const [loading, setLoading] = useState(false)
+  const [serverError, setServerError] = useState("")
 
   const onSubmit = async (data) => {
-    
-    await dispatch(login(data))
-    navigate('/')
-    reset()
+    setServerError("") 
+    setLoading(true)   
+
+    try {
+      // Call auth service with trimmed credentials
+      const session = await authService.login({ 
+        email: data.email.trim(), 
+        password: data.password.trim() 
+      });
+      
+      if (session) {
+        // Fetch authenticated user details and update Redux store
+        const userData = await authService.getCurrentUser();
+        if (userData) {
+          dispatch(loginAction({ user: userData }));
+        }
+        
+        reset();
+        navigate('/');
+      }
+    } catch (error) {
+      console.error("Login Error:", error);
+      setServerError(error?.message || "Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
+  };  
+
+
+  const userLoginStatus = async()=>{
+    try{
+      const session = await authService.getCurrentUser();
+      if(session){
+        navigate('/')
+      }
+    }
+    catch(error){
+      console.log("User Already Login",error);
+    }
   }
+  userLoginStatus();
 
   return (
-    <div className="w-full min-h-screen bg-[#0f0f11] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-red-500 selection:text-white">
-      <div className="absolute inset-0 bg-black/85 backdrop-blur-xs z-10" />
+    <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-neutral-900 selection:text-white">
+      <div className="absolute inset-0 bg-white/95 backdrop-blur-xs z-10" />
 
-      <div className="relative z-20 w-full max-w-md bg-neutral-950/80 p-8 rounded-2xl border border-white/5 shadow-2xl backdrop-blur-md">
-        
+      <div className="relative z-20 w-full max-w-md bg-white p-8 rounded-3xl border border-neutral-200/60 shadow-xl">
+
         <div className="text-center mb-8">
           <h2 className="text-xs tracking-[0.5em] text-red-500 font-black uppercase mb-2">Welcome Back</h2>
-          <h1 className="text-3xl font-black tracking-widest text-white uppercase">CREW SIGN IN</h1>
+          <h1 className="text-3xl font-black tracking-widest text-neutral-900 uppercase">CREW SIGN IN</h1>
         </div>
 
+        {/* Server error feedback */}
+        {serverError && (
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-[11px] font-black uppercase tracking-widest rounded-xl text-center animate-pulse">
+            {serverError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-          
+
           {/* Email Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Email Address</label>
-            <input 
-              type="text" 
-              placeholder="YOU@EXAMPLE.COM" 
-              className={`w-full bg-neutral-900/60 border ${errors.email ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-red-500'} rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-600 outline-hidden tracking-wider transition-colors font-medium`}
-              {...register("email", { 
+            <label className="text-[10px] font-black tracking-widest text-neutral-450 uppercase">Email Address</label>
+            <input
+              type="text"
+              placeholder="YOU@EXAMPLE.COM"
+              disabled={loading}
+              className={`w-full bg-[#fbfbfb] border ${errors.email ? 'border-red-500/50 focus:border-red-500' : 'border-neutral-200 focus:border-neutral-950'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
+              {...register("email", {
                 required: "Email is required",
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
@@ -56,13 +105,14 @@ function Login() {
           {/* Password Input */}
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
-              <label className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Password</label>
-              <a href="#" className="text-[10px] font-bold text-gray-500 hover:text-red-500 tracking-wider uppercase transition-colors">Forgot?</a>
+              <label className="text-[10px] font-black tracking-widest text-neutral-455 uppercase">Password</label>
+              <a href="#" className="text-[10px] font-bold text-neutral-400 hover:text-red-500 tracking-wider uppercase transition-colors">Forgot?</a>
             </div>
-            <input 
-              type="password" 
-              placeholder="••••••••••••" 
-              className={`w-full bg-neutral-900/60 border ${errors.password ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-red-500'} rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-600 outline-hidden transition-colors`}
+            <input
+              type="password"
+              placeholder="••••••••••••"
+              disabled={loading}
+              className={`w-full bg-[#fbfbfb] border ${errors.password ? 'border-red-500/50 focus:border-red-500' : 'border-neutral-200 focus:border-neutral-950'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden transition-colors disabled:opacity-50`}
               {...register("password", { required: "Password is required" })}
             />
             {errors.password && <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider">{errors.password.message}</span>}
@@ -70,24 +120,30 @@ function Login() {
 
           {/* Remember Me Checkbox */}
           <div className="flex items-center gap-3 mt-1 select-none">
-            <input 
-              type="checkbox" 
-              id="remember" 
-              className="accent-red-500 rounded border-white/10 bg-neutral-900 cursor-pointer h-4 w-4"
+            <input
+              type="checkbox"
+              id="remember"
+              disabled={loading}
+              className="accent-neutral-950 rounded border-neutral-200 bg-[#fbfbfb] cursor-pointer h-4 w-4 disabled:opacity-50"
               {...register("remember")}
             />
-            <label htmlFor="remember" className="text-[11px] text-gray-500 tracking-widest font-bold uppercase cursor-pointer">Remember Device</label>
+            <label htmlFor="remember" className="text-[11px] text-neutral-400 tracking-widest font-bold uppercase cursor-pointer">Remember Device</label>
           </div>
 
-          <button type="submit" className="w-full bg-red-500 hover:bg-red-600 active:scale-[0.98] transition-all text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-lg mt-4 cursor-pointer">
-            SIGN IN
+          {/* Submit button with dynamic loading text */}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-red-500 hover:bg-red-600 active:scale-[0.98] disabled:scale-100 disabled:bg-red-500/40 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md mt-4 cursor-pointer transition-all duration-200"
+          >
+            {loading ? 'AUTHENTICATING...' : 'SIGN IN'}
           </button>
         </form>
 
-        <div className="text-center mt-8 pt-6 border-t border-white/5">
-          <p className="text-xs text-gray-500 tracking-wider">
+        <div className="text-center mt-8 pt-6 border-t border-neutral-100">
+          <p className="text-xs text-neutral-450 tracking-wider">
             NEW TO THE CLUB?{' '}
-            <Link to="/signup" className="text-white font-black tracking-widest hover:text-red-500 transition-colors ml-1 uppercase">
+            <Link to="/signup" className="text-neutral-900 font-black tracking-widest hover:text-red-500 transition-colors ml-1 uppercase">
               REGISTER NOW &rarr;
             </Link>
           </p>

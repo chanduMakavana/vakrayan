@@ -1,67 +1,35 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-// Helper function to safely get array from localStorage
-const getLocalData = () => {
-    const data = localStorage.getItem("loginData");
-    try {
-        return data ? JSON.parse(data) : [];
-    } catch (e) {
-        return [];
-    }
+const initialState = {
+    user: null,             // Appwrite user object populated on successful authentication
+    isAuthenticated: false, // Tracking auth state for protected routes and conditional rendering
+    loading: true           // Controls loading state to prevent flash of unauthenticated UI on mount
 };
 
-const initialState = getLocalData();
-
 export const loginSlice = createSlice({
-    name: "login",
+    name: "auth",
     initialState,
     reducers: {
-        createAccount: (state, action) => {
-            const { name, email, password } = action.payload;
-
-            const newUser = { name, email, password, isLogin: false };
-
-            const emailExist = state.find(user => user.email === email);
-
-            if (emailExist) {
-                throw new Error("Email already exists");
-            } else {
-                state.push(newUser);
-                localStorage.setItem("loginData", JSON.stringify(state));
-            }
-        },
-
+        // Update auth state on successful login or session restoration
         login: (state, action) => {
-            const { email, password } = action.payload;
-            const user = state.find(u => u.email === email && u.password === password);
-
-            if (user) {
-                // Logout all other users
-                state.forEach(u => u.isLogin = false);
-                
-                // Login current user
-                user.isLogin = true;
-                
-                // Update localStorage
-                localStorage.setItem("loginData", JSON.stringify(state));
-                
-            } else {
-               throw new Error("Invalid email or password");
-            }
+            state.user = action.payload.user;
+            state.isAuthenticated = true;
+            state.loading = false;
         },
 
+        // Reset authentication and user state to default
         logout: (state) => {
-            // Set all users login status to false
-            state.forEach(user => {
-                user.isLogin = false;
-            });
+            state.user = null;
+            state.isAuthenticated = false;
+            state.loading = false;
+        },
 
-            // Update localStorage
-            localStorage.setItem("loginData", JSON.stringify(state));
-            localStorage.removeItem("isLogin");
+        // Set auth loading state
+        setLoading: (state, action) => {
+            state.loading = action.payload;
         }
     }
 });
 
-export const { createAccount, login, logout } = loginSlice.actions;
+export const { login, logout, setLoading } = loginSlice.actions;
 export default loginSlice.reducer;

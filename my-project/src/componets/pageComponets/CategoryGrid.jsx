@@ -24,13 +24,13 @@ function CategoryGrid() {
     ]
 
     return (
-        <section className="bg-[#0f0f11] py-16 px-4">
+        <section className="bg-[#fafafb] py-16 px-4 border-b border-neutral-200/50">
             {/* Styled Section Headers */}
             <div className="mb-12 text-center">
                 <h4 className="text-xs tracking-[0.4em] text-red-500 font-bold uppercase mb-2">
                     categorize
                 </h4>
-                <h1 className="text-3xl md:text-5xl font-black tracking-wider text-white uppercase [text-shadow:0_4px_12px_rgba(255,255,255,0.05)]">
+                <h1 className="text-3xl md:text-5xl font-black tracking-wider text-neutral-900 uppercase">
                     browse the drops
                 </h1>
             </div>
@@ -43,7 +43,7 @@ function CategoryGrid() {
                             <Link 
                                 to={data.link}
                                 key={data.id}
-                                className='group w-full md:w-[25vw] h-[75vw] md:h-[30vw] min-w-70 md:min-w-62.5 min-h-90 md:min-h-75 mx-auto relative cursor-pointer overflow-hidden rounded-xl bg-neutral-900 shadow-2xl block border border-white/5'
+                                className='group w-full md:w-[25vw] h-[75vw] md:h-[30vw] min-w-70 md:min-w-62.5 min-h-90 md:min-h-75 mx-auto relative cursor-pointer overflow-hidden rounded-2xl bg-white shadow-md hover:shadow-xl transition-shadow duration-300 block border border-neutral-200/60'
                             >
                                 {/* 1. Image */}
                                 <img 
@@ -54,11 +54,11 @@ function CategoryGrid() {
                                 
                                 {/* 2. Dark Overlay Div */}
                                 <div 
-                                    className='absolute inset-0 bg-linear-to-t from-black via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none z-10'
+                                    className='absolute inset-0 bg-linear-to-t from-neutral-950 via-neutral-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none z-10'
                                 ></div>
 
                                 {/* 3. Heading Text */}
-                                <h2 className='absolute bottom-0 left-0 right-0 p-6 text-center text-lg md:text-xl font-black tracking-wider text-white uppercase z-20 drop-shadow-[0_4px_6px_rgba(0,0,0,0.7)] transition-transform duration-300 group-hover:-translate-y-1'>
+                                <h2 className='absolute bottom-0 left-0 right-0 p-6 text-center text-lg md:text-xl font-black tracking-wider text-white uppercase z-20 transition-transform duration-300 group-hover:-translate-y-1'>
                                     {data.name}
                                 </h2>  
                             </Link>

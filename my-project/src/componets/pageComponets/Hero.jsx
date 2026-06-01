@@ -11,7 +11,7 @@ function Hero() {
       {/* Main Hero Container */}
       <div className='w-full h-[65vh] md:h-[90vh] relative overflow-hidden bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover flex flex-col justify-between pb-4 md:pb-0'>    
         
-        {/* 1. Gradient SVG Wave Background (z-30 taaki ye model aur text dono ke upar smoothly blend ho) */}
+        {/* Gradient SVG Wave Background to blend elements smoothly */}
         <div className='absolute bottom-0 w-full z-20 leading-0 pointer-events-none'>
           <svg
             className='w-full'
@@ -33,7 +33,7 @@ function Hero() {
           </svg>
         </div>
 
-        {/* 2. Titles & CTA Button (z-10 kiya taaki ye background me chala jaye) */}
+        {/* Title and CTA button positioned in the background layer */}
         <div className='relative z-10 text-center mt-8 px-4'>
           <h1 className='text-gray-200 text-4xl sm:text-7xl md:text-9xl tracking-wider font-extrabold [text-shadow:2px_1px_10px_#e4dddd] uppercase'>
             STREETWEAR
@@ -44,7 +44,7 @@ function Hero() {
           </h2>
 
           <div className='flex justify-center mt-4'>
-            {/* Button par z-40 lagaya hai taaki ye image ke piche na dbe aur clickable rahe */}
+            {/* High z-index ensures the button remains clickable above foreground imagery */}
             <button className='relative z-40 bg-red-500 py-2 px-5 rounded-2xl text-white font-bold capitalize shadow-lg text-sm md:text-base hover:bg-red-600 transition-colors'>
               <Link to="/shop">
                 Shop Collection
@@ -53,14 +53,14 @@ function Hero() {
           </div>
         </div>
 
-        {/* 3. Hero Main Model Image (z-20 kiya taaki ye text ke AAGE aa sake) */}
+        {/* Foreground Model Image situated in front of the text background */}
         <img 
           src={heroImage} 
           alt="Hero Model"
           className='absolute bottom-0 z-20 left-1/2 -translate-x-1/2 md:left-[10%] md:translate-x-0 w-[55vw] sm:w-[45vw] md:w-[30vw] max-w-105 pointer-events-none' 
         />
 
-        {/* 4. Bottom Grid Area (Thumbnails - z-40 taaki hamesha upar click-ready rahein) */}
+        {/* Thumbnails list positioned to remain interactive on the foreground */}
         <div className='relative z-40 w-full mt-auto md:absolute md:bottom-0 left-0 right-0 flex flex-col md:flex-row justify-end items-center gap-6 px-6 md:px-16 pb-4'>
           
           {/* Layout spacer for desktop */}

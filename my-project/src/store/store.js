@@ -5,7 +5,7 @@ import cartReducer from "../features/addToCart";
 
 export const store = configureStore({
     reducer: {
-        login: loginReducer,
+        auth: loginReducer,
         search: searchReducer,
         cart: cartReducer,
     }
