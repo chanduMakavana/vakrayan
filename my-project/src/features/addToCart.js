@@ -1,56 +1,54 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-const LS_KEY = "cartData";
-
-const getStoredCart = () => {
-    try {
-        return JSON.parse(localStorage.getItem(LS_KEY)) || [];
-    } catch {
-        return [];
-    }
-};
-
-const saveCart = (items) => {
-    localStorage.setItem(LS_KEY, JSON.stringify(items));
-};
-
-const getId = (product) => product?.id || product?._id;
+const initialState = [];
 
 export const cartSlice = createSlice({
     name: "cart",
-    initialState: getStoredCart(),
+    initialState,
     reducers: {
-        addToCart: (state, action) => {
-            const product = action.payload;
-            const existing = state.find(item => getId(item.product) === getId(product));
-            if (existing) {
-                existing.quantity += 1;
+        // Hydrate the Redux store with live items fetched from Appwrite DB
+        setCartItems: (state, action) => {
+            const rawPayload = action.payload || [];
+            return JSON.parse(JSON.stringify(rawPayload));
+        },
+        // Synchronously append or update a cart item document in store
+        addCartItemState: (state, action) => {
+            const newItem = JSON.parse(JSON.stringify(action.payload || {}));
+            const existingIndex = state.findIndex(
+                item => item.$id === newItem.$id || (item.product_id === newItem.product_id && item.size === newItem.size)
+            );
+            if (existingIndex !== -1) {
+                state[existingIndex] = { ...state[existingIndex], ...newItem };
             } else {
-                state.push({ product, quantity: 1 });
+                state.push(newItem);
             }
-            saveCart(state);
         },
-        removeFromCart: (state, action) => {
-            const filtered = state.filter(item => getId(item.product) !== action.payload);
-            saveCart(filtered);
-            return filtered;
+        // Remove an item document by its Appwrite ID
+        removeCartItemState: (state, action) => {
+            return state.filter(item => item.$id !== action.payload);
         },
-        increaseQuantity: (state, action) => {
-            const item = state.find(i => getId(i.product) === action.payload);
-            if (item) item.quantity += 1;
-            saveCart(state);
+        // Safely update specific properties like quantity or subtotal
+        updateCartItemState: (state, action) => {
+            const { $id, quantity, subtotal } = action.payload;
+            const item = state.find(i => i.$id === $id);
+            if (item) {
+                item.quantity = quantity;
+                item.subtotal = subtotal;
+            }
         },
-        decreaseQuantity: (state, action) => {
-            const item = state.find(i => getId(i.product) === action.payload);
-            if (item) item.quantity = Math.max(1, item.quantity - 1);
-            saveCart(state);
-        },
-        clearCart: (state) => {
-            localStorage.removeItem(LS_KEY);
+        // Clear all cart items inside Redux
+        clearCartState: () => {
             return [];
-        },
-    },
+        }
+    }
 });
 
-export const { addToCart, removeFromCart, increaseQuantity, decreaseQuantity, clearCart } = cartSlice.actions;
+export const { 
+    setCartItems, 
+    addCartItemState, 
+    removeCartItemState, 
+    updateCartItemState, 
+    clearCartState 
+} = cartSlice.actions;
+
 export default cartSlice.reducer;

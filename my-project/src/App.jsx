@@ -4,6 +4,10 @@ import { Route, Routes } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { login as loginAction, logout as logoutAction, setLoading } from './features/login'
 import authService from './appwrite/auth'
+import cartService from './appwrite/cart'
+import { setCartItems } from './features/addToCart'
+import productsService from './appwrite/products'
+import { setProducts } from './features/productsSlice'
 
 import Home from './componets/page/Home'
 import SignUp from './componets/page/SignUp'
@@ -12,6 +16,10 @@ import AdminPanel from './componets/page/AddminPanel'
 import ProductDetail from './componets/page/ProductDetail'
 import NotFound from './componets/page/NotFound'
 import AddToCartPage from './componets/pageComponets/AddToCartPage'
+import Shop from './componets/page/Shop'
+import Checkout from './componets/page/Checkout'
+import UserProfile from './componets/page/UserProfile'
+import OrderDetail from './componets/page/OrderDetail'
 
 function App() {
   const dispatch = useDispatch()
@@ -20,9 +28,15 @@ function App() {
   useEffect(() => {
     // Attempt session recovery on application startup
     authService.getCurrentUser()
-      .then((userData) => {
+      .then(async (userData) => {
         if (userData) {
           dispatch(loginAction({ user: userData }))
+          try {
+            const cartItems = await cartService.getCartItems(userData.$id)
+            dispatch(setCartItems(cartItems))
+          } catch (cartErr) {
+            console.error("Cart retrieval on session recovery failed:", cartErr)
+          }
         } else {
           dispatch(logoutAction())
         }
@@ -34,6 +48,16 @@ function App() {
       .finally(() => {
         dispatch(setLoading(false))
       })
+
+    // Preload products catalog into Redux store
+    productsService.getProducts()
+      .then((loadedProducts) => {
+        const normalized = loadedProducts?.documents || loadedProducts || []
+        dispatch(setProducts(normalized))
+      })
+      .catch((prodError) => {
+        console.error("Failed to preload products in store:", prodError)
+      })
   }, [dispatch])
 
   // High-End Streetwear Styled Loading Page (Premium Light Theme)
@@ -43,13 +67,13 @@ function App() {
         <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
         <div className="relative z-20 flex flex-col items-center">
           <h1 className="text-2xl md:text-3xl font-black tracking-[0.4em] text-neutral-900 uppercase mb-4 animate-pulse">
-            STREET<span className="text-red-500">-</span>WEAR
+            STREET<span className="text-[var(--theme-primary)]">-</span>WEAR
           </h1>
-          <p className="text-[10px] md:text-xs font-black tracking-[0.2em] text-red-500 uppercase">
+          <p className="text-[10px] md:text-xs font-black tracking-[0.2em] text-[var(--theme-primary)] uppercase">
             RESTORING SESSION...
           </p>
-          <div className="w-24 h-[1.5px] bg-red-500/20 mt-6 overflow-hidden relative rounded-full">
-            <div className="absolute inset-0 bg-red-500 w-1/2 rounded-full animate-[loading_1s_infinite_linear]" />
+          <div className="w-24 h-[1.5px] bg-[var(--theme-primary)]/20 mt-6 overflow-hidden relative rounded-full">
+            <div className="absolute inset-0 bg-[var(--theme-primary)] w-1/2 rounded-full animate-[loading_1s_infinite_linear]" />
           </div>
         </div>
         <style>{`
@@ -69,8 +93,13 @@ function App() {
         <Route path='/login' element={<Login />} />
         <Route path='/' element={<Home />} />
         <Route path='/admin' element={<AdminPanel />} />
-         <Route path='/cart' element={<AddToCartPage />} />
-         <Route path='/product/:id' element={<ProductDetail />} />
+        <Route path='/cart' element={<AddToCartPage />} />
+        <Route path='/product/:id' element={<ProductDetail />} />
+        <Route path='/shop' element={<Shop />} />
+        <Route path='/category/:category' element={<Shop />} />
+        <Route path='/checkout' element={<Checkout />} />
+        <Route path='/profile' element={<UserProfile />} />
+        <Route path='/order/:id' element={<OrderDetail />} />
         <Route path='/*' element={<NotFound />} />
       </Routes>
     </>

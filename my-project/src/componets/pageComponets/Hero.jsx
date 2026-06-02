@@ -1,8 +1,4 @@
-import React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { Link, useNavigate } from 'react-router-dom'
-import { logout } from '../../features/login'
-import { updateQuery } from '../../features/search'
+import { Link } from 'react-router-dom'
 import heroImage from '../../assets/hero-model.png'
 
 function Hero() {
@@ -45,7 +41,7 @@ function Hero() {
 
           <div className='flex justify-center mt-4'>
             {/* High z-index ensures the button remains clickable above foreground imagery */}
-            <button className='relative z-40 bg-red-500 py-2 px-5 rounded-2xl text-white font-bold capitalize shadow-lg text-sm md:text-base hover:bg-red-600 transition-colors'>
+            <button className='relative z-40 bg-indigo-600 py-2 px-5 rounded-2xl text-white font-bold capitalize shadow-lg text-sm md:text-base hover:bg-indigo-700 transition-colors'>
               <Link to="/shop">
                 Shop Collection
               </Link>

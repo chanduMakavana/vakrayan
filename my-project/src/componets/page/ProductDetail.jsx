@@ -1,18 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FiChevronDown, FiChevronUp, FiShield, FiTruck, FiScissors, FiArrowLeft } from 'react-icons/fi';
+import { useSelector } from 'react-redux';
 import productsService from '../../appwrite/products';
+import reviewsService from '../../appwrite/reviews';
+import ordersService from '../../appwrite/orders';
 import AddToCartButton from '../pageComponets/AddToCartButton';
-import { IoAlertCircleOutline } from "react-icons/io5";
+import Navbar from '../pageComponets/Navbar';
+import Footer from '../pageComponets/Footer';
+import { FaStar } from 'react-icons/fa';
 
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const products = useSelector(state => state.products.items || []);
+  const { user, isAuthenticated } = useSelector(state => state.auth);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+
+  // Product Reviews State
+  const [reviews, setReviews] = useState([]);
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [hasDeliveredOrder, setHasDeliveredOrder] = useState(false);
+  const [checkingOrder, setCheckingOrder] = useState(true);
   
 
   // Interactive detail accordions
@@ -46,11 +61,30 @@ function ProductDetail() {
     try {
       setLoading(true);
       
-      // ➡️ STEP 1: Main Single Product Data Fetch Karo
+      // Attempt Redux Cache pre-matching first
+      const cachedProduct = products.find(p => p.$id === id || p.id === id);
+      if (cachedProduct) {
+        setProduct(cachedProduct);
+        setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
+        
+        if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
+          setSelectedSize(cachedProduct.sizes[0]);
+        }
+
+        if (cachedProduct.category) {
+          const filteredSuggestions = products.filter(
+            item => item.category === cachedProduct.category && item.$id !== cachedProduct.$id && item.id !== cachedProduct.id
+          );
+          setSuggestProduct(filteredSuggestions);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Database fallback queries
       const mainProductData = await productsService.getProductById(id);
 
       if (mainProductData) {
-        // State updates triggers
         setProduct(mainProductData);
         setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
         
@@ -58,13 +92,10 @@ function ProductDetail() {
           setSelectedSize(mainProductData.sizes[0]);
         }
 
-        // ➡️ STEP 2: Main data aate hi, bina ruke catalog fetch trigger karo
-        // ✅ TRICK: Hum state wale 'product' ke bajaye direct 'mainProductData' use karenge!
         if (mainProductData.category) {
           const response = await productsService.getProducts();
           const structuredData = response?.documents || response || [];
           
-          // Current product ko recommendation pool se filter out kar do
           const filteredSuggestions = structuredData.filter(
             item => item.category === mainProductData.category && item.$id !== mainProductData.$id
           );
@@ -84,55 +115,141 @@ function ProductDetail() {
   if (id) {
     loadCompleteProductStage();
   }
-}, [id, navigate]);
+ }, [id, navigate, products]);
+
+  // Load reviews on mount
+  useEffect(() => {
+    async function loadReviews() {
+      try {
+        const productReviews = await reviewsService.getReviewsByProductId(id);
+        setReviews(productReviews || []);
+      } catch (err) {
+        console.error("Failed to load reviews:", err);
+      }
+    }
+    if (id) {
+      loadReviews();
+    }
+  }, [id]);
+
+  // Check if user has a delivered order for this product
+  useEffect(() => {
+    async function checkPurchased() {
+      if (!isAuthenticated || !user || !id || !product) {
+        setHasDeliveredOrder(false);
+        setCheckingOrder(false);
+        return;
+      }
+      try {
+        setCheckingOrder(true);
+        const userOrders = await ordersService.getUserOrders(user.$id);
+        const matched = userOrders.some(order => {
+          if (order.status !== 'DELIVERED') return false;
+          let itemsList = [];
+          try {
+            itemsList = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
+          } catch (err) {
+            console.error("Failed to parse items for order:", order.$id || order.id, err.message);
+          }
+          return itemsList.some(item => {
+            const targetProductId = product.$id || product.id || id;
+            if (item.product_id && targetProductId) {
+              return item.product_id === targetProductId;
+            }
+            return String(item.name).trim().toUpperCase() === String(product.name).trim().toUpperCase();
+          });
+        });
+        setHasDeliveredOrder(matched);
+      } catch (err) {
+        console.error("Error checking order purchase history:", err);
+        setHasDeliveredOrder(false);
+      } finally {
+        setCheckingOrder(false);
+      }
+    }
+    checkPurchased();
+  }, [user, isAuthenticated, id, product]);
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAuthenticated || !user) {
+      alert("Please login to secure a review placement.");
+      return;
+    }
+    if (!newComment.trim()) {
+      alert("Please enter a valid review comment specification.");
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      const newDoc = await reviewsService.createReview({
+        productId: id,
+        userId: user.$id,
+        userName: user.name || 'Anonymous',
+        rating: String(newRating),
+        comment: newComment
+      });
+
+      if (newDoc) {
+        setReviews(prev => [newDoc, ...prev]);
+        setNewComment('');
+        setNewRating(5);
+        alert("Review submitted successfully.");
+      }
+    } catch (err) {
+      console.error("Failed to submit review:", err);
+      alert("Failed to submit review. Connection timed out.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
         <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
         <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
-          FETCHING DROP ARCHIVE // HQ
+          Loading product details...
         </div>
       </div>
     );
   }
 
   if (!product) return null;
-
   const galleryImages = [
     product.front_image_link || product.image_url || product.image,
     ...(Array.isArray(product.back_image_links) ? product.back_image_links : [product.back_image_link])
   ].filter(Boolean);
 
   return (
-    <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans relative selection:bg-neutral-900 selection:text-white">
-      {/* Structural layout grid lines */}
-      <div className="absolute top-0 bottom-0 left-6 md:left-12 border-l border-neutral-200/30 pointer-events-none" />
-      <div className="absolute top-0 bottom-0 right-6 md:right-12 border-r border-neutral-200/30 pointer-events-none" />
+    <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans pb-20">
+      <Navbar />
 
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 space-y-8">
 
-        {/* Navigation & Back Action */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200/40">
-          <Link to="/" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-neutral-400 hover:text-neutral-950 transition-colors uppercase group">
+        {/* Breadcrumbs Navigation */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200/60">
+          <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-neutral-500 hover:text-neutral-900 transition-colors uppercase group">
             <FiArrowLeft className="text-sm group-hover:-translate-x-1 transition-transform" />
-            Back to catalogue
+            Back to Shop
           </Link>
-          <div className="text-[9px] tracking-[0.3em] font-mono text-neutral-400 uppercase flex items-center gap-2">
-            <span>INDEX</span>
+          <div className="text-[11px] text-neutral-500 flex items-center gap-2 uppercase tracking-wide">
+            <span>Shop</span>
             <span>/</span>
             <span>{product.category?.replace('-', ' ')}</span>
             <span>/</span>
-            <span className="text-neutral-950 font-bold">{product.name?.substring(0, 15)}...</span>
+            <span className="text-neutral-800 font-semibold">{product.name}</span>
           </div>
         </div>
 
-        {/* Core Product Presenter Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-16 items-start">
+        {/* Core Product Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* STAGE COLUMN 1: IMAGE AND GALLERY VIEWPORT (7 Columns) */}
+          {/* COLUMN 1: Image Gallery */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:col-span-7">
 
-            {/* Gallery Thumbnails List */}
+            {/* Thumbnails */}
             {galleryImages.length > 1 && (
               <div className="md:col-span-2 order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
                 {galleryImages.map((imgUrl, idx) => (
@@ -140,22 +257,22 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => setActiveImage(imgUrl)}
-                    className={`w-16 h-20 md:w-full md:aspect-3/4 rounded-xl overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImage === imgUrl ? 'border-neutral-955 scale-95 shadow-sm' : 'border-neutral-200 hover:border-neutral-400'}`}
+                    className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-lg overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImage === imgUrl ? 'border-neutral-900 scale-95 shadow-sm' : 'border-neutral-200 hover:border-neutral-400'}`}
                   >
-                    <img src={imgUrl} alt="Garment perspective" className="w-full h-full object-cover" />
+                    <img src={imgUrl} alt="Garment view" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
             )}
 
-            {/* Heavyweight Viewport Image with Loupe Zoom */}
+            {/* Main Viewport */}
             <div
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
-              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-2xl overflow-hidden bg-white border border-neutral-200/50 shadow-xs relative group cursor-zoom-in`}
+              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-xl overflow-hidden bg-white border border-neutral-200/50 shadow-xs relative group cursor-zoom-in`}
             >
-              <div className="absolute top-4 right-4 bg-neutral-955 text-white font-mono text-[8px] tracking-[0.2em] px-2.5 py-1 rounded-sm uppercase z-10 pointer-events-none">
-                SPEC VOL. I // ZOOM LENS
+              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-xs border border-neutral-200 text-neutral-800 font-semibold text-[9px] tracking-wider px-2 py-1 rounded-md z-10 pointer-events-none uppercase">
+                Hover to Zoom
               </div>
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
@@ -171,169 +288,171 @@ function ProductDetail() {
             </div>
           </div>
 
-          {/* STAGE COLUMN 2: SPECS AND CONTROLLER DOCK (5 Columns) */}
-          <div className="lg:col-span-5 space-y-8 lg:sticky lg:top-24">
+          {/* COLUMN 2: Details & Purchasing */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
 
             {/* Header info */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <span className="text-[9px] bg-neutral-900 text-white font-black tracking-widest uppercase px-2.5 py-1 rounded-sm">
+                <span className="text-[10px] bg-neutral-900 text-white font-bold tracking-wider uppercase px-2.5 py-0.5 rounded">
                   {product.category?.replace('-', ' ')}
                 </span>
-                <span className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded">
+                <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-semibold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  READY TO SHIP
+                  In Stock
                 </span>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-[9px] font-mono tracking-widest text-neutral-400 uppercase">
-                  DROP ID: {product.$id?.substring(0, 10).toUpperCase() || 'N/A'}
-                </p>
-                <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight uppercase text-neutral-955 leading-none">
+              <div className="space-y-1">
+                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-neutral-900">
                   {product.name}
                 </h1>
               </div>
 
-              <div className="flex items-baseline gap-3 pt-2">
-                <span className="text-3xl font-black text-neutral-955 tracking-tight">
+              <div className="flex items-baseline gap-3 pt-1">
+                <span className="text-2xl font-bold text-neutral-900">
                   ₹{Number(product.price).toLocaleString('en-IN')}
                 </span>
-                <span className="text-sm text-neutral-400 line-through font-bold">
+                <span className="text-sm text-neutral-400 line-through font-medium">
                   ₹2,999
                 </span>
-                <span className="text-xs text-red-500 font-bold tracking-wider bg-red-50 px-2 py-0.5 rounded">
+                <span className="text-[10px] text-indigo-600 font-bold tracking-wider bg-indigo-50 px-2 py-0.5 rounded">
                   50% OFF
                 </span>
               </div>
             </div>
 
-            <div className="border-t border-neutral-200/60" />
+            <div className="border-t border-neutral-200/50" />
 
             {/* Sizing selection */}
-            {product.sizes && product.sizes.length > 0 && (
-              <div className="space-y-3.5">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black tracking-[0.2em] text-neutral-400 uppercase">SELECT SPEC SIZE</h4>
-                  <span className="text-[10px] text-neutral-500 font-bold border-b border-neutral-300 cursor-pointer pb-0.5 hover:text-neutral-950 transition-colors uppercase tracking-wider">SIZE GUIDE</span>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {product.sizes.map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setSelectedSize(size)}
-                      className={`py-3.5 rounded-xl font-bold font-mono text-xs tracking-wider transition-all duration-200 cursor-pointer border ${selectedSize === size ? 'bg-neutral-950 text-white border-neutral-955 shadow-md' : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-neutral-950'}`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {product.sizes && product.sizes.length > 0 && (() => {
+              let stockMap = {};
+              try {
+                stockMap = JSON.parse(product.sizes_stock || '{}');
+              } catch {
+                stockMap = {};
+              }
 
-            {/* Cart Dock */}
-            {/* Operations Actions & Dispatch Docking Unit (Fully Mobile Responsive Colors Fixed) */}
-            <div className="space-y-4 pt-4 border-t border-neutral-900/5">
+              return (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold text-neutral-700">Select Size</h4>
+                    <span className="text-xs text-neutral-500 font-semibold border-b border-neutral-300 cursor-pointer pb-0.5 hover:text-neutral-950 transition-colors uppercase tracking-wider">Size Guide</span>
+                  </div>
+                  <div className="grid grid-cols-6 gap-2">
+                    {product.sizes.map((size) => {
+                      const isSoldOut = stockMap[size] === 0;
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          disabled={isSoldOut}
+                          onClick={() => setSelectedSize(size)}
+                          className={`py-2.5 rounded-lg font-bold text-xs tracking-wider transition-all duration-200 cursor-pointer border ${
+                            isSoldOut 
+                            ? 'bg-neutral-100 text-neutral-300 border-neutral-200 line-through opacity-40 cursor-not-allowed' 
+                            : selectedSize === size 
+                            ? 'bg-neutral-950 text-white border-neutral-950 shadow-md' 
+                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-neutral-950'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {selectedSize && stockMap[selectedSize] > 0 && stockMap[selectedSize] < 5 && (
+                    <p className="text-[10px] text-indigo-600 font-bold uppercase animate-pulse mt-1">
+                      Few items left in stock!
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
-              {/* Add to cart component wrapper box */}
+            {/* Cart Operations */}
+            <div className="space-y-4 pt-2 border-t border-neutral-100">
               <div className="w-full transform active:scale-[0.99] transition-transform duration-150">
                 <AddToCartButton
                   product={product}
-    selectedSize={selectedSize}
+                  selectedSize={selectedSize}
                 />
               </div>
 
-
-              <div className="flex items-center gap-2 text-neutral-500 font-mono text-[9px] sm:text-xs tracking-widest uppercase bg-neutral-100 p-3 rounded-lg border border-neutral-900/3">
+              <div className="flex items-center gap-2 text-neutral-500 text-xs bg-neutral-50 border border-neutral-100 p-3 rounded-lg">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-
-                <p className="font-black flex items-center gap-1.5">
-                  <span>7 Days easy exchange & return policy active</span>
-
-                  {/* 🚨 FIXED: Wrapper ko relative aur group banaya taaki tooltip accurate iske upar align ho */}
-                  <span className="group relative inline-block cursor-pointer  p-0.5">
-
-                    {/* 🔮 FULLY OPTIMIZED CSS TOOLTIP BOX */}
-                    <span className="absolute bottom-full left-1/10 -translate-x-1/2 mb-2 w-56 sm:w-64 p-3 bg-white text-neutral-600 border border-neutral-900/10 shadow-xl rounded-xl normal-case text-[10px] font-medium leading-relaxed tracking-wide opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-300 ease-out z-50">
-                      {/* Chota sa dynamic downward triangle indicator arrow */}
-                      <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white" />
-
-                      Return or exchange within 7 days of delivery. Product must be unused with original packaging intact.
-                    </span>
-
-                    {/* Icon Frame */}
-                    <IoAlertCircleOutline className="text-sm sm:text-base text-neutral-400 group-hover:text-neutral-900 transition-colors" />
-                  </span>
+                <p className="font-medium">
+                  7-Day exchange and return policy active.
                 </p>
               </div>
             </div>
 
-            {/* Collapsible Accordion Block */}
+            {/* Collapsible Accordions */}
             <div className="border-t border-b border-neutral-200/60 divide-y divide-neutral-200/40">
 
-              {/* DESCRIPTION ACCORDION */}
+              {/* DESCRIPTION */}
               {product.description && (
-                <div className="py-4">
+                <div className="py-3.5">
                   <button
                     onClick={() => setDescExpanded(!descExpanded)}
-                    className="w-full flex items-center justify-between text-left text-xs font-black tracking-widest text-neutral-800 uppercase focus:outline-hidden"
+                    className="w-full flex items-center justify-between text-left text-xs font-bold tracking-wider text-neutral-800 uppercase focus:outline-hidden"
                   >
-                    <span>GARMENT SPECIFICATION</span>
+                    <span>Description</span>
                     {descExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                   </button>
-                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-40 mt-3 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <p className="text-xs text-neutral-500 leading-relaxed font-medium uppercase tracking-wide bg-neutral-100/50 p-4 rounded-xl border border-neutral-200/30">
+                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-xl border border-neutral-200/40">
                       {product.description}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* SIZING ACCORDION */}
-              <div className="py-4">
+              {/* SIZING */}
+              <div className="py-3.5">
                 <button
                   onClick={() => setSizingExpanded(!sizingExpanded)}
-                  className="w-full flex items-center justify-between text-left text-xs font-black tracking-widest text-neutral-800 uppercase focus:outline-hidden"
+                  className="w-full flex items-center justify-between text-left text-xs font-bold tracking-wider text-neutral-800 uppercase focus:outline-hidden"
                 >
-                  <span><FiScissors className="inline mr-2 text-sm" /> FIT & MEASUREMENTS</span>
+                  <span><FiScissors className="inline mr-2 text-sm" /> Size & Fit</span>
                   {sizingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                 </button>
-                <div className={`transition-all duration-300 overflow-hidden ${sizingExpanded ? 'max-h-40 mt-3 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-neutral-500 leading-relaxed font-medium bg-neutral-100/50 p-4 rounded-xl border border-neutral-200/30 space-y-2 uppercase tracking-wide">
-                    <p>• Premium oversized signature aesthetic drop shoulders.</p>
-                    <p>• Heavyweight combed knit structure tailored for comfort.</p>
-                    <p>• Pre-shrunk industrial washed fabrics.</p>
+                <div className={`transition-all duration-300 overflow-hidden ${sizingExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-xl border border-neutral-200/40 space-y-2">
+                    <p>&bull; Premium relaxed signature styling with dropped shoulders.</p>
+                    <p>&bull; Heavyweight combed knit weave tailored for comfort.</p>
+                    <p>&bull; Pre-shrunk industrial washed fabrics.</p>
                   </div>
                 </div>
               </div>
 
-              {/* SHIPPING ACCORDION */}
-              <div className="py-4">
+              {/* SHIPPING */}
+              <div className="py-3.5">
                 <button
                   onClick={() => setShippingExpanded(!shippingExpanded)}
-                  className="w-full flex items-center justify-between text-left text-xs font-black tracking-widest text-neutral-800 uppercase focus:outline-hidden"
+                  className="w-full flex items-center justify-between text-left text-xs font-bold tracking-wider text-neutral-800 uppercase focus:outline-hidden"
                 >
-                  <span><FiTruck className="inline mr-2 text-sm" /> DISPATCH & LOGISTICS</span>
+                  <span><FiTruck className="inline mr-2 text-sm" /> Shipping & Returns</span>
                   {shippingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                 </button>
-                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-40 mt-3 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-neutral-500 leading-relaxed font-medium bg-neutral-100/50 p-4 rounded-xl border border-neutral-200/30 space-y-2 uppercase tracking-wide">
-                    <p>• Free express domestic dispatch on all active drop catalogs.</p>
-                    <p>• Delivered in custom eco-friendly heavyweight streetwear vacuum pouches.</p>
-                    <p>• 7-day hassle-free drop size swap guarantee.</p>
+                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-xl border border-neutral-200/40 space-y-2">
+                    <p>&bull; Free express shipping on all orders nationwide.</p>
+                    <p>&bull; Dispatched in custom eco-friendly protective packaging.</p>
+                    <p>&bull; Easy 7-day swap guarantee for perfect size matches.</p>
                   </div>
                 </div>
               </div>
 
             </div>
 
-            {/* Verified Footnote Badge */}
-            <div className="flex items-center gap-3 text-[9px] font-mono text-neutral-400 border border-neutral-200 bg-white p-4 rounded-xl shadow-xs">
-              <FiShield className="text-base text-neutral-700 shrink-0 animate-pulse" />
-              <div className="leading-tight uppercase">
-                <span className="font-bold text-neutral-800 block">AUTHENTIC STREETWEAR BRANDING</span>
-                100% verified drops engineered with heavy fabric architecture.
+            {/* Trust Footer */}
+            <div className="flex items-center gap-3 text-xs text-neutral-500 border border-neutral-200 bg-white p-4 rounded-xl shadow-xs">
+              <FiShield className="text-lg text-neutral-700 shrink-0" />
+              <div className="leading-tight">
+                <span className="font-semibold text-neutral-800 block mb-0.5">Authentic Quality Guaranteed</span>
+                All products are certified authentic and engineered with high-grade materials.
               </div>
             </div>
 
@@ -341,115 +460,262 @@ function ProductDetail() {
 
         </div>
 
-   {/* 🚨 REFACTORED: Related Products Section Wrapper with Responsive Grid Matrix */}
-{suggestProduct && suggestProduct.length > 0 && (
-  <div className="pt-12 border-t border-neutral-200/60 space-y-8">
-    
-    {/* Section Typography Header */}
-    <div>
-      <h4 className="text-[10px] tracking-[0.4em] text-red-500 font-black uppercase mb-1.5">
-        COMPLETE THE CREW LOOK
-      </h4>
-      <h2 className="text-2xl md:text-3xl font-black tracking-wider text-neutral-950 uppercase">
-        Related Drop Bundles
-      </h2>
-    </div>
-
-    {/* ⚡ THE MATRIX GRID: This fixes the multi-column alignment layout */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-      {suggestProduct.map((item) => {
-        const uniqueId = item.$id || item.id;
-        
-        const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Front+View';
-        const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
-
-        const activeTag = Array.isArray(item.tags) ? item.tags[0] : Array.isArray(item.tag) ? item.tag[0] : item.tag || "FRESH DROP";
-
-        return (
-          <div 
-            key={uniqueId} 
-            onClick={() => {
-              navigate(`/product/${uniqueId}`);
-              window.scrollTo({ top: 0, behavior: 'smooth' }); // Smooth scroll back to top on look shift
-            }} 
-            className="group relative flex flex-col bg-white rounded-3xl p-2 border border-neutral-200/60 hover:border-neutral-900/20 hover:shadow-xl transition-all duration-500 cursor-pointer overflow-hidden"
-          >
-            
-            {/* Hover Radial Glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-red-500/2 rounded-full blur-[80px] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-
-            {/* Product Viewport Canvas */}
-            <div className="w-full aspect-3/4 rounded-2xl overflow-hidden bg-neutral-100 relative border border-neutral-200/50">
-              
-              {/* Drop Tag Badge */}
-              <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white/90 backdrop-blur-xs border border-neutral-200/80 px-2.5 py-1 rounded-md shadow-xs group-hover:border-red-500/20 transition-colors duration-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-neutral-800 font-black text-[9px] tracking-[0.15em] uppercase">
-                  {activeTag}
-                </span>
-              </div>
-
-              {/* Seamless Hover Dual Image Flip */}
-              <div className="w-full h-full relative overflow-hidden">
-                <img
-                  src={frontView}
-                  alt={item.name}
-                  loading="lazy"
-                  className="w-full h-full object-cover object-center absolute inset-0 transition-all cubic-bezier(0.4, 0, 0.2, 1) duration-700 group-hover:opacity-0 group-hover:scale-[1.04]"
-                />
-                <img  
-                  src={backView}
-                  alt={`${item.name} alternate viewframe`}
-                  loading="lazy"
-                  className="w-full h-full object-cover object-center absolute inset-0 transition-all cubic-bezier(0.4, 0, 0.2, 1) duration-700 opacity-0 group-hover:opacity-100 group-hover:scale-[1.04]"
-                />
-              </div>
+        {/* You May Also Like Section */}
+        {suggestProduct && suggestProduct.length > 0 && (
+          <div className="pt-12 border-t border-neutral-200/60 space-y-6">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900">
+                You May Also Like
+              </h2>
             </div>
 
-            {/* Content Specifications metadata layer */}
-            <div className="mt-4 px-2 pb-2 flex flex-col justify-between grow relative z-20">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-[9px] text-red-500 font-black tracking-[0.25em] uppercase">
-                    {item.category?.replace('-', ' ') || "HQ MERCH"}
-                  </span>
-                  <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider group-hover:text-neutral-600 transition-colors duration-300">
-                    DROP VOL. I
-                  </span>
-                </div>
-                
-                <h3 className="text-sm font-black tracking-wide text-neutral-800 uppercase group-hover:text-neutral-950 transition-colors truncate duration-300">
-                  {item.name}
-                </h3>
-              </div>
-              
-              {/* Pricing Dock Unit Footer */}
-              <div className="mt-4 pt-3 border-t border-neutral-200/60 flex items-center justify-between gap-4">
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">PRICE</span>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-base font-black text-neutral-950 tracking-wider">
-                      ₹{Number(item.price).toLocaleString('en-IN')}
-                    </span>
-                    <span className="text-xs text-neutral-400 line-through font-bold">
-                      ₹2,999
-                    </span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {suggestProduct.map((item) => {
+                const uniqueId = item.$id || item.id;
+                const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';
+                const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
+                const activeTag = Array.isArray(item.tags) ? item.tags[0] : Array.isArray(item.tag) ? item.tag[0] : item.tag || "Fresh Drop";
+
+                return (
+                  <div 
+                    key={uniqueId} 
+                    onClick={() => {
+                      navigate(`/product/${uniqueId}`);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }} 
+                    className="group relative flex flex-col bg-white rounded-xl p-2 border border-neutral-200/60 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden"
+                  >
+                    {/* Viewport Image */}
+                    <div className="w-full aspect-3/4 rounded-lg overflow-hidden bg-neutral-100 relative border border-neutral-200/50">
+                      
+                      {/* Tag Badge */}
+                      <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 bg-white/90 backdrop-blur-xs border border-neutral-200 px-2 py-0.5 rounded-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                        <span className="text-neutral-800 font-bold text-[9px] uppercase tracking-wider">
+                          {activeTag}
+                        </span>
+                      </div>
+
+                      {/* Image Flip */}
+                      <div className="w-full h-full relative overflow-hidden">
+                        <img
+                          src={frontView}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
+                        />
+                        <img  
+                          src={backView}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Meta */}
+                    <div className="mt-3 px-1 pb-1 flex flex-col justify-between grow">
+                      <div>
+                        <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block mb-0.5">
+                          {item.category?.replace('-', ' ') || "Collection"}
+                        </span>
+                        <h3 className="text-xs font-bold text-neutral-800 uppercase group-hover:text-indigo-600 transition-colors truncate">
+                          {item.name}
+                        </h3>
+                      </div>
+                      
+                      <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between gap-4">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-sm font-bold text-neutral-950">
+                            ₹{Number(item.price).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-bold text-neutral-400 group-hover:text-indigo-600 transition-colors">
+                          View details &rarr;
+                        </span>
+                      </div>
+                    </div>
+
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
+            PRODUCT REVIEWS & RATINGS SECTION
+            ========================================== */}
+        <div className="pt-16 border-t border-neutral-200/60 space-y-8">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900">
+              Customer Reviews ({reviews.length})
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* COLUMN 1: RATINGS SCORECARD & WRITE REVIEW (5 Columns) */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Ratings Summary Card */}
+              <div className="bg-white p-6 rounded-xl border border-neutral-200/60 shadow-xs flex items-center gap-6">
+                <div className="text-center">
+                  <div className="text-4xl font-extrabold tracking-tight text-neutral-950">
+                    {reviews.length > 0 
+                      ? (reviews.reduce((acc, r) => acc + Number(r.rating || 5), 0) / reviews.length).toFixed(1)
+                      : '5.0'}
+                  </div>
+                  <div className="flex gap-0.5 justify-center mt-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <FaStar key={star} className="text-amber-400 text-xs" />
+                    ))}
+                  </div>
+                  <span className="text-[9px] font-bold text-neutral-500 uppercase mt-2 block">
+                    Average Rating
+                  </span>
                 </div>
-                
-                <span className="text-[9px] font-black tracking-wider text-neutral-500 group-hover:text-red-500 transition-colors duration-200 uppercase">
-                  View Drop &rarr;
-                </span>
+                <div className="flex-1 w-px bg-neutral-100 self-stretch" />
+                <div className="flex-1 space-y-1.5">
+                  {[5, 4, 3, 2, 1].map((stars) => {
+                    const count = reviews.filter(r => Number(r.rating) === stars).length;
+                    const percent = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                    return (
+                      <div key={stars} className="flex items-center gap-2 text-[10px] text-neutral-500 font-semibold">
+                        <span className="w-3 text-right">{stars}★</span>
+                        <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-neutral-950 rounded-full" style={{ width: `${percent}%` }} />
+                        </div>
+                        <span className="w-4 text-right">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Write Review Panel */}
+              <div className="bg-white p-6 rounded-xl border border-neutral-200/60 shadow-xs space-y-4">
+                <h3 className="text-xs font-bold tracking-wider uppercase text-neutral-800">
+                  Write a Review
+                </h3>
+                {!isAuthenticated ? (
+                  <div className="text-center py-6 border border-dashed border-neutral-200 bg-neutral-50/50 rounded-xl">
+                    <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-3">
+                      Log in to leave a review
+                    </p>
+                    <Link
+                      to="/login"
+                      className="inline-block bg-neutral-950 text-white font-bold text-[10px] tracking-wider uppercase px-5 py-2.5 rounded-lg shadow-sm hover:bg-neutral-800"
+                    >
+                      Sign In
+                    </Link>
+                  </div>
+                ) : checkingOrder ? (
+                  <div className="flex flex-col items-center justify-center py-6 gap-2">
+                    <div className="w-4 h-4 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[10px] tracking-widest text-neutral-400 uppercase">Verifying purchase history...</span>
+                  </div>
+                ) : hasDeliveredOrder ? (
+                  <form onSubmit={handleReviewSubmit} className="space-y-4">
+                    {/* Star Rating Select */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-neutral-500 uppercase">Your Rating</span>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setNewRating(star)}
+                            className="text-2xl cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                          >
+                            <FaStar className={star <= newRating ? 'text-amber-400' : 'text-neutral-200'} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Review Comment Textarea */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-semibold text-neutral-500 uppercase">Your Review</span>
+                      <textarea
+                        rows="3"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Write your product experience here..."
+                        className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-900 rounded-lg px-3 py-2.5 text-xs text-neutral-800 outline-hidden resize-none transition-colors"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="w-full bg-neutral-950 hover:bg-neutral-800 active:scale-95 text-white font-bold text-[10px] tracking-widest uppercase py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
+                    >
+                      {submittingReview ? 'Submitting...' : 'Submit Review'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="text-center py-6 px-4 border border-dashed border-neutral-200 bg-neutral-50/50 rounded-xl space-y-3">
+                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider leading-relaxed">
+                      Review Lock Active
+                    </p>
+                    <p className="text-xs text-neutral-500 leading-relaxed">
+                      Reviews are restricted to verified purchasers of this item. To submit a review, you must have an order for this product marked as <strong className="text-neutral-800 font-semibold">Delivered</strong> in your profile history.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* COLUMN 2: REVIEWS FEED LIST (7 Columns) */}
+            <div className="lg:col-span-7 space-y-4">
+              {reviews.length === 0 ? (
+                <div className="py-16 text-center border border-dashed border-neutral-200 rounded-xl bg-neutral-50/50">
+                  <p className="text-xs text-neutral-500">
+                    No reviews have been written for this product yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-none">
+                  {reviews.map((rev) => {
+                    const uniqueId = rev.$id || rev.id;
+                    const formattedDate = new Date(rev.$createdAt || '1970-01-01').toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    });
+
+                    return (
+                      <div key={uniqueId} className="bg-white p-5 rounded-xl border border-neutral-200/50 shadow-sm space-y-2 hover:shadow-md transition-shadow duration-200">
+                        <div className="flex justify-between items-start flex-wrap gap-2">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-neutral-400 block font-medium">
+                              {formattedDate}
+                            </span>
+                            <span className="text-xs font-semibold text-neutral-800">
+                              {rev.userName}
+                            </span>
+                          </div>
+                          <div className="flex gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <FaStar
+                                key={star}
+                                className={`text-[10px] ${star <= Number(rev.rating || 5) ? 'text-amber-400' : 'text-neutral-100'}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-3 rounded-lg border border-neutral-200/10">
+                          {rev.comment}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        );
-      })}
-    </div>
-  </div>
-)}
+        </div>
       </div>
+      <Footer />
     </div>
   );
 }

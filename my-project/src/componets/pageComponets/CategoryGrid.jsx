@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 
 function CategoryGrid() {
@@ -27,7 +26,7 @@ function CategoryGrid() {
         <section className="bg-[#fafafb] py-16 px-4 border-b border-neutral-200/50">
             {/* Styled Section Headers */}
             <div className="mb-12 text-center">
-                <h4 className="text-xs tracking-[0.4em] text-red-500 font-bold uppercase mb-2">
+                <h4 className="text-xs tracking-[0.4em] text-[var(--theme-accent)] font-bold uppercase mb-2">
                     categorize
                 </h4>
                 <h1 className="text-3xl md:text-5xl font-black tracking-wider text-neutral-900 uppercase">

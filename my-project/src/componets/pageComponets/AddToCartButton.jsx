@@ -1,11 +1,17 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CgShoppingCart } from 'react-icons/cg'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useDispatch, useSelector } from 'react-redux'
 import cartService from '../../appwrite/cart'
+import { addCartItemState } from '../../features/addToCart'
 
 function AddToCartButton({ product, selectedSize, variant = "default" }) {
     const navigate = useNavigate()
+    const dispatch = useDispatch()
+
+    const { user, isAuthenticated } = useSelector(state => state.auth)
+    const cartItems = useSelector(state => state.cart || [])
     
     // UI Visual States Management
     const [status, setStatus] = useState('idle') // states: 'idle' | 'loading' | 'success'
@@ -16,20 +22,53 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
         
         if (!product) return
 
+        if (!isAuthenticated || !user) {
+            alert("Please login to secure your drop.")
+            navigate('/login')
+            return
+        }
+
         try {
             setStatus('loading')
 
+            const targetSize = selectedSize || product.sizes?.[0] || 'M'
+            const targetProductId = product.$id || product.id
+            const existingCartItem = cartItems.find(
+                item => item.product_id === targetProductId && item.size === targetSize
+            )
+
+            // Stock Validation check
+            let stocks = {};
+            try {
+                stocks = JSON.parse(product.sizes_stock || '{}');
+            } catch {
+                stocks = {};
+            }
+            const availableStock = stocks[targetSize] !== undefined ? Number(stocks[targetSize]) : 10;
+            const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
+            if (currentQuantityInCart + 1 > availableStock) {
+                alert(`❌ Insufficient stock. Only ${availableStock} items left in stock for size ${targetSize}.`);
+                setStatus('idle');
+                return;
+            }
+
             const response = await cartService.addToCart({
                 name: product.name,
-                size: selectedSize || product.sizes?.[0] || 'M',
+                size: targetSize,
                 price: product.price,
-                product_id: product.$id || product.id,
-                product_Image: product.front_image_link || product.image_url || product.image
+                product_id: targetProductId,
+                product_Image: product.front_image_link || product.image_url || product.image,
+                userId: user.$id,
+                existingCartItem
             })
 
             if (response) {
+                dispatch(addCartItemState(response))
                 setStatus('success')
-                setTimeout(() => setStatus('idle'), 1500)
+                setTimeout(() => {
+                    setStatus('idle')
+                    navigate('/cart')
+                }, 600)
             }
         } catch (error) {
             console.error("Cart injection system crash:", error)

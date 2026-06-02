@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router-dom'
 
 function Footer() {
@@ -9,7 +8,7 @@ function Footer() {
         {/* Brand Info */}
         <div className="flex flex-col gap-4">
           <h3 className="text-neutral-900 text-xl font-black tracking-widest uppercase">
-            STREET<span className="text-red-500">-</span>WEAR
+            STREET<span className="text-[var(--theme-primary)]">-</span>WEAR
           </h3>
           <p className="text-xs text-neutral-500 leading-relaxed max-w-xs uppercase tracking-wide font-medium">
             Premium heavyweight drops crafted carefully to define contemporary street culture. Join the movement.
@@ -43,7 +42,7 @@ function Footer() {
               placeholder="ENTER YOUR EMAIL" 
               className="bg-transparent text-neutral-800 placeholder-neutral-400 text-xs tracking-wider px-4 py-3 w-full outline-hidden"
             />
-            <button className="bg-neutral-950 text-white font-black text-xs px-4 uppercase hover:bg-neutral-850 transition-colors cursor-pointer">
+            <button className="bg-neutral-950 text-white font-black text-xs px-4 uppercase hover:bg-neutral-800 transition-colors cursor-pointer">
               Join
             </button>
           </div>

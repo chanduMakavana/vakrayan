@@ -1,4 +1,3 @@
-import React from 'react'
 import Navbar from '../pageComponets/Navbar'
 import Hero from '../pageComponets/Hero'
 import CategoryGrid from '../pageComponets/CategoryGrid'

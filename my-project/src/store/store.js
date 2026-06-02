@@ -2,11 +2,17 @@ import { configureStore } from "@reduxjs/toolkit";
 import loginReducer from "../features/login";
 import searchReducer from "../features/search";
 import cartReducer from "../features/addToCart";
+import productsReducer from "../features/productsSlice";
 
 export const store = configureStore({
     reducer: {
         auth: loginReducer,
         search: searchReducer,
         cart: cartReducer,
-    }
+        products: productsReducer,
+    },
+    middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+            serializableCheck: false,
+        }),
 })

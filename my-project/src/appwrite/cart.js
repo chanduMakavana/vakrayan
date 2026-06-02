@@ -1,6 +1,5 @@
 import { Client, ID, Databases, Query } from "appwrite";
 import { conf } from "./conf/conf";
-import authService from "./auth";
 
 export class CartService {
     client = new Client();
@@ -13,22 +12,13 @@ export class CartService {
         this.databases = new Databases(this.client);
     }
 
-    // Add a product item to the database cart collection
-    async addToCart({name, size, price, quantity = 1, product_id, product_Image}) {
+    // Add a product item to the database cart collection with high-efficiency direct arguments
+    async addToCart({name, size, price, quantity = 1, product_id, product_Image, userId, existingCartItem}) {
         try {
-            const isLogin = await authService.getCurrentUser();
-            if (!isLogin) {
+            if (!userId) {
                 alert("Please login to secure your drop.");
                 return null;
             }
-
-            // 1. Live user inventory database extraction pull query
-            const userCartItems = await this.getCartItems(isLogin.$id);
-            
-            // 2. ✅ FIXED LOGIC FILTER: Pure pool mein check karo agar product + size same hai
-            const existingCartItem = userCartItems.find(
-                item => item.product_id === product_id && item.size === size
-            );
 
             if (existingCartItem) {
                 // UPDATE PIPELINE TRIGGER: Purane item ki quantity scale up karo
@@ -40,7 +30,6 @@ export class CartService {
                     subtotal: updatedSubtotal
                 });
             } else {
-                // ✅ FIXED FALLBACK: Cart khali ho ya naya product ho, direct creation parameters apply honge
                 const itemPrice = Number(price);
                 const itemQuantity = Number(quantity);
 
@@ -50,11 +39,11 @@ export class CartService {
                     ID.unique(),
                     {
                         name,
-                        userId: isLogin.$id, // Syncing parameter hook values safely
+                        userId, // Syncing parameter hook values safely
                         size,   
                         price: itemPrice,
                         quantity: itemQuantity,
-                        subtotal: itemPrice * itemQuantity, // ✅ FIXED: Hardcoded '1' hatakar actual price calculation set ki
+                        subtotal: itemPrice * itemQuantity,
                         product_id,
                         product_Image
                     }

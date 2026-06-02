@@ -1,17 +1,65 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { HiX, HiMinus, HiPlus } from 'react-icons/hi'
 import { FiShield, FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, Link } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
 import cartService from '../../appwrite/cart'
 import authService from '../../appwrite/auth'
+import campaignService from '../../appwrite/campaign'
+import { setCartItems as setCartItemsAction, removeCartItemState, updateCartItemState } from '../../features/addToCart'
 
 function AddToCartPage() {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   
   // Dynamic Hooks for Cloud Synchronization
-  const [cartItems, setCartItems] = useState([])
+  const cartItems = useSelector(state => state.cart)
+  const products = useSelector(state => state.products.items || [])
   const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState(null)
+
+  // Dynamic Coupon State
+  const [promoInput, setPromoInput] = useState('')
+  const [couponApplied, setCouponApplied] = useState('')
+  const [discountPercent, setDiscountPercent] = useState(0)
+
+  // ➡️ 4. INVENTORY MATHEMATICS MATRIX (Accumulators)
+  const cartTotalAmount = (cartItems || []).reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
+  const cartTotalQuantity = (cartItems || []).reduce((acc, item) => acc + Number(item.quantity || 0), 0)
+
+  // Load carried coupon from sessionStorage on mount
+  useEffect(() => {
+    const carriedCoupon = sessionStorage.getItem('checkout_coupon');
+    const carriedDiscount = sessionStorage.getItem('checkout_discount');
+    if (carriedCoupon && carriedDiscount) {
+      setTimeout(() => {
+        setCouponApplied(carriedCoupon);
+        setDiscountPercent(Number(carriedDiscount));
+      }, 0);
+    }
+  }, []);
+
+  const handleApplyPromo = async () => {
+    try {
+      const activeCoupons = await campaignService.getCoupons();
+      const match = activeCoupons.find(c => String(c.code || '').trim().toUpperCase() === promoInput.trim().toUpperCase());
+      if (match) {
+        setDiscountPercent(match.discount);
+        setCouponApplied(match.code);
+        setPromoInput('');
+        sessionStorage.setItem('checkout_coupon', match.code);
+        sessionStorage.setItem('checkout_discount', String(match.discount));
+        alert(`Promo code ${match.code} applied. You saved ${match.discount}%.`);
+      } else {
+        alert("Invalid promo code.");
+      }
+    } catch (err) {
+      console.error("Promo verification issue:", err);
+      alert("Verification server connection timeout.");
+    }
+  };
+
+  const discountAmount = cartTotalAmount * (discountPercent / 100);
+  const finalAmount = cartTotalAmount - discountAmount;
 
   // ➡️ 1. INITIAL FETCH: Active User details aur unka live backend cart pool fetch karo
   const fetchCartStage = async () => {
@@ -19,9 +67,8 @@ function AddToCartPage() {
       setLoading(true)
       const user = await authService.getCurrentUser()
       if (user) {
-        setUserId(user.$id)
         const items = await cartService.getCartItems(user.$id)
-        setCartItems(items)
+        dispatch(setCartItemsAction(items))
       } else {
         alert("Please session authenticate to track your cart.")
         navigate('/login')
@@ -34,14 +81,31 @@ function AddToCartPage() {
   }
 
   useEffect(() => {
-    fetchCartStage()
+    setTimeout(() => fetchCartStage(), 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ➡️ 2. QUANTITY OPERATORS: Real-time Cloud updates triggers
   const handleQuantityShift = async (item, operation) => {
     try {
       let targetQuantity = item.quantity
-      if (operation === 'increase') targetQuantity += 1
+      if (operation === 'increase') {
+        const prod = products.find(p => p.$id === item.product_id || p.id === item.product_id)
+        if (prod) {
+          let stocks = {}
+          try {
+            stocks = JSON.parse(prod.sizes_stock || '{}')
+          } catch {
+            stocks = {}
+          }
+          const availableStock = stocks[item.size] !== undefined ? Number(stocks[item.size]) : 10
+          if (targetQuantity + 1 > availableStock) {
+            alert(`❌ Cannot increase quantity. Only ${availableStock} items left in stock for size ${item.size}.`)
+            return
+          }
+        }
+        targetQuantity += 1
+      }
       if (operation === 'decrease') targetQuantity -= 1
 
       // Security check: Minimum boundary shield logic
@@ -53,7 +117,7 @@ function AddToCartPage() {
       const calculatedSubtotal = Number(item.price) * targetQuantity
 
       // Optimistic state manipulation (UI ko instantly update karne ke liye)
-      setCartItems(prev => prev.map(c => c.$id === item.$id ? { ...c, quantity: targetQuantity, subtotal: calculatedSubtotal } : c))
+      dispatch(updateCartItemState({ $id: item.$id, quantity: targetQuantity, subtotal: calculatedSubtotal }))
 
       // Final Backend Sync
       await cartService.updateCartItem(item.$id, {
@@ -70,7 +134,7 @@ function AddToCartPage() {
   const handleRemove = async (documentId) => {
     try {
       // Optimistic slice filter out
-      setCartItems(prev => prev.filter(c => c.$id !== documentId))
+      dispatch(removeCartItemState(documentId))
       await cartService.removeFromCart(documentId)
     } catch (error) {
       console.error("Failed to extract item execution drop:", error)
@@ -78,36 +142,32 @@ function AddToCartPage() {
     }
   }
 
-  // ➡️ 4. INVENTORY MATHEMATICS MATRIX (Accumulators)
-  const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
-  const cartTotalQuantity = cartItems.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
-
   // Page Loading Viewport State
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
         <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
         <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
-          SYNCHRONIZING LOGISTICS INVENTORY...
+          Loading your cart...
         </div>
       </div>
     )
   }
 
-  // Empty Inventory Base Viewport State
+  // Empty cart state
   if (cartItems.length === 0) {
     return (
       <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 flex flex-col items-center justify-center px-6 selection:bg-neutral-900 selection:text-white">
         <div className="text-center space-y-6 max-w-md">
-          <h2 className="text-3xl font-black tracking-tighter uppercase">Your Inventory is Empty</h2>
-          <p className="text-xs text-neutral-500 font-mono tracking-wide uppercase leading-relaxed">
-            No dynamic streetwear drops queued inside active local cloud registers. Secure your fits before the supply chain breaks.
+          <h2 className="text-3xl font-bold tracking-tight">Your cart is empty</h2>
+          <p className="text-sm text-neutral-500 leading-relaxed">
+            Add products to your cart and they will appear here before checkout.
           </p>
           <Link 
             to="/" 
             className="inline-block bg-neutral-900 text-white font-black text-xs tracking-widest uppercase px-8 py-4 rounded-xl shadow-md hover:bg-neutral-800 transition-all transform active:scale-95"
           >
-            Explore Active Drops &rarr;
+            Explore Collection &rarr;
           </Link>
         </div>
       </div>
@@ -115,34 +175,26 @@ function AddToCartPage() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans relative selection:bg-neutral-900 selection:text-white pb-20">
-      
-      {/* Technical Layout Accent Lines */}
-      <div className="absolute top-0 bottom-0 left-6 md:left-12 border-l border-neutral-200/30 pointer-events-none" />
-      <div className="absolute top-0 bottom-0 right-6 md:right-12 border-r border-neutral-200/30 pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
+    <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans pb-20">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 py-12 space-y-10">
         
-        {/* Navigation & Back Trigger Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-200/50">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-200/60">
           <div className="space-y-1">
-            <span className="text-[9px] tracking-[0.4em] text-red-500 font-black uppercase block">
-              CHECKOUT LOGISTICS POOL
-            </span>
-            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight uppercase">
-              Shopping Cart <span className="font-mono text-neutral-400 font-normal">({cartTotalQuantity})</span>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+              Shopping Cart <span className="text-neutral-400 font-normal text-lg">({cartTotalQuantity})</span>
             </h1>
           </div>
-          <Link to="/" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-neutral-400 hover:text-neutral-950 transition-colors uppercase group cursor-pointer w-fit">
+          <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-neutral-500 hover:text-neutral-900 transition-colors uppercase group cursor-pointer w-fit">
             <FiArrowLeft className="text-sm group-hover:-translate-x-1 transition-transform" />
-            Continue Stocking
+            Continue Shopping
           </Link>
         </div>
 
-        {/* 2-Column Split Workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-16 items-start">
+        {/* 2-Column Split Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* COLUMN 1: ITEMS STOCK LAYOUT WITH SIZE OPTIONS (Spans 7 Columns) */}
+          {/* COLUMN 1: Cart Items */}
           <div className="lg:col-span-7 space-y-4">
             
             {cartItems.map((item) => {
@@ -151,71 +203,62 @@ function AddToCartPage() {
               return (
                 <div 
                   key={uniqueId}
-                  className="flex gap-4 p-4 bg-white border border-neutral-200/60 rounded-2xl shadow-xs relative group hover:border-neutral-400/40 transition-all duration-300"
+                  className="flex gap-4 p-4 bg-white border border-neutral-200/50 rounded-xl relative group hover:shadow-md transition-all duration-300"
                 >
-                  {/* Remove Single Document Button */}
+                  {/* Remove Button */}
                   <button 
                     onClick={() => handleRemove(uniqueId)}
-                    className="absolute top-3 right-3 text-neutral-400 hover:text-red-500 p-1 cursor-pointer transition-colors"
+                    className="absolute top-3 right-3 text-neutral-400 hover:text-neutral-900 p-1 cursor-pointer transition-colors"
                   >
-                    <HiX className="text-base" />
+                    <HiX className="text-lg" />
                   </button>
 
-                  {/* Garment Aspect Viewport Box */}
-                  <div className="w-24 h-32 sm:w-28 sm:h-36 rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200/40 shrink-0">
+                  {/* Image */}
+                  <div className="w-20 h-26 sm:w-24 sm:h-32 rounded-lg overflow-hidden bg-neutral-100 border border-neutral-200/30 shrink-0">
                     <img 
-                      src={item.product_Image || 'https://placehold.co/400x500?text=PRODUCT+VIEW'} 
+                      src={item.product_Image || 'https://placehold.co/400x500?text=No+Preview'} 
                       alt={item.name} 
                       className="w-full h-full object-cover object-center"
                     />
                   </div>
 
-                  {/* Specs Metadata Stack */}
-                  <div className="flex flex-col justify-between py-1 grow pr-6 space-y-3">
+                  {/* Details */}
+                  <div className="flex flex-col justify-between py-0.5 grow pr-4">
                     <div className="space-y-1">
-                      <h3 className="text-sm font-black text-neutral-800 tracking-wide uppercase line-clamp-1">
+                      <h3 className="text-sm font-semibold text-neutral-800 line-clamp-1">
                         {item.name}
                       </h3>
-                      <p className="text-[10px] font-mono text-neutral-400 uppercase">
-                        UNIT SPEC: ₹{Number(item.price).toLocaleString('en-IN')}
+                      <p className="text-[11px] text-neutral-500">
+                        Price: ₹{Number(item.price).toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[11px] text-neutral-500">
+                        Size: <span className="font-semibold text-neutral-800">{item.size || 'M'}</span>
                       </p>
                     </div>
 
-                    {/* Integrated Active Size Badge (Static as per Cart mapping limits) */}
-                    <div className="space-y-1.5">
-                      <span className="text-[8px] font-bold text-neutral-400 tracking-widest uppercase block">
-                        SECURED SPEC SIZE
-                      </span>
-                      <div className="flex gap-1.5">
-                        <span className="text-[10px] font-mono font-black px-2.5 py-1 rounded-md bg-neutral-900 text-white border border-neutral-900 shadow-xs uppercase">
-                          {item.size || 'M'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Counter & Subtotal Dock Unit */}
-                    <div className="flex items-center justify-between gap-4 mt-2 flex-wrap pt-2 border-t border-neutral-100">
-                      <div className="flex items-center border border-neutral-200 bg-neutral-50 rounded-lg p-1">
+                    {/* Quantity Controls & Subtotal */}
+                    <div className="flex items-center justify-between gap-4 mt-4 flex-wrap pt-2 border-t border-neutral-100">
+                      <div className="flex items-center border border-neutral-200 bg-neutral-50 rounded-lg p-0.5">
                         <button 
                           onClick={() => handleQuantityShift(item, 'decrease')}
-                          className="p-1.5 hover:text-red-500 transition-colors cursor-pointer"
+                          className="p-1 hover:text-neutral-950 transition-colors cursor-pointer text-neutral-500"
                         >
                           <HiMinus className="text-xs" />
                         </button>
-                        <span className="px-3 font-mono font-black text-xs text-neutral-900 min-w-[24px] text-center">
+                        <span className="px-2.5 font-semibold text-xs text-neutral-900 min-w-5 text-center">
                           {item.quantity}
                         </span>
                         <button 
                           onClick={() => handleQuantityShift(item, 'increase')}
-                          className="p-1.5 hover:text-neutral-950 transition-colors cursor-pointer"
+                          className="p-1 hover:text-neutral-950 transition-colors cursor-pointer text-neutral-500"
                         >
                           <HiPlus className="text-xs" />
                         </button>
                       </div>
 
                       <div className="text-right">
-                        <span className="text-[8px] font-bold text-neutral-400 block tracking-widest uppercase">Accumulated Value</span>
-                        <span className="text-sm font-mono font-black text-neutral-900">
+                        <span className="text-[10px] text-neutral-400 block uppercase font-medium">Subtotal</span>
+                        <span className="text-xs font-semibold text-neutral-900">
                           ₹{Number(item.subtotal).toLocaleString('en-IN')}
                         </span>
                       </div>
@@ -227,56 +270,92 @@ function AddToCartPage() {
 
           </div>
 
-          {/* COLUMN 2: INDUSTRIAL LOGISTICS SUMMARY PANEL (Spans 5 Columns) */}
-          <div className="lg:col-span-5 bg-white border border-neutral-200/60 p-6 rounded-2xl shadow-xs space-y-6 lg:sticky lg:top-24">
-            <h3 className="text-xs font-black tracking-[0.25em] uppercase text-neutral-400">
-              LOGISTICS SUMMARY
+          {/* COLUMN 2: Order Summary */}
+          <div className="lg:col-span-5 bg-white border border-neutral-200/50 p-6 rounded-xl space-y-6 lg:sticky lg:top-24">
+            <h3 className="text-xs font-bold tracking-wider uppercase text-neutral-400">
+              Order Summary
             </h3>
 
-            <div className="space-y-3.5 text-xs font-medium uppercase tracking-wide text-neutral-600">
+            <div className="space-y-3.5 text-xs text-neutral-600">
               <div className="flex justify-between">
-                <span>SUBTOTAL SPEC VAL</span>
-                <span className="font-mono text-neutral-900 font-bold">
+                <span>Subtotal</span>
+                <span className="text-neutral-900 font-semibold">
                   ₹{cartTotalAmount.toLocaleString('en-IN')}
                 </span>
               </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-emerald-600 font-semibold">
+                  <span>Discount ({couponApplied})</span>
+                  <span>
+                    - ₹{discountAmount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
-                <span>DOMESTIC DISPATCH PACK</span>
-                <span className="font-mono text-emerald-600 font-black tracking-wider text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
-                  FREE DISPATCH
+                <span>Shipping</span>
+                <span className="text-emerald-600 font-semibold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
+                  FREE SHIPPING
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>ESTIMATED TAX PIPELINE</span>
-                <span className="font-mono text-neutral-400">INCLUDED</span>
+                <span>Estimated Tax</span>
+                <span className="text-neutral-400">Included</span>
               </div>
 
               <hr className="border-neutral-100" />
 
               <div className="flex justify-between items-baseline pt-2">
-                <span className="text-sm font-black text-neutral-900">NET ORDER VALUE</span>
-                <span className="text-2xl font-mono font-black text-neutral-950 tracking-tight">
-                  ₹{cartTotalAmount.toLocaleString('en-IN')}
+                <span className="text-sm font-semibold text-neutral-800">Total</span>
+                <span className="text-xl font-bold text-neutral-950">
+                  ₹{finalAmount.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
 
-            {/* Checkout Interface Actions */}
+            {/* Apply Coupon */}
+            <div className="space-y-2 pt-2 border-t border-neutral-100">
+              <label className="text-[10px] font-bold text-neutral-500 uppercase block">
+                Apply Coupon Code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value)}
+                  placeholder="ENTER COUPON CODE"
+                  className="flex-1 bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-900 rounded-lg px-3 py-2 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden uppercase font-semibold transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  className="bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-lg transition-all cursor-pointer"
+                >
+                  APPLY
+                </button>
+              </div>
+              {couponApplied && (
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono">
+                  {couponApplied} applied ({discountPercent}% off)
+                </div>
+              )}
+            </div>
+
+            {/* Checkout CTA */}
             <div className="space-y-3 pt-2">
               <button 
                 onClick={() => navigate('/checkout')}
-                className="w-full bg-neutral-900 hover:bg-neutral-800 active:scale-[0.99] transition-all text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md cursor-pointer select-none text-center"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] transition-all text-white font-bold text-xs tracking-widest uppercase py-3.5 rounded-lg shadow-sm cursor-pointer select-none text-center"
               >
-                PROCEED TO CHECKOUT INVOICE &rarr;
+                Proceed to Checkout
               </button>
             </div>
 
-            {/* Security Data Line */}
-            <div className="flex items-center gap-3 text-[8px] font-mono text-neutral-400 border border-neutral-100 bg-neutral-50/50 p-3 rounded-xl leading-normal uppercase">
-              <FiShield className="text-base text-neutral-700 shrink-0" />
+            {/* Security Note */}
+            <div className="flex items-start gap-3 text-[10px] text-neutral-400 border border-neutral-100 bg-neutral-50/50 p-3 rounded-lg leading-relaxed uppercase">
+              <FiShield className="text-sm text-neutral-500 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-neutral-700 block mb-0.5">🔒 REGULATORY SECURITY POOL ACTIVE</span>
-                Fits are held inside your cached storage inventory index for a limited period. Order finalize processing ensures drops bypass stock depletion thresholds.
+                <span className="font-semibold text-neutral-600 block mb-0.5">Secure Checkout</span>
+                Your transactions are safe and encrypted. Items added to your cart are not reserved until purchase is complete.
               </div>
             </div>
 
