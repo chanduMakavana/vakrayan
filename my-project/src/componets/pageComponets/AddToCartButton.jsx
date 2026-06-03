@@ -5,10 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
 import cartService from '../../appwrite/cart'
 import { addCartItemState } from '../../features/addToCart'
+import { playZip } from '../../utils/sensoryHelper'
+import { useToast } from '../../context/ToastContext'
 
 function AddToCartButton({ product, selectedSize, variant = "default" }) {
     const navigate = useNavigate()
     const dispatch = useDispatch()
+    const { showToast } = useToast()
 
     const { user, isAuthenticated } = useSelector(state => state.auth)
     const cartItems = useSelector(state => state.cart || [])
@@ -23,7 +26,7 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
         if (!product) return
 
         if (!isAuthenticated || !user) {
-            alert("Please login to secure your drop.")
+            showToast("Please login to secure your drop.", "error")
             navigate('/login')
             return
         }
@@ -47,7 +50,7 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
             const availableStock = stocks[targetSize] !== undefined ? Number(stocks[targetSize]) : 10;
             const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
             if (currentQuantityInCart + 1 > availableStock) {
-                alert(`❌ Insufficient stock. Only ${availableStock} items left in stock for size ${targetSize}.`);
+                showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${targetSize}.`, "error");
                 setStatus('idle');
                 return;
             }
@@ -64,16 +67,17 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
 
             if (response) {
                 dispatch(addCartItemState(response))
+                playZip()
+                window.dispatchEvent(new Event('cart-item-added'))
                 setStatus('success')
                 setTimeout(() => {
                     setStatus('idle')
-                    navigate('/cart')
-                }, 600)
+                }, 1500)
             }
         } catch (error) {
             console.error("Cart injection system crash:", error)
             setStatus('idle')
-            alert("Supply chain bottleneck. Attempt failed.")
+            showToast(error.message || "Supply chain bottleneck. Attempt failed.", "error")
         }
     }
 

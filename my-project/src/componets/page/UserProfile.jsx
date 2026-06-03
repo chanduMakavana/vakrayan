@@ -10,12 +10,14 @@ import reviewsService from '../../appwrite/reviews';
 import productsService from '../../appwrite/products';
 import { setProducts } from '../../features/productsSlice';
 import Navbar from '../pageComponets/Navbar';
+import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
 
 function UserProfile() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
   const products = useSelector(state => state.products.items || []);
@@ -34,15 +36,15 @@ function UserProfile() {
   const handleModalReviewSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthenticated || !user) {
-      alert("Please login to secure a review placement.");
+      showToast("Please login to secure a review placement.", "error");
       return;
     }
     if (!reviewModalItem || !reviewModalItem.productId) {
-      alert("Error resolving product mapping registry.");
+      showToast("Error resolving product mapping registry.", "error");
       return;
     }
     if (!modalComment.trim()) {
-      alert("Please enter a valid review comment specification.");
+      showToast("Please enter a valid review comment specification.", "error");
       return;
     }
 
@@ -67,7 +69,7 @@ function UserProfile() {
       }
     } catch (err) {
       console.error("Failed to submit profile review:", err);
-      alert("Failed to submit review. Connection timed out.");
+      showToast("Failed to submit review. Connection timed out.", "error");
     } finally {
       setModalSubmitting(false);
     }
@@ -186,7 +188,7 @@ function UserProfile() {
       }
     } catch (err) {
       console.error("Failed to update shipping profile:", err);
-      alert("Verification server timed out. Check data values.");
+      showToast("Verification server timed out. Check data values.", "error");
     } finally {
       setSaveLoading(false);
     }
@@ -494,7 +496,7 @@ function UserProfile() {
                                           setModalRating(5);
                                           setModalComment('');
                                         } else {
-                                          alert("Failed to locate product in current catalog.");
+                                          showToast("Failed to locate product in current catalog.", "error");
                                         }
                                       }}
                                       className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] tracking-wider px-2.5 py-1.5 rounded-md uppercase transition-all shadow-xs"

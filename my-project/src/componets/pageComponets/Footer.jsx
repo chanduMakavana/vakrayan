@@ -1,6 +1,29 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 function Footer() {
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!email.trim()) {
+      setError('PLEASE ENTER AN EMAIL ADDRESS.');
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('INVALID EMAIL ALIGNMENT. PLEASE RE-ENTER.');
+      return;
+    }
+    
+    setSubscribed(true);
+    setEmail('');
+  };
   return (
     <footer className="bg-[#f4f4f6] text-neutral-600 py-16 px-6 md:px-12 border-t border-neutral-200/50">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-6">
@@ -36,16 +59,33 @@ function Footer() {
         <div className="flex flex-col gap-3">
           <h4 className="text-neutral-900 text-xs font-black tracking-widest uppercase mb-1">Get the Intel</h4>
           <p className="text-xs text-neutral-500 uppercase tracking-wide font-medium">Subscribe to receive early drops notification and secret discounts.</p>
-          <div className="flex mt-2 max-w-sm rounded-xl overflow-hidden border border-neutral-200 bg-white focus-within:border-neutral-400 transition-colors">
-            <input 
-              type="email" 
-              placeholder="ENTER YOUR EMAIL" 
-              className="bg-transparent text-neutral-800 placeholder-neutral-400 text-xs tracking-wider px-4 py-3 w-full outline-hidden"
-            />
-            <button className="bg-neutral-950 text-white font-black text-xs px-4 uppercase hover:bg-neutral-800 transition-colors cursor-pointer">
-              Join
-            </button>
-          </div>
+          
+          {!subscribed ? (
+            <form onSubmit={handleSubscribe} className="space-y-1">
+              <div className="flex mt-2 max-w-sm rounded-xl overflow-hidden border border-neutral-200 bg-white focus-within:border-neutral-400 transition-colors">
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="ENTER YOUR EMAIL" 
+                  className="bg-transparent text-neutral-800 placeholder-neutral-400 text-[10px] tracking-wider px-4 py-3 w-full outline-hidden"
+                />
+                <button type="submit" className="bg-neutral-950 text-white font-black text-xs px-5 uppercase hover:bg-neutral-800 transition-colors cursor-pointer">
+                  Join
+                </button>
+              </div>
+              {error && (
+                <p className="text-[9px] text-red-500 font-mono tracking-widest uppercase pt-1 animate-pulse">
+                  {error}
+                </p>
+              )}
+            </form>
+          ) : (
+            <div className="mt-2 p-3.5 bg-emerald-950 text-emerald-400 border border-emerald-900/60 rounded-xl text-[10px] font-black uppercase tracking-widest leading-relaxed max-w-xs animate-scale-up">
+              ✓ YOU ARE NOW IN THE LOOP.<br />
+              <span className="text-emerald-500 font-mono text-[9px] font-medium tracking-wider">GET READY FOR EXCLUSIVE EARLY DROPS.</span>
+            </div>
+          )}
         </div>
 
       </div>

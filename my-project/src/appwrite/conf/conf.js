@@ -12,4 +12,7 @@ export const conf ={
     appwriteAddressesCollectionId: String(import.meta.env.VITE_APPWRITE_ADDRESSES_COLLECTION_ID || "").trim(),
     appwriteReviewsCollectionId: String(import.meta.env.VITE_APPWRITE_REVIEWS_COLLECTION_ID || import.meta.env.VITE_APPWRITE_REVIWES_COLLECTION_ID || "").trim(),
     appwriteSettingsCollectionId: String(import.meta.env.VITE_APPWRITE_SETTINGS_COLLECTION_ID || "").trim(),
+    appwriteWishlistCollectionId: String(import.meta.env.VITE_APPWRITE_WISHLIST_COLLECTION_ID || "wishlist").trim(),
+    appwriteCouponUsageCollectionId: String(import.meta.env.VITE_APPWRITE_COUPON_USAGE_COLLECTION_ID || "coupon_usage").trim(),
+    appwriteRestockCollectionId: String(import.meta.env.VITE_APPWRITE_RESTOCK_COLLECTION_ID || "restock_notifications").trim(),
 }

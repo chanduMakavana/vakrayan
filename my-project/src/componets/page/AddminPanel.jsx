@@ -5,6 +5,10 @@ import { useSelector } from 'react-redux';
 import productsService from '../../appwrite/products';
 import ordersService from '../../appwrite/orders';
 import campaignService from '../../appwrite/campaign';
+import { useToast } from '../../context/ToastContext';
+import restockService from '../../appwrite/restock';
+import couponUsageService from '../../appwrite/couponUsage';
+import cartService from '../../appwrite/cart';
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -15,6 +19,7 @@ const generateMockProductId = () => Date.now().toString();
 
 function AdminPanel() {
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
+  const { showToast } = useToast();
   const [successMsg, setSuccessMsg] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [products, setProducts] = useState([]);
@@ -31,6 +36,28 @@ function AdminPanel() {
   const [campaignCoupons, setCampaignCoupons] = useState([]);
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponDiscount, setNewCouponDiscount] = useState(10);
+
+  // Store Database Telemetry States
+  const [restockNotifications, setRestockNotifications] = useState([]);
+  const [couponUsages, setCouponUsages] = useState([]);
+  const [activeCarts, setActiveCarts] = useState([]);
+  const [telemetryLoading, setTelemetryLoading] = useState(false);
+
+  const loadStoreTelemetry = async () => {
+    try {
+      setTelemetryLoading(true);
+      const restocks = await restockService.getRestockNotifications();
+      const usages = await couponUsageService.getCouponUsages();
+      const carts = await cartService.getAllCarts();
+      setRestockNotifications(restocks || []);
+      setCouponUsages(usages || []);
+      setActiveCarts(carts || []);
+    } catch (err) {
+      console.error("Failed to load store database telemetry:", err);
+    } finally {
+      setTelemetryLoading(false);
+    }
+  };
 
   // Read local cache backup from localStorage
   const getLocalStorageFallbackData = () => {
@@ -148,7 +175,14 @@ function AdminPanel() {
       description: data.description?.trim() || "",
       sizes: selectedSizes,
       back_image_links: backImageLinks,
-      sizes_stock: JSON.stringify(stockMap) // Stringified stock mapping
+      sizes_stock: JSON.stringify(stockMap), // Stringified stock mapping
+      tag: data.single_tag?.trim() || "",
+      discount_percent: Number(data.discount_percent || 0),
+      color_group_id: data.color_group_id?.trim() || "",
+      color_name: data.color_name?.trim() || "",
+      color_hex: data.color_hex?.trim() || "",
+      fit_type: data.fit_type?.trim() || "",
+      fabric_gsm: data.fabric_gsm?.trim() || ""
     };
 
     try {
@@ -242,6 +276,13 @@ function AdminPanel() {
       BACK_IMAGE_FIELDS.forEach((fieldName, index) => {
         setValue(fieldName, backImageLinks[index] || '');
       });
+      setValue('single_tag', product.tag || '');
+      setValue('discount_percent', product.discount_percent || 0);
+      setValue('color_group_id', product.color_group_id || '');
+      setValue('color_name', product.color_name || '');
+      setValue('color_hex', product.color_hex || '');
+      setValue('fit_type', product.fit_type || '');
+      setValue('fabric_gsm', product.fabric_gsm || '');
       setEditingId(id);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -252,6 +293,13 @@ function AdminPanel() {
     SIZE_OPTIONS.forEach(size => {
       setValue(`stock_${size}`, '');
     });
+    setValue('single_tag', '');
+    setValue('discount_percent', '');
+    setValue('color_group_id', '');
+    setValue('color_name', '');
+    setValue('color_hex', '');
+    setValue('fit_type', '');
+    setValue('fabric_gsm', '');
     setEditingId(null);
   };
 
@@ -303,7 +351,7 @@ function AdminPanel() {
     const cleanCode = newCouponCode.trim().toUpperCase();
     
     if (campaignCoupons.some(c => c.code === cleanCode)) {
-      alert("This coupon already exists.");
+      showToast("This coupon already exists.", "error");
       return;
     }
 
@@ -384,6 +432,12 @@ function AdminPanel() {
               className={`text-[10px] font-black tracking-widest uppercase pb-1 transition-all cursor-pointer ${activeTab === 'campaigns' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-neutral-500 hover:text-neutral-900'}`}
             >
               Campaign Controls
+            </button>
+            <button 
+              onClick={() => { setActiveTab('telemetry'); setSuccessMsg(''); loadStoreTelemetry(); }}
+              className={`text-[10px] font-black tracking-widest uppercase pb-1 transition-all cursor-pointer ${activeTab === 'telemetry' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-neutral-500 hover:text-neutral-900'}`}
+            >
+              Database Telemetry
             </button>
           </div>
 
@@ -507,6 +561,98 @@ function AdminPanel() {
                       />
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Product Metadata & Custom Variations */}
+              <div className="flex flex-col gap-3 md:col-span-2">
+                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Product Metadata & Custom Variations</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 rounded-xl border border-neutral-200 bg-neutral-50/50 p-4">
+                  {/* Single Tag */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Legacy Single Tag</label>
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., HOT-DROP"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      {...register('single_tag')}
+                    />
+                  </div>
+
+                  {/* Discount Percent */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Discount Percent (%)</label>
+                    <input
+                      type="number"
+                      disabled={actionLoading}
+                      placeholder="0"
+                      min="0"
+                      max="100"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1"
+                      {...register('discount_percent')}
+                    />
+                  </div>
+
+                  {/* Color Group ID */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Color Group ID</label>
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., CG-TEE-01"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      {...register('color_group_id')}
+                    />
+                  </div>
+
+                  {/* Color Name */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Color Name</label>
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., JET BLACK"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      {...register('color_name')}
+                    />
+                  </div>
+
+                  {/* Color Hex */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Color Hex Code</label>
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., #000000"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      {...register('color_hex')}
+                    />
+                  </div>
+
+                  {/* Fit Type */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Fit Type</label>
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., OVERSIZED BOX FIT"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      {...register('fit_type')}
+                    />
+                  </div>
+
+                  {/* Fabric GSM */}
+                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200 sm:col-span-2 md:col-span-3">
+                    <label className="text-[9px] font-black text-neutral-500 uppercase">Fabric GSM</label>
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., 240 GSM 100% COMBED COTTON"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      {...register('fabric_gsm')}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -741,6 +887,155 @@ function AdminPanel() {
 
               </div>
 
+            </div>
+          )}
+
+          {/* ==========================================
+              TAB 4: APPWRITE DATABASE TELEMETRY LOGS
+              ========================================== */}
+          {activeTab === 'telemetry' && (
+            <div className="space-y-8 animate-fade-in">
+              
+              {/* Restock Alerts Section */}
+              <div className="space-y-4">
+                <div className="pb-4 border-b border-neutral-100 flex items-center justify-between">
+                  <h2 className="text-xs font-black tracking-[0.4em] text-[var(--theme-primary)] uppercase">Restock Alert Registrations</h2>
+                  <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{restockNotifications.length} REQUESTS</span>
+                </div>
+                
+                {telemetryLoading ? (
+                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Hydrating data nodes...</div>
+                ) : restockNotifications.length === 0 ? (
+                  <div className="py-12 text-center border border-dashed border-neutral-300 rounded-2xl bg-neutral-50/50">
+                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No sold-out size restock requests logged.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden border border-neutral-250/60 rounded-2xl bg-white shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
+                            <th className="p-4">Email Address</th>
+                            <th className="p-4">Product Reference</th>
+                            <th className="p-4">Size</th>
+                            <th className="p-4">Requested At</th>
+                            <th className="p-4">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
+                          {restockNotifications.map((n, idx) => (
+                            <tr key={n.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
+                              <td className="p-4 font-bold text-neutral-900 select-all lowercase">{n.email}</td>
+                              <td className="p-4 font-mono text-[10px]">{n.productId}</td>
+                              <td className="p-4 font-black text-indigo-600">{n.size}</td>
+                              <td className="p-4 text-[10px] font-mono text-neutral-500">{n.requestedAt ? new Date(n.requestedAt).toLocaleString('en-IN') : 'N/A'}</td>
+                              <td className="p-4">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${n.notified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}>
+                                  {n.notified ? 'NOTIFIED' : 'PENDING'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Coupon Usage Logs Section */}
+              <div className="space-y-4">
+                <div className="pb-4 border-b border-neutral-100 flex items-center justify-between">
+                  <h2 className="text-xs font-black tracking-[0.4em] text-[var(--theme-primary)] uppercase">Promo Coupon Redemption Audits</h2>
+                  <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{couponUsages.length} REDEEMED LOGS</span>
+                </div>
+                
+                {telemetryLoading ? (
+                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Hydrating data nodes...</div>
+                ) : couponUsages.length === 0 ? (
+                  <div className="py-12 text-center border border-dashed border-neutral-300 rounded-2xl bg-neutral-50/50">
+                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No active coupon usage history has been recorded.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden border border-neutral-250/60 rounded-2xl bg-white shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
+                            <th className="p-4">Customer reference ID</th>
+                            <th className="p-4">Promo Coupon Applied</th>
+                            <th className="p-4">Usage Count</th>
+                            <th className="p-4">Last Redeemed Timestamp</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
+                          {couponUsages.map((c, idx) => (
+                            <tr key={c.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
+                              <td className="p-4 font-mono select-all text-[10px]">{c.userId}</td>
+                              <td className="p-4 font-black text-emerald-600 tracking-widest">{c.couponCode}</td>
+                              <td className="p-4 font-mono font-black text-neutral-900">{c.usedCount}</td>
+                              <td className="p-4 text-[10px] font-mono text-neutral-500">{c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleString('en-IN') : 'N/A'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Cart Telemetry / Status Section */}
+              <div className="space-y-4">
+                <div className="pb-4 border-b border-neutral-100 flex items-center justify-between">
+                  <h2 className="text-xs font-black tracking-[0.4em] text-[var(--theme-primary)] uppercase">Real-Time Cart Telemetry Logs</h2>
+                  <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{activeCarts.length} TOTAL ALLOCATIONS</span>
+                </div>
+                
+                {telemetryLoading ? (
+                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Hydrating data nodes...</div>
+                ) : activeCarts.length === 0 ? (
+                  <div className="py-12 text-center border border-dashed border-neutral-300 rounded-2xl bg-neutral-50/50">
+                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No active cart item allocations recorded.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden border border-neutral-250/60 rounded-2xl bg-white shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
+                            <th className="p-4">Customer ID</th>
+                            <th className="p-4">Product Description</th>
+                            <th className="p-4">Size</th>
+                            <th className="p-4">Subtotal Payload</th>
+                            <th className="p-4">Lifecycle Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
+                          {activeCarts.map((c, idx) => (
+                            <tr key={c.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
+                              <td className="p-4 font-mono select-all text-[10px]">{c.userId}</td>
+                              <td className="p-4 font-bold text-neutral-900 truncate max-w-[180px]">{c.name}</td>
+                              <td className="p-4 font-mono text-neutral-800">{c.size}</td>
+                              <td className="p-4 text-neutral-500">₹{c.price} x {c.quantity}</td>
+                              <td className="p-4">
+                                <span className={`text-[9px] font-black px-2.5 py-1 rounded-md ${
+                                  c.cart_status === 'converted' 
+                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
+                                  : c.cart_status === 'abandoned' 
+                                  ? 'bg-rose-50 text-rose-600 border border-rose-250' 
+                                  : 'bg-indigo-50 text-indigo-600 border border-indigo-200 animate-pulse'
+                                }`}>
+                                  {c.cart_status || 'ACTIVE'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

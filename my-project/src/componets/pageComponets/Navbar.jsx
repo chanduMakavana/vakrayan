@@ -1,31 +1,210 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { ImSearch } from 'react-icons/im';
 import { CgShoppingCart } from 'react-icons/cg';
-import { BsFillPersonFill } from 'react-icons/bs';
-import { HiMenuAlt3, HiX } from 'react-icons/hi';
+import { BsFillPersonFill, BsHeart, BsHeartFill } from 'react-icons/bs';
+import { HiMenuAlt3, HiX, HiPlus, HiMinus } from 'react-icons/hi';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout as logoutAction } from '../../features/login'; 
 import authService from '../../appwrite/auth';
+import cartService from '../../appwrite/cart';
 import { AiOutlineClose } from "react-icons/ai";
-import { clearCartState } from '../../features/addToCart';
+import { clearCartState, addCartItemState, updateCartItemState, removeCartItemState, setCartItems } from '../../features/addToCart';
+import { motion } from 'framer-motion';
+import wishlistService from '../../appwrite/wishlist';
+import { useToast } from '../../context/ToastContext';
 
 
 
 
 function Navbar() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  // Retrieve auth state from Redux store and Appwrite cloud session (hoisted for scoping checks)
+  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const cartItems = useSelector(state => state.cart || []);
+  const products = useSelector(state => state.products.items || []);
+  const cartCount = cartItems.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
+
   const [isOpen, setIsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchVal, setSearchVal] = useState('');
 
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  // Extended Interactive States (Cart & Wishlist Drawers)
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [wishlistDrawerOpen, setWishlistDrawerOpen] = useState(false);
+  const [wishlist, setWishlist] = useState([]);
+  const [animateCart, setAnimateCart] = useState(false);
+  const [animateWishlist, setAnimateWishlist] = useState(false);
 
-  // Retrieve auth state from Redux store and Appwrite cloud session
-  const { user, isAuthenticated } = useSelector(state => state.auth);
-  const cartItems = useSelector(state => state.cart || []);
-  const cartCount = cartItems.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
+  // Sync wishlist updates across components
+  useEffect(() => {
+    let isFirstRun = true;
+    const updateWishlist = () => {
+      const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+      setWishlist(saved);
+      if (!isFirstRun) {
+        setAnimateWishlist(true);
+        setTimeout(() => setAnimateWishlist(false), 300);
+      }
+      isFirstRun = false;
+    };
+    updateWishlist();
+    window.addEventListener('wishlist-updated', updateWishlist);
+    return () => window.removeEventListener('wishlist-updated', updateWishlist);
+  }, []);
+
+  // Listen to cart additions for spring micro-animations
+  useEffect(() => {
+    const triggerCartAnim = () => {
+      setAnimateCart(true);
+      setTimeout(() => setAnimateCart(false), 300);
+    };
+    window.addEventListener('cart-item-added', triggerCartAnim);
+    return () => window.removeEventListener('cart-item-added', triggerCartAnim);
+  }, []);
+
+  const handleToggleWishlist = async (product) => {
+    const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+    const productId = product.$id || product.id;
+    const exists = saved.some(item => (item.$id || item.id) === productId);
+    let updated;
+    if (exists) {
+      updated = saved.filter(item => (item.$id || item.id) !== productId);
+      if (isAuthenticated && user) {
+        try {
+          await wishlistService.removeFromWishlist(user.$id, productId);
+        } catch (e) {
+          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+        }
+      }
+    } else {
+      updated = [...saved, product];
+      if (isAuthenticated && user) {
+        try {
+          await wishlistService.addToWishlist(user.$id, productId);
+        } catch (e) {
+          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+        }
+      }
+    }
+    localStorage.setItem('wishlist', JSON.stringify(updated));
+    window.dispatchEvent(new Event('wishlist-updated'));
+  };
+
+  // Sync wishlist with Appwrite cloud database upon authentication
+  useEffect(() => {
+    async function syncWishlistCloud() {
+      if (isAuthenticated && user) {
+        try {
+          const localSaved = JSON.parse(localStorage.getItem('wishlist')) || [];
+          const cloudDocs = await wishlistService.syncWishlist(user.$id, localSaved);
+          
+          const mergedList = [];
+          cloudDocs.forEach(doc => {
+            const foundProd = products.find(p => (p.$id || p.id) === doc.productId);
+            if (foundProd) {
+              mergedList.push(foundProd);
+            }
+          });
+          
+          if (mergedList.length > 0) {
+            localStorage.setItem('wishlist', JSON.stringify(mergedList));
+            window.dispatchEvent(new Event('wishlist-updated'));
+          }
+        } catch (err) {
+          console.error("Failed to sync cloud wishlist:", err);
+        }
+      }
+    }
+    if (products.length > 0) {
+      syncWishlistCloud();
+    }
+  }, [isAuthenticated, user, products]);
+
+  const handleMoveToCart = async (product) => {
+    if (!isAuthenticated || !user) {
+      navigate('/login');
+      return;
+    }
+    try {
+      const size = 'M'; // Default size
+      const existsInCart = cartItems.find(i => i.product_id === (product.$id || product.id) && i.size === size);
+      if (existsInCart) {
+        const newQty = Number(existsInCart.quantity) + 1;
+        const sub = Number(existsInCart.price) * newQty;
+        await cartService.updateCartItem(existsInCart.$id, { quantity: newQty, subtotal: sub });
+        dispatch(updateCartItemState({ $id: existsInCart.$id, quantity: newQty, subtotal: sub }));
+      } else {
+        const cartPayload = {
+          userId: user.$id,
+          product_id: product.$id || product.id,
+          name: product.name,
+          price: Number(product.price),
+          quantity: 1,
+          subtotal: Number(product.price),
+          product_Image: product.product_Image || product.image || 'https://placehold.co/400x500',
+          size: size
+        };
+        const response = await cartService.addToCart(cartPayload);
+        if (response) {
+          dispatch(addCartItemState(response));
+        } else {
+          const mockDoc = { $id: 'item_' + Date.now(), ...cartPayload };
+          dispatch(addCartItemState(mockDoc));
+        }
+      }
+      handleToggleWishlist(product);
+      showToast(`🛍️ "${product.name}" moved to shopping bag!`, "success");
+    } catch (error) {
+      console.error("Move to cart drawer issue:", error);
+    }
+  };
+
+  const handleCartQuantityShift = async (item, operation) => {
+    try {
+      let targetQuantity = Number(item.quantity);
+      if (operation === 'increase') targetQuantity += 1;
+      if (operation === 'decrease') targetQuantity -= 1;
+
+      if (targetQuantity < 1) {
+        dispatch(removeCartItemState(item.$id));
+        await cartService.removeFromCart(item.$id);
+        return;
+      }
+
+      const calculatedSubtotal = Number(item.price) * targetQuantity;
+      dispatch(updateCartItemState({ $id: item.$id, quantity: targetQuantity, subtotal: calculatedSubtotal }));
+      await cartService.updateCartItem(item.$id, {
+        quantity: targetQuantity,
+        subtotal: calculatedSubtotal
+      });
+    } catch (error) {
+      console.error("Failed to alter drawer cart quantity:", error);
+      if (user && user.$id) {
+        cartService.getCartItems(user.$id)
+          .then(items => dispatch(setCartItems(items)))
+          .catch(e => console.error("Rollback cart fetch failed:", e));
+      }
+    }
+  };
+
+  const handleCartRemove = async (documentId) => {
+    try {
+      dispatch(removeCartItemState(documentId));
+      await cartService.removeFromCart(documentId);
+    } catch (error) {
+      console.error("Failed to extract item from drawer:", error);
+      if (user && user.$id) {
+        cartService.getCartItems(user.$id)
+          .then(items => dispatch(setCartItems(items)))
+          .catch(e => console.error("Rollback cart fetch failed:", e));
+      }
+    }
+  };
 
   const cleanAdminEmail = import.meta.env.VITE_ADMIN_EMAIL 
     ? import.meta.env.VITE_ADMIN_EMAIL.replace(/['"]/g, '') 
@@ -95,19 +274,47 @@ function Navbar() {
 
 
 
-            {/* Cart Icon */}
+            {/* Wishlist Heart Icon */}
+            <div
+              className="relative cursor-pointer hover:text-neutral-900 transition-colors duration-200"
+              onClick={() => {
+                if (!isAuthenticated) { navigate('/login'); return; }
+                setWishlistDrawerOpen(true);
+              }}
+            >
+              {wishlist.length > 0 ? (
+                <BsHeartFill className="text-xl text-[var(--theme-primary)] animate-pulse" />
+              ) : (
+                <BsHeart className="text-xl hover:text-rose-500" />
+              )}
+              {wishlist.length > 0 && (
+                <motion.span 
+                  animate={animateWishlist ? { scale: [1, 1.4, 1] } : {}}
+                  transition={{ type: "spring", stiffness: 300, damping: 10 }}
+                  className="absolute -top-2 -right-2 bg-neutral-900 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center"
+                >
+                  {wishlist.length}
+                </motion.span>
+              )}
+            </div>
+
+            {/* Cart Icon (Toggles Sidebar Drawer) */}
             <div
               className="relative cursor-pointer hover:text-neutral-900 transition-colors duration-200 animate-fade-in"
               onClick={() => {
                 if (!isAuthenticated) { navigate('/login'); return; }
-                navigate('/cart');
+                setCartDrawerOpen(true);
               }}
             >
               <CgShoppingCart className="text-xl" />
               {isAuthenticated && cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-[var(--theme-primary)] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                <motion.span 
+                  animate={animateCart ? { scale: [1, 1.4, 1] } : {}}
+                  transition={{ type: "spring", stiffness: 300, damping: 10 }}
+                  className="absolute -top-2 -right-2 bg-[var(--theme-primary)] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse"
+                >
                   {cartCount}
-                </span>
+                </motion.span>
               )}
             </div>
 
@@ -169,7 +376,7 @@ function Navbar() {
         </div>
 
         {/* Mobile Dropdown */}
-        <div className={`lg:hidden fixed top-18.25 left-0 w-full bg-white border-b border-neutral-200/60 transition-all duration-300 ease-in-out z-40 ${isOpen ? 'opacity-100 visible h-auto py-6' : 'opacity-0 invisible h-0 overflow-hidden'}`}>
+        <div className={`lg:hidden fixed top-[73px] left-0 w-full bg-white border-b border-neutral-200/60 transition-all duration-300 ease-in-out z-40 ${isOpen ? 'opacity-100 visible h-auto py-6' : 'opacity-0 invisible h-0 overflow-hidden'}`}>
           <ul className="flex flex-col gap-5 items-center text-sm tracking-widest uppercase font-bold">
             <li><NavLink to="/" onClick={() => setIsOpen(false)} className={linkStyles}>Home</NavLink></li>
             <li><NavLink to="/shop" onClick={() => setIsOpen(false)} className={linkStyles}>Men</NavLink></li>
@@ -203,7 +410,7 @@ function Navbar() {
       </nav>
 
       {/* Dynamic Slide-down Search Bar */}
-      <div className={`bg-neutral-900 text-white z-45 sticky top-18.25 transition-all duration-300 ease-in-out overflow-hidden ${searchOpen ? 'max-h-16 py-3 border-b border-neutral-800 shadow-xl' : 'max-h-0 py-0'}`}>
+      <div className={`bg-neutral-900 text-white z-45 sticky top-[73px] transition-all duration-300 ease-in-out overflow-hidden ${searchOpen ? 'max-h-16 py-3 border-b border-neutral-800 shadow-xl' : 'max-h-0 py-0'}`}>
         <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between gap-4">
           <input 
             type="text" 
@@ -214,6 +421,216 @@ function Navbar() {
           />
           <button type="submit" className="text-[10px] font-black tracking-widest text-[var(--theme-primary)] hover:text-white uppercase transition-colors shrink-0">SEARCH</button>
         </form>
+      </div>
+
+      {/* Sidebar Cart Drawer */}
+      <div className={`fixed inset-0 z-[100] transition-opacity duration-300 ease-in-out ${cartDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        {/* Backdrop overlay */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setCartDrawerOpen(false)}></div>
+        
+        {/* Drawer Content */}
+        <div className={`absolute top-0 right-0 h-full w-full sm:w-[450px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${cartDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          {/* Header */}
+          <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-neutral-900">
+              🛍️ SHOPPING BAG ({cartCount})
+            </h3>
+            <button 
+              onClick={() => setCartDrawerOpen(false)}
+              className="text-neutral-400 hover:text-neutral-900 p-2 transition-colors cursor-pointer"
+            >
+              <HiX className="text-xl" />
+            </button>
+          </div>
+
+          {/* Cart Items list */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {cartItems.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                <CgShoppingCart className="text-5xl text-neutral-300 animate-bounce" />
+                <p className="text-xs uppercase tracking-widest font-black text-neutral-400">
+                  Your cart is empty
+                </p>
+                <button 
+                  onClick={() => { setCartDrawerOpen(false); navigate('/shop'); }}
+                  className="bg-neutral-950 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-[var(--theme-primary)] transition-colors cursor-pointer"
+                >
+                  Shop Now
+                </button>
+              </div>
+            ) : (
+              cartItems.map((item) => (
+                <div key={item.$id} className="flex gap-4 p-4 border border-neutral-100 rounded-xl hover:shadow-md transition-all duration-200">
+                  <img 
+                    src={item.product_Image || 'https://placehold.co/100x125'} 
+                    alt={item.name} 
+                    className="w-20 h-24 object-cover rounded-lg border border-neutral-200 shrink-0"
+                  />
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-xs font-black uppercase tracking-wide text-neutral-950 line-clamp-2">
+                          {item.name}
+                        </h4>
+                        <button 
+                          onClick={() => handleCartRemove(item.$id)}
+                          className="text-rose-500 hover:text-rose-700 transition-colors p-1 cursor-pointer"
+                        >
+                          <HiX className="text-base" />
+                        </button>
+                      </div>
+                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">
+                        Size: {item.size || 'M'} | ₹{item.price}
+                      </p>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-2">
+                      <div className="flex items-center border border-neutral-200 rounded-lg overflow-hidden bg-neutral-50">
+                        <button 
+                          onClick={() => handleCartQuantityShift(item, 'decrease')}
+                          className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                        >
+                          <HiMinus className="text-xs" />
+                        </button>
+                        <span className="px-3 text-xs font-black text-neutral-900">
+                          {item.quantity}
+                        </span>
+                        <button 
+                          onClick={() => handleCartQuantityShift(item, 'increase')}
+                          className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                        >
+                          <HiPlus className="text-xs" />
+                        </button>
+                      </div>
+                      <span className="text-xs font-black text-neutral-900">
+                        ₹{item.subtotal}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer Checkout Summary */}
+          {cartItems.length > 0 && (
+            <div className="p-6 border-t border-neutral-100 bg-neutral-50/50 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">
+                  Subtotal
+                </span>
+                <span className="text-base font-black text-neutral-900">
+                  ₹{cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Link
+                  to="/cart"
+                  onClick={() => setCartDrawerOpen(false)}
+                  className="w-full py-3 bg-white border border-neutral-200 hover:border-neutral-950 text-[10px] font-black uppercase tracking-[0.15em] text-neutral-900 rounded-xl text-center transition-all cursor-pointer"
+                >
+                  View Cart
+                </Link>
+                <button
+                  onClick={() => {
+                    setCartDrawerOpen(false);
+                    navigate('/checkout');
+                  }}
+                  className="w-full py-3 bg-neutral-900 hover:bg-[var(--theme-primary)] text-white text-[10px] font-black uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-lg shadow-neutral-900/10 hover:shadow-xl hover:shadow-[var(--theme-primary)]/20"
+                >
+                  Checkout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sidebar Wishlist Drawer */}
+      <div className={`fixed inset-0 z-[100] transition-opacity duration-300 ease-in-out ${wishlistDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        {/* Backdrop overlay */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setWishlistDrawerOpen(false)}></div>
+        
+        {/* Drawer Content */}
+        <div className={`absolute top-0 right-0 h-full w-full sm:w-[450px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${wishlistDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          {/* Header */}
+          <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-neutral-900">
+              ❤️ WISHLIST ({wishlist.length})
+            </h3>
+            <button 
+              onClick={() => setWishlistDrawerOpen(false)}
+              className="text-neutral-400 hover:text-neutral-900 p-2 transition-colors cursor-pointer"
+            >
+              <HiX className="text-xl" />
+            </button>
+          </div>
+
+          {/* Wishlist Items list */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {wishlist.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                <BsHeart className="text-5xl text-neutral-300 animate-pulse text-rose-300" />
+                <p className="text-xs uppercase tracking-widest font-black text-neutral-400">
+                  Your wishlist is empty
+                </p>
+                <button 
+                  onClick={() => { setWishlistDrawerOpen(false); navigate('/shop'); }}
+                  className="bg-neutral-950 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-[var(--theme-primary)] transition-colors cursor-pointer"
+                >
+                  View Fits
+                </button>
+              </div>
+            ) : (
+              wishlist.map((item) => (
+                <div key={item.$id || item.id} className="flex gap-4 p-4 border border-neutral-100 rounded-xl hover:shadow-md transition-all duration-200">
+                  <img 
+                    src={item.product_Image || item.image || 'https://placehold.co/100x125'} 
+                    alt={item.name} 
+                    className="w-20 h-24 object-cover rounded-lg border border-neutral-200 shrink-0"
+                  />
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-xs font-black uppercase tracking-wide text-neutral-950 line-clamp-2">
+                          {item.name}
+                        </h4>
+                        <button 
+                          onClick={() => handleToggleWishlist(item)}
+                          className="text-rose-500 hover:text-rose-700 transition-colors p-1 cursor-pointer"
+                        >
+                          <HiX className="text-base" />
+                        </button>
+                      </div>
+                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">
+                        ₹{item.price}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleMoveToCart(item)}
+                        className="flex-1 py-2 bg-neutral-900 hover:bg-[var(--theme-primary)] text-white text-[9px] font-black uppercase tracking-wider rounded-lg text-center transition-all cursor-pointer"
+                      >
+                        Move to Bag
+                      </button>
+                      <button
+                        onClick={() => {
+                          setWishlistDrawerOpen(false);
+                          navigate(`/shop/${item.$id || item.id}`);
+                        }}
+                        className="py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
     </>
   );

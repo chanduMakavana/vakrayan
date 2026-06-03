@@ -1,9 +1,17 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 
 function BestSellers() {
   const navigate = useNavigate()
   const products = useSelector(state => state.products.items || [])
+  const [, setWishlistVersion] = useState(0)
+
+  useEffect(() => {
+    const handleUpdate = () => setWishlistVersion(v => v + 1)
+    window.addEventListener('wishlist-updated', handleUpdate)
+    return () => window.removeEventListener('wishlist-updated', handleUpdate)
+  }, [])
 
   return (
     <section id="drops" className="bg-[#fafafb] py-16 px-4 md:px-12 border-t border-neutral-200/50 scroll-mt-20 selection:bg-neutral-900 selection:text-white">
@@ -56,6 +64,38 @@ function BestSellers() {
       {/* Product Images */}
       <div className="w-full aspect-3/4 rounded-2xl overflow-hidden bg-neutral-100 relative border border-neutral-200/50">
         
+        {/* Floating Heart Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+            const exists = saved.some(item => item.$id === uniqueId || item.id === uniqueId);
+            let updated;
+            if (exists) {
+              updated = saved.filter(item => item.$id !== uniqueId && item.id !== uniqueId);
+            } else {
+              updated = [...saved, product];
+            }
+            localStorage.setItem('wishlist', JSON.stringify(updated));
+            window.dispatchEvent(new Event('wishlist-updated'));
+          }}
+          className="absolute top-3 right-3 z-30 bg-white/95 backdrop-blur-xs border border-neutral-200/80 hover:border-neutral-950 p-2 rounded-full shadow-xs hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
+        >
+          {(() => {
+            const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+            const isFav = saved.some(item => item.$id === uniqueId || item.id === uniqueId);
+            return isFav ? (
+              <svg className="w-3.5 h-3.5 text-rose-500 fill-current" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-neutral-500 hover:text-rose-500 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            );
+          })()}
+        </button>
+
         {/* Tag Badge */}
         <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white/90 backdrop-blur-xs border border-neutral-200/80 px-2.5 py-1 rounded-md shadow-xs group-hover:border-[var(--theme-primary)]/20 transition-colors duration-300">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary)] animate-pulse" />
@@ -108,9 +148,11 @@ function BestSellers() {
         <span className="text-base font-black text-neutral-950 tracking-wider">
           ₹{Number(product.price).toLocaleString('en-IN')}
         </span>
-        <span className="text-xs text-neutral-400 line-through font-bold">
-          ₹2,999
-        </span>
+        {product.discount_percent > 0 && (
+          <span className="text-xs text-neutral-400 line-through font-bold">
+            ₹{Math.round(Number(product.price) / (1 - product.discount_percent / 100)).toLocaleString('en-IN')}
+          </span>
+        )}
       </div>
     </div>
     

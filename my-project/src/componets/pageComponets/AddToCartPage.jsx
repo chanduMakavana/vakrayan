@@ -7,10 +7,12 @@ import cartService from '../../appwrite/cart'
 import authService from '../../appwrite/auth'
 import campaignService from '../../appwrite/campaign'
 import { setCartItems as setCartItemsAction, removeCartItemState, updateCartItemState } from '../../features/addToCart'
+import { useToast } from '../../context/ToastContext'
 
 function AddToCartPage() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
+  const { showToast } = useToast()
   
   // Dynamic Hooks for Cloud Synchronization
   const cartItems = useSelector(state => state.cart)
@@ -48,13 +50,13 @@ function AddToCartPage() {
         setPromoInput('');
         sessionStorage.setItem('checkout_coupon', match.code);
         sessionStorage.setItem('checkout_discount', String(match.discount));
-        alert(`Promo code ${match.code} applied. You saved ${match.discount}%.`);
+        showToast(`Promo code ${match.code} applied. You saved ${match.discount}%.`, "success");
       } else {
-        alert("Invalid promo code.");
+        showToast("Invalid promo code.", "error");
       }
     } catch (err) {
       console.error("Promo verification issue:", err);
-      alert("Verification server connection timeout.");
+      showToast("Verification server connection timeout.", "error");
     }
   };
 
@@ -70,7 +72,7 @@ function AddToCartPage() {
         const items = await cartService.getCartItems(user.$id)
         dispatch(setCartItemsAction(items))
       } else {
-        alert("Please session authenticate to track your cart.")
+        showToast("Please session authenticate to track your cart.", "error")
         navigate('/login')
       }
     } catch (error) {
@@ -100,7 +102,7 @@ function AddToCartPage() {
           }
           const availableStock = stocks[item.size] !== undefined ? Number(stocks[item.size]) : 10
           if (targetQuantity + 1 > availableStock) {
-            alert(`❌ Cannot increase quantity. Only ${availableStock} items left in stock for size ${item.size}.`)
+            showToast(`Cannot increase quantity. Only ${availableStock} items left in stock for size ${item.size}.`, "error")
             return
           }
         }
@@ -334,8 +336,21 @@ function AddToCartPage() {
                 </button>
               </div>
               {couponApplied && (
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono">
-                  {couponApplied} applied ({discountPercent}% off)
+                <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 mt-2 animate-scale-in">
+                  <span>🎟️ {couponApplied} ACTIVE ({discountPercent}% OFF)</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCouponApplied('');
+                      setDiscountPercent(0);
+                      sessionStorage.removeItem('checkout_coupon');
+                      sessionStorage.removeItem('checkout_discount');
+                      showToast("Coupon code removed.", "info");
+                    }}
+                    className="text-rose-600 hover:text-rose-800 font-black ml-2 cursor-pointer transition-colors uppercase text-[9px]"
+                  >
+                    ✕ Remove
+                  </button>
                 </div>
               )}
             </div>

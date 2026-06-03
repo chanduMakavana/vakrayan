@@ -1,0 +1,4 @@
+name,price,tags,category,front_image_link,description,sizes,back_image_links,sizes_stock
+"GOTHIC OVERSIZED HOODIE",1499,"[""NEW DROP"",""BEST SELLER""]",hoodies,https://images.unsplash.com/photo-1556821840-3a63f95609a7,"Heavyweight premium streetwear hoodie with gothic drop-shoulder cut.",S;M;L;XL,"[]","{""S"":15,""M"":20,""L"":10,""XL"":5}"
+"GRAPHIC VINTAGE TEE",999,"[""LIMITED ITEM""]",tshirts,https://images.unsplash.com/photo-1521572267360-ee0c2909d518,"Vintage washed heavy cotton tee with retro graphic accents.",M;L;XL,"[]","{""M"":30,""L"":25,""XL"":15}"
+"CARGO STREETWEAR PANTS",1899,"[""FEW LEFT""]",pants,https://images.unsplash.com/photo-1542272604-787c3835535d,"Relaxed fit utility cargo pants with multiple tactical pocket straps.",,"[]","{""S"":5,""M"":12,""L"":2}"

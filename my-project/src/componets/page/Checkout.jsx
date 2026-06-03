@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
@@ -12,6 +12,9 @@ import { clearCartState } from '../../features/addToCart'
 import { setProducts } from '../../features/productsSlice'
 import Navbar from '../pageComponets/Navbar'
 import Footer from '../pageComponets/Footer'
+import { playSuccessChime, triggerConfetti } from '../../utils/sensoryHelper'
+import couponUsageService from '../../appwrite/couponUsage'
+import { useToast } from '../../context/ToastContext'
 
 const generateMockOrderId = () => 'ORD-' + Date.now();
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
@@ -19,14 +22,28 @@ const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
 function Checkout() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
+  const { showToast } = useToast()
+  const confettiCanvasRef = useRef(null)
 
   const { register, handleSubmit, formState: { errors }, setValue } = useForm()
 
   const cartItems = useSelector(state => state.cart || [])
   const { user, isAuthenticated } = useSelector(state => state.auth)
-  const products = useSelector(state => state.products.items || [])
+  const { items: products, fetched: productsFetched } = useSelector(state => state.products)
 
   const [checkoutStatus, setCheckoutStatus] = useState('idle') // idle | processing | success
+
+  useEffect(() => {
+    if (checkoutStatus === 'success') {
+      playSuccessChime()
+      const timer = setTimeout(() => {
+        if (confettiCanvasRef.current) {
+          triggerConfetti(confettiCanvasRef.current)
+        }
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [checkoutStatus])
   const [processingStep, setProcessingStep] = useState(0)
   const [selectedPayment, setSelectedPayment] = useState('COD') // COD | ONLINE
   const [razorpayModalOpen, setRazorpayModalOpen] = useState(false)
@@ -67,8 +84,8 @@ function Checkout() {
         setUpiTimer(prev => {
           if (prev <= 1) {
             clearInterval(interval);
-            setTimeout(() => {
-              alert("UPI QR Code expired. Please generate a new one.");
+             setTimeout(() => {
+              showToast("UPI QR Code expired. Please generate a new one.", "error");
               setUpiQrActive(false);
               setUpiTimer(300);
             }, 0);
@@ -79,24 +96,36 @@ function Checkout() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [razorpayModalOpen, simulatedMethod, upiQrActive]);
+  }, [razorpayModalOpen, simulatedMethod, upiQrActive, showToast]);
 
   // Dynamic Coupon State
   const [promoInput, setPromoInput] = useState('')
-  const [couponApplied, setCouponApplied] = useState('')
-  const [discountPercent, setDiscountPercent] = useState(0)
+  const [couponApplied, setCouponApplied] = useState(() => {
+    return sessionStorage.getItem('checkout_coupon') || '';
+  })
+  const [discountPercent, setDiscountPercent] = useState(() => {
+    return Number(sessionStorage.getItem('checkout_discount') || 0);
+  })
 
-  // Load carried coupon from sessionStorage on mount
+  // Load carried coupon from sessionStorage on mount and validate usage
   useEffect(() => {
     const carriedCoupon = sessionStorage.getItem('checkout_coupon');
-    const carriedDiscount = sessionStorage.getItem('checkout_discount');
-    if (carriedCoupon && carriedDiscount) {
-      setTimeout(() => {
-        setCouponApplied(carriedCoupon);
-        setDiscountPercent(Number(carriedDiscount));
-      }, 0);
+    if (carriedCoupon && user && user.$id) {
+      couponUsageService.checkCouponUsage(user.$id, carriedCoupon)
+        .then(alreadyUsed => {
+          if (alreadyUsed) {
+            sessionStorage.removeItem('checkout_coupon');
+            sessionStorage.removeItem('checkout_discount');
+            setCouponApplied('');
+            setDiscountPercent(0);
+            console.warn("Carried coupon was auto-removed (already used in database).");
+          }
+        })
+        .catch(err => {
+          console.warn("Coupon check failed on mount, ignoring validation:", err);
+        });
     }
-  }, []);
+  }, [user]);
 
   // Programmatically inject official Razorpay SDK script on mount for zero-config deployment
   useEffect(() => {
@@ -136,13 +165,24 @@ function Checkout() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      alert("Please log in to continue checking out.")
+      showToast("Please log in to continue checking out.", "error")
       navigate('/login')
     } else if (cartItems.length === 0) {
-      alert("Your inventory is currently empty.")
+      showToast("Your inventory is currently empty.", "error")
       navigate('/')
     }
-  }, [isAuthenticated, cartItems, navigate])
+  }, [isAuthenticated, cartItems, navigate, showToast])
+
+  if (!productsFetched) {
+    return (
+      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
+        <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+        <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
+          Verifying catalog signatures...
+        </div>
+      </div>
+    );
+  }
 
   const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
   const discountAmount = cartTotalAmount * (discountPercent / 100)
@@ -160,18 +200,28 @@ function Checkout() {
       const activeCoupons = await campaignService.getCoupons();
       const match = activeCoupons.find(c => String(c.code || '').trim().toUpperCase() === promoInput.trim().toUpperCase());
       if (match) {
+        // Enforce single-use coupon check from Appwrite database usage collection
+        if (user && user.$id) {
+          const alreadyUsed = await couponUsageService.checkCouponUsage(user.$id, match.code);
+          if (alreadyUsed) {
+            showToast(`Coupon ${match.code} has already been redeemed. Limit: 1 use per customer.`, "error");
+            setPromoInput('');
+            return;
+          }
+        }
+
         setDiscountPercent(match.discount);
         setCouponApplied(match.code);
         setPromoInput('');
         sessionStorage.setItem('checkout_coupon', match.code);
         sessionStorage.setItem('checkout_discount', String(match.discount));
-        alert(`🎟️ Promo Code ${match.code} applied! Saved ${match.discount}% on fits drop.`);
+        showToast(`Promo Code ${match.code} applied! Saved ${match.discount}% on fits drop.`, "success");
       } else {
-        alert("Invalid promo code.");
+        showToast("Invalid promo code.", "error");
       }
     } catch (err) {
       console.error("Promo verification issue:", err);
-      alert("Verification server connection timeout.");
+      showToast("Verification server connection timeout.", "error");
     }
   };
 
@@ -190,7 +240,7 @@ function Checkout() {
         }
         const availableStock = stocks[cartItem.size] !== undefined ? Number(stocks[cartItem.size]) : 10;
         if (Number(cartItem.quantity) > availableStock) {
-          alert(`❌ Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} items left. Please adjust your cart.`);
+          showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} items left. Please adjust your cart.`, "error");
           return;
         }
       }
@@ -237,7 +287,7 @@ function Checkout() {
             },
             modal: {
               ondismiss: function () {
-                alert("Payment window closed by customer.");
+                showToast("Payment window closed by customer.", "info");
               }
             }
           };
@@ -289,7 +339,7 @@ function Checkout() {
     }
 
     try {
-      // 1. Build the Order Payload
+      // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Appwrite compatibility)
       const orderPayload = {
         userId: user.$id,
         customerName: formData.name.trim(),
@@ -308,11 +358,18 @@ function Checkout() {
         total: Number(finalAmount),
         status: 'PENDING',
         couponApplied: couponApplied || 'NONE',
+        coupon_code: couponApplied || 'NONE',
+        discountAmount: Number(discountAmount),
+        discount_amount: Number(discountAmount),
+        discount_applied: Number(discountAmount) > 0 ? "true" : "false",
         paymentMethod: method,
         paymentStatus: status,
+        payment_status: status,
         paymentProvider: method === 'ONLINE' ? 'RAZORPAY' : 'NONE',
         razorpayOrderId: ordId,
-        razorpayPaymentId: payId
+        razorpay_order_id: ordId,
+        razorpayPaymentId: payId,
+        razorpay_payment_id: payId
       };
 
       // 2. Perform Stock Depletion size-wise on Catalog
@@ -381,7 +438,23 @@ function Checkout() {
         console.warn("⚠️ Address profile auto-save ignored on cloud database:", addrErr.message);
       }
 
-      // 4. Clear Cart globally on Appwrite database & Redux state & Clear Coupon
+      // 4. Log coupon usage in database if coupon was applied
+      if (couponApplied && couponApplied !== 'NONE') {
+        try {
+          await couponUsageService.logCouponUsage(user.$id, couponApplied);
+        } catch (couponErr) {
+          console.warn("⚠️ Coupon usage tracking write failed:", couponErr.message);
+        }
+      }
+
+      // 4.1. Mark cart items as converted before clearing (for abandonment analytics)
+      try {
+        await cartService.convertCartItems(user.$id);
+      } catch (cartErr) {
+        console.warn("⚠️ Cart abandonment status conversion failed:", cartErr.message);
+      }
+
+      // 4.2. Clear Cart globally on Appwrite database & Redux state & Clear Coupon
       await cartService.clearUserCart(user.$id)
       dispatch(clearCartState())
       sessionStorage.removeItem('checkout_coupon')
@@ -390,7 +463,7 @@ function Checkout() {
       setCheckoutStatus('success')
     } catch (error) {
       console.error("Billing pipeline crash:", error)
-      alert("Logistics error. Transaction aborted.")
+      showToast("Logistics error. Transaction aborted.", "error")
       setCheckoutStatus('idle')
     }
   };
@@ -423,10 +496,16 @@ function Checkout() {
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
+      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
         <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
         
-        <div className="relative z-20 w-full max-w-md bg-white p-10 rounded-2xl border border-neutral-200/60 shadow-2xl text-center space-y-6 animate-scale-in">
+        {/* Full-screen celebratory confetti canvas overlay */}
+        <canvas 
+          ref={confettiCanvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none z-15"
+        />
+        
+        <div className="relative z-20 w-full max-w-md bg-white p-10 rounded-2xl border border-neutral-200/60 shadow-2xl text-center space-y-6 animate-scale-up">
           <div className="flex justify-center">
             <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
               <FiCheckCircle className="text-3xl" />
@@ -637,6 +716,19 @@ function Checkout() {
                   </div>
                 </div>
 
+                {selectedPayment === 'ONLINE' && (
+                  <div className="p-3.5 bg-indigo-50/50 border border-indigo-100/60 rounded-xl space-y-1.5 animate-fade-in">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-indigo-700 tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+                      💡 Razorpay Secured Sandbox Active
+                    </div>
+                    <p className="text-[9px] font-mono uppercase text-indigo-600/90 leading-relaxed">
+                      UPI: Enter <strong className="select-all font-black text-indigo-800">success@razorpay</strong> for instant verify, or use mock handles. <br />
+                      Cards: Enter any test card details in the secure pop-up.
+                    </p>
+                  </div>
+                )}
+
                 {/* Simulated Order Submission */}
                 <button
                   type="submit"
@@ -702,8 +794,21 @@ function Checkout() {
                   </button>
                 </div>
                 {couponApplied && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono">
-                    🎟️ {couponApplied} ACTIVE ({discountPercent}% OFF)
+                  <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 mt-2 animate-scale-in">
+                    <span>🎟️ {couponApplied} ACTIVE ({discountPercent}% OFF)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCouponApplied('');
+                        setDiscountPercent(0);
+                        sessionStorage.removeItem('checkout_coupon');
+                        sessionStorage.removeItem('checkout_discount');
+                        showToast("Coupon code removed.", "info");
+                      }}
+                      className="text-rose-600 hover:text-rose-800 font-black ml-2 cursor-pointer transition-colors uppercase text-[9px]"
+                    >
+                      ✕ Remove
+                    </button>
                   </div>
                 )}
               </div>

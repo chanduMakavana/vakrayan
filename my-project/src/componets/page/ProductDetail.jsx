@@ -8,11 +8,14 @@ import ordersService from '../../appwrite/orders';
 import AddToCartButton from '../pageComponets/AddToCartButton';
 import Navbar from '../pageComponets/Navbar';
 import Footer from '../pageComponets/Footer';
+import restockService from '../../appwrite/restock';
 import { FaStar } from 'react-icons/fa';
+import { useToast } from '../../context/ToastContext';
 
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const products = useSelector(state => state.products.items || []);
   const { user, isAuthenticated } = useSelector(state => state.auth);
 
@@ -21,6 +24,41 @@ function ProductDetail() {
   const [activeImage, setActiveImage] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
 
+  // Restock Notifications State & Handler
+  const [notifyEmail, setNotifyEmail] = useState('');
+  const [notifyStatus, setNotifyStatus] = useState('idle');
+  const [notifyError, setNotifyError] = useState('');
+
+  const handleNotifyMe = async (e, size) => {
+    e.preventDefault();
+    setNotifyError('');
+    
+    if (!notifyEmail.trim()) {
+      setNotifyError('Email is required.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(notifyEmail.trim())) {
+      setNotifyError('Invalid email formatting.');
+      return;
+    }
+    
+    try {
+      setNotifyStatus('loading');
+      await restockService.requestRestockNotification(
+        notifyEmail,
+        product.$id || product.id,
+        size
+      );
+      setNotifyStatus('success');
+      setNotifyEmail('');
+    } catch (err) {
+      console.error("Restock log failure:", err);
+      setNotifyError('Registration failed. Try again.');
+      setNotifyStatus('idle');
+    }
+  };
+
   // Product Reviews State
   const [reviews, setReviews] = useState([]);
   const [newRating, setNewRating] = useState(5);
@@ -28,6 +66,30 @@ function ProductDetail() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [hasDeliveredOrder, setHasDeliveredOrder] = useState(false);
   const [checkingOrder, setCheckingOrder] = useState(true);
+
+  // Virtual Size Advisor & Wishlist Integration
+  const [sizeAdvisorOpen, setSizeAdvisorOpen] = useState(false);
+  const [advHeight, setAdvHeight] = useState('');
+  const [advWeight, setAdvWeight] = useState('');
+  const [advRecommendation, setAdvRecommendation] = useState('');
+  const [advBmi, setAdvBmi] = useState(null);
+  const [, setWishlistVersion] = useState(0);
+
+  useEffect(() => {
+    const handleUpdate = () => setWishlistVersion(v => v + 1);
+    window.addEventListener('wishlist-updated', handleUpdate);
+    return () => window.removeEventListener('wishlist-updated', handleUpdate);
+  }, []);
+
+  const calculateRecommendation = () => {
+    const h = Number(advHeight) / 100;
+    const w = Number(advWeight);
+    if (!h || !w) return;
+    const bmi = w / (h * h);
+    setAdvBmi(bmi.toFixed(1));
+    const recSize = bmi < 19 ? 'S' : bmi < 23 ? 'M' : bmi < 27 ? 'L' : 'XL';
+    setAdvRecommendation(recSize);
+  };
   
 
   // Interactive detail accordions
@@ -57,34 +119,36 @@ function ProductDetail() {
   };
 
  useEffect(() => {
+  let isMounted = true;
   async function loadCompleteProductStage() {
     try {
-      setLoading(true);
+      if (isMounted) setLoading(true);
       
       // Attempt Redux Cache pre-matching first
       const cachedProduct = products.find(p => p.$id === id || p.id === id);
       if (cachedProduct) {
-        setProduct(cachedProduct);
-        setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
-        
-        if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
-          setSelectedSize(cachedProduct.sizes[0]);
-        }
+        if (isMounted) {
+          setProduct(cachedProduct);
+          setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
+          
+          if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
+            setSelectedSize(cachedProduct.sizes[0]);
+          }
 
-        if (cachedProduct.category) {
+          const cachedCategory = cachedProduct.category || "";
           const filteredSuggestions = products.filter(
-            item => item.category === cachedProduct.category && item.$id !== cachedProduct.$id && item.id !== cachedProduct.id
+            item => cachedCategory && item.category === cachedCategory && (item.$id || item.id) !== (cachedProduct.$id || cachedProduct.id)
           );
           setSuggestProduct(filteredSuggestions);
+          setLoading(false);
         }
-        setLoading(false);
         return;
       }
 
       // Database fallback queries
       const mainProductData = await productsService.getProductById(id);
 
-      if (mainProductData) {
+      if (mainProductData && isMounted) {
         setProduct(mainProductData);
         setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
         
@@ -92,37 +156,42 @@ function ProductDetail() {
           setSelectedSize(mainProductData.sizes[0]);
         }
 
-        if (mainProductData.category) {
-          const response = await productsService.getProducts();
-          const structuredData = response?.documents || response || [];
-          
-          const filteredSuggestions = structuredData.filter(
-            item => item.category === mainProductData.category && item.$id !== mainProductData.$id
-          );
-          
-          setSuggestProduct(filteredSuggestions);
-        }
+        const mainCategory = mainProductData.category || "";
+        const response = await productsService.getProducts();
+        const structuredData = response?.documents || response || [];
+        
+        const filteredSuggestions = structuredData.filter(
+          item => mainCategory && item.category === mainCategory && (item.$id || item.id) !== (mainProductData.$id || mainProductData.id)
+        );
+        
+        setSuggestProduct(filteredSuggestions);
       }
     } catch (error) {
       console.error("Failed to execute data pipeline matrix updates from Appwrite:", error);
-      alert("Requested drop sequence untraceable inside active servers.");
-      navigate('/');
+      if (isMounted) {
+        showToast("Requested drop sequence untraceable inside active servers.", "error");
+        navigate('/');
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
   }
 
   if (id) {
     loadCompleteProductStage();
   }
- }, [id, navigate, products]);
+  return () => {
+    isMounted = false;
+  };
+ }, [id, navigate, products, showToast]);
 
   // Load reviews on mount
   useEffect(() => {
+    let isMounted = true;
     async function loadReviews() {
       try {
         const productReviews = await reviewsService.getReviewsByProductId(id);
-        setReviews(productReviews || []);
+        if (isMounted) setReviews(productReviews || []);
       } catch (err) {
         console.error("Failed to load reviews:", err);
       }
@@ -130,18 +199,24 @@ function ProductDetail() {
     if (id) {
       loadReviews();
     }
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   // Check if user has a delivered order for this product
   useEffect(() => {
+    let isMounted = true;
     async function checkPurchased() {
       if (!isAuthenticated || !user || !id || !product) {
-        setHasDeliveredOrder(false);
-        setCheckingOrder(false);
+        if (isMounted) {
+          setHasDeliveredOrder(false);
+          setCheckingOrder(false);
+        }
         return;
       }
       try {
-        setCheckingOrder(true);
+        if (isMounted) setCheckingOrder(true);
         const userOrders = await ordersService.getUserOrders(user.$id);
         const matched = userOrders.some(order => {
           if (order.status !== 'DELIVERED') return false;
@@ -159,25 +234,28 @@ function ProductDetail() {
             return String(item.name).trim().toUpperCase() === String(product.name).trim().toUpperCase();
           });
         });
-        setHasDeliveredOrder(matched);
+        if (isMounted) setHasDeliveredOrder(matched);
       } catch (err) {
         console.error("Error checking order purchase history:", err);
-        setHasDeliveredOrder(false);
+        if (isMounted) setHasDeliveredOrder(false);
       } finally {
-        setCheckingOrder(false);
+        if (isMounted) setCheckingOrder(false);
       }
     }
     checkPurchased();
+    return () => {
+      isMounted = false;
+    };
   }, [user, isAuthenticated, id, product]);
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthenticated || !user) {
-      alert("Please login to secure a review placement.");
+      showToast("Please login to secure a review placement.", "error");
       return;
     }
     if (!newComment.trim()) {
-      alert("Please enter a valid review comment specification.");
+      showToast("Please enter a valid review comment specification.", "error");
       return;
     }
 
@@ -195,11 +273,11 @@ function ProductDetail() {
         setReviews(prev => [newDoc, ...prev]);
         setNewComment('');
         setNewRating(5);
-        alert("Review submitted successfully.");
+        showToast("Review submitted successfully.", "success");
       }
     } catch (err) {
       console.error("Failed to submit review:", err);
-      alert("Failed to submit review. Connection timed out.");
+      showToast("Failed to submit review. Connection timed out.", "error");
     } finally {
       setSubmittingReview(false);
     }
@@ -207,16 +285,33 @@ function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
-        <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
-        <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
-          Loading product details...
+      <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center gap-4 py-32">
+          <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+          <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
+            Loading product details...
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!product) return null;
+  if (!product) {
+    return (
+      <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center gap-6 py-32 text-center">
+          <p className="text-xs uppercase tracking-widest text-neutral-400 font-bold">
+            Requested drop not found.
+          </p>
+          <Link to="/" className="text-xs font-black uppercase tracking-widest text-[var(--theme-primary)] border-b border-[var(--theme-primary)] pb-0.5 hover:text-neutral-950 transition-colors">
+            Back to Shop
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const galleryImages = [
     product.front_image_link || product.image_url || product.image,
     ...(Array.isArray(product.back_image_links) ? product.back_image_links : [product.back_image_link])
@@ -313,12 +408,16 @@ function ProductDetail() {
                 <span className="text-2xl font-bold text-neutral-900">
                   ₹{Number(product.price).toLocaleString('en-IN')}
                 </span>
-                <span className="text-sm text-neutral-400 line-through font-medium">
-                  ₹2,999
-                </span>
-                <span className="text-[10px] text-indigo-600 font-bold tracking-wider bg-indigo-50 px-2 py-0.5 rounded">
-                  50% OFF
-                </span>
+                {product.discount_percent > 0 && (
+                  <>
+                    <span className="text-sm text-neutral-400 line-through font-medium">
+                      ₹{Math.round(Number(product.price) / (1 - product.discount_percent / 100)).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[10px] text-indigo-600 font-bold tracking-wider bg-indigo-50 px-2 py-0.5 rounded">
+                      {product.discount_percent}% OFF
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -337,7 +436,12 @@ function ProductDetail() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-bold text-neutral-700">Select Size</h4>
-                    <span className="text-xs text-neutral-500 font-semibold border-b border-neutral-300 cursor-pointer pb-0.5 hover:text-neutral-950 transition-colors uppercase tracking-wider">Size Guide</span>
+                    <span 
+                      onClick={() => setSizeAdvisorOpen(true)}
+                      className="text-xs text-[var(--theme-primary)] font-black border-b border-[var(--theme-primary)] cursor-pointer pb-0.5 hover:text-neutral-900 transition-colors uppercase tracking-wider animate-pulse"
+                    >
+                      📏 Size Advisor
+                    </span>
                   </div>
                   <div className="grid grid-cols-6 gap-2">
                     {product.sizes.map((size) => {
@@ -362,22 +466,131 @@ function ProductDetail() {
                     })}
                   </div>
                   
-                  {selectedSize && stockMap[selectedSize] > 0 && stockMap[selectedSize] < 5 && (
-                    <p className="text-[10px] text-indigo-600 font-bold uppercase animate-pulse mt-1">
-                      Few items left in stock!
-                    </p>
-                  )}
+                  {selectedSize && (() => {
+                    const stockVal = stockMap[selectedSize] !== undefined ? Number(stockMap[selectedSize]) : 10;
+                    if (stockVal === 0) {
+                      return (
+                        <div className="space-y-3 mt-2 animate-fade-in">
+                          <div className="p-3 bg-neutral-900 border border-neutral-800 text-white rounded-xl flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            <p className="text-[10px] text-neutral-300 font-bold uppercase tracking-wider">
+                              ✕ Size {selectedSize} is Out of Stock
+                            </p>
+                          </div>
+                          
+                          {notifyStatus !== 'success' ? (
+                            <form onSubmit={(e) => handleNotifyMe(e, selectedSize)} className="space-y-1.5">
+                              <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">
+                                Get notified when we restock this size:
+                              </label>
+                              <div className="flex rounded-xl overflow-hidden border border-neutral-200 bg-white focus-within:border-neutral-400 transition-colors">
+                                <input 
+                                  type="email" 
+                                  value={notifyEmail}
+                                  onChange={(e) => setNotifyEmail(e.target.value)}
+                                  placeholder="ENTER YOUR EMAIL" 
+                                  disabled={notifyStatus === 'loading'}
+                                  className="bg-transparent text-neutral-800 placeholder-neutral-400 text-[10px] tracking-wider px-4 py-3 w-full outline-hidden"
+                                />
+                                <button 
+                                  type="submit" 
+                                  disabled={notifyStatus === 'loading'}
+                                  className="bg-neutral-950 text-white font-black text-xs px-5 uppercase hover:bg-neutral-800 transition-colors cursor-pointer disabled:bg-neutral-300"
+                                >
+                                  {notifyStatus === 'loading' ? 'Saving...' : 'Notify Me'}
+                                </button>
+                              </div>
+                              {notifyError && (
+                                <p className="text-[9px] text-rose-500 font-mono tracking-widest uppercase pt-0.5 animate-pulse">
+                                  {notifyError}
+                                </p>
+                              )}
+                            </form>
+                          ) : (
+                            <div className="p-3 bg-emerald-950 text-emerald-400 border border-emerald-900 rounded-xl text-[10px] font-black uppercase tracking-widest leading-normal animate-scale-up">
+                              ✓ Notification registered successfully!<br />
+                              <span className="text-emerald-500 font-mono text-[9px] font-medium tracking-wider">We'll alert you the second this size drops again.</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    if (stockVal < 5) {
+                      const fillPercent = (stockVal / 5) * 100;
+                      return (
+                        <div className="space-y-2 mt-2.5 animate-fade-in">
+                          <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-rose-600 animate-pulse">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              ⚠️ Extremely Low Stock in Size {selectedSize}!
+                            </span>
+                            <span>Only {stockVal} items left</span>
+                          </div>
+                          {/* Premium warning bar */}
+                          <div className="w-full h-[3px] bg-rose-100 rounded-full overflow-hidden">
+                            <div 
+                              style={{ width: `${fillPercent}%` }} 
+                              className="h-full bg-rose-500 rounded-full transition-all duration-700 ease-out" 
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="p-3 bg-emerald-50/50 border border-emerald-100/60 rounded-xl flex items-center gap-2 mt-2 animate-fade-in">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
+                          ✓ Size {selectedSize} is In Stock - Ready for immediate drop
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
 
             {/* Cart Operations */}
             <div className="space-y-4 pt-2 border-t border-neutral-100">
-              <div className="w-full transform active:scale-[0.99] transition-transform duration-150">
-                <AddToCartButton
-                  product={product}
-                  selectedSize={selectedSize}
-                />
+              <div className="flex gap-4 items-center">
+                <div className="flex-1 transform active:scale-[0.99] transition-transform duration-150">
+                  <AddToCartButton
+                    product={product}
+                    selectedSize={selectedSize}
+                  />
+                </div>
+                
+                {/* Wishlist Detail Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                    const exists = saved.some(item => item.$id === (product.$id || product.id) || item.id === (product.$id || product.id));
+                    let updated;
+                    if (exists) {
+                      updated = saved.filter(item => item.$id !== (product.$id || product.id) && item.id !== (product.$id || product.id));
+                    } else {
+                      updated = [...saved, product];
+                    }
+                    localStorage.setItem('wishlist', JSON.stringify(updated));
+                    window.dispatchEvent(new Event('wishlist-updated'));
+                  }}
+                  className="p-3 bg-white border border-neutral-200 hover:border-rose-500 rounded-xl shadow-xs hover:shadow-md transition-all group shrink-0 cursor-pointer"
+                  title="Save Fit to Wishlist"
+                >
+                  {(() => {
+                    const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                    const exists = saved.some(item => item.$id === (product.$id || product.id) || item.id === (product.$id || product.id));
+                    return exists ? (
+                      <svg className="w-5 h-5 text-rose-500 fill-current" viewBox="0 0 24 24">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-neutral-400 group-hover:text-rose-500 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      </svg>
+                    );
+                  })()}
+                </button>
               </div>
 
               <div className="flex items-center gap-2 text-neutral-500 text-xs bg-neutral-50 border border-neutral-100 p-3 rounded-lg">
@@ -591,6 +804,53 @@ function ProductDetail() {
                 </div>
               </div>
 
+              {/* Sizing & Fit Stats (True to Size) */}
+              <div className="bg-white p-6 rounded-xl border border-neutral-200/60 shadow-xs space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-black tracking-wider uppercase text-neutral-800">
+                    Fit Statistics
+                  </h3>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">
+                    94% Verified Fit
+                  </span>
+                </div>
+                
+                <div className="space-y-4 pt-2">
+                  {/* Slider indicator */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-black uppercase text-neutral-500">
+                      <span>Tight (8%)</span>
+                      <span className="text-[var(--theme-primary)] font-bold">True To Size (82%)</span>
+                      <span>Loose (10%)</span>
+                    </div>
+                    <div className="relative h-2 bg-neutral-100 rounded-full overflow-hidden">
+                      {/* Tight segment */}
+                      <div className="absolute top-0 left-0 h-full bg-rose-300" style={{ width: '8%' }} />
+                      {/* True to Size segment */}
+                      <div className="absolute top-0 left-[8%] h-full bg-[var(--theme-primary)]" style={{ width: '82%' }} />
+                      {/* Loose segment */}
+                      <div className="absolute top-0 left-[90%] h-full bg-amber-300" style={{ width: '10%' }} />
+                    </div>
+                  </div>
+
+                  {/* Rating parameters */}
+                  <div className="grid grid-cols-3 gap-2 pt-2 text-center">
+                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
+                      <span className="text-[18px] font-black text-neutral-800">4.8</span>
+                      <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block mt-1">Comfort</span>
+                    </div>
+                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
+                      <span className="text-[18px] font-black text-neutral-800">4.9</span>
+                      <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block mt-1">Quality</span>
+                    </div>
+                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
+                      <span className="text-[18px] font-black text-neutral-800">4.7</span>
+                      <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block mt-1">Breathable</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Write Review Panel */}
               <div className="bg-white p-6 rounded-xl border border-neutral-200/60 shadow-xs space-y-4">
                 <h3 className="text-xs font-bold tracking-wider uppercase text-neutral-800">
@@ -715,6 +975,133 @@ function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Sizing Advisor Modal */}
+      {sizeAdvisorOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          {/* Backdrop overlay */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity" onClick={() => {
+            setSizeAdvisorOpen(false);
+            setAdvHeight('');
+            setAdvWeight('');
+            setAdvBmi(null);
+            setAdvRecommendation('');
+          }}></div>
+
+          {/* Modal Box */}
+          <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-neutral-100 z-10 animate-fade-in space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-neutral-900">
+                  👔 VIRTUAL SIZE ADVISOR
+                </h3>
+                <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-0.5">
+                  Calculate Your Perfect Fit
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setSizeAdvisorOpen(false);
+                  setAdvHeight('');
+                  setAdvWeight('');
+                  setAdvBmi(null);
+                  setAdvRecommendation('');
+                }}
+                className="text-neutral-400 hover:text-neutral-900 p-2 transition-colors cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Form body */}
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                  Height (cm)
+                </label>
+                <input 
+                  type="number" 
+                  placeholder="e.g. 175" 
+                  value={advHeight}
+                  onChange={(e) => setAdvHeight(e.target.value)}
+                  className="bg-neutral-50 border border-neutral-200 focus:border-neutral-950 focus:bg-white rounded-xl px-4 py-3 text-xs font-bold outline-hidden transition-all text-neutral-900"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                  Weight (kg)
+                </label>
+                <input 
+                  type="number" 
+                  placeholder="e.g. 70" 
+                  value={advWeight}
+                  onChange={(e) => setAdvWeight(e.target.value)}
+                  className="bg-neutral-50 border border-neutral-200 focus:border-neutral-950 focus:bg-white rounded-xl px-4 py-3 text-xs font-bold outline-hidden transition-all text-neutral-900"
+                />
+              </div>
+
+              <button
+                onClick={calculateRecommendation}
+                disabled={!advHeight || !advWeight}
+                className="w-full py-3.5 bg-neutral-900 hover:bg-[var(--theme-primary)] text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed"
+              >
+                Calculate Size
+              </button>
+            </div>
+
+            {/* Recommendations display */}
+            {advBmi && (
+              <div className="p-5 bg-neutral-50 border border-neutral-200/60 rounded-2xl text-center space-y-3 animate-fade-in">
+                <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest">
+                  Your BMI: <span className="text-neutral-900 font-black">{advBmi}</span>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">
+                    Recommended Size
+                  </div>
+                  <div className="text-3xl font-black text-[var(--theme-primary)] tracking-wide">
+                    {advRecommendation}
+                  </div>
+                </div>
+
+                <p className="text-[10px] font-medium text-neutral-500 leading-relaxed max-w-xs mx-auto">
+                  {advRecommendation === 'S' && "Based on lightweight dimensions, 'S' provides a sleek look."}
+                  {advRecommendation === 'M' && "Based on balanced dimensions, 'M' guarantees standard relaxed styling."}
+                  {advRecommendation === 'L' && "Based on solid dimensions, 'L' guarantees comfortable signatures drops."}
+                  {advRecommendation === 'XL' && "Based on heavyweight dimensions, 'XL' guarantees a bold oversized silhouette."}
+                </p>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      if (product.sizes?.includes(advRecommendation)) {
+                        setSelectedSize(advRecommendation);
+                        showToast(`Applied Recommended Size "${advRecommendation}"!`, "success");
+                      } else {
+                        showToast(`Recommended size "${advRecommendation}" is not in stock for this product.`, "error");
+                      }
+                      setSizeAdvisorOpen(false);
+                      setAdvHeight('');
+                      setAdvWeight('');
+                      setAdvBmi(null);
+                      setAdvRecommendation('');
+                    }}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                  >
+                    Select & Apply Size
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );

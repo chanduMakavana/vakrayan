@@ -4,11 +4,13 @@ import { useSelector } from 'react-redux';
 import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText } from 'react-icons/fi';
 import ordersService from '../../appwrite/orders';
 import Navbar from '../pageComponets/Navbar';
+import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 
 function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
   const [order, setOrder] = useState(null);
@@ -27,13 +29,13 @@ function OrderDetail() {
         if (orderData) {
           // Security lock: Ensure users can only view their own orders
           if (orderData.userId !== user.$id && user.email !== import.meta.env.VITE_ADMIN_EMAIL && user.email !== "makwanachandu480@gmail.com") {
-            alert("Security Clearance Required. Access Aborted.");
+            showToast("Security Clearance Required. Access Aborted.", "error");
             navigate('/profile');
             return;
           }
           setOrder(orderData);
         } else {
-          alert("Requested order manifest untraceable inside active servers.");
+          showToast("Requested order manifest untraceable inside active servers.", "error");
           navigate('/profile');
         }
       } catch (err) {
@@ -47,7 +49,7 @@ function OrderDetail() {
     if (id && user) {
       loadOrderSpec();
     }
-  }, [id, user, isAuthenticated, navigate]);
+  }, [id, user, isAuthenticated, navigate, showToast]);
 
   if (loading) {
     return (
@@ -82,8 +84,17 @@ function OrderDetail() {
   const totalItemsCount = parsedItems.reduce((acc, i) => acc + Number(i.quantity || 1), 0);
 
   // Status index for visual track
-  const statusSteps = ['PENDING', 'SHIPPED', 'DELIVERED'];
-  const currentStatusIdx = statusSteps.indexOf(order.status || 'PENDING');
+  const statusSteps = [
+    { key: 'PENDING', label: 'Order Confirmed', desc: 'Garment manifest logged and secured.' },
+    { key: 'PROCESSING', label: 'Processed & Packed', desc: 'HQ staff verified streetwear quality standards.' },
+    { key: 'SHIPPED', label: 'Shipped & Outward', desc: 'Express shipment dispatched via global logistics partner.' },
+    { key: 'IN_TRANSIT', label: 'In Transit', desc: 'Drop packages arriving at nearest fulfillment center.' },
+    { key: 'DELIVERED', label: 'Delivered Fits', desc: 'Secure courier drop off confirmed at consignee address.' }
+  ];
+
+  const foundIdx = statusSteps.findIndex(s => s.key === order.status);
+  const currentStepIdx = foundIdx !== -1 ? foundIdx : 0;
+
 
   return (
     <>
@@ -125,40 +136,51 @@ function OrderDetail() {
             </div>
 
             {/* Industrial Fulfillment Status Track */}
-            <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200 space-y-4">
-              <h3 className="text-[9px] font-black tracking-[0.25em] text-neutral-400 uppercase">
-                SHIPMENT DISPATCH STATE
+            <div className="bg-neutral-50 p-8 rounded-2xl border border-neutral-200 space-y-6">
+              <h3 className="text-[10px] font-black tracking-[0.25em] text-neutral-400 uppercase">
+                🚚 LIVE SHIPMENT TRACKER
               </h3>
               
-              {/* Visual Track Steps */}
-              <div className="grid grid-cols-3 gap-2 relative">
+              <div className="relative pl-6 space-y-8">
+                {/* Vertical Line */}
+                <div className="absolute left-[35px] top-4 bottom-4 w-1 bg-neutral-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-[var(--theme-primary)] transition-all duration-1000 ease-out" 
+                    style={{ height: `${(currentStepIdx / 4) * 100}%` }}
+                  />
+                </div>
+
                 {statusSteps.map((step, idx) => {
-                  const isActive = idx <= currentStatusIdx;
-                  const isCurrent = idx === currentStatusIdx;
+                  const isActive = idx <= currentStepIdx;
+                  const isCurrent = idx === currentStepIdx;
                   return (
-                    <div key={step} className="text-center space-y-2 group">
-                      <div className="flex justify-center relative">
-                        {/* Connecting Line */}
-                        {idx < 2 && (
-                          <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 w-full h-[1.5px] z-0 ${
-                            idx < currentStatusIdx ? 'bg-neutral-950' : 'bg-neutral-200'
-                          }`} />
-                        )}
-                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center relative z-10 transition-all duration-300 ${
-                          isCurrent 
-                          ? 'bg-neutral-950 border-neutral-950 text-white shadow-md scale-105' 
-                          : isActive 
-                          ? 'bg-neutral-900 border-neutral-900 text-white' 
-                          : 'bg-white border-neutral-200 text-neutral-400'
-                        }`}>
-                          {step === 'PENDING' ? <FiFileText className="text-sm" /> : step === 'SHIPPED' ? <FiTruck className="text-sm" /> : <FiCheckCircle className="text-sm" />}
-                        </div>
-                      </div>
-                      <span className={`text-[9px] font-mono tracking-wider font-black block uppercase ${
-                        isActive ? 'text-neutral-900' : 'text-neutral-400'
+                    <div key={step.key} className="flex gap-6 items-start relative z-10">
+                      {/* Checkpoint Dot */}
+                      <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
+                        isCurrent 
+                        ? 'bg-[var(--theme-primary)] border-[var(--theme-primary)] text-white shadow-lg scale-110 animate-pulse' 
+                        : isActive 
+                        ? 'bg-neutral-900 border-neutral-900 text-white' 
+                        : 'bg-white border-neutral-200 text-neutral-400'
                       }`}>
-                        {step}
-                      </span>
+                        {idx === 4 ? (
+                          <FiCheckCircle className="text-sm" />
+                        ) : idx === 2 ? (
+                          <FiTruck className="text-sm" />
+                        ) : (
+                          <FiFileText className="text-sm" />
+                        )}
+                      </div>
+
+                      {/* Content block */}
+                      <div className="space-y-1 pt-1">
+                        <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-neutral-950 font-black' : 'text-neutral-400'}`}>
+                          {step.label}
+                        </h4>
+                        <p className="text-[10px] text-neutral-500 max-w-lg leading-relaxed">
+                          {step.desc}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}

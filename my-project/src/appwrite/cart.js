@@ -16,8 +16,7 @@ export class CartService {
     async addToCart({name, size, price, quantity = 1, product_id, product_Image, userId, existingCartItem}) {
         try {
             if (!userId) {
-                alert("Please login to secure your drop.");
-                return null;
+                throw new Error("Please login to secure your drop.");
             }
 
             if (existingCartItem) {
@@ -117,6 +116,39 @@ export class CartService {
         } catch (error) {
             console.error("Appwrite service :: clearUserCart :: error", error.message);
             throw error;
+        }
+    }
+
+    // Soft-update cart items status to converted on checkout (used for abandonment analytics)
+    async convertCartItems(user_id) {
+        try {
+            const items = await this.getCartItems(user_id);
+            for (const item of items) {
+                try {
+                    await this.updateCartItem(item.$id, { cart_status: 'converted' });
+                } catch (e) {
+                    console.warn("⚠️ Appwrite schema missing 'cart_status' attribute:", e.message);
+                }
+            }
+            return true;
+        } catch (error) {
+            console.error("Appwrite service :: convertCartItems :: error", error.message);
+            return false;
+        }
+    }
+
+    // Retrieve all cart documents for admin abandonment analysis
+    async getAllCarts() {
+        try {
+            if (!conf.appwriteCartCollectionId) return [];
+            const response = await this.databases.listDocuments(
+                conf.appwriteDatabaseId,
+                conf.appwriteCartCollectionId
+            );
+            return response.documents;
+        } catch (error) {
+            console.error("Appwrite service :: getAllCarts :: error", error.message);
+            return [];
         }
     }
 }
