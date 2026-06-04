@@ -3,6 +3,7 @@ import loginReducer from "../features/login";
 import searchReducer from "../features/search";
 import cartReducer from "../features/addToCart";
 import productsReducer from "../features/productsSlice";
+import wishlistReducer from "../features/wishlistSlice";
 
 export const store = configureStore({
     reducer: {
@@ -10,9 +11,7 @@ export const store = configureStore({
         search: searchReducer,
         cart: cartReducer,
         products: productsReducer,
-    },
-    middleware: (getDefaultMiddleware) =>
-        getDefaultMiddleware({
-            serializableCheck: false,
-        }),
-})
+        wishlist: wishlistReducer,
+    }
+});
+

@@ -58,23 +58,8 @@ function SignUp() {
     }
   }
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/')
-      return
-    }
-    const userLoginStatus = async()=>{
-      try{
-        const session = await authService.getCurrentUser();
-        if(session){
-          navigate('/')
-        }
-      }
-      catch(error){
-        console.log("User Already Login",error);
-      }
-    }
-    userLoginStatus();
-  }, [navigate, isAuthenticated]);
+    if (isAuthenticated) navigate('/');
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-neutral-900 selection:text-white">

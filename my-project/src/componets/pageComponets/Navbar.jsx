@@ -8,8 +8,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logout as logoutAction } from '../../features/login'; 
 import authService from '../../appwrite/auth';
 import cartService from '../../appwrite/cart';
+import productsService from '../../appwrite/products';
 import { AiOutlineClose } from "react-icons/ai";
 import { clearCartState, addCartItemState, updateCartItemState, removeCartItemState, setCartItems } from '../../features/addToCart';
+import { setWishlistItems, addWishlistItemState, removeWishlistItemState, clearWishlistState } from '../../features/wishlistSlice';
 import { motion } from 'framer-motion';
 import wishlistService from '../../appwrite/wishlist';
 import { useToast } from '../../context/ToastContext';
@@ -36,64 +38,17 @@ function Navbar() {
   // Extended Interactive States (Cart & Wishlist Drawers)
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [wishlistDrawerOpen, setWishlistDrawerOpen] = useState(false);
-  const [wishlist, setWishlist] = useState([]);
   const [animateCart, setAnimateCart] = useState(false);
   const [animateWishlist, setAnimateWishlist] = useState(false);
+  const [removingIds, setRemovingIds] = useState(new Set());
 
-  // Sync wishlist updates across components
+  const wishlist = useSelector(state => state.wishlist || []);
+
+  // Hydrate Redux wishlist from localStorage on mount
   useEffect(() => {
-    let isFirstRun = true;
-    const updateWishlist = () => {
-      const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-      setWishlist(saved);
-      if (!isFirstRun) {
-        setAnimateWishlist(true);
-        setTimeout(() => setAnimateWishlist(false), 300);
-      }
-      isFirstRun = false;
-    };
-    updateWishlist();
-    window.addEventListener('wishlist-updated', updateWishlist);
-    return () => window.removeEventListener('wishlist-updated', updateWishlist);
-  }, []);
-
-  // Listen to cart additions for spring micro-animations
-  useEffect(() => {
-    const triggerCartAnim = () => {
-      setAnimateCart(true);
-      setTimeout(() => setAnimateCart(false), 300);
-    };
-    window.addEventListener('cart-item-added', triggerCartAnim);
-    return () => window.removeEventListener('cart-item-added', triggerCartAnim);
-  }, []);
-
-  const handleToggleWishlist = async (product) => {
     const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-    const productId = product.$id || product.id;
-    const exists = saved.some(item => (item.$id || item.id) === productId);
-    let updated;
-    if (exists) {
-      updated = saved.filter(item => (item.$id || item.id) !== productId);
-      if (isAuthenticated && user) {
-        try {
-          await wishlistService.removeFromWishlist(user.$id, productId);
-        } catch (e) {
-          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
-        }
-      }
-    } else {
-      updated = [...saved, product];
-      if (isAuthenticated && user) {
-        try {
-          await wishlistService.addToWishlist(user.$id, productId);
-        } catch (e) {
-          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
-        }
-      }
-    }
-    localStorage.setItem('wishlist', JSON.stringify(updated));
-    window.dispatchEvent(new Event('wishlist-updated'));
-  };
+    dispatch(setWishlistItems(saved));
+  }, [dispatch]);
 
   // Sync wishlist with Appwrite cloud database upon authentication
   useEffect(() => {
@@ -113,7 +68,7 @@ function Navbar() {
           
           if (mergedList.length > 0) {
             localStorage.setItem('wishlist', JSON.stringify(mergedList));
-            window.dispatchEvent(new Event('wishlist-updated'));
+            dispatch(setWishlistItems(mergedList));
           }
         } catch (err) {
           console.error("Failed to sync cloud wishlist:", err);
@@ -123,7 +78,66 @@ function Navbar() {
     if (products.length > 0) {
       syncWishlistCloud();
     }
-  }, [isAuthenticated, user, products]);
+  }, [isAuthenticated, user, products, dispatch]);
+
+  const handleToggleWishlist = async (product) => {
+    const productId = product.$id || product.id;
+    const exists = wishlist.some(item => (item.$id || item.id) === productId);
+    let updated;
+    setAnimateWishlist(true);
+    setTimeout(() => setAnimateWishlist(false), 300);
+
+    if (exists) {
+      dispatch(removeWishlistItemState(productId));
+      const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+      updated = saved.filter(item => (item.$id || item.id) !== productId);
+      localStorage.setItem('wishlist', JSON.stringify(updated));
+      if (isAuthenticated && user) {
+        try {
+          await wishlistService.removeFromWishlist(user.$id, productId);
+        } catch (e) {
+          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+        }
+      }
+    } else {
+      dispatch(addWishlistItemState(product));
+      const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+      updated = [...saved, product];
+      localStorage.setItem('wishlist', JSON.stringify(updated));
+      if (isAuthenticated && user) {
+        try {
+          await wishlistService.addToWishlist(user.$id, productId);
+        } catch (e) {
+          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+        }
+      }
+    }
+  };
+
+  // Debounced search logic (350ms duration)
+  useEffect(() => {
+    if (!searchOpen) return;
+    const timer = setTimeout(() => {
+      if (searchVal.trim()) {
+        navigate(`/shop?search=${encodeURIComponent(searchVal.trim())}`);
+      } else {
+        navigate(`/shop`);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchVal, searchOpen, navigate]);
+
+  // Listen to cart additions for spring micro-animations
+  useEffect(() => {
+    const triggerCartAnim = () => {
+      setAnimateCart(true);
+      setTimeout(() => setAnimateCart(false), 300);
+    };
+    window.addEventListener('cart-item-added', triggerCartAnim);
+    return () => window.removeEventListener('cart-item-added', triggerCartAnim);
+  }, []);
+
+
 
   const handleMoveToCart = async (product) => {
     if (!isAuthenticated || !user) {
@@ -167,7 +181,41 @@ function Navbar() {
   const handleCartQuantityShift = async (item, operation) => {
     try {
       let targetQuantity = Number(item.quantity);
-      if (operation === 'increase') targetQuantity += 1;
+      if (operation === 'increase') {
+        let availableStock = 10;
+        try {
+          const liveProduct = await productsService.getProductById(item.product_id);
+          if (liveProduct) {
+            let stocks = {};
+            try {
+              stocks = JSON.parse(liveProduct.sizes_stock || '{}');
+            } catch {
+              stocks = {};
+            }
+            const baseSize = item.size ? String(item.size).split('/')[0].trim() : 'M';
+            availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+          }
+        } catch (err) {
+          console.warn("Live stock check failed, falling back to cache:", err.message);
+          const prod = products.find(p => p.$id === item.product_id || p.id === item.product_id);
+          if (prod) {
+            let stocks = {};
+            try {
+              stocks = JSON.parse(prod.sizes_stock || '{}');
+            } catch {
+              stocks = {};
+            }
+            const baseSize = item.size ? String(item.size).split('/')[0].trim() : 'M';
+            availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+          }
+        }
+
+        if (targetQuantity + 1 > availableStock) {
+          showToast(`Cannot increase quantity. Only ${availableStock} items left in stock for size ${item.size}.`, "error");
+          return;
+        }
+        targetQuantity += 1;
+      }
       if (operation === 'decrease') targetQuantity -= 1;
 
       if (targetQuantity < 1) {
@@ -193,6 +241,13 @@ function Navbar() {
   };
 
   const handleCartRemove = async (documentId) => {
+    if (removingIds.has(documentId)) return;
+    setRemovingIds(prev => {
+      const next = new Set(prev);
+      next.add(documentId);
+      return next;
+    });
+
     try {
       dispatch(removeCartItemState(documentId));
       await cartService.removeFromCart(documentId);
@@ -203,22 +258,23 @@ function Navbar() {
           .then(items => dispatch(setCartItems(items)))
           .catch(e => console.error("Rollback cart fetch failed:", e));
       }
+    } finally {
+      setRemovingIds(prev => {
+        const next = new Set(prev);
+        next.delete(documentId);
+        return next;
+      });
     }
   };
 
-  const cleanAdminEmail = import.meta.env.VITE_ADMIN_EMAIL 
-    ? import.meta.env.VITE_ADMIN_EMAIL.replace(/['"]/g, '') 
-    : '';
-  const isAdmin = isAuthenticated && user && (
-    user.email === "makwanachandu480@gmail.com" || 
-    user.email === import.meta.env.VITE_ADMIN_EMAIL ||
-    user.email === cleanAdminEmail
-  );
+  // Admin check: single env-var lookup — no hardcoded emails in source
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim()
+  const isAdmin = isAuthenticated && user && adminEmail && user.email === adminEmail
 
   const linkStyles = ({ isActive }) =>
     isActive
-      ? 'text-neutral-900 border-b-2 border-[var(--theme-primary)] pb-1 font-black transition-all'
-      : 'text-neutral-500 hover:text-neutral-900 transition-all duration-200 pb-1';
+      ? 'text-neutral-950 underline underline-offset-8 decoration-1 decoration-neutral-950 font-bold transition-all duration-300'
+      : 'text-neutral-400 hover:text-neutral-950 transition-all duration-300';
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -236,9 +292,11 @@ function Navbar() {
     } catch (error) {
       console.log("Navbar logout cloud ignore:", error);
     } finally {
-      // Clean up local store and state
+      // Clean up local store, wishlist, and state
       dispatch(logoutAction());
       dispatch(clearCartState());
+      localStorage.removeItem('wishlist'); // Prevent wishlist leaking between users on shared devices
+      dispatch(clearWishlistState());
       setAccountOpen(false);
       setIsOpen(false);
       navigate('/login');
@@ -247,19 +305,19 @@ function Navbar() {
 
   return (
     <>
-      <nav className="bg-white/90 border-b border-neutral-200/60 sticky top-0 z-50 backdrop-blur-md">
+      <nav className="bg-white sticky top-0 z-50 border-b border-neutral-950/10">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-5 flex justify-between items-center capitalize font-semibold">
 
           {/* Brand Logo */}
-          <div className="text-xl font-black uppercase tracking-widest text-neutral-900">
+          <div className="text-sm font-mono font-black uppercase tracking-[0.35em] text-neutral-950">
             <Link to="/">
-              STREET<span className="text-[var(--theme-primary)]">-</span>WEAR
+              STREETWEAR
             </Link>
           </div>
 
           {/* Desktop Navigation Links */}
           <div className="hidden lg:block">
-            <ul className="flex gap-6 text-[10px] tracking-[0.2em] font-black uppercase">
+            <ul className="flex gap-8 text-[11px] tracking-[0.2em] font-bold uppercase font-sans">
               <li><NavLink to="/" className={linkStyles}>Home</NavLink></li>
               <li><NavLink to="/shop" className={linkStyles}>Men</NavLink></li>
               <li><NavLink to="/category/oversized-tshirt" className={linkStyles}>Oversized T-Shirt</NavLink></li>
@@ -326,22 +384,22 @@ function Navbar() {
                   onClick={() => setAccountOpen(!accountOpen)}
                 />
                 {accountOpen && (
-                  <div className="absolute right-0 mt-3 w-56 bg-white border border-neutral-200/80 rounded-xl shadow-2xl py-2 z-50 backdrop-blur-md">
-                    <div className="px-4 py-2 border-b border-neutral-100">
-                      <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest">Active Crew</p>
-                      <p className="text-sm text-neutral-900 font-black uppercase tracking-wide truncate mt-0.5">
+                  <div className="absolute right-0 mt-3 w-56 bg-white border border-neutral-950 rounded-none py-2 z-50">
+                    <div className="px-4 py-2 border-b border-neutral-950/10">
+                      <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest font-mono">Active Crew</p>
+                      <p className="text-sm text-neutral-950 font-black uppercase tracking-wide truncate mt-0.5">
                         {user.name || "GUEST"}
                       </p>
-                      <p className='text-xs lowercase text-neutral-500'>{user.email}</p>
+                      <p className='text-xs lowercase text-neutral-500 font-mono'>{user.email}</p>
                       
                       <div className="flex gap-2 mt-2">
-                        <Link to="/profile" onClick={() => setAccountOpen(false)} className="text-[10px] text-neutral-900 hover:text-white hover:bg-neutral-900 py-1 px-2 rounded-md inline-block uppercase font-bold tracking-wider transition-colors border border-neutral-200">
+                        <Link to="/profile" onClick={() => setAccountOpen(false)} className="text-[10px] text-neutral-950 hover:bg-neutral-950 hover:text-white py-1.5 px-2.5 rounded-none inline-block uppercase font-bold tracking-wider transition-colors border border-neutral-950">
                           My Profile
                         </Link>
 
                         {/* Render Admin Panel link if authorized */}
                         {isAdmin && (
-                          <Link to="/admin" onClick={() => setAccountOpen(false)} className="text-[10px] text-[var(--theme-primary)] hover:text-white hover:bg-[var(--theme-primary)] py-1 px-2 rounded-md inline-block uppercase font-bold tracking-wider transition-colors border border-[var(--theme-primary)]/30">
+                          <Link to="/admin" onClick={() => setAccountOpen(false)} className="text-[10px] text-neutral-950 hover:bg-neutral-950 hover:text-white py-1.5 px-2.5 rounded-none inline-block uppercase font-bold tracking-wider transition-colors border border-neutral-950">
                             Admin Panel
                           </Link>
                         )}
@@ -350,7 +408,7 @@ function Navbar() {
                     <div className="p-1">
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-lg transition-all duration-150 uppercase tracking-wider cursor-pointer"
+                        className="w-full text-left text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-none transition-all duration-150 uppercase tracking-wider cursor-pointer font-mono"
                       >
                         Sign Out &rarr;
                       </button>
@@ -410,16 +468,16 @@ function Navbar() {
       </nav>
 
       {/* Dynamic Slide-down Search Bar */}
-      <div className={`bg-neutral-900 text-white z-45 sticky top-[73px] transition-all duration-300 ease-in-out overflow-hidden ${searchOpen ? 'max-h-16 py-3 border-b border-neutral-800 shadow-xl' : 'max-h-0 py-0'}`}>
+      <div className={`bg-white text-neutral-950 z-45 sticky top-[73px] transition-all duration-300 ease-in-out overflow-hidden ${searchOpen ? 'max-h-16 py-3 border-b border-neutral-950' : 'max-h-0 py-0'}`}>
         <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between gap-4">
           <input 
             type="text" 
-            placeholder="TYPE STYLE & PRESS ENTER TO SEARCH..." 
+            placeholder="TYPE TO SEARCH THE STYLES ARCHIVE..." 
             value={searchVal}
             onChange={(e) => setSearchVal(e.target.value)}
-            className="bg-transparent border-b border-neutral-700 focus:border-white text-xs tracking-widest font-black uppercase py-2 outline-hidden w-full text-white placeholder-neutral-500"
+            className="bg-transparent border-b border-neutral-200 focus:border-neutral-950 text-xs tracking-widest font-mono uppercase py-2 outline-hidden w-full text-neutral-950 placeholder-neutral-400"
           />
-          <button type="submit" className="text-[10px] font-black tracking-widest text-[var(--theme-primary)] hover:text-white uppercase transition-colors shrink-0">SEARCH</button>
+          <button type="submit" className="text-[10px] font-mono font-bold tracking-widest bg-neutral-950 border border-neutral-950 text-white px-4 py-2 hover:bg-white hover:text-neutral-950 transition-colors uppercase shrink-0 rounded-none">SEARCH</button>
         </form>
       </div>
 
@@ -448,51 +506,56 @@ function Navbar() {
             {cartItems.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
                 <CgShoppingCart className="text-5xl text-neutral-300 animate-bounce" />
-                <p className="text-xs uppercase tracking-widest font-black text-neutral-400">
+                <p className="text-xs uppercase tracking-widest font-mono font-bold text-neutral-400">
                   Your cart is empty
                 </p>
                 <button 
                   onClick={() => { setCartDrawerOpen(false); navigate('/shop'); }}
-                  className="bg-neutral-950 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-[var(--theme-primary)] transition-colors cursor-pointer"
+                  className="bg-neutral-950 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-none hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   Shop Now
                 </button>
               </div>
             ) : (
               cartItems.map((item) => (
-                <div key={item.$id} className="flex gap-4 p-4 border border-neutral-100 rounded-xl hover:shadow-md transition-all duration-200">
+                <div key={item.$id} className="flex gap-4 p-4 border border-neutral-950/10 rounded-none hover:border-neutral-950 transition-all duration-200">
                   <img 
                     src={item.product_Image || 'https://placehold.co/100x125'} 
                     alt={item.name} 
-                    className="w-20 h-24 object-cover rounded-lg border border-neutral-200 shrink-0"
+                    className="w-20 h-24 object-cover rounded-none border border-neutral-200 shrink-0"
                   />
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start gap-2">
-                        <h4 className="text-xs font-black uppercase tracking-wide text-neutral-950 line-clamp-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wide text-neutral-950 line-clamp-2">
                           {item.name}
                         </h4>
                         <button 
                           onClick={() => handleCartRemove(item.$id)}
-                          className="text-rose-500 hover:text-rose-700 transition-colors p-1 cursor-pointer"
+                          disabled={removingIds.has(item.$id)}
+                          className="text-rose-500 hover:text-rose-700 transition-colors p-1 cursor-pointer disabled:opacity-50"
                         >
-                          <HiX className="text-base" />
+                          {removingIds.has(item.$id) ? (
+                            <span className="w-3.5 h-3.5 border-2 border-rose-500 border-t-transparent rounded-none animate-spin block" />
+                          ) : (
+                            <HiX className="text-base" />
+                          )}
                         </button>
                       </div>
-                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">
+                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1 font-mono">
                         Size: {item.size || 'M'} | ₹{item.price}
                       </p>
                     </div>
 
                     <div className="flex justify-between items-center mt-2">
-                      <div className="flex items-center border border-neutral-200 rounded-lg overflow-hidden bg-neutral-50">
+                      <div className="flex items-center border border-neutral-950/15 rounded-none overflow-hidden bg-neutral-50">
                         <button 
                           onClick={() => handleCartQuantityShift(item, 'decrease')}
                           className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
                         >
                           <HiMinus className="text-xs" />
                         </button>
-                        <span className="px-3 text-xs font-black text-neutral-900">
+                        <span className="px-3 text-xs font-mono font-bold text-neutral-900">
                           {item.quantity}
                         </span>
                         <button 
@@ -502,7 +565,7 @@ function Navbar() {
                           <HiPlus className="text-xs" />
                         </button>
                       </div>
-                      <span className="text-xs font-black text-neutral-900">
+                      <span className="text-xs font-mono font-bold text-neutral-900">
                         ₹{item.subtotal}
                       </span>
                     </div>
@@ -514,12 +577,12 @@ function Navbar() {
 
           {/* Footer Checkout Summary */}
           {cartItems.length > 0 && (
-            <div className="p-6 border-t border-neutral-100 bg-neutral-50/50 space-y-4">
+            <div className="p-6 border-t border-neutral-950/10 bg-neutral-50/50 space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">
+                <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest font-mono">
                   Subtotal
                 </span>
-                <span className="text-base font-black text-neutral-900">
+                <span className="text-base font-mono font-bold text-neutral-900">
                   ₹{cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)}
                 </span>
               </div>
@@ -528,7 +591,7 @@ function Navbar() {
                 <Link
                   to="/cart"
                   onClick={() => setCartDrawerOpen(false)}
-                  className="w-full py-3 bg-white border border-neutral-200 hover:border-neutral-950 text-[10px] font-black uppercase tracking-[0.15em] text-neutral-900 rounded-xl text-center transition-all cursor-pointer"
+                  className="w-full py-3 bg-white border border-neutral-950 hover:bg-neutral-50 text-[10px] font-mono font-bold uppercase tracking-[0.15em] text-neutral-950 rounded-none text-center transition-all cursor-pointer"
                 >
                   View Cart
                 </Link>
@@ -537,7 +600,7 @@ function Navbar() {
                     setCartDrawerOpen(false);
                     navigate('/checkout');
                   }}
-                  className="w-full py-3 bg-neutral-900 hover:bg-[var(--theme-primary)] text-white text-[10px] font-black uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-lg shadow-neutral-900/10 hover:shadow-xl hover:shadow-[var(--theme-primary)]/20"
+                  className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-mono font-bold uppercase tracking-[0.15em] rounded-none text-center transition-all cursor-pointer"
                 >
                   Checkout
                 </button>
@@ -572,28 +635,28 @@ function Navbar() {
             {wishlist.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
                 <BsHeart className="text-5xl text-neutral-300 animate-pulse text-rose-300" />
-                <p className="text-xs uppercase tracking-widest font-black text-neutral-400">
+                <p className="text-xs uppercase tracking-widest font-mono font-bold text-neutral-400">
                   Your wishlist is empty
                 </p>
                 <button 
                   onClick={() => { setWishlistDrawerOpen(false); navigate('/shop'); }}
-                  className="bg-neutral-950 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-lg hover:bg-[var(--theme-primary)] transition-colors cursor-pointer"
+                  className="bg-neutral-950 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-none hover:bg-neutral-800 transition-colors cursor-pointer"
                 >
                   View Fits
                 </button>
               </div>
             ) : (
               wishlist.map((item) => (
-                <div key={item.$id || item.id} className="flex gap-4 p-4 border border-neutral-100 rounded-xl hover:shadow-md transition-all duration-200">
+                <div key={item.$id || item.id} className="flex gap-4 p-4 border border-neutral-950/10 rounded-none hover:border-neutral-950 transition-all duration-200">
                   <img 
                     src={item.product_Image || item.image || 'https://placehold.co/100x125'} 
                     alt={item.name} 
-                    className="w-20 h-24 object-cover rounded-lg border border-neutral-200 shrink-0"
+                    className="w-20 h-24 object-cover rounded-none border border-neutral-200 shrink-0"
                   />
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start gap-2">
-                        <h4 className="text-xs font-black uppercase tracking-wide text-neutral-950 line-clamp-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wide text-neutral-950 line-clamp-2">
                           {item.name}
                         </h4>
                         <button 
@@ -603,7 +666,7 @@ function Navbar() {
                           <HiX className="text-base" />
                         </button>
                       </div>
-                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">
+                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1 font-mono">
                         ₹{item.price}
                       </p>
                     </div>
@@ -611,16 +674,16 @@ function Navbar() {
                     <div className="flex gap-2 mt-2">
                       <button
                         onClick={() => handleMoveToCart(item)}
-                        className="flex-1 py-2 bg-neutral-900 hover:bg-[var(--theme-primary)] text-white text-[9px] font-black uppercase tracking-wider rounded-lg text-center transition-all cursor-pointer"
+                        className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-bold uppercase tracking-wider rounded-none text-center transition-all cursor-pointer"
                       >
                         Move to Bag
                       </button>
                       <button
                         onClick={() => {
                           setWishlistDrawerOpen(false);
-                          navigate(`/shop/${item.$id || item.id}`);
+                          navigate(`/product/${item.$id || item.id}`);
                         }}
-                        className="py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+                        className="py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[9px] font-bold uppercase tracking-wider rounded-none transition-all cursor-pointer"
                       >
                         View
                       </button>

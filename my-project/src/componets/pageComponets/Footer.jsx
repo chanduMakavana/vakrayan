@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import campaignService from '../../appwrite/campaign'
 
 function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubscribe = (e) => {
+  const handleSubscribe = async (e) => {
     e.preventDefault();
     setError('');
     
@@ -21,8 +22,14 @@ function Footer() {
       return;
     }
     
-    setSubscribed(true);
-    setEmail('');
+    try {
+      await campaignService.subscribeNewsletter(email.trim());
+      setSubscribed(true);
+      setEmail('');
+    } catch (err) {
+      console.error("Newsletter registration failed:", err);
+      setError('SUBSCRIPTION FAIL. TRY AGAIN LATER.');
+    }
   };
   return (
     <footer className="bg-[#f4f4f6] text-neutral-600 py-16 px-6 md:px-12 border-t border-neutral-200/50">

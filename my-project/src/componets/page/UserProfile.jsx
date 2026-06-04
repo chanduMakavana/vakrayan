@@ -13,6 +13,7 @@ import Navbar from '../pageComponets/Navbar';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
+import storageService, { compressImage } from '../../appwrite/storage';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -20,10 +21,10 @@ function UserProfile() {
   const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
-  const products = useSelector(state => state.products.items || []);
+  const { items: products, fetched: productsFetched } = useSelector(state => state.products);
 
   const [orders, setOrders] = useState([]);
-  const [address, setAddress] = useState(null);
+  const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Review submission state for the direct profile modal
@@ -32,6 +33,43 @@ function UserProfile() {
   const [modalComment, setModalComment] = useState('');
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalSuccessMsg, setModalSuccessMsg] = useState('');
+
+  // Fit & characteristic rating modal states
+  const [modalFit, setModalFit] = useState('true'); // 'tight', 'true', or 'loose'
+  const [modalComfort, setModalComfort] = useState(5);
+  const [modalQuality, setModalQuality] = useState(5);
+  const [modalBreathable, setModalBreathable] = useState(5);
+
+  const [modalImages, setModalImages] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e, setImagesValue, currentImages) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      // Compress reviews images to save storage and improve loading speed
+      const compressedFile = await compressImage(file, 800, 800, 0.7);
+
+      const response = await storageService.uploadFile(compressedFile);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        const newUrlList = currentImages.trim() 
+          ? `${currentImages.trim()}, ${fileUrl}` 
+          : fileUrl;
+        setImagesValue(newUrlList);
+        showToast("✓ Image uploaded successfully to Appwrite Storage!", "success");
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      showToast("Appwrite Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleModalReviewSubmit = async (e) => {
     e.preventDefault();
@@ -44,52 +82,73 @@ function UserProfile() {
       return;
     }
     if (!modalComment.trim()) {
-      showToast("Please enter a valid review comment specification.", "error");
+      showToast("Please write a review comment.", "error");
       return;
     }
 
+    const imageLinks = modalImages.split(',')
+      .map(url => url.trim())
+      .filter(url => url.startsWith('http://') || url.startsWith('https://'));
+
     setModalSubmitting(true);
     try {
-      const newDoc = await reviewsService.createReview({
+      await reviewsService.createReview({
         productId: reviewModalItem.productId,
         userId: user.$id,
         userName: user.name || 'Anonymous',
         rating: String(modalRating),
-        comment: modalComment
+        comment: modalComment,
+        images: imageLinks,
+        fit: modalFit,
+        comfort: modalComfort,
+        quality: modalQuality,
+        breathable: modalBreathable
       });
 
-      if (newDoc) {
-        setModalSuccessMsg('Review published successfully.');
-        setModalComment('');
-        setModalRating(5);
-        setTimeout(() => {
-          setReviewModalItem(null);
-          setModalSuccessMsg('');
-        }, 2000);
-      }
+      setModalSuccessMsg("Review posted successfully! Thank you for the fit feedback.");
+      showToast("Review submitted successfully!", "success");
+      setModalComment('');
+      setModalImages('');
+      setModalRating(5);
+      setModalFit('true');
+      setModalComfort(5);
+      setModalQuality(5);
+      setModalBreathable(5);
+      setTimeout(() => {
+        setReviewModalItem(null);
+        setModalSuccessMsg('');
+      }, 2000);
     } catch (err) {
-      console.error("Failed to submit profile review:", err);
-      showToast("Failed to submit review. Connection timed out.", "error");
+      console.error("Review submission error:", err.message);
+      showToast("Failed to submit review. Try again.", "error");
     } finally {
       setModalSubmitting(false);
     }
   };
 
   // Address edit state
-  const [editingAddress, setEditingAddress] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null); // null | 'new' | addressDoc
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     address: '',
     city: '',
-    pincode: ''
+    state: '',
+    country: 'India',
+    pincode: '',
+    is_default: false
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Custom dialog/confirmation states
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isAddressDeleteModalOpen, setIsAddressDeleteModalOpen] = useState(false);
+  const [deleteTargetAddressId, setDeleteTargetAddressId] = useState(null);
+
   // Fetch products catalog on mount if empty in Redux cache
   useEffect(() => {
-    if (isAuthenticated && products.length === 0) {
+    if (isAuthenticated && !productsFetched) {
       const getLocalStorageFallbackData = () => {
         return JSON.parse(localStorage.getItem('products')) || [];
       };
@@ -109,7 +168,33 @@ function UserProfile() {
       };
       loadProducts();
     }
-  }, [products.length, isAuthenticated, dispatch]);
+  }, [productsFetched, isAuthenticated, dispatch]);
+
+  async function reloadAddresses() {
+    if (user && user.$id) {
+      try {
+        const list = await addressService.getUserAddresses(user.$id);
+        setAddresses(list || []);
+      } catch (err) {
+        console.error("Failed to reload addresses:", err);
+      }
+    }
+  }
+
+  const confirmDeleteAddress = async () => {
+    if (!deleteTargetAddressId) return;
+    const addrId = deleteTargetAddressId;
+    setDeleteTargetAddressId(null);
+    setIsAddressDeleteModalOpen(false);
+    try {
+      await addressService.deleteAddress(user.$id, addrId);
+      await reloadAddresses();
+      showToast("Address deleted successfully.", "success");
+    } catch (err) {
+      console.error("Address sweep failed:", err);
+      showToast("Failed to delete address.", "error");
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -120,26 +205,9 @@ function UserProfile() {
     async function loadProfileData() {
       try {
         setLoading(true);
-        // Load User Saved Address Profile
-        const savedAddr = await addressService.getUserAddress(user.$id);
-        if (savedAddr) {
-          setAddress(savedAddr);
-          setFormData({
-            name: savedAddr.customerName || '',
-            phone: savedAddr.phone || '',
-            address: savedAddr.addressLine || '',
-            city: savedAddr.city || '',
-            pincode: savedAddr.pincode || ''
-          });
-        } else {
-          setFormData({
-            name: user.name || '',
-            phone: '',
-            address: '',
-            city: '',
-            pincode: ''
-          });
-        }
+        // Load User Saved Address Profiles
+        const list = await addressService.getUserAddresses(user.$id);
+        setAddresses(list || []);
 
         // Load User Orders
         const userOrdersList = await ordersService.getUserOrders(user.$id);
@@ -156,15 +224,18 @@ function UserProfile() {
     }
   }, [user, isAuthenticated, navigate]);
 
-  const handleLogout = async () => {
-    if (window.confirm("Are you sure you want to terminate session?")) {
-      try {
-        await authService.logout();
-        dispatch(logoutAction());
-        navigate('/');
-      } catch (err) {
-        console.error("Logout failed:", err);
-      }
+  const handleLogout = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const confirmLogout = async () => {
+    setIsLogoutModalOpen(false);
+    try {
+      await authService.logout();
+      dispatch(logoutAction());
+      navigate('/');
+    } catch (err) {
+      console.error("Logout failed:", err);
     }
   };
 
@@ -173,17 +244,28 @@ function UserProfile() {
     setSaveLoading(true);
     setSuccessMsg('');
     try {
-      const response = await addressService.saveAddress(user.$id, {
+      const payload = {
         name: formData.name,
         phone: formData.phone,
         address: formData.address,
         city: formData.city,
-        pincode: formData.pincode
-      });
+        state: formData.state,
+        country: formData.country,
+        pincode: formData.pincode,
+        is_default: formData.is_default
+      };
+      
+      // If we are editing, carry over the document ID
+      if (editingAddress && editingAddress !== 'new') {
+        payload.$id = editingAddress.$id || editingAddress.id;
+        payload.id = editingAddress.$id || editingAddress.id;
+      }
+
+      const response = await addressService.saveAddress(user.$id, payload);
       if (response) {
-        setAddress(response);
-        setEditingAddress(false);
-        setSuccessMsg('Shipping address updated successfully.');
+        await reloadAddresses();
+        setEditingAddress(null);
+        setSuccessMsg(editingAddress === 'new' ? 'Shipping address added successfully.' : 'Shipping address updated successfully.');
         setTimeout(() => setSuccessMsg(''), 4000);
       }
     } catch (err) {
@@ -265,19 +347,31 @@ function UserProfile() {
                 </div>
               </div>
 
-              {/* Shipping Address */}
+              {/* Shipping Addresses List */}
               <div className="bg-white p-6 rounded-xl border border-neutral-200/50 shadow-xs space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xs font-bold text-neutral-700 flex items-center gap-2">
                     <FiMapPin className="text-sm text-neutral-600" />
-                    Default Shipping Address
+                    Saved Shipping Addresses ({addresses.length})
                   </h3>
                   {!editingAddress && (
                     <button 
-                      onClick={() => setEditingAddress(true)}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setEditingAddress('new');
+                        setFormData({
+                          name: user.name || '',
+                          phone: '',
+                          address: '',
+                          city: '',
+                          state: '',
+                          country: 'India',
+                          pincode: '',
+                          is_default: addresses.length === 0
+                        });
+                      }}
+                      className="text-xs font-black text-indigo-600 hover:text-indigo-855 transition-colors cursor-pointer uppercase tracking-wider"
                     >
-                      {address ? 'Edit' : 'Create'}
+                      + Add New
                     </button>
                   )}
                 </div>
@@ -338,50 +432,126 @@ function UserProfile() {
                         />
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase">State</label>
+                        <input 
+                          type="text"
+                          required
+                          value={formData.state}
+                          onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                          className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-900 rounded-lg px-3 py-2 text-xs text-neutral-800 outline-hidden font-medium"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase">Country</label>
+                        <input 
+                          type="text"
+                          required
+                          value={formData.country}
+                          onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                          className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-900 rounded-lg px-3 py-2 text-xs text-neutral-800 outline-hidden font-medium"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox"
+                        id="is_default"
+                        checked={formData.is_default}
+                        onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                        className="rounded accent-neutral-900"
+                      />
+                      <label htmlFor="is_default" className="text-[10px] font-mono font-bold text-neutral-500 uppercase cursor-pointer">Set as default shipping address</label>
+                    </div>
                     <div className="flex gap-2">
                       <button 
                         type="submit"
                         disabled={saveLoading}
                         className="flex-1 bg-neutral-950 hover:bg-neutral-800 text-white font-bold text-xs py-2.5 rounded-lg cursor-pointer"
                       >
-                        {saveLoading ? 'Saving...' : 'Save Changes'}
+                        {saveLoading ? 'Saving...' : 'Save Address'}
                       </button>
                       <button 
                         type="button"
-                        onClick={() => setEditingAddress(false)}
+                        onClick={() => setEditingAddress(null)}
                         className="px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold text-xs py-2.5 rounded-lg cursor-pointer"
                       >
                         Cancel
                       </button>
                     </div>
                   </form>
-                ) : address ? (
-                  <div className="space-y-3.5 text-xs text-neutral-600">
-                    <div>
-                      <span className="text-[10px] text-neutral-400 block font-medium">Recipient</span>
-                      <span className="text-neutral-900 font-semibold mt-0.5 block">{address.customerName}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-neutral-400 block font-medium">Street Address</span>
-                      <span className="text-neutral-900 font-semibold mt-0.5 block">{address.addressLine}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-[10px] text-neutral-400 block font-medium">City</span>
-                        <span className="text-neutral-900 font-semibold mt-0.5 block">{address.city}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-neutral-400 block font-medium">Pincode</span>
-                        <span className="text-neutral-900 font-semibold mt-0.5 block">{address.pincode}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-neutral-400 block font-medium">Phone Number</span>
-                      <span className="text-neutral-900 font-semibold mt-0.5 block">{address.phone}</span>
-                    </div>
+                ) : addresses.length > 0 ? (
+                  <div className="space-y-4">
+                    {addresses.map((addr) => {
+                      const id = addr.$id || addr.id;
+                      const line = addr.addressLine || '';
+                      const stateStr = addr.state || '';
+                      const countryStr = addr.country || 'India';
+
+                      return (
+                        <div key={id} className="p-4 border border-neutral-100 rounded-xl space-y-3 bg-neutral-50/20 hover:bg-neutral-50/50 transition-colors">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-black uppercase text-neutral-900">{addr.customerName}</span>
+                            {(addr.is_default || addr.isDefault) && (
+                              <span className="text-[8px] bg-neutral-950 text-white font-mono uppercase px-1.5 py-0.5 font-bold">DEFAULT</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-neutral-600 space-y-0.5">
+                            <p>{line}</p>
+                            <p className="font-semibold">{addr.city}, {stateStr} {addr.pincode}, {countryStr}</p>
+                            <p className="font-mono text-neutral-450 mt-1 text-[10px]">Phone: {addr.phone}</p>
+                          </div>
+                          <div className="flex gap-3 pt-2 border-t border-neutral-100 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                            <button 
+                              onClick={() => {
+                                setEditingAddress(addr);
+                                setFormData({
+                                  name: addr.customerName || '',
+                                  phone: addr.phone || '',
+                                  address: addr.addressLine || '',
+                                  city: addr.city || '',
+                                  state: addr.state || '',
+                                  country: addr.country || 'India',
+                                  pincode: addr.pincode || '',
+                                  is_default: !!(addr.is_default || addr.isDefault)
+                                });
+                              }}
+                              className="hover:text-neutral-950 cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                               onClick={() => {
+                                 setDeleteTargetAddressId(id);
+                                 setIsAddressDeleteModalOpen(true);
+                               }}
+                               className="hover:text-rose-600 text-rose-500/80 cursor-pointer"
+                             >
+                               Delete
+                             </button>
+                            {!(addr.is_default || addr.isDefault) && (
+                              <button 
+                                onClick={async () => {
+                                  await addressService.saveAddress(user.$id, {
+                                    ...addr,
+                                    is_default: true
+                                  });
+                                  await reloadAddresses();
+                                  showToast("Default address updated.", "success");
+                                }}
+                                className="text-indigo-600 hover:text-indigo-850 cursor-pointer ml-auto"
+                              >
+                                Set As Default
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-center py-6 border border-dashed border-neutral-200 bg-neutral-50/50 rounded-xl">
+                  <div className="text-center py-8 border border-dashed border-neutral-200 bg-neutral-50/50 rounded-xl">
                     <p className="text-xs text-neutral-400 leading-relaxed">
                       No shipping address saved yet.<br />
                       Create one to enable fast one-click checkout.
@@ -443,6 +613,17 @@ function UserProfile() {
                       parsedItems = [];
                     }
 
+                    // Parse metadata/order number
+                    let orderNum = order.order_number || `ORD-${new Date(order.$createdAt || '2026-01-01').getFullYear()}-${uniqueId?.substring(0, 6).toUpperCase()}`;
+                    try {
+                      const parsed = JSON.parse(order.address);
+                      if (parsed && typeof parsed === 'object' && parsed.metadata && parsed.metadata.order_number) {
+                        orderNum = parsed.metadata.order_number;
+                      }
+                    } catch (err) {
+                      console.warn("Could not parse address metadata for orderNumber:", err.message);
+                    }
+
                     return (
                       <div 
                         key={uniqueId || idx}
@@ -452,7 +633,7 @@ function UserProfile() {
                         <div className="space-y-2.5 flex-1">
                           <div className="space-y-0.5">
                             <span className="text-[10px] text-neutral-400 block font-medium">
-                              Order Date: {orderDate} / ID: #{uniqueId?.substring(0, 12).toUpperCase()}
+                              Order Date: {orderDate} / ID: {orderNum}
                             </span>
                             <h4 className="text-xs font-semibold text-neutral-800 leading-relaxed">
                               {parsedItems.map(i => `${i.name} (${i.size || 'M'})`).join(' , ')}
@@ -465,6 +646,8 @@ function UserProfile() {
                               ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
                               : order.status === 'SHIPPED' 
                               ? 'bg-amber-50 text-amber-600 border border-amber-100' 
+                              : order.status === 'CANCELLED'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-100'
                               : 'bg-indigo-50 text-indigo-600 border border-indigo-100 animate-pulse'
                             }`}>
                               {order.status || 'PENDING'}
@@ -495,6 +678,10 @@ function UserProfile() {
                                           setReviewModalItem({ name: item.name, productId });
                                           setModalRating(5);
                                           setModalComment('');
+                                          setModalFit('true');
+                                          setModalComfort(5);
+                                          setModalQuality(5);
+                                          setModalBreathable(5);
                                         } else {
                                           showToast("Failed to locate product in current catalog.", "error");
                                         }
@@ -528,25 +715,24 @@ function UserProfile() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Review Modal Overlay */}
+      </div>      {/* Review Modal Overlay */}
       {reviewModalItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl p-6 relative space-y-6 animate-scale-up">
+          <div className="bg-white w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-6 animate-scale-up text-neutral-900">
             
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setReviewModalItem(null)}
-              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-900 font-bold text-sm p-1 cursor-pointer"
+              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-950 font-bold text-sm p-1 cursor-pointer"
             >
               ✕
             </button>
 
             {/* Header */}
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-neutral-900 pr-6 uppercase leading-tight">
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">PRODUCT FIT FEEDBACK</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
                 Review {reviewModalItem.name}
               </h2>
             </div>
@@ -554,19 +740,19 @@ function UserProfile() {
             <hr className="border-neutral-100" />
 
             {modalSuccessMsg ? (
-              <div className="py-8 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto text-xl animate-bounce">
+              <div className="py-8 text-center space-y-3 font-mono">
+                <div className="w-12 h-12 rounded-none border border-emerald-500 bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-xs font-bold uppercase tracking-wider animate-bounce">
                   Done
                 </div>
-                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest leading-relaxed px-4">
                   {modalSuccessMsg}
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleModalReviewSubmit} className="space-y-4">
+              <form onSubmit={handleModalReviewSubmit} className="space-y-4 font-sans text-neutral-900">
                 {/* Star Rating Selector */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-neutral-500 uppercase">Your Rating</span>
+                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Your Rating</span>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -581,17 +767,135 @@ function UserProfile() {
                   </div>
                 </div>
 
+                {/* Size Fit Preference Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Size Fit Preference</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: 'tight', label: 'TIGHT' },
+                      { key: 'true', label: 'TRUE TO SIZE' },
+                      { key: 'loose', label: 'LOOSE' }
+                    ].map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setModalFit(item.key)}
+                        className={`py-2 rounded-none font-bold text-[10px] tracking-wider transition-all cursor-pointer border uppercase font-mono ${
+                          modalFit === item.key
+                            ? 'bg-neutral-950 text-white border-neutral-950'
+                            : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Characteristics Rating Selectors */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Comfort */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Comfort</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setModalComfort(val)}
+                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
+                            modalComfort === val
+                              ? 'bg-neutral-950 text-white border-neutral-950'
+                              : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quality */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Quality</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setModalQuality(val)}
+                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
+                            modalQuality === val
+                              ? 'bg-neutral-950 text-white border-neutral-950'
+                              : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Breathable */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Breathable</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setModalBreathable(val)}
+                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
+                            modalBreathable === val
+                              ? 'bg-neutral-950 text-white border-neutral-950'
+                              : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Review comment */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-neutral-500 uppercase">Your Review</span>
+                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Your Review</span>
                   <textarea
                     rows="3"
                     required
                     value={modalComment}
                     onChange={(e) => setModalComment(e.target.value)}
                     placeholder="Write your product experience here..."
-                    className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-900 rounded-lg px-3 py-2 text-xs text-neutral-800 outline-hidden resize-none transition-colors"
+                    className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden resize-none transition-colors"
                   />
+                </div>
+
+                {/* Review Image URLs */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Customer Image URLs (comma-separated, optional)</span>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={modalImages}
+                      onChange={(e) => setModalImages(e.target.value)}
+                      placeholder="https://example.com/pic1.jpg, https://example.com/pic2.jpg"
+                      className="flex-1 bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden transition-colors"
+                    />
+                    <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
+                      {uploadingImage ? 'Uploading...' : 'Upload File'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, setModalImages, modalImages)}
+                        disabled={uploadingImage}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  <span className="text-[8px] font-mono text-neutral-450 uppercase tracking-wide">
+                    TIP: PASTE DIRECT HTTPS LINKS OR CHOOSE A LOCAL IMAGE TO UPLOAD TEMPORARILY.
+                  </span>
                 </div>
 
                 {/* Submit / Cancel Buttons */}
@@ -599,14 +903,14 @@ function UserProfile() {
                   <button
                     type="submit"
                     disabled={modalSubmitting}
-                    className="flex-1 bg-neutral-950 hover:bg-neutral-800 active:scale-95 text-white font-bold text-xs py-2.5 rounded-lg shadow-sm transition-all cursor-pointer"
+                    className="flex-1 bg-neutral-950 hover:bg-neutral-800 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer text-center py-2.5 shadow-md"
                   >
                     {modalSubmitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setReviewModalItem(null)}
-                    className="px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold text-xs py-2.5 rounded-lg cursor-pointer"
+                    className="px-4 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer py-2.5"
                   >
                     Cancel
                   </button>
@@ -618,22 +922,79 @@ function UserProfile() {
         </div>
       )}
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleUp {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-fade-in {
-          animation: fadeIn 0.2s ease-out forwards;
-        }
-        .animate-scale-up {
-          animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-      `}</style>
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-neutral-950/60 backdrop-blur-xs" 
+            onClick={() => setIsLogoutModalOpen(false)}
+          />
+          <div className="relative z-50 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">LOGOUT CONFIRMATION</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Confirm Log Out
+              </h2>
+              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+                Are you sure you want to log out? You will need to sign in again to place orders or view your profile.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setIsLogoutModalOpen(false)}
+                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmLogout}
+                className="w-full py-3 bg-neutral-950 hover:bg-neutral-850 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Deletion Confirmation Modal */}
+      {isAddressDeleteModalOpen && deleteTargetAddressId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-neutral-950/60 backdrop-blur-xs" 
+            onClick={() => setIsAddressDeleteModalOpen(false)}
+          />
+          <div className="relative z-50 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">DELETE SAVED ADDRESS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Delete Shipping Address?
+              </h2>
+              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+                Are you sure you want to delete this shipping address? It will be permanently removed from your saved address list.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setIsAddressDeleteModalOpen(false)}
+                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAddress}
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </>

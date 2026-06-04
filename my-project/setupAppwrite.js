@@ -2,6 +2,20 @@
 import fs from 'fs';
 import path from 'path';
 
+import readline from 'readline';
+
+// Function to prompt user
+function askQuestion(query) {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+    return new Promise(resolve => rl.question(query, ans => {
+        rl.close();
+        resolve(ans.trim());
+    }));
+}
+
 // Parse .env manually to avoid extra dependencies
 const envPath = path.resolve(process.cwd(), '.env');
 if (!fs.existsSync(envPath)) {
@@ -22,27 +36,48 @@ envContent.split('\n').forEach(line => {
     }
 });
 
-const API_KEY = env.VITE_APPWRITE_API_KEY;
+let API_KEY = env.VITE_APPWRITE_API_KEY;
 const ENDPOINT = env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
 const PROJECT_ID = env.VITE_APPWRITE_PROJECT_ID;
 const DATABASE_ID = env.VITE_APPWRITE_DATABASE_ID;
 
-if (!API_KEY) {
-    console.error("❌ VITE_APPWRITE_API_KEY is missing in your .env file! Please follow Step 1.");
-    process.exit(1);
+// ----- Automatic Storage Bucket Creation -----
+const BUCKET_ID = env.VITE_APPWRITE_BUCKET_ID || 'images';
+async function ensureBucketExists() {
+    const url = `${ENDPOINT}/storage/buckets`;
+    try {
+        await callAPI(url, {
+            method: 'POST',
+            body: JSON.stringify({
+                bucketId: BUCKET_ID,
+                name: BUCKET_ID,
+                permissions: [
+                    'read("any")',
+                    'write("any")'
+                ]
+            })
+        });
+        console.log(`   ✅ Storage bucket "${BUCKET_ID}" created successfully.`);
+    } catch (err) {
+        if (err.message.includes('already exists') || err.message.includes('Conflict')) {
+            console.log(`   ℹ️ Storage bucket "${BUCKET_ID}" already exists.`);
+        } else {
+            console.error(`   ❌ Failed to create storage bucket: ${err.message}`);
+        }
+    }
 }
+
+await ensureBucketExists();
+// -------------------------------------------
+
 if (!PROJECT_ID || !DATABASE_ID) {
     console.error("❌ VITE_APPWRITE_PROJECT_ID or VITE_APPWRITE_DATABASE_ID is missing in .env.");
     process.exit(1);
 }
 
-const headers = {
-    'Content-Type': 'application/json',
-    'X-Appwrite-Project': PROJECT_ID,
-    'X-Appwrite-Key': API_KEY
-};
+let headers = {};
 
-// Define ALL 10 collections and their schema attributes dynamically mapping .env values
+// Define ALL collections and their schema attributes dynamically mapping .env values
 const schema = [
     {
         id: env.VITE_APPWRITE_PRODUCTS_COLLECTION_ID || 'products',
@@ -63,7 +98,11 @@ const schema = [
             { key: 'color_name', type: 'string', size: 100, required: false, default: '' },
             { key: 'color_hex', type: 'string', size: 50, required: false, default: '' },
             { key: 'fit_type', type: 'string', size: 100, required: false, default: '' },
-            { key: 'fabric_gsm', type: 'string', size: 100, required: false, default: '' }
+            { key: 'fabric_gsm', type: 'string', size: 100, required: false, default: '' },
+            { key: 'compare_at_price', type: 'integer', required: false, default: 0 },
+            { key: 'is_featured', type: 'boolean', required: false, default: false },
+            { key: 'total_sold', type: 'integer', required: false, default: 0 },
+            { key: 'slug', type: 'string', size: 255, required: false, default: '' }
         ]
     },
     {
@@ -105,7 +144,13 @@ const schema = [
             { key: 'razorpayOrderId', type: 'string', size: 255, required: false, default: '' },
             { key: 'razorpay_order_id', type: 'string', size: 255, required: false, default: '' },
             { key: 'razorpayPaymentId', type: 'string', size: 255, required: false, default: '' },
-            { key: 'razorpay_payment_id', type: 'string', size: 255, required: false, default: '' }
+            { key: 'razorpay_payment_id', type: 'string', size: 255, required: false, default: '' },
+            { key: 'order_number', type: 'string', size: 100, required: false, default: '' },
+            { key: 'tracking_number', type: 'string', size: 100, required: false, default: '' },
+            { key: 'tracking_url', type: 'string', size: 500, required: false, default: '' },
+            { key: 'tax_amount', type: 'float', required: false, default: 0 },
+            { key: 'subtotal', type: 'float', required: false, default: 0 },
+            { key: 'shipping_charge', type: 'float', required: false, default: 0 }
         ]
     },
     {
@@ -145,7 +190,10 @@ const schema = [
             { key: 'userId', type: 'string', size: 255, required: true },
             { key: 'userName', type: 'string', size: 255, required: false, default: 'Anonymous' },
             { key: 'rating', type: 'string', size: 20, required: true, default: '5' },
-            { key: 'comment', type: 'string', size: 4000, required: true }
+            { key: 'comment', type: 'string', size: 4000, required: true },
+            { key: 'title', type: 'string', size: 255, required: false, default: '' },
+            { key: 'images', type: 'string', size: 500, required: false, array: true },
+            { key: 'is_verified_purchase', type: 'boolean', required: false, default: false }
         ]
     },
     {
@@ -157,7 +205,10 @@ const schema = [
             { key: 'phone', type: 'string', size: 50, required: true },
             { key: 'addressLine', type: 'string', size: 2000, required: true },
             { key: 'city', type: 'string', size: 255, required: true },
-            { key: 'pincode', type: 'string', size: 50, required: true }
+            { key: 'pincode', type: 'string', size: 50, required: true },
+            { key: 'state', type: 'string', size: 100, required: false, default: '' },
+            { key: 'country', type: 'string', size: 100, required: false, default: 'India' },
+            { key: 'is_default', type: 'boolean', required: false, default: false }
         ]
     },
     {
@@ -166,7 +217,9 @@ const schema = [
         attributes: [
             { key: 'code', type: 'string', size: 100, required: true },
             { key: 'discount', type: 'integer', required: true },
-            { key: 'coupon_usage', type: 'string', size: 255, required: false, default: '' }
+            { key: 'coupon_usage', type: 'string', size: 255, required: false, default: '' },
+            { key: 'min_order_value', type: 'float', required: false, default: 0 },
+            { key: 'valid_until', type: 'string', size: 100, required: false, default: '' }
         ]
     },
     {
@@ -174,6 +227,24 @@ const schema = [
         name: 'Settings',
         attributes: [
             { key: 'announcementText', type: 'string', size: 2000, required: true }
+        ]
+    },
+    {
+        id: env.VITE_APPWRITE_SEARCH_LOGS_COLLECTION_ID || 'search_logs',
+        name: 'Search Logs',
+        attributes: [
+            { key: 'query', type: 'string', size: 255, required: true },
+            { key: 'results_count', type: 'integer', required: true },
+            { key: 'userId', type: 'string', size: 255, required: false, default: 'GUEST' },
+            { key: 'searched_at', type: 'string', size: 100, required: false }
+        ]
+    },
+    {
+        id: env.VITE_APPWRITE_NEWSLETTER_COLLECTION_ID || 'newsletter',
+        name: 'Newsletter',
+        attributes: [
+            { key: 'email', type: 'string', size: 255, required: true },
+            { key: 'subscribedAt', type: 'string', size: 100, required: false }
         ]
     }
 ];
@@ -207,6 +278,37 @@ async function waitForAttributeReady(collectionId, attributeKey) {
 }
 
 async function run() {
+    if (!API_KEY) {
+        console.log("\n==================================================================");
+        console.log("🔑 Appwrite API Key is required to dynamically create columns!");
+        console.log("To create one:");
+        console.log("1. Open your Appwrite Cloud Console: https://cloud.appwrite.io/");
+        console.log("2. Navigate to your Project -> Overview -> Settings -> API Keys (at bottom).");
+        console.log("3. Click 'Add API Key', give it a name (e.g., 'Antigravity Setup').");
+        console.log("4. Check 'Database' and 'Collections' permissions.");
+        console.log("5. Copy the secret key.");
+        console.log("==================================================================\n");
+        
+        API_KEY = await askQuestion("👉 Paste your Appwrite API Key here: ");
+        if (!API_KEY) {
+            console.error("❌ API Key cannot be empty. Exiting.");
+            process.exit(1);
+        }
+        
+        try {
+            fs.appendFileSync(envPath, `\nVITE_APPWRITE_API_KEY="${API_KEY}"\n`);
+            console.log("💾 API Key saved to your .env file for future executions.");
+        } catch (e) {
+            console.warn("⚠️ Could not write API Key to .env file:", e.message);
+        }
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Appwrite-Project': PROJECT_ID,
+        'X-Appwrite-Key': API_KEY
+    };
+
     console.log("⚡ Starting Appwrite Automatic Schema Deployment Protocol...");
     console.log(`📡 Connection URL: ${ENDPOINT}`);
     console.log(`🔒 Project ID: ${PROJECT_ID}`);

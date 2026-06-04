@@ -12,8 +12,8 @@ export const loginSlice = createSlice({
     reducers: {
         // Update auth state on successful login or session restoration
         login: (state, action) => {
-            state.user = action.payload.user;
-            state.isAuthenticated = true;
+            state.user = action.payload.user ? JSON.parse(JSON.stringify(action.payload.user)) : null;
+            state.isAuthenticated = !!action.payload.user;
             state.loading = false;
         },
 

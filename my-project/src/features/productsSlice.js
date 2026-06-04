@@ -2,8 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
     items: [],
-    loading: false,
-    fetched: false // Tracks if we've successfully loaded catalog once
+    fetched: false // Tracks if catalog has been successfully loaded once
 };
 
 export const productsSlice = createSlice({
@@ -13,13 +12,9 @@ export const productsSlice = createSlice({
         setProducts: (state, action) => {
             state.items = JSON.parse(JSON.stringify(action.payload || []));
             state.fetched = true;
-            state.loading = false;
-        },
-        setLoadingProducts: (state, action) => {
-            state.loading = action.payload;
         }
     }
 });
 
-export const { setProducts, setLoadingProducts } = productsSlice.actions;
+export const { setProducts } = productsSlice.actions;
 export default productsSlice.reducer;

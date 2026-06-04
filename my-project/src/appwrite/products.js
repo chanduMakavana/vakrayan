@@ -28,17 +28,18 @@ export class ProductsService {
         }
     }
 
-    // Retrieve all available products
+    // Retrieve all available products (max 100 — add cursor pagination when catalog exceeds this)
     async getProducts() {
         try {
             const response = await this.databases.listDocuments(
                 conf.appwriteDatabaseId,
                 conf.appwriteProductsCollectionId,
                 [
-                    Query.orderDesc("$createdAt") // Order by creation date descending to show new items first
+                    Query.orderDesc("$createdAt"),
+                    Query.limit(100) // Explicit cap — Appwrite defaults silently to 25
                 ]
             );
-            return response.documents; // Returns raw array safely
+            return response.documents;
         }
         catch (error) {
             console.error("Appwrite service :: getProducts :: error", error.message);
@@ -76,18 +77,43 @@ export class ProductsService {
         }
     }
     // Retrieve details for a specific product by ID
-async getProductById(documentId) {
-    try {
-        return await this.databases.getDocument(
-            conf.appwriteDatabaseId,
-            conf.appwriteProductsCollectionId,
-            documentId
-        );
-    } catch (error) {
-        console.error("Appwrite service :: getProductById :: error", error.message);
-        throw error;
+    async getProductById(documentId) {
+        try {
+            return await this.databases.getDocument(
+                conf.appwriteDatabaseId,
+                conf.appwriteProductsCollectionId,
+                documentId
+            );
+        } catch (error) {
+            console.error("Appwrite service :: getProductById :: error", error.message);
+            throw error;
+        }
     }
-}
+
+    // Log query search analytics for marketing insight
+    async logSearch(query, resultsCount, userId) {
+        const payload = {
+            query: String(query).trim(),
+            results_count: Number(resultsCount),
+            userId: userId || 'GUEST',
+            searched_at: new Date().toISOString()
+        };
+        try {
+            const collectionId = import.meta.env.VITE_APPWRITE_SEARCH_LOGS_COLLECTION_ID || 'search_logs';
+            return await this.databases.createDocument(
+                conf.appwriteDatabaseId,
+                collectionId,
+                ID.unique(),
+                payload
+            );
+        } catch (error) {
+            console.warn("Appwrite search logs collection unavailable. Storing locally.", error.message);
+            const logs = JSON.parse(localStorage.getItem('search_logs')) || [];
+            logs.push(payload);
+            localStorage.setItem('search_logs', JSON.stringify(logs));
+            return payload;
+        }
+    }
 }
 
 const productsService = new ProductsService();

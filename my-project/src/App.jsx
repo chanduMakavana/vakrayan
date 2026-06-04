@@ -20,6 +20,8 @@ import Shop from './componets/page/Shop'
 import Checkout from './componets/page/Checkout'
 import UserProfile from './componets/page/UserProfile'
 import OrderDetail from './componets/page/OrderDetail'
+import ProtectedRoute from './componets/ProtectedRoute'
+import AdminRoute from './componets/AdminRoute'
 
 function App() {
   const dispatch = useDispatch()
@@ -52,7 +54,7 @@ function App() {
     // Preload products catalog into Redux store
     productsService.getProducts()
       .then((loadedProducts) => {
-        const normalized = loadedProducts?.documents || loadedProducts || []
+        const normalized = Array.isArray(loadedProducts) ? loadedProducts : []
         dispatch(setProducts(normalized))
       })
       .catch((prodError) => {
@@ -76,12 +78,6 @@ function App() {
             <div className="absolute inset-0 bg-[var(--theme-primary)] w-1/2 rounded-full animate-[loading_1s_infinite_linear]" />
           </div>
         </div>
-        <style>{`
-          @keyframes loading {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(200%); }
-          }
-        `}</style>
       </div>
     )
   }
@@ -89,18 +85,33 @@ function App() {
   return (
     <>
       <Routes>
+        {/* Public routes */}
         <Route path='/signup' element={<SignUp />} />
         <Route path='/login' element={<Login />} />
         <Route path='/' element={<Home />} />
-        <Route path='/admin' element={<AdminPanel />} />
-        <Route path='/cart' element={<AddToCartPage />} />
         <Route path='/product/:id' element={<ProductDetail />} />
         <Route path='/shop' element={<Shop />} />
         <Route path='/category/:category' element={<Shop />} />
-        <Route path='/checkout' element={<Checkout />} />
-        <Route path='/profile' element={<UserProfile />} />
-        <Route path='/order/:id' element={<OrderDetail />} />
         <Route path='/*' element={<NotFound />} />
+
+        {/* Protected routes — require authentication */}
+        <Route path='/cart' element={
+          <ProtectedRoute><AddToCartPage /></ProtectedRoute>
+        } />
+        <Route path='/checkout' element={
+          <ProtectedRoute><Checkout /></ProtectedRoute>
+        } />
+        <Route path='/profile' element={
+          <ProtectedRoute><UserProfile /></ProtectedRoute>
+        } />
+        <Route path='/order/:id' element={
+          <ProtectedRoute><OrderDetail /></ProtectedRoute>
+        } />
+
+        {/* Admin-only route — requires authentication + admin email */}
+        <Route path='/admin' element={
+          <AdminRoute><AdminPanel /></AdminRoute>
+        } />
       </Routes>
     </>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
@@ -16,8 +16,15 @@ import { playSuccessChime, triggerConfetti } from '../../utils/sensoryHelper'
 import couponUsageService from '../../appwrite/couponUsage'
 import { useToast } from '../../context/ToastContext'
 
-const generateMockOrderId = () => 'ORD-' + Date.now();
+import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
+
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
+
+const generateOrderNumber = () => {
+  const year = new Date().getFullYear();
+  const randomNum = Math.floor(100000 + Math.random() * 900000);
+  return `ORD-${year}-${randomNum}`;
+};
 
 function Checkout() {
   const navigate = useNavigate()
@@ -47,56 +54,12 @@ function Checkout() {
   const [processingStep, setProcessingStep] = useState(0)
   const [selectedPayment, setSelectedPayment] = useState('COD') // COD | ONLINE
   const [razorpayModalOpen, setRazorpayModalOpen] = useState(false)
-  const [simulatedMethod, setSimulatedMethod] = useState('card') // card | upi | netbanking | wallet | paylater
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
 
-  // Interactive Razorpay Sandbox States
-  const [razorpayLang, setRazorpayLang] = useState('en') // 'en' | 'hi'
-  const [cardNo, setCardNo] = useState('')
-  const [cardExpiry, setCardExpiry] = useState('')
-  const [cardCvv, setCardCvv] = useState('')
-  const [cardName, setCardName] = useState('')
-  const [saveCard, setSaveCard] = useState(true)
-
-  const [upiId, setUpiId] = useState('')
-  const [upiVerified, setUpiVerified] = useState('idle') // idle | verifying | verified
-  const [upiTimer, setUpiTimer] = useState(300) // 5:00 minutes QR countdown
-  const [upiQrActive, setUpiQrActive] = useState(false)
-
-  const [selectedBank, setSelectedBank] = useState('')
-  const [customBankSelected, setCustomBankSelected] = useState('')
-  const [nbSearchQuery, setNbSearchQuery] = useState('')
-  const [nbDropdownOpen, setNbDropdownOpen] = useState(false)
-
-  const [selectedWallet, setSelectedWallet] = useState('')
-  const [walletPhone, setWalletPhone] = useState('')
-  const [walletOtp, setWalletOtp] = useState('')
-  const [walletLinked, setWalletLinked] = useState('idle') // idle | sending | sent | linked
-
-  const [paylaterOption, setPaylaterOption] = useState('')
-
-  // QR Countdown timer effect
-  useEffect(() => {
-    let interval = null;
-    if (razorpayModalOpen && simulatedMethod === 'upi' && upiQrActive) {
-      interval = setInterval(() => {
-        setUpiTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(interval);
-             setTimeout(() => {
-              showToast("UPI QR Code expired. Please generate a new one.", "error");
-              setUpiQrActive(false);
-              setUpiTimer(300);
-            }, 0);
-            return 300;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [razorpayModalOpen, simulatedMethod, upiQrActive, showToast]);
+  // Multiple Saved Addresses State
+  const [savedAddresses, setSavedAddresses] = useState([])
+  const [selectedAddressId, setSelectedAddressId] = useState('')
 
   // Dynamic Coupon State
   const [promoInput, setPromoInput] = useState('')
@@ -127,7 +90,49 @@ function Checkout() {
     }
   }, [user]);
 
-  // Programmatically inject official Razorpay SDK script on mount for zero-config deployment
+  const applyAddressFields = useCallback((addr) => {
+    if (!addr) return;
+    setValue('name', addr.customerName || user?.name || '');
+    setValue('email', addr.email || user?.email || '');
+    setValue('phone', addr.phone || '');
+    setValue('address', addr.addressLine || '');
+    setValue('city', addr.city || '');
+    setValue('pincode', addr.pincode || '');
+    setValue('state', addr.state || '');
+    setValue('country', addr.country || 'India');
+  }, [setValue, user]);
+
+  // Load saved addresses on mount/session load
+  useEffect(() => {
+    if (user && user.$id) {
+      addressService.getUserAddresses(user.$id)
+        .then(addresses => {
+          setSavedAddresses(addresses || []);
+          const def = addresses.find(a => a.is_default === true || a.isDefault === true) || addresses[0];
+          if (def) {
+            setSelectedAddressId(def.$id || def.id);
+            applyAddressFields(def);
+          } else {
+            setValue('name', user.name || '');
+            setValue('email', user.email || '');
+          }
+        })
+        .catch(err => console.warn("Failed to load saved addresses profile:", err));
+    }
+  }, [user, setValue, applyAddressFields]);
+
+  useEffect(() => {
+    if (checkoutStatus !== 'idle') return;
+    if (!isAuthenticated) {
+      showToast("Please log in to continue checking out.", "error")
+      navigate('/login')
+    } else if (cartItems.length === 0) {
+      showToast("Your inventory is currently empty.", "error")
+      navigate('/')
+    }
+  }, [isAuthenticated, cartItems, checkoutStatus, navigate, showToast])
+
+  // Programmatically inject official Razorpay SDK script on mount
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -144,35 +149,6 @@ function Checkout() {
     };
   }, []);
 
-
-  // Load saved address on mount/session load
-  useEffect(() => {
-    if (user && user.$id) {
-      addressService.getUserAddress(user.$id)
-        .then(savedAddress => {
-          if (savedAddress) {
-            setValue('name', savedAddress.customerName || user.name || '');
-            setValue('email', savedAddress.email || user.email || '');
-            setValue('phone', savedAddress.phone || '');
-            setValue('address', savedAddress.addressLine || '');
-            setValue('city', savedAddress.city || '');
-            setValue('pincode', savedAddress.pincode || '');
-          }
-        })
-        .catch(err => console.warn("Failed to load saved address profile:", err));
-    }
-  }, [user, setValue]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      showToast("Please log in to continue checking out.", "error")
-      navigate('/login')
-    } else if (cartItems.length === 0) {
-      showToast("Your inventory is currently empty.", "error")
-      navigate('/')
-    }
-  }, [isAuthenticated, cartItems, navigate, showToast])
-
   if (!productsFetched) {
     return (
       <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
@@ -186,13 +162,15 @@ function Checkout() {
 
   const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
   const discountAmount = cartTotalAmount * (discountPercent / 100)
-  const finalAmount = cartTotalAmount - discountAmount
+  const netBeforeTax = cartTotalAmount - discountAmount
+  const taxAmount = netBeforeTax * 0.18
+  const finalAmount = netBeforeTax + taxAmount
 
   const steps = [
-    "Validating secure shipping channel...",
-    "Tunneling transaction gateway...",
-    "Sweeping active cart inventory registers...",
-    "Dispatch manifest finalized!"
+    "Checking shipping details...",
+    "Processing payment...",
+    "Updating product stock...",
+    "Order confirmed!"
   ]
 
   const handleApplyPromo = async () => {
@@ -206,6 +184,35 @@ function Checkout() {
           if (alreadyUsed) {
             showToast(`Coupon ${match.code} has already been redeemed. Limit: 1 use per customer.`, "error");
             setPromoInput('');
+            return;
+          }
+        }
+
+        // Parse min_order_value and valid_until from coupon metadata
+        let minOrder = Number(match.min_order_value || 0);
+        let validUntil = match.valid_until || null;
+        if (match.coupon_usage) {
+          try {
+            const parsed = JSON.parse(match.coupon_usage);
+            if (parsed && typeof parsed === 'object') {
+              if ('min_order_value' in parsed) minOrder = Number(parsed.min_order_value);
+              if ('valid_until' in parsed) validUntil = parsed.valid_until;
+            }
+          } catch (err) {
+            console.warn("Could not parse coupon usage metadata:", err.message);
+          }
+        }
+
+        if (cartTotalAmount < minOrder) {
+          showToast(`Coupon ${match.code} requires a minimum order value of ₹${minOrder}.`, "error");
+          return;
+        }
+
+        if (validUntil) {
+          const expiryDate = new Date(validUntil);
+          const currentDate = new Date();
+          if (currentDate > expiryDate) {
+            showToast(`Coupon ${match.code} expired on ${new Date(validUntil).toLocaleDateString()}.`, "error");
             return;
           }
         }
@@ -228,20 +235,39 @@ function Checkout() {
   const onSubmit = async (data) => {
     if (!user) return
 
-    // 0. Enforce Product Size-Stock Validation
+    // 0. Live Stock Validation — fetch fresh product data from Appwrite at submit time
+    // This eliminates the TOCTOU race condition where two users could both pass
+    // a stale Redux cache check and oversell the last unit.
     for (const cartItem of cartItems) {
-      const prod = products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
-      if (prod) {
-        let stocks;
-        try {
-          stocks = JSON.parse(prod.sizes_stock || '{}');
-        } catch {
-          stocks = {};
+      try {
+        const liveProduct = await productsService.getProductById(cartItem.product_id);
+        if (liveProduct) {
+          let stocks;
+          try {
+            stocks = JSON.parse(liveProduct.sizes_stock || '{}');
+          } catch {
+            stocks = {};
+          }
+          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+          if (Number(cartItem.quantity) > availableStock) {
+            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
+            return;
+          }
         }
-        const availableStock = stocks[cartItem.size] !== undefined ? Number(stocks[cartItem.size]) : 10;
-        if (Number(cartItem.quantity) > availableStock) {
-          showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} items left. Please adjust your cart.`, "error");
-          return;
+      } catch (stockErr) {
+        console.warn(`Live stock check failed for ${cartItem.name}, proceeding with cached data:`, stockErr.message);
+        // Fallback to Redux cache if live fetch fails
+        const cachedProd = products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
+        if (cachedProd) {
+          let stocks;
+          try { stocks = JSON.parse(cachedProd.sizes_stock || '{}'); } catch { stocks = {}; }
+          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+          if (Number(cartItem.quantity) > availableStock) {
+            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left.`, "error");
+            return;
+          }
         }
       }
     }
@@ -302,25 +328,6 @@ function Checkout() {
       // Launch custom Razorpay secured simulator fallback
       setSubmittedFormData(data);
       setRazorpayModalOpen(true);
-      setSimulatedMethod('card');
-      // Reset interactive states
-      setCardNo('');
-      setCardExpiry('');
-      setCardCvv('');
-      setCardName(data.name || '');
-      setUpiId('');
-      setUpiVerified('idle');
-      setUpiTimer(300);
-      setUpiQrActive(false);
-      setSelectedBank('');
-      setCustomBankSelected('');
-      setNbSearchQuery('');
-      setNbDropdownOpen(false);
-      setSelectedWallet('');
-      setWalletPhone(data.phone || '');
-      setWalletOtp('');
-      setWalletLinked('idle');
-      setPaylaterOption('');
       return;
     }
 
@@ -339,13 +346,27 @@ function Checkout() {
     }
 
     try {
+      const orderNumber = generateOrderNumber();
+      const serializedAddress = JSON.stringify({
+        customerAddress: `${formData.address.trim()}, ${formData.city.trim()}, ${formData.state?.trim() || ''} - ${formData.pincode.trim()}, ${formData.country?.trim() || 'India'} [Payment: ${method}]`,
+        metadata: {
+          order_number: orderNumber,
+          tracking_number: '',
+          tracking_url: '',
+          subtotal: Math.round(cartTotalAmount),
+          tax_amount: Math.round(taxAmount),
+          shipping_charge: 0,
+          coupon_code: couponApplied || 'NONE'
+        }
+      });
+
       // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Appwrite compatibility)
       const orderPayload = {
         userId: user.$id,
         customerName: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        address: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()} [Payment: ${method}]`,
+        address: serializedAddress,
         items: JSON.stringify(
           cartItems.map(i => ({
             name: i.name,
@@ -355,12 +376,12 @@ function Checkout() {
             product_id: i.product_id
           }))
         ),
-        total: Number(finalAmount),
+        total: Math.round(finalAmount),
         status: 'PENDING',
         couponApplied: couponApplied || 'NONE',
         coupon_code: couponApplied || 'NONE',
-        discountAmount: Number(discountAmount),
-        discount_amount: Number(discountAmount),
+        discountAmount: Math.round(discountAmount),
+        discount_amount: Math.round(discountAmount),
         discount_applied: Number(discountAmount) > 0 ? "true" : "false",
         paymentMethod: method,
         paymentStatus: status,
@@ -369,10 +390,19 @@ function Checkout() {
         razorpayOrderId: ordId,
         razorpay_order_id: ordId,
         razorpayPaymentId: payId,
-        razorpay_payment_id: payId
+        razorpay_payment_id: payId,
+
+        // Dynamic additions for blueprint compatibility
+        order_number: orderNumber,
+        subtotal: Math.round(cartTotalAmount),
+        tax_amount: Math.round(taxAmount),
+        shipping_charge: 0,
+        tracking_number: '',
+        tracking_url: ''
       };
 
-      // 2. Perform Stock Depletion size-wise on Catalog
+      // 2. Perform Stock Depletion size-wise on Catalog & update total_sold
+      const stockUpdatePromises = [];
       const updatedProducts = products.map(prod => {
         let stocks = {};
         try {
@@ -382,58 +412,71 @@ function Checkout() {
         }
 
         let stocksMutated = false;
+        let quantitySold = 0;
         cartItems.forEach(cartItem => {
           if (cartItem.product_id === prod.$id || cartItem.product_id === prod.id) {
-            const currentStock = stocks[cartItem.size] !== undefined ? Number(stocks[cartItem.size]) : 10;
-            stocks[cartItem.size] = Math.max(0, currentStock - Number(cartItem.quantity));
+            const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+            const currentStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+            stocks[baseSize] = Math.max(0, currentStock - Number(cartItem.quantity));
             stocksMutated = true;
+            quantitySold += Number(cartItem.quantity);
           }
         });
 
         if (stocksMutated) {
           const serializedStock = JSON.stringify(stocks);
-          // Async push stock update to cloud without blocking
-          productsService.updateProduct(prod.$id || prod.id, { sizes_stock: serializedStock })
-            .catch(e => console.warn("Stock update on cloud ignored:", e.message));
+          const newTotalSold = Number(prod.total_sold || 0) + quantitySold;
           
-          return { ...prod, sizes_stock: serializedStock };
+          // Save stock update promise
+          const promise = productsService.updateProduct(prod.$id || prod.id, { 
+            sizes_stock: serializedStock,
+            total_sold: newTotalSold
+          })
+          .catch(e => console.warn("Stock update on cloud ignored:", e.message));
+          
+          stockUpdatePromises.push(promise);
+          
+          return { ...prod, sizes_stock: serializedStock, total_sold: newTotalSold };
         }
         return prod;
       });
 
       // Update Redux Products Cache instantly
       dispatch(setProducts(updatedProducts));
-      
-      // Update local storage fallback products instantly
-      const localProds = JSON.parse(localStorage.getItem('products')) || [];
-      const updatedLocalProds = localProds.map(lp => {
-        const matching = updatedProducts.find(up => up.id === lp.id || up.$id === lp.id);
-        return matching ? { ...lp, sizes_stock: matching.sizes_stock } : lp;
-      });
-      localStorage.setItem('products', JSON.stringify(updatedLocalProds));
 
-      // 3. Save Order into Database
-      try {
-        const response = await ordersService.createOrder(orderPayload);
-        if (!response) {
-          throw new Error("Appwrite orders collection is not configured.");
-        }
-      } catch (orderErr) {
-        console.warn("⚠️ Orders DB unavailable. Saving manifest in sandbox logs.", orderErr.message);
-        const mockOrder = {
-          id: generateMockOrderId(),
-          $id: generateMockOrderId(),
-          $createdAt: new Date().toISOString(),
-          ...orderPayload
-        };
-        const localOrders = JSON.parse(localStorage.getItem('ordersData')) || [];
-        localOrders.unshift(mockOrder);
-        localStorage.setItem('ordersData', JSON.stringify(localOrders));
+      // Await all stock updates before proceeding to save order
+      if (stockUpdatePromises.length > 0) {
+        await Promise.all(stockUpdatePromises);
+      }
+
+      // 3. Save Order into Appwrite Database
+      const response = await ordersService.createOrder(orderPayload);
+      if (!response) {
+        throw new Error("Order creation returned null — check Appwrite collection configuration.");
       }
 
       // 3.5. Save Address Profile in Background for Future Checkouts
       try {
-        await addressService.saveAddress(user.$id, formData);
+        // Check if this exact address already exists
+        const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
+        const existingAddr = savedAddresses.find(a => {
+          const existingKey = `${(a.addressLine || a.address || '').trim()}_${a.city.trim()}_${a.pincode.trim()}`;
+          return existingKey === addressKey;
+        });
+
+        await addressService.saveAddress(user.$id, {
+          ...formData,
+          $id: existingAddr?.$id || existingAddr?.id, // Update if exists
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          pincode: formData.pincode,
+          state: formData.state || '',
+          country: formData.country || 'India',
+          is_default: savedAddresses.length === 0 && !existingAddr // Only set as default if new
+        });
       } catch (addrErr) {
         console.warn("⚠️ Address profile auto-save ignored on cloud database:", addrErr.message);
       }
@@ -514,7 +557,7 @@ function Checkout() {
 
           <div>
             <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
-              SECURED TRANSACTION COMPLETE
+              TRANSACTION COMPLETED
             </h4>
             <h1 className="text-2xl md:text-3xl font-black tracking-widest text-neutral-950 uppercase">
               Order Placed
@@ -522,7 +565,7 @@ function Checkout() {
           </div>
 
           <p className="text-xs text-neutral-500 leading-relaxed font-mono uppercase tracking-wide">
-            Your streetwear manifest has been logged inside our cloud shipping nodes. Preparing express domestic dispatch.
+            Your order details have been saved in our system. We are preparing to ship your order soon.
           </p>
 
           <div className="w-12 h-px bg-neutral-200 mx-auto" />
@@ -569,6 +612,44 @@ function Checkout() {
                   Shipping Details
                 </h2>
               </div>
+
+              {savedAddresses.length > 0 && (
+                <div className="space-y-2 mb-6">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Select Saved Address</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {savedAddresses.map((addr) => {
+                      const id = addr.$id || addr.id;
+                      const line = addr.addressLine || '';
+                      const stateStr = addr.state || '';
+                      
+                      return (
+                        <div 
+                          key={id}
+                          onClick={() => {
+                            setSelectedAddressId(id);
+                            applyAddressFields(addr);
+                          }}
+                          className={`p-3 border rounded-xl cursor-pointer transition-all ${
+                            selectedAddressId === id 
+                              ? 'border-neutral-950 bg-neutral-50' 
+                              : 'border-neutral-200 hover:border-neutral-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-black uppercase truncate">{addr.customerName}</span>
+                            {(addr.is_default || addr.isDefault) && (
+                              <span className="text-[8px] bg-neutral-900 text-white font-mono uppercase px-1.5 py-0.5 font-bold">DEFAULT</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-neutral-500 truncate mt-1">{line}</p>
+                          <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{addr.city} {stateStr} {addr.pincode}</p>
+                          <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{addr.phone}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
@@ -664,6 +745,31 @@ function Checkout() {
                   {errors.pincode && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.pincode.message}</span>}
                 </div>
 
+                {/* State */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">State</label>
+                  <input
+                    type="text"
+                    placeholder="MAHARASHTRA"
+                    className={`w-full bg-[#fbfbfb] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('state', { required: 'State is required' })}
+                  />
+                  {errors.state && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.state.message}</span>}
+                </div>
+
+                {/* Country */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Country</label>
+                  <input
+                    type="text"
+                    placeholder="INDIA"
+                    defaultValue="INDIA"
+                    className={`w-full bg-[#fbfbfb] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('country', { required: 'Country is required' })}
+                  />
+                  {errors.country && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.country.message}</span>}
+                </div>
+
                 {/* Premium Payment Method Selector */}
                 <div className="w-full md:col-span-2 flex flex-col gap-2 mt-2">
                   <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Payment Option</label>
@@ -719,7 +825,7 @@ function Checkout() {
                 {selectedPayment === 'ONLINE' && (
                   <div className="p-3.5 bg-indigo-50/50 border border-indigo-100/60 rounded-xl space-y-1.5 animate-fade-in">
                     <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-indigo-700 tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                       💡 Razorpay Secured Sandbox Active
                     </div>
                     <p className="text-[9px] font-mono uppercase text-indigo-600/90 leading-relaxed">
@@ -732,9 +838,9 @@ function Checkout() {
                 {/* Simulated Order Submission */}
                 <button
                   type="submit"
-                  className="w-full md:col-span-2 bg-neutral-950 hover:bg-[#222222] active:scale-[0.99] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer mt-4 animate-pulse"
+                  className="w-full md:col-span-2 bg-neutral-950 hover:bg-[#222222] active:scale-[0.99] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer mt-4"
                 >
-                  FINALIZE & PLACE ORDER // ₹{finalAmount.toLocaleString('en-IN')}
+                  FINALIZE & PLACE ORDER // ₹{Math.round(finalAmount).toLocaleString('en-IN')}
                 </button>
 
               </form>
@@ -832,6 +938,12 @@ function Checkout() {
                   </div>
                 )}
                 <div className="flex justify-between">
+                  <span>GST (18% EXCLUSIVE)</span>
+                  <span className="font-mono text-neutral-900 font-bold">
+                    ₹{Math.round(taxAmount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span>SHIPPING EXPENSES</span>
                   <span className="font-mono text-emerald-600 font-black tracking-wider text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
                     FREE DISPATCH
@@ -843,817 +955,33 @@ function Checkout() {
                 <div className="flex justify-between items-baseline pt-2">
                   <span className="text-sm font-black text-neutral-950">NET AMOUNT</span>
                   <span className="text-2xl font-mono font-black text-neutral-950 tracking-tight">
-                    ₹{finalAmount.toLocaleString('en-IN')}
+                    ₹{Math.round(finalAmount).toLocaleString('en-IN')}
                   </span>
+                </div>
               </div>
-            </div>
 
           </div>
         </div>
+
+        <RazorpaySandboxModal
+          isOpen={razorpayModalOpen}
+          onClose={() => {
+            setRazorpayModalOpen(false);
+            setSubmittedFormData(null);
+          }}
+          finalAmount={finalAmount}
+          customerName={submittedFormData?.name || user?.name || ''}
+          showToast={showToast}
+          onSuccess={(generatedPayId) => {
+            setRazorpayModalOpen(false);
+            processFinalizeOrder(submittedFormData, 'ONLINE', 'PAID', generatedPayId, mockOrderId);
+          }}
+        />
+
       </div>
     </div>
 
-             {/* Dynamic Razorpay Secured Checkout Overlay Simulator */}
-      {razorpayModalOpen && (() => {
-        // Translation helper dictionary
-        const translations = {
-          en: {
-            secured: "SECURED GATEWAY",
-            title: "Razorpay Checkout (Sandbox)",
-            cancel: "✕ CANCEL",
-            merchant: "MERCHANT NAME",
-            amount: "AMOUNT PAYABLE",
-            payVia: "PAY VIA",
-            cards: "Cards",
-            upi: "UPI / QR",
-            netbanking: "Netbanking",
-            wallets: "Wallets",
-            paylater: "EMI / Pay Later",
-            cardTitle: "Credit or Debit Card",
-            cardSubtitle: "Enter sandbox card credentials to verify",
-            cardNo: "Card Number",
-            cardExpiry: "Expiry Date",
-            cardCvv: "CVV",
-            cardHolder: "Cardholder Name",
-            saveCard: "Remember this card securely",
-            upiTitle: "Unified Payments Interface (UPI)",
-            upiSubtitle: "Select preference for simulated payment channel",
-            upiQr: "Instant GPay / PhonePe QR Code",
-            upiQrSub: "Scan mock sandbox QR matrix",
-            upiIdLabel: "Enter Virtual Payment Address (VPA)",
-            verify: "Verify VPA",
-            verifying: "Verifying...",
-            verified: "Verified",
-            nbTitle: "Popular Bank Selection",
-            nbSubtitle: "Choose your bank sandbox connection",
-            searchBank: "Search other Indian banks...",
-            walletTitle: "Digital Wallet Partners",
-            walletSubtitle: "Select active mock partner wallet channel",
-            walletPhone: "Link Wallet Phone Number",
-            sendOtp: "Link Wallet & Send OTP",
-            linking: "Sending OTP...",
-            otpSent: "OTP Sent successfully!",
-            enterOtp: "Enter 4-Digit OTP",
-            verifyOtp: "Verify & Link Wallet",
-            linked: "Wallet Linked Successfully! ✅",
-            paylaterTitle: "Pay Later & Cardless EMI",
-            paylaterSubtitle: "Select simulated digital credit line",
-            secStamp: "Razorpay Secured Sandbox Channel · PCI-DSS Compliant Gateway",
-            paySecured: "Pay Secured"
-          },
-          hi: {
-            secured: "सुरक्षित गेटवे",
-            title: "रेज़रपे चेकआउट (सैंडबॉक्स)",
-            cancel: "✕ रद्द करें",
-            merchant: "विक्रेता का नाम",
-            amount: "भुगतान राशि",
-            payVia: "भुगतान का प्रकार",
-            cards: "कार्ड",
-            upi: "UPI / क्यूआर",
-            netbanking: "नेटबैंकिंग",
-            wallets: "वॉलेट",
-            paylater: "पे लेटर / ईएमआई",
-            cardTitle: "क्रेडिट या डेबिट कार्ड",
-            cardSubtitle: "सत्यापित करने के लिए विवरण दर्ज करें",
-            cardNo: "कार्ड नंबर",
-            cardExpiry: "समाप्ति तिथि",
-            cardCvv: "सीवीवी",
-            cardHolder: "कार्डधारक का नाम",
-            saveCard: "इस कार्ड को सुरक्षित रूप से याद रखें",
-            upiTitle: "यूनिफाइड पेमेंट्स इंटरफेस (UPI)",
-            upiSubtitle: "सिम्युलेटेड भुगतान चैनल चुनें",
-            upiQr: "त्वरित GPay / PhonePe क्यूआर कोड",
-            upiQrSub: "सैंडबॉक्स क्यूआर मैट्रिक्स स्कैन करें",
-            upiIdLabel: "वर्चुअल पेमेंट एड्रेस (VPA) दर्ज करें",
-            verify: "VPA सत्यापित करें",
-            verifying: "सत्यापित हो रहा है...",
-            verified: "सत्यापित",
-            nbTitle: "लोकप्रिय बैंक चयन",
-            nbSubtitle: "अपना बैंक सैंडबॉक्स कनेक्शन चुनें",
-            searchBank: "अन्य भारतीय बैंक खोजें...",
-            walletTitle: "डिजिटल वॉलेट भागीदार",
-            walletSubtitle: "सक्रिय वॉलेट चैनल चुनें",
-            walletPhone: "वॉलेट फ़ोन नंबर लिंक करें",
-            sendOtp: "वॉलेट लिंक करें और OTP भेजें",
-            linking: "ओटीपी भेज रहा है...",
-            otpSent: "ओटीपी सफलतापूर्वक भेजा गया!",
-            enterOtp: "4-अंकीय ओटीपी दर्ज करें",
-            verifyOtp: "सत्यापित करें और लिंक करें",
-            linked: "वॉलेट सफलतापूर्वक लिंक हो गया! ✅",
-            paylaterTitle: "पे लेटर और कार्डलेस ईएमआई",
-            paylaterSubtitle: "सिम्युलेटेड डिजिटल क्रेडिट लाइन चुनें",
-            secStamp: "रेज़रपे सुरक्षित सैंडबॉक्स चैनल · PCI-DSS अनुपालन गेटवे",
-            paySecured: "सुरक्षित भुगतान करें"
-          }
-        };
-
-        const t = translations[razorpayLang] || translations.en;
-
-        const allIndianBanksList = [
-          "Bank of Baroda",
-          "Bank of India",
-          "Canara Bank",
-          "Union Bank of India",
-          "IDFC First Bank",
-          "IndusInd Bank",
-          "Federal Bank",
-          "Central Bank of India",
-          "Punjab National Bank",
-          "Indian Overseas Bank",
-          "UCO Bank",
-          "Indian Bank",
-          "Karnataka Bank",
-          "RBL Bank",
-          "South Indian Bank",
-          "Bandhan Bank",
-          "IDBI Bank",
-          "Standard Chartered"
-        ];
-
-        // Card network logo generator
-        const getCardNetwork = (num) => {
-          const raw = num.replace(/\s+/g, '');
-          if (raw.startsWith('4')) return { name: 'Visa', logo: '💳 Visa' };
-          if (raw.startsWith('5')) return { name: 'Mastercard', logo: '💳 Mastercard' };
-          if (raw.startsWith('6')) return { name: 'RuPay', logo: '💳 RuPay' };
-          return { name: 'Card', logo: '💳 Card' };
-        };
-        const cardNetwork = getCardNetwork(cardNo);
-
-        // Validation for payment action button
-        const getIsPayButtonDisabled = () => {
-          if (simulatedMethod === 'card') {
-            return !cardNo || !cardExpiry || !cardCvv;
-          }
-          if (simulatedMethod === 'upi') {
-            return !upiQrActive && upiVerified !== 'verified';
-          }
-          if (simulatedMethod === 'netbanking') {
-            return !selectedBank && !customBankSelected;
-          }
-          if (simulatedMethod === 'wallet') {
-            return walletLinked !== 'linked';
-          }
-          if (simulatedMethod === 'paylater') {
-            return !paylaterOption;
-          }
-          return true;
-        };
-        const isPayButtonDisabled = getIsPayButtonDisabled();
-
-        const getPayButtonText = () => {
-          if (isPayButtonDisabled) {
-            if (simulatedMethod === 'card') return "Fill card details to pay";
-            if (simulatedMethod === 'upi') return "Generate QR or Verify UPI ID";
-            if (simulatedMethod === 'netbanking') return "Select bank to pay";
-            if (simulatedMethod === 'wallet') return "Select and Link Wallet";
-            if (simulatedMethod === 'paylater') return "Select Pay Later option";
-            return "Complete details";
-          }
-          return `${t.paySecured} ₹${finalAmount.toLocaleString('en-IN')}`;
-        };
-
-        return (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/80 backdrop-blur-xs animate-fade-in">
-            <div className="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-neutral-200/50 flex flex-col animate-scale-up">
-              
-              {/* Razorpay Brand Header */}
-              <div className="bg-[#121c2c] px-6 py-4 text-white flex items-center justify-between border-b border-[#1b2a40]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded bg-indigo-500 flex items-center justify-center text-xs font-black text-white font-mono">R</div>
-                  <div className="flex flex-col">
-                    <span className="text-[8px] font-black tracking-[0.25em] text-neutral-400 uppercase leading-none">{t.secured}</span>
-                    <span className="text-xs font-black tracking-wider uppercase mt-1">{t.title}</span>
-                  </div>
-                </div>
-                
-                {/* Language Selector & Cancel button */}
-                <div className="flex items-center gap-4">
-                  <select
-                    value={razorpayLang}
-                    onChange={(e) => setRazorpayLang(e.target.value)}
-                    className="bg-[#1b2a40] text-white text-[10px] font-black tracking-wider uppercase px-2 py-1 rounded border border-[#2b3e59] outline-hidden cursor-pointer"
-                  >
-                    <option value="en">English ▾</option>
-                    <option value="hi">हिंदी ▾</option>
-                  </select>
-                  <button 
-                    type="button"
-                    onClick={() => { setRazorpayModalOpen(false); setSubmittedFormData(null); }}
-                    className="text-neutral-400 hover:text-white text-[10px] font-bold font-mono tracking-widest cursor-pointer px-2 py-0.5 rounded transition-colors"
-                  >
-                    {t.cancel}
-                  </button>
-                </div>
-              </div>
-
-              {/* Merchant Details Block */}
-              <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
-                <div>
-                  <span className="text-[8px] font-mono text-neutral-400 block uppercase font-black">{t.merchant}</span>
-                  <span className="text-xs font-black text-neutral-800 uppercase tracking-wide">Aashis Streetwear HQ</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[8px] font-mono text-neutral-400 block uppercase font-black">{t.amount}</span>
-                  <span className="text-base font-mono font-black text-[#121c2c]">₹{finalAmount.toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-
-              {/* Main Interactive Split-pane */}
-              <div className="flex flex-1 min-h-[350px] bg-white">
-                
-                {/* Left Sidebar Tab Selection */}
-                <div className="w-1/3 border-r border-neutral-200/60 bg-neutral-50/40 p-3 flex flex-col gap-1.5 shrink-0">
-                  <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest font-black mb-1 px-2">{t.payVia}</span>
-                  
-                  {/* 1. Card Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setSimulatedMethod('card')}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
-                      simulatedMethod === 'card' 
-                      ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                      : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
-                    }`}
-                  >
-                    <span className="text-xs">💳</span>
-                    <span className="truncate">{t.cards}</span>
-                  </button>
-
-                  {/* 2. UPI Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setSimulatedMethod('upi')}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
-                      simulatedMethod === 'upi' 
-                      ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                      : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
-                    }`}
-                  >
-                    <span className="text-xs">⚡</span>
-                    <span className="truncate">{t.upi}</span>
-                  </button>
-
-                  {/* 3. Netbanking Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setSimulatedMethod('netbanking')}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
-                      simulatedMethod === 'netbanking' 
-                      ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                      : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
-                    }`}
-                  >
-                    <span className="text-xs">🏦</span>
-                    <span className="truncate">{t.netbanking}</span>
-                  </button>
-
-                  {/* 4. Wallet Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setSimulatedMethod('wallet')}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
-                      simulatedMethod === 'wallet' 
-                      ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                      : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
-                    }`}
-                  >
-                    <span className="text-xs">📱</span>
-                    <span className="truncate">{t.wallets}</span>
-                  </button>
-
-                  {/* 5. EMI & PayLater Tab */}
-                  <button
-                    type="button"
-                    onClick={() => setSimulatedMethod('paylater')}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
-                      simulatedMethod === 'paylater' 
-                      ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                      : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
-                    }`}
-                  >
-                    <span className="text-xs">⏳</span>
-                    <span className="truncate">{t.paylater}</span>
-                  </button>
-                </div>
-
-                {/* Right Content Pane */}
-                <div className="flex-1 p-6 flex flex-col justify-between">
-                  
-                  {/* Dynamic Content Views */}
-                  <div className="flex-1 space-y-4">
-                    
-                    {/* CARD FORM VIEW */}
-                    {simulatedMethod === 'card' && (
-                      <div className="space-y-3 animate-fade-in">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.cardTitle}</span>
-                            <span className="text-[9px] text-neutral-400 block mt-0.5">{t.cardSubtitle}</span>
-                          </div>
-                          
-                          {/* Autofill Demo Card button */}
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setCardNo('4111 2222 3333 4444');
-                              setCardExpiry('12 / 29');
-                              setCardCvv('123');
-                              setCardName(submittedFormData?.name?.toUpperCase() || user?.name?.toUpperCase() || 'SANDBOX USER');
-                            }}
-                            className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded transition-all cursor-pointer select-none"
-                          >
-                            ✨ Autofill Demo Card
-                          </button>
-                        </div>
-                        
-                        <div className="space-y-2.5">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardNo}</label>
-                              <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-mono">{cardNetwork.logo}</span>
-                            </div>
-                            <input 
-                              type="text" 
-                              placeholder="4111 2222 3333 4444" 
-                              value={cardNo}
-                              onChange={(e) => {
-                                let val = e.target.value.replace(/\D/g, '').substring(0, 16);
-                                let formatted = val.replace(/(\d{4})(?=\d)/g, '$1 ');
-                                setCardNo(formatted);
-                              }}
-                              className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
-                            />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardExpiry}</label>
-                              <input 
-                                type="text" 
-                                placeholder="12 / 29" 
-                                value={cardExpiry}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                                  if (val.length >= 2) {
-                                    val = val.substring(0, 2) + ' / ' + val.substring(2);
-                                  }
-                                  setCardExpiry(val);
-                                }}
-                                className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardCvv}</label>
-                              <input 
-                                type="password" 
-                                placeholder="•••" 
-                                maxLength={3}
-                                value={cardCvv}
-                                onChange={(e) => {
-                                  setCardCvv(e.target.value.replace(/\D/g, '').substring(0, 3));
-                                }}
-                                className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardHolder}</label>
-                            <input 
-                              type="text" 
-                              placeholder="SANDBOX USER" 
-                              value={cardName}
-                              onChange={(e) => setCardName(e.target.value.toUpperCase())}
-                              className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-sans font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
-                            />
-                          </div>
-
-                          <label className="flex items-center gap-2 text-[9px] font-bold text-neutral-500 cursor-pointer select-none mt-1">
-                            <input 
-                              type="checkbox" 
-                              checked={saveCard}
-                              onChange={(e) => setSaveCard(e.target.checked)}
-                              className="accent-indigo-600"
-                            />
-                            <span>{t.saveCard}</span>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* UPI / QR VIEW */}
-                    {simulatedMethod === 'upi' && (
-                      <div className="space-y-3 animate-fade-in">
-                        <div>
-                          <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.upiTitle}</span>
-                          <span className="text-[9px] text-neutral-400 block mt-0.5">{t.upiSubtitle}</span>
-                        </div>
-                        
-                        {upiQrActive ? (
-                          <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-scale-in">
-                            {/* Real looking QR Code block */}
-                            <div className="bg-white p-3 border border-neutral-200 rounded-lg shadow-sm relative group">
-                              <svg className="w-28 h-28 text-[#121c2c]" viewBox="0 0 100 100">
-                                <path fill="currentColor" d="M0,0 h30 v30 h-30 z M10,10 h10 v10 h-10 z M70,0 h30 v30 h-30 z M80,10 h10 v10 h-10 z M0,70 h30 v30 h-30 z M10,80 h10 v10 h-10 z M40,10 h10 v10 h-10 z M55,5 h10 v10 h-10 z M45,40 h15 v15 h-15 z M5,45 h20 v10 h-20 z M80,45 h10 v20 h-10 z M40,75 h15 v15 h-15 z M75,75 h20 v20 h-20 z M85,65 h10 v10 h-10 z M65,35 h15 v10 h-15 z" />
-                              </svg>
-                              <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setUpiTimer(300)}>
-                                <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">🔄 Reset QR</span>
-                              </div>
-                            </div>
-                            
-                            <div className="text-center">
-                              <span className="text-[9px] font-black text-neutral-800 uppercase tracking-wide block">Scan & Pay using GPay / PhonePe / BHIM</span>
-                              <span className="text-[8px] font-mono text-rose-600 font-bold block mt-1">
-                                ⏳ QR Code expires in {Math.floor(upiTimer / 60)}:{(upiTimer % 60).toString().padStart(2, '0')}
-                              </span>
-                            </div>
-                            
-                            <button 
-                              type="button" 
-                              onClick={() => setUpiQrActive(false)}
-                              className="text-[8px] font-bold text-neutral-500 hover:text-neutral-700 bg-neutral-200/50 px-2 py-0.5 rounded transition-colors cursor-pointer"
-                            >
-                              Cancel QR Scan
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {/* QR Code Option */}
-                            <div 
-                              onClick={() => {
-                                setUpiQrActive(true);
-                                setUpiTimer(300);
-                              }}
-                              className="p-3 bg-neutral-50 hover:bg-indigo-50/20 hover:border-indigo-200 border border-neutral-200 rounded-xl flex items-center justify-between cursor-pointer transition-all active:scale-[0.99]"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 bg-white border border-neutral-200 rounded flex items-center justify-center text-xs shrink-0 select-none">📱</div>
-                                <div>
-                                  <span className="text-[10px] font-black uppercase text-neutral-800 block">{t.upiQr}</span>
-                                  <span className="text-[8px] font-mono text-neutral-400 block mt-0.5">{t.upiQrSub}</span>
-                                </div>
-                              </div>
-                              <span className="text-[8px] font-black bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-0.5 rounded uppercase">Generate QR</span>
-                            </div>
-
-                            <div className="relative flex items-center py-1">
-                              <div className="w-full h-px bg-neutral-100" />
-                              <span className="absolute left-1/2 -translate-x-1/2 bg-white px-2.5 text-[8px] font-mono text-neutral-400 uppercase tracking-widest">OR PAY VIA UPI ID</span>
-                            </div>
-
-                            {/* UPI ID input field */}
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center justify-between">
-                                <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.upiIdLabel}</label>
-                                {upiVerified === 'verified' && <span className="text-[8px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">✅ Verified: {submittedFormData?.name?.toLowerCase() || 'customer'}@upi</span>}
-                                {upiVerified === 'invalid' && <span className="text-[8px] font-mono font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">{t.invalidUpi}</span>}
-                              </div>
-                              <div className="flex gap-2">
-                                <input 
-                                  type="text" 
-                                  placeholder="username@okhdfcbank" 
-                                  value={upiId}
-                                  onChange={(e) => {
-                                    setUpiId(e.target.value);
-                                    setUpiVerified('idle');
-                                  }}
-                                  className="bg-neutral-50 border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider flex-1 transition-colors"
-                                />
-                                <button
-                                  type="button"
-                                  disabled={!upiId || upiVerified === 'verified' || upiVerified === 'verifying'}
-                                  onClick={() => {
-                                    setUpiVerified('verifying');
-                                    setTimeout(() => {
-                                      const isValid = upiId.includes('@') && upiId.split('@')[0].length >= 2 && upiId.split('@')[1].length >= 2;
-                                      if (isValid) {
-                                        setUpiVerified('verified');
-                                      } else {
-                                        setUpiVerified('invalid');
-                                      }
-                                    }, 800);
-                                  }}
-                                  className={`px-3 py-2 text-[9px] font-black tracking-wider uppercase rounded-lg transition-all ${
-                                    upiVerified === 'verified' 
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                                    : upiVerified === 'invalid'
-                                    ? 'bg-rose-50 text-rose-600 border border-rose-200'
-                                    : upiVerified === 'verifying'
-                                    ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 animate-pulse'
-                                    : 'bg-neutral-950 hover:bg-neutral-800 text-white cursor-pointer active:scale-95'
-                                  }`}
-                                >
-                                  {upiVerified === 'verifying' ? t.verifying : upiVerified === 'verified' ? t.verified : t.verify}
-                                </button>
-                              </div>
-
-                              {upiVerified === 'invalid' && (
-                                <p className="text-[8px] font-mono text-rose-500 uppercase leading-normal tracking-wide">
-                                  {t.invalidUpiSub}
-                                </p>
-                              )}
-
-                              {/* Developer helper tip */}
-                              <div className="bg-indigo-50/40 border border-indigo-100 rounded-lg p-2 flex items-start gap-1.5">
-                                <span className="text-xs">💡</span>
-                                <p className="text-[8px] font-medium text-indigo-700 uppercase leading-normal tracking-wide">
-                                  Tip: For secure test mode, enter <strong className="font-mono text-indigo-900 select-all">success@razorpay</strong> or click quick handles to verify instantly!
-                                </p>
-                              </div>
-
-                              {/* Quick Handles */}
-                              <div className="flex flex-wrap gap-1.5 pt-1">
-                                {['@okhdfcbank', '@okaxis', '@okicici', '@ybl', '@paytm'].map((handle) => (
-                                  <button
-                                    key={handle}
-                                    type="button"
-                                    onClick={() => {
-                                      let base = upiId.split('@')[0] || (submittedFormData?.name?.toLowerCase().replace(/\s+/g, '') || 'customer');
-                                      setUpiId(base + handle);
-                                      setUpiVerified('idle');
-                                    }}
-                                    className="text-[8px] font-mono font-bold text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 bg-neutral-50 border border-neutral-200 px-2 py-0.5 rounded transition-all cursor-pointer"
-                                  >
-                                    {handle}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* NETBANKING VIEW */}
-                    {simulatedMethod === 'netbanking' && (
-                      <div className="space-y-3 animate-fade-in">
-                        <div>
-                          <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.nbTitle}</span>
-                          <span className="text-[9px] text-neutral-400 block mt-0.5">{t.nbSubtitle}</span>
-                        </div>
-                        
-                        {/* 6 Popular Banks Grid */}
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { name: 'HDFC Bank', logo: '🏦' },
-                            { name: 'SBI Bank', logo: '🏦' },
-                            { name: 'ICICI Bank', logo: '🏦' },
-                            { name: 'Axis Bank', logo: '🏦' },
-                            { name: 'Kotak Bank', logo: '🏦' },
-                            { name: 'Yes Bank', logo: '🏦' }
-                          ].map((bank) => {
-                            const isSelected = selectedBank === bank.name && !customBankSelected;
-                            return (
-                              <div 
-                                key={bank.name}
-                                onClick={() => {
-                                  setSelectedBank(bank.name);
-                                  setCustomBankSelected('');
-                                }}
-                                className={`p-2.5 border rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all active:scale-95 ${
-                                  isSelected 
-                                  ? 'border-indigo-600 bg-indigo-50/50 shadow-xs scale-[1.02]' 
-                                  : 'border-neutral-200 bg-[#fbfbfb] hover:border-neutral-300'
-                                }`}
-                              >
-                                <span className="text-base">{bank.logo}</span>
-                                <span className="text-[8px] font-black uppercase tracking-wider text-neutral-700 mt-1 truncate w-full">{bank.name}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Search & Select Other Bank Dropdown */}
-                        <div className="relative">
-                          <div 
-                            onClick={() => setNbDropdownOpen(!nbDropdownOpen)}
-                            className="w-full p-3 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl flex items-center justify-between cursor-pointer transition-colors"
-                          >
-                            <span className="text-[9px] font-black uppercase tracking-wider text-neutral-600">
-                              {customBankSelected ? `🏦 Selected: ${customBankSelected}` : t.searchBank}
-                            </span>
-                            <span className="text-xs text-neutral-400">{nbDropdownOpen ? '▴' : '▾'}</span>
-                          </div>
-
-                          {nbDropdownOpen && (
-                            <div className="absolute top-full left-0 w-full mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 p-2 space-y-2 max-h-48 overflow-y-auto">
-                              <input 
-                                type="text" 
-                                placeholder="Search bank name..."
-                                value={nbSearchQuery}
-                                onChange={(e) => setNbSearchQuery(e.target.value)}
-                                className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-[9px] font-sans font-bold text-neutral-800 outline-hidden placeholder-neutral-400"
-                              />
-                              <div className="space-y-1">
-                                {allIndianBanksList
-                                  .filter(bName => bName.toLowerCase().includes(nbSearchQuery.toLowerCase()))
-                                  .map((bName) => (
-                                    <div
-                                      key={bName}
-                                      onClick={() => {
-                                        setCustomBankSelected(bName);
-                                        setSelectedBank('');
-                                        setNbDropdownOpen(false);
-                                        setNbSearchQuery('');
-                                      }}
-                                      className="px-3 py-2 hover:bg-neutral-50 rounded-lg text-[9px] font-black uppercase tracking-wider text-neutral-700 cursor-pointer transition-colors"
-                                    >
-                                      🏦 {bName}
-                                    </div>
-                                  ))}
-                                {allIndianBanksList.filter(bName => bName.toLowerCase().includes(nbSearchQuery.toLowerCase())).length === 0 && (
-                                  <div className="px-3 py-2 text-[9px] font-mono text-neutral-400 text-center">
-                                    No matching Indian banks found
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* WALLET VIEW */}
-                    {simulatedMethod === 'wallet' && (
-                      <div className="space-y-3 animate-fade-in">
-                        <div>
-                          <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.walletTitle}</span>
-                          <span className="text-[9px] text-neutral-400 block mt-0.5">{t.walletSubtitle}</span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          {['Paytm Wallet', 'PhonePe Wallet', 'Amazon Pay', 'JioMoney'].map((wName) => {
-                            const isSelected = selectedWallet === wName;
-                            return (
-                              <div 
-                                key={wName} 
-                                onClick={() => {
-                                  setSelectedWallet(wName);
-                                  setWalletLinked('idle');
-                                  setWalletOtp('');
-                                }}
-                                className={`flex items-center gap-2 p-3 border rounded-xl text-[9px] font-black uppercase tracking-wider text-neutral-700 cursor-pointer select-none transition-all active:scale-[0.98] ${
-                                  isSelected 
-                                  ? 'border-indigo-600 bg-indigo-50/50 shadow-xs' 
-                                  : 'border-neutral-200 bg-[#fbfbfb] hover:border-neutral-300'
-                                }`}
-                              >
-                                <span>📱</span>
-                                <span>{wName}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {selectedWallet && (
-                          <div className="p-3 bg-neutral-50/50 border border-neutral-200 rounded-xl space-y-3 animate-slide-down">
-                            {walletLinked === 'idle' && (
-                              <div className="space-y-2">
-                                <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.walletPhone}</label>
-                                <input 
-                                  type="text" 
-                                  value={walletPhone}
-                                  onChange={(e) => setWalletPhone(e.target.value)}
-                                  placeholder="Enter mobile number linked to wallet"
-                                  className="bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full focus:border-indigo-600 transition-colors"
-                                />
-                                <button
-                                  type="button"
-                                  disabled={!walletPhone}
-                                  onClick={() => {
-                                    setWalletLinked('sending');
-                                    setTimeout(() => {
-                                      setWalletLinked('sent');
-                                    }, 1000);
-                                  }}
-                                  className="w-full bg-neutral-950 hover:bg-neutral-800 text-white font-black text-[9px] tracking-widest uppercase py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
-                                >
-                                  {t.sendOtp}
-                                </button>
-                              </div>
-                            )}
-
-                            {walletLinked === 'sending' && (
-                              <div className="text-center py-2 animate-pulse">
-                                <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">{t.linking}</span>
-                              </div>
-                            )}
-
-                            {walletLinked === 'sent' && (
-                              <div className="space-y-2.5">
-                                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider block font-mono">
-                                  📩 {t.otpSent} (Type '1234' to link)
-                                </span>
-                                <input 
-                                  type="text" 
-                                  value={walletOtp}
-                                  onChange={(e) => setWalletOtp(e.target.value.replace(/\D/g, '').substring(0, 4))}
-                                  placeholder="ENTER 4-DIGIT OTP"
-                                  className="bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 text-center outline-hidden tracking-[0.3em] w-full focus:border-indigo-600 transition-colors"
-                                />
-                                <button
-                                  type="button"
-                                  disabled={walletOtp.length !== 4}
-                                  onClick={() => {
-                                    setWalletLinked('linked');
-                                  }}
-                                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[9px] tracking-widest uppercase py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
-                                >
-                                  {t.verifyOtp}
-                                </button>
-                              </div>
-                            )}
-
-                            {walletLinked === 'linked' && (
-                              <div className="text-center py-2 bg-emerald-50 border border-emerald-200 rounded-lg animate-scale-in">
-                                <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">
-                                  {t.linked}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* PAY LATER & EMI VIEW */}
-                    {simulatedMethod === 'paylater' && (
-                      <div className="space-y-3 animate-fade-in">
-                        <div>
-                          <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.paylaterTitle}</span>
-                          <span className="text-[9px] text-neutral-400 block mt-0.5">{t.paylaterSubtitle}</span>
-                        </div>
-                        
-                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1 scrollbar-none">
-                          {[
-                            { name: 'Simpl', desc: 'Get ₹15,000 credit limit instantly. 1-click checkout, pay in 15 days.' },
-                            { name: 'LazyPay', desc: 'Secure credit line. Pay in 15 days at 0% interest.' },
-                            { name: 'ICICI Bank PayLater', desc: 'Pre-approved credit line for ICICI account holders.' },
-                            { name: 'HDFC FlexiPay', desc: 'Instant flexible digital credit line.' }
-                          ].map((opt) => {
-                            const isSelected = paylaterOption === opt.name;
-                            return (
-                              <div 
-                                key={opt.name}
-                                onClick={() => setPaylaterOption(opt.name)}
-                                className={`p-2.5 border rounded-xl flex items-start gap-2.5 cursor-pointer transition-all active:scale-[0.99] ${
-                                  isSelected 
-                                  ? 'border-indigo-600 bg-indigo-50/50 shadow-xs' 
-                                  : 'border-neutral-200 bg-[#fbfbfb] hover:border-neutral-300'
-                                }`}
-                              >
-                                <div className={`w-3 h-3 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                                  isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-neutral-300 bg-white'
-                                }`}>
-                                  {isSelected && <div className="w-1 h-1 bg-white rounded-full" />}
-                                </div>
-                                <div className="min-w-0">
-                                  <span className="text-[9px] font-black uppercase text-neutral-800 block">{opt.name}</span>
-                                  <span className="text-[8px] font-mono text-neutral-400 block leading-normal mt-0.5 truncate">{opt.desc}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-
-                  {/* Primary Sandbox Payment Action Trigger Button */}
-                  <button
-                    type="button"
-                    disabled={isPayButtonDisabled}
-                    onClick={() => {
-                      setRazorpayModalOpen(false);
-                      const generatedPayId = `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-                      processFinalizeOrder(submittedFormData, 'ONLINE', 'PAID', generatedPayId, mockOrderId);
-                    }}
-                    className={`w-full text-white font-black text-[10px] tracking-widest uppercase py-3.5 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer mt-4 ${
-                      isPayButtonDisabled 
-                      ? 'bg-neutral-200 text-neutral-400 border border-neutral-300 cursor-not-allowed shadow-none' 
-                      : 'bg-[#121c2c] hover:bg-[#1b2a40]'
-                    }`}
-                  >
-                    {getPayButtonText()} &rarr;
-                  </button>
-
-                </div>
-              </div>
-
-              {/* Secure Footer stamp */}
-              <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-center gap-2 text-[8px] font-mono text-neutral-400 uppercase bg-neutral-50/50 select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{t.secStamp}</span>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
-
-      <Footer />
+    <Footer />
     </>
   )
 }

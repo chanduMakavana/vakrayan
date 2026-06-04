@@ -40,12 +40,12 @@ function Hero() {
           </h2>
 
           <div className='flex justify-center mt-4'>
-            {/* High z-index ensures the button remains clickable above foreground imagery */}
-            <button className='relative z-40 bg-indigo-600 py-2 px-5 rounded-2xl text-white font-bold capitalize shadow-lg text-sm md:text-base hover:bg-indigo-700 transition-colors'>
-              <Link to="/shop">
-                Shop Collection
-              </Link>
-            </button>
+            <Link
+              to="/shop"
+              className='relative z-40 bg-[var(--theme-primary)] py-2 px-5 rounded-2xl text-white font-bold capitalize shadow-lg text-sm md:text-base hover:bg-[var(--theme-primary-hover)] transition-colors'
+            >
+              Shop Collection
+            </Link>
           </div>
         </div>
 

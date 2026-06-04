@@ -5,14 +5,17 @@ import { BrowserRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { store } from './store/store.js'
 import { ToastProvider } from './context/ToastContext.jsx'
+import ErrorBoundary from './componets/ErrorBoundary.jsx'
 
 createRoot(document.getElementById('root')).render(
-  <Provider store={store}>
-    <BrowserRouter>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </BrowserRouter>
-  </Provider >,
+  <ErrorBoundary>
+    <Provider store={store}>
+      <BrowserRouter>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </BrowserRouter>
+    </Provider>
+  </ErrorBoundary>
 )
 

@@ -8,7 +8,7 @@ import { addCartItemState } from '../../features/addToCart'
 import { playZip } from '../../utils/sensoryHelper'
 import { useToast } from '../../context/ToastContext'
 
-function AddToCartButton({ product, selectedSize, variant = "default" }) {
+function AddToCartButton({ product, selectedSize, selectedColor, variant = "default" }) {
     const navigate = useNavigate()
     const dispatch = useDispatch()
     const { showToast } = useToast()
@@ -34,7 +34,11 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
         try {
             setStatus('loading')
 
-            const targetSize = selectedSize || product.sizes?.[0] || 'M'
+            const baseSize = selectedSize || product.sizes?.[0] || 'M'
+            let targetSize = baseSize
+            if (selectedColor) {
+                targetSize = `${baseSize} / ${selectedColor.toUpperCase()}`
+            }
             const targetProductId = product.$id || product.id
             const existingCartItem = cartItems.find(
                 item => item.product_id === targetProductId && item.size === targetSize
@@ -47,10 +51,10 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
             } catch {
                 stocks = {};
             }
-            const availableStock = stocks[targetSize] !== undefined ? Number(stocks[targetSize]) : 10;
+            const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
             const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
             if (currentQuantityInCart + 1 > availableStock) {
-                showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${targetSize}.`, "error");
+                showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSize}.`, "error");
                 setStatus('idle');
                 return;
             }
@@ -103,7 +107,7 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
                 {...buttonClickSpring}
                 onClick={handleAdd}
                 disabled={status === 'loading'}
-                className={`text-xs tracking-widest uppercase py-3 px-6 rounded-full transform translate-y-4 group-hover:translate-y-0 shadow-2xl font-black cursor-pointer select-none transition-all duration-300 min-w-35 flex items-center justify-center ${
+                className={`text-xs tracking-widest uppercase py-3 px-6 rounded-none transform translate-y-4 group-hover:translate-y-0 shadow-2xl font-black cursor-pointer select-none transition-all duration-300 min-w-35 flex items-center justify-center ${
                     status === 'success' 
                     ? 'bg-emerald-500 text-white' 
                     : 'bg-white text-black hover:bg-neutral-200'
@@ -115,7 +119,7 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
                         <motion.span {...textTransition} key="idle-overlay">Add To Cart</motion.span>
                     )}
                     {status === 'loading' && (
-                        <motion.div {...textTransition} key="loading-overlay" className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        <motion.div {...textTransition} key="loading-overlay" className="w-4 h-4 border-2 border-black border-t-transparent rounded-none animate-spin" />
                     )}
                     {status === 'success' && (
                         /* ✅ CHANGED TO CLEAN 'Add To Cart' WITH CHECKMARK */
@@ -134,10 +138,10 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
             {...buttonClickSpring}
             onClick={handleAdd}
             disabled={status === 'loading'}
-            className={`w-full flex items-center justify-center gap-2 font-black text-xs tracking-widest uppercase py-4 px-6 rounded-xl transition-all shadow-sm select-none cursor-pointer ${
+            className={`w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none transition-all select-none cursor-pointer ${
                 status === 'success'
-                ? 'bg-emerald-500 text-white'
-                : 'bg-neutral-950 text-white hover:bg-neutral-800'
+                ? 'bg-emerald-500 text-white border border-emerald-500'
+                : 'bg-neutral-950 text-white hover:bg-neutral-800 border border-neutral-950'
             }`}
         >
             <AnimatePresence mode="wait">
@@ -151,7 +155,7 @@ function AddToCartButton({ product, selectedSize, variant = "default" }) {
                 
                 {status === 'loading' && (
                     <motion.div {...textTransition} key="loading-def" className="flex items-center gap-2">
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-none animate-spin" />
                         <span className="tracking-widest">Add To Cart...</span>
                     </motion.div>
                 )}

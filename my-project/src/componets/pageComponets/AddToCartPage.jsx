@@ -4,8 +4,9 @@ import { FiShield, FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import cartService from '../../appwrite/cart'
-import authService from '../../appwrite/auth'
+import productsService from '../../appwrite/products'
 import campaignService from '../../appwrite/campaign'
+import couponUsageService from '../../appwrite/couponUsage'
 import { setCartItems as setCartItemsAction, removeCartItemState, updateCartItemState } from '../../features/addToCart'
 import { useToast } from '../../context/ToastContext'
 
@@ -17,6 +18,7 @@ function AddToCartPage() {
   // Dynamic Hooks for Cloud Synchronization
   const cartItems = useSelector(state => state.cart)
   const products = useSelector(state => state.products.items || [])
+  const { user } = useSelector(state => state.auth)
   const [loading, setLoading] = useState(true)
 
   // Dynamic Coupon State
@@ -45,6 +47,14 @@ function AddToCartPage() {
       const activeCoupons = await campaignService.getCoupons();
       const match = activeCoupons.find(c => String(c.code || '').trim().toUpperCase() === promoInput.trim().toUpperCase());
       if (match) {
+        if (user && user.$id) {
+          const alreadyUsed = await couponUsageService.checkCouponUsage(user.$id, match.code);
+          if (alreadyUsed) {
+            showToast(`Coupon ${match.code} has already been redeemed. Limit: 1 use per customer.`, "error");
+            setPromoInput('');
+            return;
+          }
+        }
         setDiscountPercent(match.discount);
         setCouponApplied(match.code);
         setPromoInput('');
@@ -63,12 +73,11 @@ function AddToCartPage() {
   const discountAmount = cartTotalAmount * (discountPercent / 100);
   const finalAmount = cartTotalAmount - discountAmount;
 
-  // ➡️ 1. INITIAL FETCH: Active User details aur unka live backend cart pool fetch karo
+  // ➡️ 1. INITIAL FETCH: use Redux user directly — no redundant API call
   const fetchCartStage = async () => {
     try {
       setLoading(true)
-      const user = await authService.getCurrentUser()
-      if (user) {
+      if (user && user.$id) {
         const items = await cartService.getCartItems(user.$id)
         dispatch(setCartItemsAction(items))
       } else {
@@ -92,21 +101,39 @@ function AddToCartPage() {
     try {
       let targetQuantity = item.quantity
       if (operation === 'increase') {
-        const prod = products.find(p => p.$id === item.product_id || p.id === item.product_id)
-        if (prod) {
-          let stocks = {}
-          try {
-            stocks = JSON.parse(prod.sizes_stock || '{}')
-          } catch {
-            stocks = {}
+        let availableStock = 10;
+        try {
+          const liveProduct = await productsService.getProductById(item.product_id);
+          if (liveProduct) {
+            let stocks = {};
+            try {
+              stocks = JSON.parse(liveProduct.sizes_stock || '{}');
+            } catch {
+              stocks = {};
+            }
+            const baseSize = item.size ? String(item.size).split('/')[0].trim() : 'M';
+            availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
           }
-          const availableStock = stocks[item.size] !== undefined ? Number(stocks[item.size]) : 10
-          if (targetQuantity + 1 > availableStock) {
-            showToast(`Cannot increase quantity. Only ${availableStock} items left in stock for size ${item.size}.`, "error")
-            return
+        } catch (err) {
+          console.warn("Live stock check failed, falling back to cache:", err.message);
+          const prod = products.find(p => p.$id === item.product_id || p.id === item.product_id);
+          if (prod) {
+            let stocks = {};
+            try {
+              stocks = JSON.parse(prod.sizes_stock || '{}');
+            } catch {
+              stocks = {};
+            }
+            const baseSize = item.size ? String(item.size).split('/')[0].trim() : 'M';
+            availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
           }
         }
-        targetQuantity += 1
+
+        if (targetQuantity + 1 > availableStock) {
+          showToast(`Cannot increase quantity. Only ${availableStock} items left in stock for size ${item.size}.`, "error");
+          return;
+        }
+        targetQuantity += 1;
       }
       if (operation === 'decrease') targetQuantity -= 1
 
