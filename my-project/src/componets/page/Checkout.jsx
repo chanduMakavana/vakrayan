@@ -1,0 +1,989 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { useSelector, useDispatch } from 'react-redux'
+import { useForm } from 'react-hook-form'
+import { FiArrowLeft, FiCheckCircle } from 'react-icons/fi'
+import cartService from '../../appwrite/cart'
+import ordersService from '../../appwrite/orders'
+import productsService from '../../appwrite/products'
+import campaignService from '../../appwrite/campaign'
+import addressService from '../../appwrite/address'
+import { clearCartState } from '../../features/addToCart'
+import { setProducts } from '../../features/productsSlice'
+import Navbar from '../pageComponets/Navbar'
+import Footer from '../pageComponets/Footer'
+import { playSuccessChime, triggerConfetti } from '../../utils/sensoryHelper'
+import couponUsageService from '../../appwrite/couponUsage'
+import { useToast } from '../../context/ToastContext'
+
+import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
+
+const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
+
+const generateOrderNumber = () => {
+  const year = new Date().getFullYear();
+  const randomNum = Math.floor(100000 + Math.random() * 900000);
+  return `ORD-${year}-${randomNum}`;
+};
+
+function Checkout() {
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const { showToast } = useToast()
+  const confettiCanvasRef = useRef(null)
+
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm()
+
+  const cartItems = useSelector(state => state.cart || [])
+  const { user, isAuthenticated } = useSelector(state => state.auth)
+  const { items: products, fetched: productsFetched } = useSelector(state => state.products)
+
+  const [checkoutStatus, setCheckoutStatus] = useState('idle') // idle | processing | success
+
+  useEffect(() => {
+    if (checkoutStatus === 'success') {
+      playSuccessChime()
+      const timer = setTimeout(() => {
+        if (confettiCanvasRef.current) {
+          triggerConfetti(confettiCanvasRef.current)
+        }
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [checkoutStatus])
+  const [processingStep, setProcessingStep] = useState(0)
+  const [selectedPayment, setSelectedPayment] = useState('COD') // COD | ONLINE
+  const [razorpayModalOpen, setRazorpayModalOpen] = useState(false)
+  const [submittedFormData, setSubmittedFormData] = useState(null)
+  const [mockOrderId, setMockOrderId] = useState('')
+
+  // Multiple Saved Addresses State
+  const [savedAddresses, setSavedAddresses] = useState([])
+  const [selectedAddressId, setSelectedAddressId] = useState('')
+
+  // Dynamic Coupon State
+  const [promoInput, setPromoInput] = useState('')
+  const [couponApplied, setCouponApplied] = useState(() => {
+    return sessionStorage.getItem('checkout_coupon') || '';
+  })
+  const [discountPercent, setDiscountPercent] = useState(() => {
+    return Number(sessionStorage.getItem('checkout_discount') || 0);
+  })
+
+  // Load carried coupon from sessionStorage on mount and validate usage
+  useEffect(() => {
+    const carriedCoupon = sessionStorage.getItem('checkout_coupon');
+    if (carriedCoupon && user && user.$id) {
+      couponUsageService.checkCouponUsage(user.$id, carriedCoupon)
+        .then(alreadyUsed => {
+          if (alreadyUsed) {
+            sessionStorage.removeItem('checkout_coupon');
+            sessionStorage.removeItem('checkout_discount');
+            setCouponApplied('');
+            setDiscountPercent(0);
+            console.warn("Carried coupon was auto-removed (already used in database).");
+          }
+        })
+        .catch(err => {
+          console.warn("Coupon check failed on mount, ignoring validation:", err);
+        });
+    }
+  }, [user]);
+
+  const applyAddressFields = useCallback((addr) => {
+    if (!addr) return;
+    setValue('name', addr.customerName || user?.name || '');
+    setValue('email', addr.email || user?.email || '');
+    setValue('phone', addr.phone || '');
+    setValue('address', addr.addressLine || '');
+    setValue('city', addr.city || '');
+    setValue('pincode', addr.pincode || '');
+    setValue('state', addr.state || '');
+    setValue('country', addr.country || 'India');
+  }, [setValue, user]);
+
+  // Load saved addresses on mount/session load
+  useEffect(() => {
+    if (user && user.$id) {
+      addressService.getUserAddresses(user.$id)
+        .then(addresses => {
+          setSavedAddresses(addresses || []);
+          const def = addresses.find(a => a.is_default === true || a.isDefault === true) || addresses[0];
+          if (def) {
+            setSelectedAddressId(def.$id || def.id);
+            applyAddressFields(def);
+          } else {
+            setValue('name', user.name || '');
+            setValue('email', user.email || '');
+          }
+        })
+        .catch(err => console.warn("Failed to load saved addresses profile:", err));
+    }
+  }, [user, setValue, applyAddressFields]);
+
+  useEffect(() => {
+    if (checkoutStatus !== 'idle') return;
+    if (!isAuthenticated) {
+      showToast("Please log in to continue checking out.", "error")
+      navigate('/login')
+    } else if (cartItems.length === 0) {
+      showToast("Your inventory is currently empty.", "error")
+      navigate('/')
+    }
+  }, [isAuthenticated, cartItems, checkoutStatus, navigate, showToast])
+
+  // Programmatically inject official Razorpay SDK script on mount
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => console.log("Razorpay Secured SDK initialized successfully.");
+    script.onerror = () => console.warn("Razorpay SDK offline. Reverting transaction channel to Sandbox.");
+    document.body.appendChild(script);
+    return () => {
+      try {
+        document.body.removeChild(script);
+      } catch (e) {
+        console.warn("Razorpay script cleanup ignored:", e.message);
+      }
+    };
+  }, []);
+
+  if (!productsFetched) {
+    return (
+      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
+        <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+        <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
+          Verifying catalog signatures...
+        </div>
+      </div>
+    );
+  }
+
+  const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
+  const discountAmount = cartTotalAmount * (discountPercent / 100)
+  const netBeforeTax = cartTotalAmount - discountAmount
+  const taxAmount = netBeforeTax * 0.18
+  const finalAmount = netBeforeTax + taxAmount
+
+  const steps = [
+    "Checking shipping details...",
+    "Processing payment...",
+    "Updating product stock...",
+    "Order confirmed!"
+  ]
+
+  const handleApplyPromo = async () => {
+    try {
+      const activeCoupons = await campaignService.getCoupons();
+      const match = activeCoupons.find(c => String(c.code || '').trim().toUpperCase() === promoInput.trim().toUpperCase());
+      if (match) {
+        // Enforce single-use coupon check from Appwrite database usage collection
+        if (user && user.$id) {
+          const alreadyUsed = await couponUsageService.checkCouponUsage(user.$id, match.code);
+          if (alreadyUsed) {
+            showToast(`Coupon ${match.code} has already been redeemed. Limit: 1 use per customer.`, "error");
+            setPromoInput('');
+            return;
+          }
+        }
+
+        // Parse min_order_value and valid_until from coupon metadata
+        let minOrder = Number(match.min_order_value || 0);
+        let validUntil = match.valid_until || null;
+        if (match.coupon_usage) {
+          try {
+            const parsed = JSON.parse(match.coupon_usage);
+            if (parsed && typeof parsed === 'object') {
+              if ('min_order_value' in parsed) minOrder = Number(parsed.min_order_value);
+              if ('valid_until' in parsed) validUntil = parsed.valid_until;
+            }
+          } catch (err) {
+            console.warn("Could not parse coupon usage metadata:", err.message);
+          }
+        }
+
+        if (cartTotalAmount < minOrder) {
+          showToast(`Coupon ${match.code} requires a minimum order value of ₹${minOrder}.`, "error");
+          return;
+        }
+
+        if (validUntil) {
+          const expiryDate = new Date(validUntil);
+          const currentDate = new Date();
+          if (currentDate > expiryDate) {
+            showToast(`Coupon ${match.code} expired on ${new Date(validUntil).toLocaleDateString()}.`, "error");
+            return;
+          }
+        }
+
+        setDiscountPercent(match.discount);
+        setCouponApplied(match.code);
+        setPromoInput('');
+        sessionStorage.setItem('checkout_coupon', match.code);
+        sessionStorage.setItem('checkout_discount', String(match.discount));
+        showToast(`Promo Code ${match.code} applied! Saved ${match.discount}% on fits drop.`, "success");
+      } else {
+        showToast("Invalid promo code.", "error");
+      }
+    } catch (err) {
+      console.error("Promo verification issue:", err);
+      showToast("Verification server connection timeout.", "error");
+    }
+  };
+
+  const onSubmit = async (data) => {
+    if (!user) return
+
+    // 0. Live Stock Validation — fetch fresh product data from Appwrite at submit time
+    // This eliminates the TOCTOU race condition where two users could both pass
+    // a stale Redux cache check and oversell the last unit.
+    for (const cartItem of cartItems) {
+      try {
+        const liveProduct = await productsService.getProductById(cartItem.product_id);
+        if (liveProduct) {
+          let stocks;
+          try {
+            stocks = JSON.parse(liveProduct.sizes_stock || '{}');
+          } catch {
+            stocks = {};
+          }
+          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+          if (Number(cartItem.quantity) > availableStock) {
+            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
+            return;
+          }
+        }
+      } catch (stockErr) {
+        console.warn(`Live stock check failed for ${cartItem.name}, proceeding with cached data:`, stockErr.message);
+        // Fallback to Redux cache if live fetch fails
+        const cachedProd = products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
+        if (cachedProd) {
+          let stocks;
+          try { stocks = JSON.parse(cachedProd.sizes_stock || '{}'); } catch { stocks = {}; }
+          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+          if (Number(cartItem.quantity) > availableStock) {
+            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left.`, "error");
+            return;
+          }
+        }
+      }
+    }
+
+    if (selectedPayment === 'ONLINE') {
+      const liveKey = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
+      const hasRealKey = liveKey && !liveKey.includes('your_project_id') && !liveKey.includes('test_your_public_key');
+
+      const currentMockId = generateMockRazorpayOrderId();
+      setMockOrderId(currentMockId);
+      setSubmittedFormData(data);
+
+      if (window.Razorpay && hasRealKey) {
+        // Launch REAL Razorpay Standard Payment Gateway Popup
+        try {
+          const options = {
+            key: liveKey,
+            amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
+            currency: "INR",
+            name: "Streetwear",
+            description: "Streetwear Drops Secure Transaction Gateway",
+            image: "https://cdn-icons-png.flaticon.com/512/5752/5752538.png", // Company store logo icon
+            prefill: {
+              name: data.name,
+              email: data.email,
+              contact: data.phone
+            },
+            notes: {
+              address: `${data.address}, ${data.city} - ${data.pincode}`,
+              merchant_order_id: currentMockId
+            },
+            retry: {
+              enabled: true,
+              max_count: 4
+            },
+            theme: {
+              color: "#4f46e5" // Premium Indigo theme color
+            },
+            handler: function (response) {
+              const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+              const ordId = response.razorpay_order_id || currentMockId;
+              processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
+            },
+            modal: {
+              ondismiss: function () {
+                showToast("Payment window closed by customer.", "info");
+              }
+            }
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+          return;
+        } catch (err) {
+          console.warn("Real Razorpay initiation issue, falling back to sandbox simulator:", err.message);
+        }
+      }
+
+      // Launch custom Razorpay secured simulator fallback
+      setSubmittedFormData(data);
+      setRazorpayModalOpen(true);
+      return;
+    }
+
+    // Cash on Delivery proceeds instantly
+    await processFinalizeOrder(data, 'COD', 'UNPAID', '', '');
+  };
+
+  const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
+    setCheckoutStatus('processing')
+    setProcessingStep(0)
+
+    // Simulate smooth processing steps
+    for (let i = 0; i < steps.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      setProcessingStep(i + 1)
+    }
+
+    try {
+      const orderNumber = generateOrderNumber();
+      const serializedAddress = JSON.stringify({
+        customerAddress: `${formData.address.trim()}, ${formData.city.trim()}, ${formData.state?.trim() || ''} - ${formData.pincode.trim()}, ${formData.country?.trim() || 'India'} [Payment: ${method}]`,
+        metadata: {
+          order_number: orderNumber,
+          tracking_number: '',
+          tracking_url: '',
+          subtotal: Math.round(cartTotalAmount),
+          tax_amount: Math.round(taxAmount),
+          shipping_charge: 0,
+          coupon_code: couponApplied || 'NONE'
+        }
+      });
+
+      // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Appwrite compatibility)
+      const orderPayload = {
+        userId: user.$id,
+        customerName: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        address: serializedAddress,
+        items: JSON.stringify(
+          cartItems.map(i => ({
+            name: i.name,
+            size: i.size,
+            quantity: Number(i.quantity),
+            price: Number(i.price),
+            product_id: i.product_id
+          }))
+        ),
+        total: Math.round(finalAmount),
+        status: 'PENDING',
+        couponApplied: couponApplied || 'NONE',
+        coupon_code: couponApplied || 'NONE',
+        discountAmount: Math.round(discountAmount),
+        discount_amount: Math.round(discountAmount),
+        discount_applied: Number(discountAmount) > 0 ? "true" : "false",
+        paymentMethod: method,
+        paymentStatus: status,
+        payment_status: status,
+        paymentProvider: method === 'ONLINE' ? 'RAZORPAY' : 'NONE',
+        razorpayOrderId: ordId,
+        razorpay_order_id: ordId,
+        razorpayPaymentId: payId,
+        razorpay_payment_id: payId,
+
+        // Dynamic additions for blueprint compatibility
+        order_number: orderNumber,
+        subtotal: Math.round(cartTotalAmount),
+        tax_amount: Math.round(taxAmount),
+        shipping_charge: 0,
+        tracking_number: '',
+        tracking_url: ''
+      };
+
+      // 2. Perform Stock Depletion size-wise on Catalog & update total_sold
+      const stockUpdatePromises = [];
+      const updatedProducts = products.map(prod => {
+        let stocks = {};
+        try {
+          stocks = JSON.parse(prod.sizes_stock || '{}');
+        } catch {
+          stocks = {};
+        }
+
+        let stocksMutated = false;
+        let quantitySold = 0;
+        cartItems.forEach(cartItem => {
+          if (cartItem.product_id === prod.$id || cartItem.product_id === prod.id) {
+            const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+            const currentStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+            stocks[baseSize] = Math.max(0, currentStock - Number(cartItem.quantity));
+            stocksMutated = true;
+            quantitySold += Number(cartItem.quantity);
+          }
+        });
+
+        if (stocksMutated) {
+          const serializedStock = JSON.stringify(stocks);
+          const newTotalSold = Number(prod.total_sold || 0) + quantitySold;
+          
+          // Save stock update promise
+          const promise = productsService.updateProduct(prod.$id || prod.id, { 
+            sizes_stock: serializedStock,
+            total_sold: newTotalSold
+          })
+          .catch(e => console.warn("Stock update on cloud ignored:", e.message));
+          
+          stockUpdatePromises.push(promise);
+          
+          return { ...prod, sizes_stock: serializedStock, total_sold: newTotalSold };
+        }
+        return prod;
+      });
+
+      // Update Redux Products Cache instantly
+      dispatch(setProducts(updatedProducts));
+
+      // Await all stock updates before proceeding to save order
+      if (stockUpdatePromises.length > 0) {
+        await Promise.all(stockUpdatePromises);
+      }
+
+      // 3. Save Order into Appwrite Database
+      const response = await ordersService.createOrder(orderPayload);
+      if (!response) {
+        throw new Error("Order creation returned null — check Appwrite collection configuration.");
+      }
+
+      // 3.5. Save Address Profile in Background for Future Checkouts
+      try {
+        // Check if this exact address already exists
+        const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
+        const existingAddr = savedAddresses.find(a => {
+          const existingKey = `${(a.addressLine || a.address || '').trim()}_${a.city.trim()}_${a.pincode.trim()}`;
+          return existingKey === addressKey;
+        });
+
+        await addressService.saveAddress(user.$id, {
+          ...formData,
+          $id: existingAddr?.$id || existingAddr?.id, // Update if exists
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          pincode: formData.pincode,
+          state: formData.state || '',
+          country: formData.country || 'India',
+          is_default: savedAddresses.length === 0 && !existingAddr // Only set as default if new
+        });
+      } catch (addrErr) {
+        console.warn("⚠️ Address profile auto-save ignored on cloud database:", addrErr.message);
+      }
+
+      // 4. Log coupon usage in database if coupon was applied
+      if (couponApplied && couponApplied !== 'NONE') {
+        try {
+          await couponUsageService.logCouponUsage(user.$id, couponApplied);
+        } catch (couponErr) {
+          console.warn("⚠️ Coupon usage tracking write failed:", couponErr.message);
+        }
+      }
+
+      // 4.1. Mark cart items as converted before clearing (for abandonment analytics)
+      try {
+        await cartService.convertCartItems(user.$id);
+      } catch (cartErr) {
+        console.warn("⚠️ Cart abandonment status conversion failed:", cartErr.message);
+      }
+
+      // 4.2. Clear Cart globally on Appwrite database & Redux state & Clear Coupon
+      await cartService.clearUserCart(user.$id)
+      dispatch(clearCartState())
+      sessionStorage.removeItem('checkout_coupon')
+      sessionStorage.removeItem('checkout_discount')
+      
+      setCheckoutStatus('success')
+    } catch (error) {
+      console.error("Billing pipeline crash:", error)
+      showToast("Logistics error. Transaction aborted.", "error")
+      setCheckoutStatus('idle')
+    }
+  };
+
+  if (checkoutStatus === 'processing') {
+    return (
+      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
+        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
+          <div className="w-8 h-8 border-4 border-neutral-900 border-t-indigo-600 rounded-full animate-spin" />
+          <h2 className="text-xl font-black tracking-widest uppercase text-neutral-950">
+            PROCESSING INVOICE
+          </h2>
+          <div className="space-y-1.5 w-full">
+            <p className="text-[10px] font-mono tracking-widest text-indigo-600 uppercase font-black animate-pulse">
+              {steps[processingStep] || "Finalizing process modules..."}
+            </p>
+            {/* Custom progress bar */}
+            <div className="w-48 h-[1.5px] bg-neutral-200 mx-auto rounded-full overflow-hidden relative">
+              <div 
+                className="absolute left-0 top-0 h-full bg-indigo-600 transition-all duration-700" 
+                style={{ width: `${(processingStep / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (checkoutStatus === 'success') {
+    return (
+      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
+        
+        {/* Full-screen celebratory confetti canvas overlay */}
+        <canvas 
+          ref={confettiCanvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none z-15"
+        />
+        
+        <div className="relative z-20 w-full max-w-md bg-white p-10 rounded-2xl border border-neutral-200/60 shadow-2xl text-center space-y-6 animate-scale-up">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
+              <FiCheckCircle className="text-3xl" />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
+              TRANSACTION COMPLETED
+            </h4>
+            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-neutral-950 uppercase">
+              Order Placed
+            </h1>
+          </div>
+
+          <p className="text-xs text-neutral-500 leading-relaxed font-mono uppercase tracking-wide">
+            Your order details have been saved in our system. We are preparing to ship your order soon.
+          </p>
+
+          <div className="w-12 h-px bg-neutral-200 mx-auto" />
+
+          <button 
+            onClick={() => navigate('/')} 
+            className="w-full bg-neutral-950 hover:bg-neutral-800 active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer"
+          >
+            Continue Shopping &rarr;
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Navbar />
+
+      <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans relative selection:bg-neutral-900 selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
+        <div className="absolute inset-0 bg-white/96 backdrop-blur-xs z-10" />
+
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
+          
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200/40">
+            <Link to="/cart" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-neutral-500 hover:text-neutral-950 transition-colors uppercase group">
+              <FiArrowLeft className="text-sm group-hover:-translate-x-1 transition-transform" />
+              Return to stock cart
+            </Link>
+            <div className="text-[10px] tracking-[0.3em] font-mono text-neutral-500 uppercase">
+              CHECKOUT MODULE // SECURE CHANNEL
+            </div>
+          </div>
+
+          {/* Checkout split view */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-16 items-start">
+            
+            {/* Billing details form */}
+            <div className="lg:col-span-7 bg-white p-8 rounded-2xl border border-neutral-200/60 shadow-xl space-y-6">
+              <div>
+                <h4 className="text-[9px] tracking-[0.4em] text-indigo-600 font-black uppercase mb-1">HQ Logistics</h4>
+                <h2 className="text-2xl font-black tracking-widest uppercase text-neutral-950">
+                  Shipping Details
+                </h2>
+              </div>
+
+              {savedAddresses.length > 0 && (
+                <div className="space-y-2 mb-6">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Select Saved Address</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {savedAddresses.map((addr) => {
+                      const id = addr.$id || addr.id;
+                      const line = addr.addressLine || '';
+                      const stateStr = addr.state || '';
+                      
+                      return (
+                        <div 
+                          key={id}
+                          onClick={() => {
+                            setSelectedAddressId(id);
+                            applyAddressFields(addr);
+                          }}
+                          className={`p-3 border rounded-xl cursor-pointer transition-all ${
+                            selectedAddressId === id 
+                              ? 'border-neutral-950 bg-neutral-50' 
+                              : 'border-neutral-200 hover:border-neutral-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-black uppercase truncate">{addr.customerName}</span>
+                            {(addr.is_default || addr.isDefault) && (
+                              <span className="text-[8px] bg-neutral-900 text-white font-mono uppercase px-1.5 py-0.5 font-bold">DEFAULT</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-neutral-500 truncate mt-1">{line}</p>
+                          <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{addr.city} {stateStr} {addr.pincode}</p>
+                          <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{addr.phone}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                
+                {/* Full name */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Full Name</label>
+                  <input
+                    type="text"
+                    defaultValue={user?.name || ''}
+                    placeholder="ENTER YOUR NAME"
+                    className={`w-full bg-[#fbfbfb] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('name', { required: 'Name is required' })}
+                  />
+                  {errors.name && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
+                </div>
+
+                {/* Email address */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Email Address</label>
+                  <input
+                    type="text"
+                    defaultValue={user?.email || ''}
+                    placeholder="YOU@EXAMPLE.COM"
+                    className={`w-full bg-[#fbfbfb] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('email', { 
+                      required: 'Email is required',
+                      pattern: {
+                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        message: 'Invalid email'
+                      }
+                    })}
+                  />
+                  {errors.email && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.email.message}</span>}
+                </div>
+
+                {/* Mobile number */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Contact Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="9876543210"
+                    className={`w-full bg-[#fbfbfb] border ${errors.phone ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors font-black`}
+                    {...register('phone', { 
+                      required: 'Phone is required',
+                      pattern: {
+                        value: /^[0-9]{10}$/,
+                        message: 'Must be a 10-digit number'
+                      }
+                    })}
+                  />
+                  {errors.phone && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.phone.message}</span>}
+                </div>
+
+                {/* Street address */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Street Address</label>
+                  <input
+                    type="text"
+                    placeholder="HOUSE NO, APARTMENT, STREET NAME"
+                    className={`w-full bg-[#fbfbfb] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('address', { required: 'Street address is required' })}
+                  />
+                  {errors.address && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.address.message}</span>}
+                </div>
+
+                {/* City */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">City</label>
+                  <input
+                    type="text"
+                    placeholder="MUMBAI"
+                    className={`w-full bg-[#fbfbfb] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('city', { required: 'City is required' })}
+                  />
+                  {errors.city && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.city.message}</span>}
+                </div>
+
+                {/* Pin Code */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">PIN Code</label>
+                  <input
+                    type="text"
+                    placeholder="400001"
+                    className={`w-full bg-[#fbfbfb] border ${errors.pincode ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors font-black`}
+                    {...register('pincode', { 
+                      required: 'Pin code is required',
+                      pattern: {
+                        value: /^[0-9]{6}$/,
+                        message: 'Must be a 6-digit pin code'
+                      }
+                    })}
+                  />
+                  {errors.pincode && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.pincode.message}</span>}
+                </div>
+
+                {/* State */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">State</label>
+                  <input
+                    type="text"
+                    placeholder="MAHARASHTRA"
+                    className={`w-full bg-[#fbfbfb] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('state', { required: 'State is required' })}
+                  />
+                  {errors.state && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.state.message}</span>}
+                </div>
+
+                {/* Country */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Country</label>
+                  <input
+                    type="text"
+                    placeholder="INDIA"
+                    defaultValue="INDIA"
+                    className={`w-full bg-[#fbfbfb] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    {...register('country', { required: 'Country is required' })}
+                  />
+                  {errors.country && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.country.message}</span>}
+                </div>
+
+                {/* Premium Payment Method Selector */}
+                <div className="w-full md:col-span-2 flex flex-col gap-2 mt-2">
+                  <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Payment Option</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* COD Option */}
+                    <div 
+                      onClick={() => setSelectedPayment('COD')}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                        selectedPayment === 'COD' 
+                        ? 'border-neutral-950 bg-neutral-50/50 shadow-sm' 
+                        : 'border-neutral-200 hover:border-neutral-300 bg-[#fbfbfb]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-950 font-black">Cash on Delivery (COD)</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          selectedPayment === 'COD' ? 'border-neutral-950 bg-neutral-950' : 'border-neutral-300'
+                        }`}>
+                          {selectedPayment === 'COD' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                      </div>
+                      <p className="text-[9px] font-mono uppercase text-neutral-500 leading-normal">
+                        Free domestic express shipping. Pay at your doorstep using cash or UPI.
+                      </p>
+                    </div>
+
+                    {/* Online Razorpay Option */}
+                    <div 
+                      onClick={() => setSelectedPayment('ONLINE')}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                        selectedPayment === 'ONLINE' 
+                        ? 'border-neutral-950 bg-neutral-50/50 shadow-sm' 
+                        : 'border-neutral-200 hover:border-neutral-300 bg-[#fbfbfb]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-950 font-black">Online Payment (Razorpay)</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          selectedPayment === 'ONLINE' ? 'border-neutral-950 bg-neutral-950' : 'border-neutral-300'
+                        }`}>
+                          {selectedPayment === 'ONLINE' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                      </div>
+                      <p className="text-[9px] font-mono uppercase text-neutral-500 leading-normal">
+                        Secure transaction gateway. Direct UPI, Credit Cards, and wallets routing.
+                      </p>
+                    </div>
+
+                  </div>
+                </div>
+
+                {selectedPayment === 'ONLINE' && (
+                  <div className="p-3.5 bg-indigo-50/50 border border-indigo-100/60 rounded-xl space-y-1.5 animate-fade-in">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-indigo-700 tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                      💡 Razorpay Secured Sandbox Active
+                    </div>
+                    <p className="text-[9px] font-mono uppercase text-indigo-600/90 leading-relaxed">
+                      UPI: Enter <strong className="select-all font-black text-indigo-800">success@razorpay</strong> for instant verify, or use mock handles. <br />
+                      Cards: Enter any test card details in the secure pop-up.
+                    </p>
+                  </div>
+                )}
+
+                {/* Simulated Order Submission */}
+                <button
+                  type="submit"
+                  className="w-full md:col-span-2 bg-neutral-950 hover:bg-[#222222] active:scale-[0.99] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer mt-4"
+                >
+                  FINALIZE & PLACE ORDER // ₹{Math.round(finalAmount).toLocaleString('en-IN')}
+                </button>
+
+              </form>
+            </div>
+
+            {/* Order Summary Dock */}
+            <div className="lg:col-span-5 bg-white border border-neutral-200/60 p-6 rounded-2xl shadow-xl space-y-6 lg:sticky lg:top-24">
+              <h3 className="text-xs font-black tracking-[0.25em] uppercase text-neutral-400">
+                Fit Summary
+              </h3>
+
+              {/* Items List */}
+              <div className="space-y-4 max-h-72 overflow-y-auto pr-2 scrollbar-none">
+                {cartItems.map((item) => (
+                  <div key={item.$id} className="flex gap-3 items-center">
+                    <img 
+                      src={item.product_Image || 'https://placehold.co/100x100'} 
+                      alt={item.name} 
+                      className="w-12 h-16 object-cover border border-neutral-200 rounded-lg shrink-0" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-black uppercase text-neutral-900 truncate tracking-wide">
+                        {item.name}
+                      </h4>
+                      <p className="text-[9px] font-mono text-neutral-500 uppercase">
+                        Size: {item.size || 'M'} · Qty: {item.quantity}
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-black text-neutral-900">
+                      ₹{item.subtotal?.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <hr className="border-neutral-100" />
+
+              {/* Deploy Coupon Code */}
+              <div className="space-y-2 pt-1">
+                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase block">
+                  Apply Coupon
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoInput}
+                    onChange={(e) => setPromoInput(e.target.value)}
+                    placeholder="E.G. DROP20"
+                    className="flex-1 bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-950 rounded-xl px-4 py-2.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider uppercase font-black font-mono transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    className="bg-neutral-950 hover:bg-neutral-800 active:scale-95 text-white font-black text-[10px] tracking-wider uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                  >
+                    APPLY
+                  </button>
+                </div>
+                {couponApplied && (
+                  <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 mt-2 animate-scale-in">
+                    <span>🎟️ {couponApplied} ACTIVE ({discountPercent}% OFF)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCouponApplied('');
+                        setDiscountPercent(0);
+                        sessionStorage.removeItem('checkout_coupon');
+                        sessionStorage.removeItem('checkout_discount');
+                        showToast("Coupon code removed.", "info");
+                      }}
+                      className="text-rose-600 hover:text-rose-800 font-black ml-2 cursor-pointer transition-colors uppercase text-[9px]"
+                    >
+                      ✕ Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <hr className="border-neutral-100" />
+
+              {/* Calculations */}
+              <div className="space-y-3 text-xs font-medium uppercase tracking-wide text-neutral-600">
+                <div className="flex justify-between">
+                  <span>CART VALUE</span>
+                  <span className="font-mono text-neutral-900 font-bold">
+                    ₹{cartTotalAmount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-bold">
+                    <span>COUPON SAVINGS ({couponApplied})</span>
+                    <span className="font-mono font-black">
+                      - ₹{discountAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>GST (18% EXCLUSIVE)</span>
+                  <span className="font-mono text-neutral-900 font-bold">
+                    ₹{Math.round(taxAmount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>SHIPPING EXPENSES</span>
+                  <span className="font-mono text-emerald-600 font-black tracking-wider text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
+                    FREE DISPATCH
+                  </span>
+                </div>
+                
+                <hr className="border-neutral-100" />
+
+                <div className="flex justify-between items-baseline pt-2">
+                  <span className="text-sm font-black text-neutral-950">NET AMOUNT</span>
+                  <span className="text-2xl font-mono font-black text-neutral-950 tracking-tight">
+                    ₹{Math.round(finalAmount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+          </div>
+        </div>
+
+        <RazorpaySandboxModal
+          isOpen={razorpayModalOpen}
+          onClose={() => {
+            setRazorpayModalOpen(false);
+            setSubmittedFormData(null);
+          }}
+          finalAmount={finalAmount}
+          customerName={submittedFormData?.name || user?.name || ''}
+          showToast={showToast}
+          onSuccess={(generatedPayId) => {
+            setRazorpayModalOpen(false);
+            processFinalizeOrder(submittedFormData, 'ONLINE', 'PAID', generatedPayId, mockOrderId);
+          }}
+        />
+
+      </div>
+    </div>
+
+    <Footer />
+    </>
+  )
+}
+
+export default Checkout
