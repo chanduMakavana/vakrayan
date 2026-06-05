@@ -28,19 +28,56 @@ function Hero() {
   const navigate = useNavigate()
   const [slides, setSlides] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [direction, setDirection] = useState(0) // -1 for left, 1 for right
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [imagesLoaded, setImagesLoaded] = useState(false)
 
-  // Fetch slides from Appwrite
+  // Fetch slides and preload all images
   useEffect(() => {
     let active = true
+
+    const preloadImages = (slidesList) => {
+      const urls = []
+      slidesList.forEach(s => {
+        if (s.image) urls.push(s.image)
+        if (s.mobileImage) urls.push(s.mobileImage)
+      })
+
+      if (urls.length === 0) {
+        setImagesLoaded(true)
+        return
+      }
+
+      let count = 0
+      urls.forEach(url => {
+        const img = new window.Image()
+        img.src = url
+        img.onload = () => {
+          count++
+          if (count === urls.length && active) {
+            setImagesLoaded(true)
+          }
+        }
+        img.onerror = () => {
+          count++
+          if (count === urls.length && active) {
+            setImagesLoaded(true)
+          }
+        }
+      })
+    }
+
     slidesService.getSlides().then((res) => {
-      if (active && res && res.length > 0) {
-        setSlides(res)
-      } else if (active) {
-        setSlides(DEFAULT_SLIDES)
+      if (active) {
+        const list = res && res.length > 0 ? res : DEFAULT_SLIDES
+        setSlides(list)
+        preloadImages(list)
       }
     }).catch(() => {
-      if (active) setSlides(DEFAULT_SLIDES)
+      if (active) {
+        setSlides(DEFAULT_SLIDES)
+        preloadImages(DEFAULT_SLIDES)
+      }
     })
 
     return () => {
@@ -59,6 +96,7 @@ function Hero() {
   useEffect(() => {
     if (slides.length <= 1) return
     const interval = setInterval(() => {
+      setDirection(1)
       setCurrentIndex((prev) => (prev + 1) % slides.length)
     }, 5000)
     return () => clearInterval(interval)
@@ -66,33 +104,75 @@ function Hero() {
 
   const nextSlide = (e) => {
     e.stopPropagation()
+    setDirection(1)
     setCurrentIndex((prev) => (prev + 1) % slides.length)
   }
 
   const prevSlide = (e) => {
     e.stopPropagation()
+    setDirection(-1)
     setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length)
   }
 
   const activeSlide = slides[currentIndex] || DEFAULT_SLIDES[0]
 
-  const fadeVariants = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1, transition: { duration: 0.8, ease: "easeInOut" } },
-    exit: { opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }
+  const slideVariants = {
+    enter: (direction) => ({
+      x: direction > 0 ? '100%' : direction < 0 ? '-100%' : '0%',
+      opacity: 0.95
+    }),
+    center: {
+      x: '0%',
+      opacity: 1,
+      transition: {
+        x: { type: "tween", ease: "easeInOut", duration: 0.5 },
+        opacity: { duration: 0.2 }
+      }
+    },
+    exit: (direction) => ({
+      x: direction < 0 ? '100%' : direction > 0 ? '-100%' : '0%',
+      opacity: 0.95,
+      transition: {
+        x: { type: "tween", ease: "easeInOut", duration: 0.5 },
+        opacity: { duration: 0.2 }
+      }
+    })
+  }
+
+  if (!imagesLoaded) {
+    return (
+      <div className="w-full h-[55vh] md:h-[75vh] relative overflow-hidden bg-neutral-900 animate-pulse">
+        {/* Skeleton Left Arrow Control */}
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-neutral-800/80 rounded-full" />
+        
+        {/* Skeleton Right Arrow Control */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-neutral-800/80 rounded-full" />
+
+        {/* Skeleton Indicator Dots */}
+        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
+          {Array.from({ length: slides.length > 0 ? slides.length : 3 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="w-2.5 h-2.5 rounded-full bg-neutral-850"
+            />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className='w-full h-[65vh] md:h-[90vh] relative overflow-hidden bg-neutral-950 flex flex-col justify-between pb-4 md:pb-0'>
+    <div className='w-full h-[55vh] md:h-[75vh] relative overflow-hidden bg-neutral-955'>
       
-      {/* Dynamic Background Image Slider with Cross-Fade */}
-      <div className="absolute inset-0 z-0">
-        <AnimatePresence mode="wait">
+      {/* Dynamic Background Image Slider with Horizontal Slide */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <AnimatePresence initial={false} custom={direction}>
           <motion.div
-            key={activeSlide.$id || currentIndex}
-            variants={fadeVariants}
-            initial="initial"
-            animate="animate"
+            key={currentIndex}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
             exit="exit"
             className="absolute inset-0 cursor-pointer"
             onClick={() => {
@@ -103,55 +183,11 @@ function Hero() {
           >
             <img
               src={isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image}
-              alt="Streetwear Banner Banner"
+              alt="Streetwear Banner"
               className="w-full h-full object-cover select-none"
             />
-            {/* Dark tint overlay for rich aesthetic contrast and readable text */}
-            <div className="absolute inset-0 bg-neutral-950/45 backdrop-brightness-[0.8]" />
           </motion.div>
         </AnimatePresence>
-      </div>
-
-      {/* Gradient SVG Wave Background to blend elements smoothly */}
-      <div className='absolute bottom-0 w-full z-20 leading-0 pointer-events-none'>
-        <svg
-          className='w-full'
-          xmlns="http://www.w3.org/2000/svg" 
-          viewBox="0 0 1440 320"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#1a1a1a" stopOpacity="0.4" />
-              <stop offset="30%" stopColor="#262a2e" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#343a40" stopOpacity="1" />
-            </linearGradient>
-          </defs>
-          <path 
-            fill="url(#wave-gradient)" 
-            d="M0,32L48,74.7C96,117,192,203,288,218.7C384,235,480,181,576,144C672,107,768,85,864,80C960,75,1056,85,1152,80C1248,75,1344,53,1392,42.7L1440,32L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-          ></path>
-        </svg>
-      </div>
-
-      {/* Main Static Content Overlay */}
-      <div className='relative z-10 text-center mt-16 px-4 pointer-events-none'>
-        <h1 className='text-gray-100 text-4xl sm:text-7xl md:text-9xl tracking-wider font-extrabold [text-shadow:2px_1px_15px_rgba(0,0,0,0.6)] uppercase'>
-          STREETWEAR
-        </h1>
-        
-        <h2 className='text-white text-lg sm:text-2xl md:text-3xl tracking-widest mt-1 font-bold [text-shadow:2px_1px_10px_rgba(0,0,0,0.6)]'>
-          SOLVING
-        </h2>
-
-        <div className='flex justify-center mt-6 pointer-events-auto'>
-          <Link
-            to="/shop"
-            className='bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] py-3.5 px-8 rounded-full text-white font-black tracking-widest uppercase shadow-xl text-xs md:text-sm transition-all duration-300 transform hover:scale-105 active:scale-95'
-          >
-            Shop Collection &rarr;
-          </Link>
-        </div>
       </div>
 
       {/* Interactive Controls Overlay (Dots + Arrows) */}
@@ -160,7 +196,7 @@ function Hero() {
           {/* Arrow Controls */}
           <button
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-xs transition-colors cursor-pointer border border-white/15"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-3 rounded-full backdrop-blur-xs transition-colors cursor-pointer border border-white/10"
             aria-label="Previous slide"
           >
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -170,7 +206,7 @@ function Hero() {
           
           <button
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full backdrop-blur-xs transition-colors cursor-pointer border border-white/15"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-3 rounded-full backdrop-blur-xs transition-colors cursor-pointer border border-white/10"
             aria-label="Next slide"
           >
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -179,7 +215,7 @@ function Hero() {
           </button>
 
           {/* Indicator Dots */}
-          <div className="absolute bottom-10 left-0 right-0 z-30 flex justify-center gap-2">
+          <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center gap-2">
             {slides.map((_, idx) => (
               <button
                 key={idx}
