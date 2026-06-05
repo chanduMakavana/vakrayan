@@ -55,14 +55,34 @@ export class AuthService {
 
     // Terminate current active session
     async logout() {
-    try {
-        return await this.account.deleteSession('current');
-    } catch (error) {
-        // Log exception but do not throw to avoid breaking the frontend state
-        console.log("Appwrite service :: logout :: No active session found or already logged out", error.message);
-        return null; 
+        try {
+            return await this.account.deleteSession('current');
+        } catch (error) {
+            // Log exception but do not throw to avoid breaking the frontend state
+            console.log("Appwrite service :: logout :: No active session found or already logged out", error.message);
+            return null; 
+        }
     }
-}
+
+    // Create recovery link for forgotten password
+    async createRecovery(email, url) {
+        try {
+            return await this.account.createRecovery(email, url);
+        } catch (error) {
+            console.error("Appwrite service :: createRecovery :: error", error.message);
+            throw error;
+        }
+    }
+
+    // Complete recovery with userId, secret, new password, and confirmed new password
+    async updateRecovery(userId, secret, password) {
+        try {
+            return await this.account.updateRecovery(userId, secret, password);
+        } catch (error) {
+            console.error("Appwrite service :: updateRecovery :: error", error.message);
+            throw error;
+        }
+    }
 }
 
 const authService = new AuthService();

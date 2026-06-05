@@ -160,6 +160,34 @@ function Shop() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, filteredProducts.length, user]);
 
+  // Get all unique categories from products
+  const uniqueProductCategories = Array.from(
+    new Set(products.map(p => p.category).filter(Boolean))
+  )
+  
+  const defaultCategories = [
+    { value: 'printed-tshirt', label: 'PRINTED T-SHIRTS' },
+    { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRTS' },
+    { value: 'shirts', label: 'SHIRTS' },
+    { value: 'hoodies', label: 'HOODIES' },
+  ]
+  
+  const categoriesList = [{ value: 'all', label: 'ALL PRODUCTS' }]
+  
+  defaultCategories.forEach(c => {
+    if (!categoriesList.some(item => item.value === c.value)) {
+      categoriesList.push(c)
+    }
+  })
+  
+  uniqueProductCategories.forEach(cat => {
+    const value = cat.toLowerCase().trim()
+    if (!categoriesList.some(item => item.value === value)) {
+      const label = cat.replace(/-/g, ' ').toUpperCase()
+      categoriesList.push({ value, label })
+    }
+  })
+
   return (
     <>
       <Navbar />
@@ -181,13 +209,7 @@ function Shop() {
           <div className="bg-white border border-neutral-950/10 p-6 rounded-none flex flex-col gap-6">
             {/* Category Select Tabs */}
             <div className="border-b border-neutral-950/10 flex flex-wrap gap-x-8 gap-y-2 pb-3">
-              {[
-                { value: 'all', label: 'ALL PRODUCTS' },
-                { value: 'printed-tshirt', label: 'PRINTED T-SHIRTS' },
-                { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRTS' },
-                { value: 'shirts', label: 'SHIRTS' },
-                { value: 'hoodies', label: 'HOODIES' },
-              ].map((c) => (
+              {categoriesList.map((c) => (
                 <button
                   key={c.value}
                   onClick={() => setSelectedCategory(c.value)}

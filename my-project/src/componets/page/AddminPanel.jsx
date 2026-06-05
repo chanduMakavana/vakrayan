@@ -10,10 +10,17 @@ import restockService from '../../appwrite/restock';
 import couponUsageService from '../../appwrite/couponUsage';
 import cartService from '../../appwrite/cart';
 import storageService from '../../appwrite/storage';
+import slidesService from '../../appwrite/slides';
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const BACK_IMAGE_FIELDS = ['back_image_link_1', 'back_image_link_2', 'back_image_link_3', 'back_image_link_4'];
+const DEFAULT_CATEGORIES = [
+  { value: 'printed-tshirt', label: 'PRINTED T-SHIRT' },
+  { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRT' },
+  { value: 'shirts', label: 'SHIRT' },
+  { value: 'hoodies', label: 'HOODIES & SWEATSHIRTS' }
+];
 
 function AdminPanel() {
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
@@ -21,6 +28,7 @@ function AdminPanel() {
   const [editingId, setEditingId] = useState(null);
   const [products, setProducts] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
 
   // Tab Manager State
   const [activeTab, setActiveTab] = useState('products'); // products | orders | campaigns
@@ -75,6 +83,92 @@ function AdminPanel() {
   const [vBack, setVBack] = useState('');
 
   const [uploadingFields, setUploadingFields] = useState({});
+
+  // Slides manager states
+  const [slides, setSlides] = useState([]);
+  const [slidesLoading, setSlidesLoading] = useState(false);
+  const [slideImage, setSlideImage] = useState("");
+  const [slideMobileImage, setSlideMobileImage] = useState("");
+  const [slideLink, setSlideLink] = useState("");
+  const [slideUploading, setSlideUploading] = useState(false);
+
+  const loadSlides = async () => {
+    try {
+      setSlidesLoading(true);
+      const response = await slidesService.getSlides();
+      setSlides(response || []);
+    } catch (err) {
+      console.error("Failed to load slides:", err);
+    } finally {
+      setSlidesLoading(false);
+    }
+  };
+
+  const handleSlideImageUpload = async (e, isMobile = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSlideUploading(true);
+    try {
+      const response = await storageService.uploadFile(file);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        if (isMobile) {
+          setSlideMobileImage(fileUrl);
+        } else {
+          setSlideImage(fileUrl);
+        }
+        showToast("✓ Slide image uploaded successfully!", "success");
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Slide image upload failed:", err);
+      showToast("Appwrite Storage upload failed.", "error");
+    } finally {
+      setSlideUploading(false);
+    }
+  };
+
+  const handleAddSlide = async () => {
+    if (!slideImage.trim()) {
+      showToast("Desktop image is required.", "error");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await slidesService.createSlide({
+        image: slideImage.trim(),
+        mobileImage: slideMobileImage.trim(),
+        link: slideLink.trim()
+      });
+      showToast("🚀 Dynamic banner slide added successfully!", "success");
+      setSlideImage("");
+      setSlideMobileImage("");
+      setSlideLink("");
+      await loadSlides();
+    } catch (err) {
+      console.error("Failed to add slide:", err);
+      showToast("Failed to add slide. Ensure collection exists.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteSlide = async (id) => {
+    setActionLoading(true);
+    try {
+      await slidesService.deleteSlide(id);
+      showToast("🗑️ Banner slide deleted successfully.", "success");
+      await loadSlides();
+    } catch (err) {
+      console.error("Failed to delete slide:", err);
+      showToast("Failed to delete slide.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleProductImageUpload = async (e, fieldName) => {
     const file = e.target.files?.[0];
@@ -176,6 +270,7 @@ function AdminPanel() {
 
     loadProductCatalog();
     loadCustomerOrders();
+    loadSlides();
 
     // Hydrate campaigns
     campaignService.getPromoText()
@@ -223,12 +318,21 @@ function AdminPanel() {
       finalColorName = colorVariants.map(v => v.name).join(', ');
     }
 
+    // Helper to format/slugify custom category
+    const slugifyCategory = (cat) => {
+      return (cat || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    };
+
     // Format product database payload
     const productPayload = {
       name: data.name.trim(),
       price: String(data.price).trim(),
       tags: searchKeywords,
-      category: data.category,
+      category: slugifyCategory(data.category),
       front_image_link: data.front_image_link.trim(),
       description: data.description?.trim() || "",
       sizes: selectedSizes,
@@ -314,6 +418,7 @@ function AdminPanel() {
       setValue('slug', '');
       setColorVariants([]);
       setEditingId(null);
+      setIsCustomCategory(false);
       setProductsSubTab('list');
       setActionLoading(false);
       await loadProductCatalog(); // Refresh catalog view
@@ -323,6 +428,7 @@ function AdminPanel() {
   const handleEdit = (id) => {
     const product = products.find(p => p.id === id || p.$id === id);
     if (product) {
+      setIsCustomCategory(false);
       setValue('name', product.name);
       
       const numericPrice = typeof product.price === 'string'
@@ -418,6 +524,7 @@ function AdminPanel() {
     setVFront('');
     setVBack('');
     setEditingId(null);
+    setIsCustomCategory(false);
     setProductsSubTab('list');
   };
 
@@ -684,6 +791,15 @@ function AdminPanel() {
     }
   };
 
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  const allCategories = [...DEFAULT_CATEGORIES];
+  uniqueCategories.forEach(cat => {
+    const val = cat.toLowerCase().trim();
+    if (!allCategories.some(c => c.value === val)) {
+      allCategories.push({ value: val, label: cat.replace(/-/g, ' ').toUpperCase() });
+    }
+  });
+
   return (
     <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 p-6 md:p-12 relative selection:bg-neutral-950 selection:text-white">
       <div className="relative z-20 max-w-4xl mx-auto space-y-8">
@@ -726,6 +842,12 @@ function AdminPanel() {
               className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'campaigns' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
             >
               Campaign Panel
+            </button>
+            <button 
+              onClick={() => { setActiveTab('slider'); loadSlides(); }}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'slider' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+            >
+              Hero Slider
             </button>
             <button 
               onClick={() => { setActiveTab('telemetry'); loadStoreTelemetry(); }}
@@ -818,16 +940,55 @@ function AdminPanel() {
               {/* Category */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Category</label>
-                <select
-                  disabled={actionLoading}
-                  className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
-                  {...register('category')}
-                >
-                  <option value="printed-tshirt">PRINTED T-SHIRT</option>
-                  <option value="oversized-tshirt">OVERSIZED T-SHIRT</option>
-                  <option value="shirts">SHIRT</option>
-                  <option value="hoodies">HOODIES & SWEATSHIRTS</option>
-                </select>
+                {!isCustomCategory ? (
+                  <div className="relative">
+                    <select
+                      disabled={actionLoading}
+                      className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 pr-10 text-sm text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
+                      {...register('category', { 
+                        required: 'Category is required',
+                        onChange: (e) => {
+                          if (e.target.value === 'custom') {
+                            setIsCustomCategory(true);
+                            setValue('category', '');
+                          }
+                        }
+                      })}
+                    >
+                      <option value="">-- SELECT CATEGORY --</option>
+                      {allCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                      <option value="custom">➕ ADD NEW CUSTOM CATEGORY</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-neutral-500">
+                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      disabled={actionLoading}
+                      placeholder="E.G., CARGO PANTS"
+                      className="grow bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors uppercase font-medium disabled:opacity-50"
+                      {...register('category', { required: 'Category is required' })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCategory(false);
+                        setValue('category', 'printed-tshirt'); // Reset to default
+                      }}
+                      className="bg-neutral-200 hover:bg-[#e2e2e2] text-neutral-800 px-4 py-3.5 rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                {errors.category && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.category.message}</span>}
               </div>
 
               {/* Custom URL Slug */}
@@ -1225,10 +1386,9 @@ function AdminPanel() {
                             className="w-full bg-white border border-neutral-950 text-xs font-mono font-bold text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 uppercase cursor-pointer rounded-none px-2 py-2"
                           >
                             <option value="ALL">ALL CATEGORIES</option>
-                            <option value="printed-tshirt">PRINTED T-SHIRT</option>
-                            <option value="oversized-tshirt">OVERSIZED T-SHIRT</option>
-                            <option value="shirts">SHIRT</option>
-                            <option value="hoodies">HOODIES & SWEATSHIRTS</option>
+                            {allCategories.map(cat => (
+                              <option key={cat.value} value={cat.value}>{cat.label}</option>
+                            ))}
                           </select>
                         </div>
                         {/* Tag Selector */}
@@ -1878,6 +2038,156 @@ function AdminPanel() {
             </div>
           )}
 
+          {/* ==========================================
+              TAB 5: HERO SLIDER MANAGEMENT
+              ========================================== */}
+          {activeTab === 'slider' && (
+            <div className="space-y-8 animate-fade-in">
+              <div className="pb-4 border-b border-neutral-200 flex items-center justify-between">
+                <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Hero Banner Slides</h2>
+                <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{slides.length} SLIDES ACTIVE</span>
+              </div>
+
+              {/* Add New Slide Form */}
+              <div className="bg-[#fcfcfd] border border-neutral-200 p-6 rounded-none space-y-6">
+                <h3 className="text-[10px] font-mono font-black tracking-widest text-neutral-900 uppercase">➕ Add New Banner Slide</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Desktop Image Upload */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Desktop Banner Image (1440x800 recommended)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Paste image URL or upload file..."
+                        value={slideImage}
+                        onChange={(e) => setSlideImage(e.target.value)}
+                        className="grow bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                      />
+                      <label className="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
+                        {slideUploading ? "Uploading..." : "Upload"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleSlideImageUpload(e, false)}
+                          disabled={slideUploading}
+                        />
+                      </label>
+                    </div>
+                    {slideImage && (
+                      <div className="mt-2 relative w-32 aspect-[16/9] border border-neutral-200 overflow-hidden bg-neutral-100">
+                        <img src={slideImage} alt="Desktop Preview" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => setSlideImage("")} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 text-[8px] hover:bg-red-800 leading-none">✕</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile Image Upload */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Mobile Banner Image (Optional - 800x1200 recommended)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Paste mobile image URL or upload..."
+                        value={slideMobileImage}
+                        onChange={(e) => setSlideMobileImage(e.target.value)}
+                        className="grow bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                      />
+                      <label className="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
+                        {slideUploading ? "Uploading..." : "Upload"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleSlideImageUpload(e, true)}
+                          disabled={slideUploading}
+                        />
+                      </label>
+                    </div>
+                    {slideMobileImage && (
+                      <div className="mt-2 relative w-20 aspect-[3/4] border border-neutral-200 overflow-hidden bg-neutral-100">
+                        <img src={slideMobileImage} alt="Mobile Preview" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => setSlideMobileImage("")} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 text-[8px] hover:bg-red-800 leading-none">✕</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Click Redirect Link */}
+                  <div className="flex flex-col gap-1.5 md:col-span-2">
+                    <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Destination Redirect Link (e.g., /shop or /category/printed-tshirt)</label>
+                    <input
+                      type="text"
+                      placeholder="E.G., /shop"
+                      value={slideLink}
+                      onChange={(e) => setSlideLink(e.target.value)}
+                      className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-3 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddSlide}
+                  disabled={actionLoading || slideUploading || !slideImage.trim()}
+                  className="bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-none uppercase transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  🚀 DEPLOY BANNER SLIDE
+                </button>
+              </div>
+
+              {/* Active Slides Display Grid */}
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-mono font-black tracking-widest text-neutral-900 uppercase">Active Banners</h3>
+                
+                {slidesLoading ? (
+                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Loading Slides...</div>
+                ) : slides.length === 0 ? (
+                  <div className="py-12 text-center border border-dashed border-neutral-300 bg-neutral-50/50">
+                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No active homepage slides. Falling back to default banners.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {slides.map((slide) => (
+                      <div key={slide.$id} className="border border-neutral-950/10 bg-white p-4 flex flex-col justify-between space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex gap-4">
+                            <div className="w-1/2 aspect-[16/9] border border-neutral-200 overflow-hidden bg-neutral-100 relative">
+                              <img src={slide.image} alt="Desktop slide view" className="w-full h-full object-cover" />
+                              <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">DESKTOP</span>
+                            </div>
+                            {slide.mobileImage ? (
+                              <div className="w-1/4 aspect-[3/4] border border-neutral-200 overflow-hidden bg-neutral-100 relative">
+                                <img src={slide.mobileImage} alt="Mobile slide view" className="w-full h-full object-cover" />
+                                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">MOBILE</span>
+                              </div>
+                            ) : (
+                              <div className="w-1/4 aspect-[3/4] border border-dashed border-neutral-300 flex items-center justify-center text-neutral-400 text-[8px] uppercase">
+                                No Mobile View
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="text-[10px] font-mono space-y-1">
+                            <div className="truncate"><span className="text-neutral-400">LINK:</span> <span className="font-bold">{slide.link || "None"}</span></div>
+                            <div><span className="text-neutral-400">CREATED:</span> <span>{new Date(slide.$createdAt).toLocaleString()}</span></div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSlide(slide.$id)}
+                          className="w-full border border-red-500 text-red-500 hover:bg-red-50 text-[9px] font-mono font-bold tracking-widest py-2 uppercase transition-all cursor-pointer"
+                        >
+                          🗑️ DELETE SLIDE
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
 

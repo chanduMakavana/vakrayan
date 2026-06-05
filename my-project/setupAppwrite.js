@@ -246,6 +246,15 @@ const schema = [
             { key: 'email', type: 'string', size: 255, required: true },
             { key: 'subscribedAt', type: 'string', size: 100, required: false }
         ]
+    },
+    {
+        id: env.VITE_APPWRITE_SLIDES_COLLECTION_ID || 'slides',
+        name: 'Slides',
+        attributes: [
+            { key: 'image', type: 'string', size: 500, required: true },
+            { key: 'mobileImage', type: 'string', size: 500, required: false, default: '' },
+            { key: 'link', type: 'string', size: 500, required: false, default: '' }
+        ]
     }
 ];
 

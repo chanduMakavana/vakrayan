@@ -1,6 +1,6 @@
 
 export const conf = {
-    appwriteurl: String(import.meta.env.VITE_APPWRITE_ENDPOINT || "").trim(),
+    appwriteurl: String(import.meta.env.VITE_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1").trim(),
     appwriteProjectId: String(import.meta.env.VITE_APPWRITE_PROJECT_ID || "").trim(),
     appwriteDatabaseId: String(import.meta.env.VITE_APPWRITE_DATABASE_ID || "").trim(),
     appwriteProductsCollectionId: String(import.meta.env.VITE_APPWRITE_PRODUCTS_COLLECTION_ID || "").trim(),
@@ -17,6 +17,7 @@ export const conf = {
     appwriteWishlistCollectionId: String(import.meta.env.VITE_APPWRITE_WISHLIST_COLLECTION_ID || "").trim(),
     appwriteCouponUsageCollectionId: String(import.meta.env.VITE_APPWRITE_COUPON_USAGE_COLLECTION_ID || "").trim(),
     appwriteRestockCollectionId: String(import.meta.env.VITE_APPWRITE_RESTOCK_COLLECTION_ID || "").trim(),
+    appwriteSlidesCollectionId: String(import.meta.env.VITE_APPWRITE_SLIDES_COLLECTION_ID || "slides").trim(),
     appwriteBucketId: String(import.meta.env.VITE_APPWRITE_BUCKET_ID || "images").trim(),
     appwriteApiKey: String(import.meta.env.VITE_APPWRITE_API_KEY || "").trim(),
 }
