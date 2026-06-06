@@ -55,7 +55,6 @@ export class AuthService {
 
     // Terminate current active session
     async logout() {
-<<<<<<< HEAD
         try {
             return await this.account.deleteSession('current');
         } catch (error) {
@@ -97,17 +96,6 @@ export class AuthService {
         }
     }
 }
-=======
-    try {
-        return await this.account.deleteSession('current');
-    } catch (error) {
-        // Log exception but do not throw to avoid breaking the frontend state
-        console.log("Appwrite service :: logout :: No active session found or already logged out", error.message);
-        return null; 
-    }
-}
-}
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
 const authService = new AuthService();
 export default authService;

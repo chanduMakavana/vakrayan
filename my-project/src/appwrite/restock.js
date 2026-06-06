@@ -52,7 +52,6 @@ export class RestockService {
             return [];
         }
     }
-<<<<<<< HEAD
 
     // Delete a restock notification request by ID
     async deleteRestockNotification(documentId) {
@@ -84,8 +83,6 @@ export class RestockService {
             throw error;
         }
     }
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 }
 
 const restockService = new RestockService();

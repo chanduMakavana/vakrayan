@@ -19,11 +19,7 @@ function Shop() {
 
   const products = useSelector(state => state.products.items || [])
   const wishlist = useSelector(state => state.wishlist || [])
-<<<<<<< HEAD
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
-=======
-  const { user, isAuthenticated } = useSelector(state => state.auth)
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const reduxFetched = useSelector(state => state.products.fetched)
   
   const [loading, setLoading] = useState(!reduxFetched)
@@ -142,7 +138,6 @@ function Shop() {
 
   // 3. Sort Results
   const filteredProducts = baseFiltered.sort((a, b) => {
-<<<<<<< HEAD
     const isOutOfStock = (product) => {
       let stocks = {};
       try {
@@ -163,8 +158,6 @@ function Shop() {
     if (aOut && !bOut) return 1;
     if (!aOut && bOut) return -1;
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     if (sortBy === 'popularity') {
       return Number(b.total_sold || 0) - Number(a.total_sold || 0)
     }
@@ -187,7 +180,6 @@ function Shop() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, filteredProducts.length, user]);
 
-<<<<<<< HEAD
   // Get all unique categories from products
   const uniqueProductCategories = Array.from(
     new Set(products.map(p => p.category).filter(Boolean))
@@ -216,8 +208,6 @@ function Shop() {
     }
   })
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   return (
     <>
       <Navbar />
@@ -239,17 +229,7 @@ function Shop() {
           <div className="bg-white border border-neutral-950/10 p-6 rounded-none flex flex-col gap-6">
             {/* Category Select Tabs */}
             <div className="border-b border-neutral-950/10 flex flex-wrap gap-x-8 gap-y-2 pb-3">
-<<<<<<< HEAD
               {categoriesList.map((c) => (
-=======
-              {[
-                { value: 'all', label: 'ALL PRODUCTS' },
-                { value: 'printed-tshirt', label: 'PRINTED T-SHIRTS' },
-                { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRTS' },
-                { value: 'shirts', label: 'SHIRTS' },
-                { value: 'hoodies', label: 'HOODIES' },
-              ].map((c) => (
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                 <button
                   key={c.value}
                   onClick={() => setSelectedCategory(c.value)}
@@ -356,7 +336,6 @@ function Shop() {
                 const backView = product.back_image_links?.[0] || product.back_image_link || frontView
                 const activeTag = product.tag || ""
 
-<<<<<<< HEAD
                 let stocks = {};
                 try {
                   stocks = JSON.parse(product?.sizes_stock || '{}');
@@ -369,8 +348,6 @@ function Shop() {
                   isAllOutOfStock = totalStock === 0;
                 }
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                 let swatches = [];
                 if (product.color_hex) {
                   if (product.color_hex.startsWith('[')) {
@@ -446,7 +423,6 @@ function Shop() {
                         )}
                       </button>
 
-<<<<<<< HEAD
                       {/* Edit Button for Admin Mode */}
                       {adminMode && (
                         <button
@@ -460,8 +436,6 @@ function Shop() {
                         </button>
                       )}
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                       {/* Active Tag Badge */}
                       {activeTag && (
                         <div className="absolute top-4 left-4 z-20 flex items-center bg-neutral-950 px-2 py-0.5 select-none">
@@ -471,7 +445,6 @@ function Shop() {
                         </div>
                       )}
 
-<<<<<<< HEAD
                       {/* Out of Stock Overlay */}
                       {isAllOutOfStock && (
                         <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
@@ -483,10 +456,6 @@ function Shop() {
 
                       {/* Image Flip */}
                       <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
-=======
-                      {/* Image Flip */}
-                      <div className="w-full h-full relative">
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                         <img
                           src={frontView}
                           alt={product.name}
@@ -505,7 +474,6 @@ function Shop() {
                     </div>
 
                     {/* Metadata Content */}
-<<<<<<< HEAD
                     <div className="mt-3 px-1 flex flex-col justify-between grow">
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-1">
@@ -542,63 +510,6 @@ function Shop() {
                         </div>
                         <span className="text-[8px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
                           incl. taxes
-=======
-                    <div className="mt-5 px-1 flex flex-col justify-between grow">
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="text-[9px] font-sans text-neutral-400 font-extrabold tracking-widest uppercase">
-                            {product.category?.replace('-', ' ') || "HQ MERCH"}
-                          </span>
-                          <span className="text-[9px] font-sans text-neutral-300 font-bold uppercase tracking-widest">
-                            VOL. I
-                          </span>
-                        </div>
-                        
-                        <h3 className="text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
-                          {product.name}
-                        </h3>
-                        {swatches.length > 0 && (
-                          <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                            {swatches.map((swatch, idx) => (
-                              <span
-                                key={idx}
-                                title={swatch.name}
-                                className="w-2 h-2 rounded-full border border-neutral-950/15 block shrink-0"
-                                style={{ backgroundColor: swatch.hex }}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="mt-3 pt-3 border-t border-neutral-100 flex items-end justify-between gap-4">
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-mono font-bold text-neutral-400 uppercase tracking-widest">PRICE</span>
-                          <div className="flex items-baseline gap-2 mt-0.5">
-                            <span className="text-sm font-mono font-black text-neutral-950">
-                              ₹{Number(product.price).toLocaleString('en-IN')}
-                            </span>
-                            {(() => {
-                              const priceNum = Number(product.price || 0);
-                              const compareNum = Number(product.compare_at_price || 0);
-                              const showCompare = compareNum > priceNum;
-                              const compareDisplay = showCompare
-                                ? compareNum
-                                : (product.discount_percent > 0
-                                    ? Math.round(priceNum / (1 - product.discount_percent / 100))
-                                    : null);
-                              return compareDisplay ? (
-                                <span className="text-[10px] font-mono text-neutral-400 line-through font-bold">
-                                  ₹{compareDisplay.toLocaleString('en-IN')}
-                                </span>
-                              ) : null;
-                            })()}
-                          </div>
-                        </div>
-                        
-                        <span className="text-[10px] font-sans font-bold tracking-widest text-neutral-400 group-hover:text-neutral-950 transition-colors duration-300 uppercase pb-0.5">
-                          DETAILS &rarr;
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                         </span>
                       </div>
                     </div>

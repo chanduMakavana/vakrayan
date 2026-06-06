@@ -231,7 +231,6 @@ function OrderDetail() {
       console.warn("Could not parse order address or metadata JSON:", outerErr.message);
     }
 
-<<<<<<< HEAD
     if (typeof addressText === 'string') {
       addressText = addressText.replace(/\[Payment:\s*\w+\]/i, '').trim();
       if (addressText.endsWith(',')) {
@@ -239,14 +238,11 @@ function OrderDetail() {
       }
     }
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     return { addressText, metadata };
   };
 
   const { addressText, metadata } = parseOrderAddressAndMetadata(order);
 
-<<<<<<< HEAD
   // Extract base shipping, remote route surcharge, and COD handling fee from the stored total shipping charge
   const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
   const isCod = order.paymentMethod === 'COD';
@@ -255,13 +251,10 @@ function OrderDetail() {
   const remoteSurcharge = (remainingShipping === 80 || remainingShipping === 179) ? 80 : 0;
   const baseShippingCharge = Math.max(0, remainingShipping - remoteSurcharge);
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const handleCancelOrder = () => {
     setIsCancelModalOpen(true);
   };
 
-<<<<<<< HEAD
   const handlePrintInvoice = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -419,8 +412,6 @@ function OrderDetail() {
     printWindow.document.close();
   };
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const submitCancelOrder = async () => {
     let finalReason = cancellationReasonOption;
     if (cancellationReasonOption === "Other (Explain in box below)") {
@@ -532,7 +523,6 @@ function OrderDetail() {
                       Cancel Order
                     </button>
                   )}
-<<<<<<< HEAD
                   {order.status === 'DELIVERED' && (
                     <button
                       onClick={handlePrintInvoice}
@@ -541,8 +531,6 @@ function OrderDetail() {
                       <FiFileText className="text-xs" /> Download Invoice
                     </button>
                   )}
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                 </div>
                 <span className="text-[9px] font-mono text-neutral-400 block uppercase">Database ID: {order.$id || order.id}</span>
               </div>
@@ -628,11 +616,7 @@ function OrderDetail() {
             )}
 
             {/* Tracking details */}
-<<<<<<< HEAD
             {(order.tracking_number || metadata.tracking_number) && (
-=======
-            {metadata.tracking_number && (
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               <div className="bg-indigo-50 border border-indigo-100/60 p-6 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2">
                   <FiTruck className="text-indigo-600 text-lg" />
@@ -641,21 +625,12 @@ function OrderDetail() {
                   </h3>
                 </div>
                 <div className="text-xs font-mono uppercase text-indigo-800 space-y-1">
-<<<<<<< HEAD
                   <div>Tracking Number: <strong className="font-black select-all text-neutral-900">{order.tracking_number || metadata.tracking_number}</strong></div>
                   <div>Carrier Channel: <span className="font-black">Delhivery/DTDC Express</span></div>
                   {(order.tracking_url || metadata.tracking_url) && (
                     <div className="pt-2">
                       <a 
                         href={order.tracking_url || metadata.tracking_url} 
-=======
-                  <div>Tracking Number: <strong className="font-black select-all text-neutral-900">{metadata.tracking_number}</strong></div>
-                  <div>Carrier Channel: <span className="font-black">Delhivery/DTDC Express</span></div>
-                  {metadata.tracking_url && (
-                    <div className="pt-2">
-                      <a 
-                        href={metadata.tracking_url} 
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="inline-block bg-indigo-600 hover:bg-indigo-750 text-white font-sans font-black text-[10px] tracking-widest uppercase px-4 py-2 rounded-lg transition-all"
@@ -675,7 +650,6 @@ function OrderDetail() {
               </h3>
 
               <div className="divide-y divide-neutral-100 border border-neutral-100 rounded-2xl overflow-hidden bg-neutral-50/20 p-4 space-y-4">
-<<<<<<< HEAD
                 {parsedItems.map((item, idx) => {
                   const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
                   const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
@@ -737,52 +711,6 @@ function OrderDetail() {
                     </div>
                   );
                 })}
-=======
-                {parsedItems.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center py-2 text-xs pt-4 first:pt-0">
-                    <div className="space-y-1">
-                      <h4 className="font-black text-neutral-950 uppercase tracking-wide">
-                        {item.name}
-                      </h4>
-                      <p className="text-[9px] font-mono text-neutral-500 uppercase">
-                        Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
-                      </p>
-                      {order.status === 'DELIVERED' && (() => {
-                        let productId = item.product_id;
-                        if (!productId) {
-                          const matchingProd = products.find(p => p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
-                          productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
-                        }
-
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (productId) {
-                                setReviewModalItem({ name: item.name, productId });
-                                setModalRating(5);
-                                setModalComment('');
-                                setModalFit('true');
-                                setModalComfort(5);
-                                setModalQuality(5);
-                                setModalBreathable(5);
-                              } else {
-                                showToast("Failed to locate product in current catalog.", "error");
-                              }
-                            }}
-                            className="mt-1.5 inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer border border-neutral-950"
-                          >
-                            Write Review
-                          </button>
-                        );
-                      })()}
-                    </div>
-                    <span className="font-mono font-black text-neutral-950 text-sm shrink-0">
-                      ₹{Number(item.price * item.quantity).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                ))}
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               </div>
             </div>
 
@@ -802,7 +730,6 @@ function OrderDetail() {
                   </span>
                 </div>
               )}
-<<<<<<< HEAD
 
               <div className="flex justify-between">
                 <span>SHIPPING & DELIVERY</span>
@@ -832,20 +759,6 @@ function OrderDetail() {
                   </span>
                 </div>
               )}
-=======
-              <div className="flex justify-between">
-                <span>GST (18% EXCLUSIVE)</span>
-                <span className="text-neutral-950 font-bold">
-                  ₹{Math.round(Number(metadata.tax_amount || 0)).toLocaleString('en-IN')}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>DISPATCH EXPRESS</span>
-                <span className="text-emerald-600 font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded">
-                  FREE DISPATCH
-                </span>
-              </div>
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               <div className="flex justify-between">
                 <span>PAYMENT METHOD</span>
                 <span className="text-neutral-950 font-bold tracking-wide">
@@ -880,7 +793,6 @@ function OrderDetail() {
               )}
               <hr className="border-neutral-100" />
               <div className="flex justify-between items-baseline pt-2">
-<<<<<<< HEAD
                 <div className="flex flex-col">
                   <span className="text-sm font-black text-neutral-950 uppercase tracking-wide">Net deposited amount</span>
                   <span className="text-[9px] text-neutral-400 font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
@@ -888,10 +800,6 @@ function OrderDetail() {
                   </span>
                 </div>
                 <span className="text-2xl font-black text-neutral-950 tracking-tight font-mono">
-=======
-                <span className="text-sm font-black text-neutral-950 uppercase tracking-wide">Net deposited amount</span>
-                <span className="text-2xl font-black text-neutral-950 tracking-tight">
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                   ₹{Number(order.total || 0).toLocaleString('en-IN')}
                 </span>
               </div>

@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-<<<<<<< HEAD
 import { FiChevronDown, FiChevronUp, FiShield, FiTruck, FiScissors, FiArrowLeft, FiMapPin } from 'react-icons/fi';
-=======
-import { FiChevronDown, FiChevronUp, FiShield, FiTruck, FiScissors, FiArrowLeft } from 'react-icons/fi';
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../appwrite/products';
 import reviewsService from '../../appwrite/reviews';
@@ -26,11 +22,7 @@ function ProductDetail() {
   const dispatch = useDispatch();
   const products = useSelector(state => state.products.items || []);
   const wishlist = useSelector(state => state.wishlist || []);
-<<<<<<< HEAD
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth);
-=======
-  const { user, isAuthenticated } = useSelector(state => state.auth);
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +115,6 @@ function ProductDetail() {
   const [sizingExpanded, setSizingExpanded] = useState(false);
   const [shippingExpanded, setShippingExpanded] = useState(false);
 
-<<<<<<< HEAD
   // Pincode Checker States
   const [pincodeInput, setPincodeInput] = useState(() => localStorage.getItem('checked_pincode') || '');
   const [pinChecking, setPinChecking] = useState(false);
@@ -267,8 +258,6 @@ function ProductDetail() {
     }
   }, []);
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   // Loupe Zoom Magnifier State
   const [zoomStyle, setZoomStyle] = useState({ transformOrigin: 'center center', scale: '1' });
 
@@ -303,7 +292,6 @@ function ProductDetail() {
            setProduct(cachedProduct);
            setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
            
-<<<<<<< HEAD
             if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
               let stockMap = {};
               try {
@@ -314,11 +302,6 @@ function ProductDetail() {
               const firstInStockSize = cachedProduct.sizes.find(sz => stockMap[sz] > 0);
               setSelectedSize(firstInStockSize || cachedProduct.sizes[0]);
             }
-=======
-           if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
-             setSelectedSize(cachedProduct.sizes[0]);
-           }
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
            // Initialize selectedColor if Option B JSON exists
            if (cachedProduct.color_hex && cachedProduct.color_hex.startsWith('[')) {
@@ -354,7 +337,6 @@ function ProductDetail() {
          setProduct(mainProductData);
          setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
          
-<<<<<<< HEAD
           if (mainProductData.sizes && mainProductData.sizes.length > 0) {
             let stockMap = {};
             try {
@@ -365,11 +347,6 @@ function ProductDetail() {
             const firstInStockSize = mainProductData.sizes.find(sz => stockMap[sz] > 0);
             setSelectedSize(firstInStockSize || mainProductData.sizes[0]);
           }
-=======
-         if (mainProductData.sizes && mainProductData.sizes.length > 0) {
-           setSelectedSize(mainProductData.sizes[0]);
-         }
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
          // Initialize selectedColor if Option B JSON exists
          if (mainProductData.color_hex && mainProductData.color_hex.startsWith('[')) {
@@ -672,7 +649,6 @@ function ProductDetail() {
     };
   })();
 
-<<<<<<< HEAD
   // Parse stocks mapping
   let stocks = {};
   try {
@@ -688,8 +664,6 @@ function ProductDetail() {
     isAllOutOfStock = totalStock === 0;
   }
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const galleryImages = activeVariant
     ? [activeVariant.front, activeVariant.back].filter(Boolean)
     : [
@@ -777,7 +751,6 @@ function ProductDetail() {
                     {product.tag}
                   </span>
                 )}
-<<<<<<< HEAD
                 {isAllOutOfStock ? (
                   <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-2.5 py-0.5 rounded-none border border-rose-100">
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
@@ -797,12 +770,6 @@ function ProductDetail() {
                     ✏️ Edit Drop
                   </button>
                 )}
-=======
-                <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  In Stock
-                </span>
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               </div>
 
               <div className="space-y-1">
@@ -852,7 +819,6 @@ function ProductDetail() {
                   : product.discount_percent;
 
                 return (
-<<<<<<< HEAD
                   <div className="flex items-baseline gap-3 pt-1 flex-wrap">
                     <span className="text-2xl font-mono font-bold text-neutral-950">
                       ₹{priceNum.toLocaleString('en-IN')}
@@ -860,22 +826,12 @@ function ProductDetail() {
                     <span className="text-[9px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
                       incl. of all taxes
                     </span>
-=======
-                  <div className="flex items-baseline gap-3 pt-1">
-                    <span className="text-2xl font-mono font-bold text-neutral-950">
-                      ₹{priceNum.toLocaleString('en-IN')}
-                    </span>
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                     {compareDisplay && (
                       <>
                         <span className="text-sm text-neutral-400 line-through font-mono font-medium">
                           ₹{compareDisplay.toLocaleString('en-IN')}
                         </span>
-<<<<<<< HEAD
                         <span className="text-[10px] text-rose-600 font-mono font-bold tracking-wider bg-rose-50 px-2.5 py-0.5 rounded-none border border-rose-100">
-=======
-                        <span className="text-[10px] text-rose-600 font-mono font-bold tracking-wider bg-rose-50 px-2 py-0.5 rounded-none border border-rose-100">
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                           {discountDisplay}% OFF
                         </span>
                       </>
@@ -943,27 +899,17 @@ function ProductDetail() {
                               setActiveImage(variant.front);
                             }
                           }}
-<<<<<<< HEAD
                           className={`w-10 h-12 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
-=======
-                          className={`w-8 h-8 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                             selectedColor === variant.name
                               ? 'border-neutral-950 scale-110 shadow-sm'
                               : 'border-neutral-200 hover:border-neutral-400'
                           }`}
                           title={variant.name}
                         >
-<<<<<<< HEAD
                           <img
                             src={variant.front || 'https://placehold.co/100x120?text=Color'}
                             alt={variant.name}
                             className="w-full h-full object-cover object-center"
-=======
-                          <span
-                            className="w-full h-full block"
-                            style={{ backgroundColor: variant.hex }}
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                           />
                         </button>
                       ))}
@@ -991,27 +937,17 @@ function ProductDetail() {
                                 navigate(`/product/${siblingId}`);
                               }
                             }}
-<<<<<<< HEAD
                             className={`w-10 h-12 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
-=======
-                            className={`w-8 h-8 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               isCurrent
                                 ? 'border-neutral-950 scale-110 shadow-sm'
                                 : 'border-neutral-200 hover:border-neutral-400'
                             }`}
                             title={sibling.color_name}
                           >
-<<<<<<< HEAD
                             <img
                               src={sibling.front_image_link || sibling.image_url || sibling.image || 'https://placehold.co/100x120?text=Color'}
                               alt={sibling.color_name}
                               className="w-full h-full object-cover object-center"
-=======
-                            <span
-                              className="w-full h-full block"
-                              style={{ backgroundColor: sibling.color_hex || '#CCC' }}
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                             />
                           </button>
                         );
@@ -1054,15 +990,6 @@ function ProductDetail() {
                       >
                         Size Guide
                       </span>
-<<<<<<< HEAD
-=======
-                      <span 
-                        onClick={() => setSizeAdvisorOpen(true)}
-                        className="text-xs text-neutral-950 font-mono font-bold border-b border-neutral-950 cursor-pointer pb-0.5 hover:text-neutral-600 transition-colors uppercase tracking-wider"
-                      >
-                        Size Advisor
-                      </span>
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                     </div>
                   </div>
                   <div className="grid grid-cols-6 gap-2">
@@ -1239,7 +1166,6 @@ function ProductDetail() {
               </div>
             </div>
 
-<<<<<<< HEAD
             {/* Pincode Checker Component */}
             <div className="pt-4 pb-2 border-t border-neutral-150 space-y-3">
               <span className="text-[8px] font-bold text-neutral-400 block tracking-widest uppercase">CHECK DELIVERY AVAILABILITY</span>
@@ -1328,8 +1254,6 @@ function ProductDetail() {
               )}
             </div>
 
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
             {/* Collapsible Accordions */}
             <div className="border-t border-b border-neutral-200 divide-y divide-neutral-200">
 
@@ -1507,7 +1431,6 @@ function ProductDetail() {
             {/* COLUMN 1: RATINGS SCORECARD & WRITE REVIEW (5 Columns) */}
             <div className="lg:col-span-5 space-y-6">
               {/* Ratings Summary Card */}
-<<<<<<< HEAD
               {reviews.length > 0 && (
                 <div className="bg-white p-6 rounded-none border border-neutral-950/15 flex items-center gap-6">
                   <div className="text-center">
@@ -1609,105 +1532,6 @@ function ProductDetail() {
                   </div>
                 </div>
               )}
-=======
-              <div className="bg-white p-6 rounded-none border border-neutral-950/15 flex items-center gap-6">
-                <div className="text-center">
-                  <div className="text-4xl font-mono font-bold tracking-tight text-neutral-950">
-                    {(() => {
-                      if (reviews.length === 0) return '5.0';
-                      const sum = reviews.reduce((acc, r) => {
-                        const val = Number(r.rating);
-                        return acc + (isNaN(val) ? 5 : val);
-                      }, 0);
-                      return (sum / reviews.length).toFixed(1);
-                    })()}
-                  </div>
-                  <div className="flex gap-0.5 justify-center mt-1">
-                    {[1, 2, 3, 4, 5].map((star) => {
-                      const sum = reviews.reduce((acc, r) => {
-                        const val = Number(r.rating);
-                        return acc + (isNaN(val) ? 5 : val);
-                      }, 0);
-                      const avg = reviews.length > 0 ? sum / reviews.length : 5.0;
-                      const isFilled = star <= Math.round(avg);
-                      return (
-                        <FaStar key={star} className={`text-xs ${isFilled ? 'text-amber-400' : 'text-neutral-200'}`} />
-                      );
-                    })}
-                  </div>
-                  <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase mt-2 block">
-                    Average Rating
-                  </span>
-                </div>
-                <div className="flex-1 w-px bg-neutral-950/10 self-stretch" />
-                <div className="flex-1 space-y-1.5">
-                  {[5, 4, 3, 2, 1].map((stars) => {
-                    const count = reviews.filter(r => {
-                      const val = Number(r.rating);
-                      const ratingClean = isNaN(val) ? 5 : Math.round(val);
-                      return ratingClean === stars;
-                    }).length;
-                    const percent = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
-                    return (
-                      <div key={stars} className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono font-bold">
-                        <span className="w-3 text-right">{stars}★</span>
-                        <div className="flex-1 h-1.5 bg-neutral-100 rounded-none overflow-hidden">
-                          <div className="h-full bg-neutral-950 rounded-none" style={{ width: `${percent}%` }} />
-                        </div>
-                        <span className="w-4 text-right">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Sizing & Fit Stats (True to Size) */}
-              <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-neutral-850">
-                    Fit Statistics
-                  </h3>
-                  <span className="text-[9px] text-emerald-600 font-mono font-bold bg-emerald-50 border border-emerald-250 px-2 py-0.5 rounded-none">
-                    {fitStats.verifiedFitPercent}% Verified Fit
-                  </span>
-                </div>
-                
-                <div className="space-y-4 pt-2">
-                  {/* Slider indicator */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-neutral-500">
-                      <span>Tight ({fitStats.fitTightPercent}%)</span>
-                      <span className="text-neutral-950 font-bold">True To Size ({fitStats.fitTruePercent}%)</span>
-                      <span>Loose ({fitStats.fitLoosePercent}%)</span>
-                    </div>
-                    <div className="relative h-2 bg-neutral-100 rounded-none overflow-hidden flex">
-                      {/* Tight segment */}
-                      <div className="h-full bg-rose-300 transition-all duration-550" style={{ width: `${fitStats.fitTightPercent}%` }} />
-                      {/* True to Size segment */}
-                      <div className="h-full bg-neutral-950 transition-all duration-550" style={{ width: `${fitStats.fitTruePercent}%` }} />
-                      {/* Loose segment */}
-                      <div className="h-full bg-amber-300 transition-all duration-550" style={{ width: `${fitStats.fitLoosePercent}%` }} />
-                    </div>
-                  </div>
-
-                  {/* Rating parameters */}
-                  <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-                    <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
-                      <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgComfort}</span>
-                      <span className="text-[9px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mt-1">Comfort</span>
-                    </div>
-                    <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
-                      <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgQuality}</span>
-                      <span className="text-[9px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mt-1">Quality</span>
-                    </div>
-                    <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
-                      <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgBreathable}</span>
-                      <span className="text-[9px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mt-1">Breathable</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
               {/* Write Review Panel */}
               <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
@@ -2242,7 +2066,6 @@ function ProductDetail() {
                 <div className="pt-2">
                   <button
                     onClick={() => {
-<<<<<<< HEAD
                       let stockMap = {};
                       try {
                         stockMap = JSON.parse(product.sizes_stock || '{}');
@@ -2254,13 +2077,6 @@ function ProductDetail() {
                         showToast(`Applied Recommended Size "${advRecommendation}"!`, "success");
                       } else {
                         showToast(`Recommended size "${advRecommendation}" is out of stock.`, "error");
-=======
-                      if (product.sizes?.includes(advRecommendation)) {
-                        setSelectedSize(advRecommendation);
-                        showToast(`Applied Recommended Size "${advRecommendation}"!`, "success");
-                      } else {
-                        showToast(`Recommended size "${advRecommendation}" is not in stock for this product.`, "error");
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                       }
                       setSizeAdvisorOpen(false);
                       setAdvHeight('');

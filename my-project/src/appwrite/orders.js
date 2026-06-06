@@ -194,7 +194,6 @@ export class OrdersService {
             throw error;
         }
     }
-<<<<<<< HEAD
 
     // ➡️ 6. Delete an order document by ID
     async deleteOrder(documentId) {
@@ -210,8 +209,6 @@ export class OrdersService {
             throw error;
         }
     }
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 }
 
 const ordersService = new OrdersService();

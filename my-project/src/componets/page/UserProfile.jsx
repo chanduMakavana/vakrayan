@@ -628,7 +628,6 @@ function UserProfile() {
                       <div 
                         key={uniqueId || idx}
                         onClick={() => navigate(`/order/${uniqueId}`)}
-<<<<<<< HEAD
                         className="bg-white p-5 rounded-xl border border-neutral-200/50 shadow-xs hover:shadow-md cursor-pointer flex flex-row items-center gap-4 transition-all duration-300 group relative"
                       >
                         {/* Order Item Image(s) */}
@@ -653,20 +652,11 @@ function UserProfile() {
                         </div>
 
                         <div className="space-y-2.5 flex-1 min-w-0">
-=======
-                        className="bg-white p-5 rounded-xl border border-neutral-200/50 shadow-xs hover:shadow-md cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-300 group relative"
-                      >
-                        <div className="space-y-2.5 flex-1">
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                           <div className="space-y-0.5">
                             <span className="text-[10px] text-neutral-400 block font-medium">
                               Order Date: {orderDate} / ID: {orderNum}
                             </span>
-<<<<<<< HEAD
                             <h4 className="text-xs font-semibold text-neutral-800 leading-relaxed truncate">
-=======
-                            <h4 className="text-xs font-semibold text-neutral-800 leading-relaxed">
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               {parsedItems.map(i => `${i.name} (${i.size || 'M'})`).join(' , ')}
                             </h4>
                           </div>
@@ -728,13 +718,8 @@ function UserProfile() {
                           )}
                         </div>
 
-<<<<<<< HEAD
                         <div className="flex items-center gap-4 justify-end shrink-0">
                           <div className="text-right">
-=======
-                        <div className="flex items-center gap-4 justify-between sm:justify-end shrink-0">
-                          <div className="text-left sm:text-right">
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                             <span className="text-[10px] text-neutral-400 block font-medium">Total Paid</span>
                             <span className="text-sm font-semibold text-neutral-900">
                               ₹{Number(order.total || 0).toLocaleString('en-IN')}

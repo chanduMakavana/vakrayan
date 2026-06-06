@@ -12,10 +12,7 @@ import { setProducts } from './features/productsSlice'
 import Home from './componets/page/Home'
 import SignUp from './componets/page/SignUp'
 import Login from './componets/page/Login'
-<<<<<<< HEAD
 import ResetPassword from './componets/page/ResetPassword'
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 import AdminPanel from './componets/page/AddminPanel'
 import ProductDetail from './componets/page/ProductDetail'
 import NotFound from './componets/page/NotFound'
@@ -92,10 +89,7 @@ function App() {
         {/* Public routes */}
         <Route path='/signup' element={<SignUp />} />
         <Route path='/login' element={<Login />} />
-<<<<<<< HEAD
         <Route path='/reset-password' element={<ResetPassword />} />
-=======
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         <Route path='/' element={<Home />} />
         <Route path='/product/:id' element={<ProductDetail />} />
         <Route path='/shop' element={<Shop />} />

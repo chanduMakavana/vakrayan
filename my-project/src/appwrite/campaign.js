@@ -48,7 +48,6 @@ export class CampaignService {
     }
 
     // ➡️ 2. Create/Activate a Promo Coupon
-<<<<<<< HEAD
     async createCoupon(code, discount, extraData = {}) {
         const minOrder = extraData.min_order_value ? Number(extraData.min_order_value) : 0;
         const validUntil = extraData.valid_until || '';
@@ -65,10 +64,6 @@ export class CampaignService {
             coupon_usage: serializedUsage
         };
 
-=======
-    async createCoupon(code, discount) {
-        const payload = { code: code.toUpperCase(), discount: Number(discount) };
->>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         try {
             if (!conf.appwriteCouponsCollectionId) {
                 throw new Error("appwriteCouponsCollectionId is missing.");
