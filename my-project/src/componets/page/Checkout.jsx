@@ -26,16 +26,21 @@ const generateOrderNumber = () => {
   return `ORD-${year}-${randomNum}`;
 };
 
+const isRemoteRoute = (pin, stateName = '') => {
+  if (!pin) return false;
+  const cleanedPin = String(pin).trim();
+  const state = String(stateName).toUpperCase().trim();
+  if (cleanedPin.startsWith('19') || cleanedPin.startsWith('79') || cleanedPin.startsWith('744')) {
+    return true;
+  }
+  if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP', 'JAMMU & KASHMIR STATE', 'J&K', 'ANDAMAN AND NICOBAR'].includes(state)) {
+    return true;
+  }
+  return false;
+};
+
 const isCodAvailableForPincode = (pin, stateName = '') => {
-  if (!pin) return true;
-  const state = stateName.toUpperCase().trim();
-  if (pin.startsWith('19') || pin.startsWith('79') || pin.startsWith('744')) {
-    return false;
-  }
-  if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP'].includes(state)) {
-    return false;
-  }
-  return true;
+  return !isRemoteRoute(pin, stateName);
 };
 
 function Checkout() {
@@ -44,7 +49,7 @@ function Checkout() {
   const { showToast } = useToast()
   const confettiCanvasRef = useRef(null)
 
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm()
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm()
 
   const cartItems = useSelector(state => state.cart || [])
   const { user, isAuthenticated } = useSelector(state => state.auth)
@@ -216,10 +221,16 @@ function Checkout() {
   const discountAmount = cartTotalAmount * (discountPercent / 100)
   const discountedAmount = cartTotalAmount - discountAmount
 
+  // Watch address fields to dynamically calculate remote route surcharge (₹80)
+  const watchedPin = watch('pincode')
+  const watchedState = watch('state')
+  const isRemote = isRemoteRoute(watchedPin, watchedState)
+  const remoteSurcharge = isRemote ? 80 : 0
+
   // Calculate Shipping Expenses & COD Fees
   const baseShippingCharge = discountedAmount >= 999 ? 0 : 99;
   const codFee = selectedPayment === 'COD' ? 30 : 0;
-  const shippingCharge = baseShippingCharge + codFee;
+  const shippingCharge = baseShippingCharge + codFee + remoteSurcharge;
 
   const finalAmount = discountedAmount + shippingCharge
   const taxAmount = finalAmount * 0.18 / 1.18
@@ -440,7 +451,9 @@ function Checkout() {
       const discountedAmount = cartTotalAmount - discountAmount;
       const baseShipping = discountedAmount >= 999 ? 0 : 99;
       const currentCodFee = method === 'COD' ? 30 : 0;
-      const currentShippingCharge = baseShipping + currentCodFee;
+      const isRemote = isRemoteRoute(formData.pincode, formData.state);
+      const remoteSurcharge = isRemote ? 80 : 0;
+      const currentShippingCharge = baseShipping + currentCodFee + remoteSurcharge;
       const calculatedFinalAmount = discountedAmount + currentShippingCharge;
       const calculatedTax = calculatedFinalAmount * 0.18 / 1.18;
 
@@ -1057,6 +1070,15 @@ function Checkout() {
                     {baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}
                   </span>
                 </div>
+
+                {remoteSurcharge > 0 && (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>REMOTE ROUTE SURCHARGE</span>
+                    <span className="font-mono text-neutral-900 font-bold">
+                      ₹{remoteSurcharge}
+                    </span>
+                  </div>
+                )}
 
                 {codFee > 0 && (
                   <div className="flex justify-between text-neutral-600">

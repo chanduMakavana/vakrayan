@@ -243,6 +243,14 @@ function OrderDetail() {
 
   const { addressText, metadata } = parseOrderAddressAndMetadata(order);
 
+  // Extract base shipping, remote route surcharge, and COD handling fee from the stored total shipping charge
+  const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
+  const isCod = order.paymentMethod === 'COD';
+  const codFee = isCod ? 30 : 0;
+  const remainingShipping = Math.max(0, totalShipping - codFee);
+  const remoteSurcharge = (remainingShipping === 80 || remainingShipping === 179) ? 80 : 0;
+  const baseShippingCharge = Math.max(0, remainingShipping - remoteSurcharge);
+
   const handleCancelOrder = () => {
     setIsCancelModalOpen(true);
   };
@@ -265,10 +273,6 @@ function OrderDetail() {
     `).join('');
 
     const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
-    const isCod = order.paymentMethod === 'COD';
-    const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
-    const codFee = isCod ? 30 : 0;
-    const baseShippingCharge = isCod ? Math.max(0, totalShipping - 30) : totalShipping;
     const subtotal = Number(metadata.subtotal || order.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0));
     const discountVal = Number(order.discountAmount || order.discount_amount || metadata.discount || 0);
     const taxAmount = Math.round(Number(metadata.tax_amount || order.tax_amount || (Number(order.total) * 0.18 / 1.18)));
@@ -368,10 +372,16 @@ function OrderDetail() {
                 <span style="color: #666;">Shipping & Delivery</span>
                 <span style="font-family: monospace; font-weight: bold;">${baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}</span>
               </div>
+              ${remoteSurcharge > 0 ? `
+              <div class="total-row">
+                <span style="color: #666;">Remote Route Surcharge</span>
+                <span style="font-family: monospace; font-weight: bold;">₹${remoteSurcharge}</span>
+              </div>
+              ` : ''}
               ${isCod ? `
               <div class="total-row">
                 <span style="color: #666;">COD Handling Fee</span>
-                <span style="font-family: monospace; font-weight: bold;">₹30</span>
+                <span style="font-family: monospace; font-weight: bold;">₹${codFee}</span>
               </div>
               ` : ''}
 
@@ -723,9 +733,9 @@ function OrderDetail() {
 
               <div className="flex justify-between">
                 <span>SHIPPING & DELIVERY</span>
-                {Number(metadata.shipping_charge || 0) > 0 ? (
+                {baseShippingCharge > 0 ? (
                   <span className="text-neutral-950 font-bold font-mono">
-                    ₹{Number(metadata.shipping_charge)}
+                    ₹{baseShippingCharge}
                   </span>
                 ) : (
                   <span className="text-emerald-600 font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded animate-scale-up">
@@ -733,6 +743,22 @@ function OrderDetail() {
                   </span>
                 )}
               </div>
+              {remoteSurcharge > 0 && (
+                <div className="flex justify-between">
+                  <span>REMOTE ROUTE SURCHARGE</span>
+                  <span className="text-neutral-950 font-bold font-mono">
+                    ₹{remoteSurcharge}
+                  </span>
+                </div>
+              )}
+              {isCod && (
+                <div className="flex justify-between">
+                  <span>COD HANDLING FEE</span>
+                  <span className="text-neutral-950 font-bold font-mono">
+                    ₹{codFee}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>PAYMENT METHOD</span>
                 <span className="text-neutral-950 font-bold tracking-wide">
