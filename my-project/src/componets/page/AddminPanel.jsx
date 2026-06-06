@@ -2061,7 +2061,8 @@ function AdminPanel() {
 
                           {/* Actions to shift status */}
                           <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-neutral-200/40">
-                            {(order.status === 'SHIPPED' || order.status === 'CANCELLED') && (
+                            {/* Reset to Pending button */}
+                            {(order.status !== 'PENDING' && order.status !== 'CANCELLED') && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'PENDING')}
@@ -2070,16 +2071,44 @@ function AdminPanel() {
                                 Reset to Pending
                               </button>
                             )}
+                            
                             {order.status === 'CANCELLED' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleRemoveOrder(order)}
-                                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-rose-600 hover:bg-rose-750 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Delete Order
                               </button>
                             )}
+                            
+                            {/* Pending State transitions */}
                             {order.status === 'PENDING' && (
+                              <>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleOrderStatusShift(order, 'PROCESSING')}
+                                  className="bg-neutral-900 hover:bg-neutral-800 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-900 cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                  Start Processing
+                                </button>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => {
+                                    setShippedTargetOrder(order);
+                                    setAdminTrackingNumber('');
+                                    setAdminTrackingUrl('');
+                                    setIsShippedModalOpen(true);
+                                  }}
+                                  className="bg-neutral-950 hover:bg-neutral-855 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                  Mark as Shipped
+                                </button>
+                              </>
+                            )}
+
+                            {/* Processing State transitions */}
+                            {order.status === 'PROCESSING' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => {
@@ -2088,20 +2117,43 @@ function AdminPanel() {
                                   setAdminTrackingUrl('');
                                   setIsShippedModalOpen(true);
                                 }}
-                                className="bg-neutral-950 hover:bg-neutral-800 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-neutral-950 hover:bg-neutral-855 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Mark as Shipped
                               </button>
                             )}
+
+                            {/* Shipped State transitions */}
                             {order.status === 'SHIPPED' && (
+                              <>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleOrderStatusShift(order, 'IN_TRANSIT')}
+                                  className="bg-indigo-600 hover:bg-indigo-755 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-indigo-600 cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                  Mark as In Transit
+                                </button>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleOrderStatusShift(order, 'DELIVERED')}
+                                  className="bg-emerald-600 hover:bg-emerald-755 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-emerald-600 cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                  Mark as Delivered
+                                </button>
+                              </>
+                            )}
+
+                            {/* In Transit State transitions */}
+                            {order.status === 'IN_TRANSIT' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'DELIVERED')}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-emerald-700 cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-emerald-600 hover:bg-emerald-755 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-emerald-600 cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Mark as Delivered
                               </button>
                             )}
+
                             {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
                               <button
                                 disabled={actionLoading}
@@ -2111,13 +2163,12 @@ function AdminPanel() {
                                   setAdminCancelCustomText('');
                                   setIsAdminCancelModalOpen(true);
                                 }}
-                                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-rose-600 hover:bg-rose-750 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Cancel Order
                               </button>
                             )}
                           </div>
-
                         </div>
                       );
                     })}

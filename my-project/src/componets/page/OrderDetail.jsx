@@ -606,7 +606,7 @@ function OrderDetail() {
             )}
 
             {/* Tracking details */}
-            {metadata.tracking_number && (
+            {(order.tracking_number || metadata.tracking_number) && (
               <div className="bg-indigo-50 border border-indigo-100/60 p-6 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2">
                   <FiTruck className="text-indigo-600 text-lg" />
@@ -615,12 +615,12 @@ function OrderDetail() {
                   </h3>
                 </div>
                 <div className="text-xs font-mono uppercase text-indigo-800 space-y-1">
-                  <div>Tracking Number: <strong className="font-black select-all text-neutral-900">{metadata.tracking_number}</strong></div>
+                  <div>Tracking Number: <strong className="font-black select-all text-neutral-900">{order.tracking_number || metadata.tracking_number}</strong></div>
                   <div>Carrier Channel: <span className="font-black">Delhivery/DTDC Express</span></div>
-                  {metadata.tracking_url && (
+                  {(order.tracking_url || metadata.tracking_url) && (
                     <div className="pt-2">
                       <a 
-                        href={metadata.tracking_url} 
+                        href={order.tracking_url || metadata.tracking_url} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="inline-block bg-indigo-600 hover:bg-indigo-750 text-white font-sans font-black text-[10px] tracking-widest uppercase px-4 py-2 rounded-lg transition-all"
