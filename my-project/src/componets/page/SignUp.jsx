@@ -57,6 +57,7 @@ function SignUp() {
       setLoading(false)
     }
   }
+<<<<<<< HEAD
 
   const handleGoogleSignIn = async () => {
     setServerError("");
@@ -70,6 +71,8 @@ function SignUp() {
     }
   };
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   useEffect(() => {
     if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
@@ -169,6 +172,7 @@ function SignUp() {
           </button>
         </form>
 
+<<<<<<< HEAD
         <div className="relative flex py-4 items-center">
           <div className="flex-grow border-t border-neutral-200/60"></div>
           <span className="flex-shrink mx-4 text-[10px] font-black text-neutral-400 tracking-widest uppercase">OR</span>
@@ -190,6 +194,8 @@ function SignUp() {
           {loading ? 'CONNECTING...' : 'Continue with Google'}
         </button>
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         <div className="text-center mt-8 pt-6 border-t border-neutral-100">
           <p className="text-xs text-neutral-500 tracking-wider">
             ALREADY PART OF THE CREW?{' '}

@@ -26,6 +26,7 @@ const generateOrderNumber = () => {
   return `ORD-${year}-${randomNum}`;
 };
 
+<<<<<<< HEAD
 const isRemoteRoute = (pin, stateName = '') => {
   if (!pin) return false;
   const cleanedPin = String(pin).trim();
@@ -43,13 +44,19 @@ const isCodAvailableForPincode = (pin, stateName = '') => {
   return !isRemoteRoute(pin, stateName);
 };
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 function Checkout() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const { showToast } = useToast()
   const confettiCanvasRef = useRef(null)
 
+<<<<<<< HEAD
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm()
+=======
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm()
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   const cartItems = useSelector(state => state.cart || [])
   const { user, isAuthenticated } = useSelector(state => state.auth)
@@ -70,7 +77,10 @@ function Checkout() {
   }, [checkoutStatus])
   const [processingStep, setProcessingStep] = useState(0)
   const [selectedPayment, setSelectedPayment] = useState('COD') // COD | ONLINE
+<<<<<<< HEAD
   const [codAvailable, setCodAvailable] = useState(true)
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const [razorpayModalOpen, setRazorpayModalOpen] = useState(false)
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
@@ -118,6 +128,7 @@ function Checkout() {
     setValue('pincode', addr.pincode || '');
     setValue('state', addr.state || '');
     setValue('country', addr.country || 'India');
+<<<<<<< HEAD
 
     const pin = String(addr.pincode || '').trim();
     const state = String(addr.state || '').trim();
@@ -159,6 +170,10 @@ function Checkout() {
     }
   };
 
+=======
+  }, [setValue, user]);
+
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   // Load saved addresses on mount/session load
   useEffect(() => {
     if (user && user.$id) {
@@ -219,6 +234,7 @@ function Checkout() {
 
   const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
   const discountAmount = cartTotalAmount * (discountPercent / 100)
+<<<<<<< HEAD
   const discountedAmount = cartTotalAmount - discountAmount
 
   // Watch address fields to dynamically calculate remote route surcharge (₹80)
@@ -235,6 +251,11 @@ function Checkout() {
   const finalAmount = discountedAmount + shippingCharge
   const taxAmount = finalAmount * 0.18 / 1.18
   const netBeforeTax = finalAmount - taxAmount
+=======
+  const netBeforeTax = cartTotalAmount - discountAmount
+  const taxAmount = netBeforeTax * 0.18
+  const finalAmount = netBeforeTax + taxAmount
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   const steps = [
     "Checking shipping details...",
@@ -305,6 +326,7 @@ function Checkout() {
   const onSubmit = async (data) => {
     if (!user) return
 
+<<<<<<< HEAD
     // 0. Live Pincode Deliverability Check
     const pin = (data.pincode || '').trim();
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
@@ -336,6 +358,8 @@ function Checkout() {
       }
     }
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     // 0. Live Stock Validation — fetch fresh product data from Appwrite at submit time
     // This eliminates the TOCTOU race condition where two users could both pass
     // a stale Redux cache check and oversell the last unit.
@@ -448,6 +472,7 @@ function Checkout() {
 
     try {
       const orderNumber = generateOrderNumber();
+<<<<<<< HEAD
       const discountedAmount = cartTotalAmount - discountAmount;
       const baseShipping = discountedAmount >= 999 ? 0 : 99;
       const currentCodFee = method === 'COD' ? 30 : 0;
@@ -457,6 +482,8 @@ function Checkout() {
       const calculatedFinalAmount = discountedAmount + currentShippingCharge;
       const calculatedTax = calculatedFinalAmount * 0.18 / 1.18;
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
       const serializedAddress = JSON.stringify({
         customerAddress: `${formData.address.trim()}, ${formData.city.trim()}, ${formData.state?.trim() || ''} - ${formData.pincode.trim()}, ${formData.country?.trim() || 'India'} [Payment: ${method}]`,
         metadata: {
@@ -464,8 +491,13 @@ function Checkout() {
           tracking_number: '',
           tracking_url: '',
           subtotal: Math.round(cartTotalAmount),
+<<<<<<< HEAD
           tax_amount: Math.round(calculatedTax),
           shipping_charge: Math.round(currentShippingCharge),
+=======
+          tax_amount: Math.round(taxAmount),
+          shipping_charge: 0,
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
           coupon_code: couponApplied || 'NONE'
         }
       });
@@ -483,11 +515,18 @@ function Checkout() {
             size: i.size,
             quantity: Number(i.quantity),
             price: Number(i.price),
+<<<<<<< HEAD
             product_id: i.product_id,
             product_Image: i.product_Image || i.product_image || i.image || i.front_image_link || ''
           }))
         ),
         total: Math.round(calculatedFinalAmount),
+=======
+            product_id: i.product_id
+          }))
+        ),
+        total: Math.round(finalAmount),
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         status: 'PENDING',
         couponApplied: couponApplied || 'NONE',
         coupon_code: couponApplied || 'NONE',
@@ -506,8 +545,13 @@ function Checkout() {
         // Dynamic additions for blueprint compatibility
         order_number: orderNumber,
         subtotal: Math.round(cartTotalAmount),
+<<<<<<< HEAD
         tax_amount: Math.round(calculatedTax),
         shipping_charge: Math.round(currentShippingCharge),
+=======
+        tax_amount: Math.round(taxAmount),
+        shipping_charge: 0,
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         tracking_number: '',
         tracking_url: ''
       };
@@ -850,8 +894,12 @@ function Checkout() {
                       pattern: {
                         value: /^[0-9]{6}$/,
                         message: 'Must be a 6-digit pin code'
+<<<<<<< HEAD
                       },
                       onChange: (e) => handlePincodeChange(e.target.value)
+=======
+                      }
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                     })}
                   />
                   {errors.pincode && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.pincode.message}</span>}
@@ -889,6 +937,7 @@ function Checkout() {
                     
                     {/* COD Option */}
                     <div 
+<<<<<<< HEAD
                       onClick={() => {
                         if (codAvailable) {
                           setSelectedPayment('COD');
@@ -920,6 +969,25 @@ function Checkout() {
                         {codAvailable
                           ? 'Pay at your doorstep using cash or UPI. (Handling fee of ₹30 applies)'
                           : 'COD is not serviceable for this remote route. Please pay online.'}
+=======
+                      onClick={() => setSelectedPayment('COD')}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                        selectedPayment === 'COD' 
+                        ? 'border-neutral-950 bg-neutral-50/50 shadow-sm' 
+                        : 'border-neutral-200 hover:border-neutral-300 bg-[#fbfbfb]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-950 font-black">Cash on Delivery (COD)</span>
+                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          selectedPayment === 'COD' ? 'border-neutral-950 bg-neutral-950' : 'border-neutral-300'
+                        }`}>
+                          {selectedPayment === 'COD' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                      </div>
+                      <p className="text-[9px] font-mono uppercase text-neutral-500 leading-normal">
+                        Free domestic express shipping. Pay at your doorstep using cash or UPI.
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                       </p>
                     </div>
 
@@ -941,7 +1009,11 @@ function Checkout() {
                         </div>
                       </div>
                       <p className="text-[9px] font-mono uppercase text-neutral-500 leading-normal">
+<<<<<<< HEAD
                         Secure transaction gateway. Direct UPI, Credit Cards, and wallets routing. (FREE SHIPPING)
+=======
+                        Secure transaction gateway. Direct UPI, Credit Cards, and wallets routing.
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                       </p>
                     </div>
 
@@ -1063,6 +1135,7 @@ function Checkout() {
                     </span>
                   </div>
                 )}
+<<<<<<< HEAD
 
                 <div className="flex justify-between">
                   <span>SHIPPING & DELIVERY</span>
@@ -1088,16 +1161,34 @@ function Checkout() {
                     </span>
                   </div>
                 )}
+=======
+                <div className="flex justify-between">
+                  <span>GST (18% EXCLUSIVE)</span>
+                  <span className="font-mono text-neutral-900 font-bold">
+                    ₹{Math.round(taxAmount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>SHIPPING EXPENSES</span>
+                  <span className="font-mono text-emerald-600 font-black tracking-wider text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
+                    FREE DISPATCH
+                  </span>
+                </div>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                 
                 <hr className="border-neutral-100" />
 
                 <div className="flex justify-between items-baseline pt-2">
+<<<<<<< HEAD
                   <div className="flex flex-col">
                     <span className="text-sm font-black text-neutral-950">NET AMOUNT</span>
                     <span className="text-[9px] text-neutral-400 font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
                       (incl. of all taxes)
                     </span>
                   </div>
+=======
+                  <span className="text-sm font-black text-neutral-950">NET AMOUNT</span>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                   <span className="text-2xl font-mono font-black text-neutral-950 tracking-tight">
                     ₹{Math.round(finalAmount).toLocaleString('en-IN')}
                   </span>

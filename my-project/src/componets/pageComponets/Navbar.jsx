@@ -5,7 +5,11 @@ import { CgShoppingCart } from 'react-icons/cg';
 import { BsFillPersonFill, BsHeart, BsHeartFill } from 'react-icons/bs';
 import { HiMenuAlt3, HiX, HiPlus, HiMinus } from 'react-icons/hi';
 import { useDispatch, useSelector } from 'react-redux';
+<<<<<<< HEAD
 import { logout as logoutAction, toggleAdminMode } from '../../features/login'; 
+=======
+import { logout as logoutAction } from '../../features/login'; 
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 import authService from '../../appwrite/auth';
 import cartService from '../../appwrite/cart';
 import productsService from '../../appwrite/products';
@@ -25,7 +29,11 @@ function Navbar() {
   const { showToast } = useToast();
 
   // Retrieve auth state from Redux store and Appwrite cloud session (hoisted for scoping checks)
+<<<<<<< HEAD
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth);
+=======
+  const { user, isAuthenticated } = useSelector(state => state.auth);
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const cartItems = useSelector(state => state.cart || []);
   const products = useSelector(state => state.products.items || []);
   const cartCount = cartItems.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
@@ -328,6 +336,7 @@ function Navbar() {
 
           {/* Action Icons */}
           <div className="flex items-center gap-6 text-neutral-500 text-lg">
+<<<<<<< HEAD
             {/* Admin Mode Toggle Switch */}
             {isAdmin && (
               <div className="flex items-center gap-2 mr-1">
@@ -350,6 +359,8 @@ function Navbar() {
               </div>
             )}
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
             <ImSearch className="hover:text-neutral-900 cursor-pointer transition-colors duration-200" onClick={() => setSearchOpen(!searchOpen)} />
 
 
@@ -468,6 +479,7 @@ function Navbar() {
               <li className="pt-4 border-t border-neutral-200/60 w-4/5 text-center flex flex-col gap-2">
                 <span className="text-xs text-neutral-800 font-black uppercase">{user.name}</span>
                 <span className="text-xs text-neutral-500 font-light lowercase">{user.email}</span>
+<<<<<<< HEAD
                 
                 {isAdmin && (
                   <div className="flex justify-center items-center gap-3 py-2 border-y border-neutral-100 my-1">
@@ -489,6 +501,8 @@ function Navbar() {
                   </div>
                 )}
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                 <Link to="/profile" onClick={() => setIsOpen(false)} className="text-xs font-black text-neutral-900 uppercase tracking-widest mt-1">
                   My Profile
                 </Link>
@@ -692,7 +706,11 @@ function Navbar() {
               wishlist.map((item) => (
                 <div key={item.$id || item.id} className="flex gap-4 p-4 border border-neutral-950/10 rounded-none hover:border-neutral-950 transition-all duration-200">
                   <img 
+<<<<<<< HEAD
                     src={item.front_image_link || item.image_url || item.product_Image || item.product_image || item.image || 'https://placehold.co/100x125'} 
+=======
+                    src={item.product_Image || item.image || 'https://placehold.co/100x125'} 
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                     alt={item.name} 
                     className="w-20 h-24 object-cover rounded-none border border-neutral-200 shrink-0"
                   />

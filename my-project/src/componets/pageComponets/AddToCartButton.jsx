@@ -19,6 +19,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     // UI Visual States Management
     const [status, setStatus] = useState('idle') // states: 'idle' | 'loading' | 'success'
 
+<<<<<<< HEAD
     // Parse stocks mapping
     let stocks = {};
     try {
@@ -38,6 +39,8 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     const baseSize = selectedSize || product?.sizes?.[0] || 'M';
     const isSelectedSizeOutOfStock = stocks[baseSize] === 0;
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     const handleAdd = async (e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -53,10 +56,17 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
         try {
             setStatus('loading')
 
+<<<<<<< HEAD
             const baseSizeVal = selectedSize || product.sizes?.[0] || 'M'
             let targetSize = baseSizeVal
             if (selectedColor) {
                 targetSize = `${baseSizeVal} / ${selectedColor.toUpperCase()}`
+=======
+            const baseSize = selectedSize || product.sizes?.[0] || 'M'
+            let targetSize = baseSize
+            if (selectedColor) {
+                targetSize = `${baseSize} / ${selectedColor.toUpperCase()}`
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
             }
             const targetProductId = product.$id || product.id
             const existingCartItem = cartItems.find(
@@ -64,10 +74,23 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             )
 
             // Stock Validation check
+<<<<<<< HEAD
             const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
             const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
             if (currentQuantityInCart + 1 > availableStock) {
                 showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "error");
+=======
+            let stocks = {};
+            try {
+                stocks = JSON.parse(product.sizes_stock || '{}');
+            } catch {
+                stocks = {};
+            }
+            const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+            const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
+            if (currentQuantityInCart + 1 > availableStock) {
+                showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSize}.`, "error");
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                 setStatus('idle');
                 return;
             }
@@ -115,6 +138,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     // 🎴 CASE 1: OVERLAY VARIANT (Product Grid Card Layout)
     // ==========================================
     if (variant === "overlay") {
+<<<<<<< HEAD
         if (isAllOutOfStock) {
             return (
                 <button
@@ -126,6 +150,8 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             )
         }
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         return (
             <motion.button
                 {...buttonClickSpring}
@@ -157,6 +183,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     // ==========================================
     // 🕹️ CASE 2: DEFAULT VARIANT (Product Details Stage Terminal)
     // ==========================================
+<<<<<<< HEAD
     if (isAllOutOfStock || isSelectedSizeOutOfStock) {
         return (
             <button
@@ -168,6 +195,8 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
         )
     }
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     return (
         <motion.button
             {...buttonClickSpring}

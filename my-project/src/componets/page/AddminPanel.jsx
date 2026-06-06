@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+<<<<<<< HEAD
 import { Navigate, Link, useLocation } from 'react-router-dom';
+=======
+import { Navigate, Link } from 'react-router-dom';
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 import { useSelector } from 'react-redux';
 import productsService from '../../appwrite/products';
 import ordersService from '../../appwrite/orders';
@@ -10,12 +14,16 @@ import restockService from '../../appwrite/restock';
 import couponUsageService from '../../appwrite/couponUsage';
 import cartService from '../../appwrite/cart';
 import storageService from '../../appwrite/storage';
+<<<<<<< HEAD
 import slidesService from '../../appwrite/slides';
 import { FiFileText } from 'react-icons/fi';
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const BACK_IMAGE_FIELDS = ['back_image_link_1', 'back_image_link_2', 'back_image_link_3', 'back_image_link_4'];
+<<<<<<< HEAD
 const DEFAULT_CATEGORIES = [
   { value: 'printed-tshirt', label: 'PRINTED T-SHIRT' },
   { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRT' },
@@ -26,11 +34,19 @@ const DEFAULT_CATEGORIES = [
 function AdminPanel() {
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
   const location = useLocation();
+=======
+
+function AdminPanel() {
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const { showToast } = useToast();
   const [editingId, setEditingId] = useState(null);
   const [products, setProducts] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
+<<<<<<< HEAD
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   // Tab Manager State
   const [activeTab, setActiveTab] = useState('products'); // products | orders | campaigns
@@ -55,8 +71,11 @@ function AdminPanel() {
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [isSweepProductModalOpen, setIsSweepProductModalOpen] = useState(false);
   const [sweepTargetProductId, setSweepTargetProductId] = useState(null);
+<<<<<<< HEAD
   const [deleteTargetOrder, setDeleteTargetOrder] = useState(null);
   const [isDeleteOrderModalOpen, setIsDeleteOrderModalOpen] = useState(false);
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   // Drops Manager Search & Filter States
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -88,6 +107,7 @@ function AdminPanel() {
 
   const [uploadingFields, setUploadingFields] = useState({});
 
+<<<<<<< HEAD
   // Slides manager states
   const [slides, setSlides] = useState([]);
   const [slidesLoading, setSlidesLoading] = useState(false);
@@ -174,6 +194,8 @@ function AdminPanel() {
     }
   };
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const handleProductImageUpload = async (e, fieldName) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -274,7 +296,10 @@ function AdminPanel() {
 
     loadProductCatalog();
     loadCustomerOrders();
+<<<<<<< HEAD
     loadSlides();
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
     // Hydrate campaigns
     campaignService.getPromoText()
@@ -322,6 +347,7 @@ function AdminPanel() {
       finalColorName = colorVariants.map(v => v.name).join(', ');
     }
 
+<<<<<<< HEAD
     // Helper to format/slugify custom category
     const slugifyCategory = (cat) => {
       return (cat || '')
@@ -331,12 +357,18 @@ function AdminPanel() {
         .replace(/(^-|-$)/g, '');
     };
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     // Format product database payload
     const productPayload = {
       name: data.name.trim(),
       price: String(data.price).trim(),
       tags: searchKeywords,
+<<<<<<< HEAD
       category: slugifyCategory(data.category),
+=======
+      category: data.category,
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
       front_image_link: data.front_image_link.trim(),
       description: data.description?.trim() || "",
       sizes: selectedSizes,
@@ -422,7 +454,10 @@ function AdminPanel() {
       setValue('slug', '');
       setColorVariants([]);
       setEditingId(null);
+<<<<<<< HEAD
       setIsCustomCategory(false);
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
       setProductsSubTab('list');
       setActionLoading(false);
       await loadProductCatalog(); // Refresh catalog view
@@ -432,7 +467,10 @@ function AdminPanel() {
   const handleEdit = (id) => {
     const product = products.find(p => p.id === id || p.$id === id);
     if (product) {
+<<<<<<< HEAD
       setIsCustomCategory(false);
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
       setValue('name', product.name);
       
       const numericPrice = typeof product.price === 'string'
@@ -503,6 +541,7 @@ function AdminPanel() {
     }
   };
 
+<<<<<<< HEAD
   useEffect(() => {
     if (isAdmin && products.length > 0) {
       const searchParams = new URLSearchParams(location.search);
@@ -522,6 +561,8 @@ function AdminPanel() {
     }
   }, [location, products, isAdmin]);
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const handleCancelEdit = () => {
     reset();
     SIZE_OPTIONS.forEach(size => {
@@ -547,7 +588,10 @@ function AdminPanel() {
     setVFront('');
     setVBack('');
     setEditingId(null);
+<<<<<<< HEAD
     setIsCustomCategory(false);
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
     setProductsSubTab('list');
   };
 
@@ -571,6 +615,7 @@ function AdminPanel() {
     }
   };
 
+<<<<<<< HEAD
   const handleRemoveOrder = (order) => {
     setDeleteTargetOrder(order);
     setIsDeleteOrderModalOpen(true);
@@ -594,6 +639,8 @@ function AdminPanel() {
     }
   };
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const handleExportOrdersToCSV = () => {
     if (orders.length === 0) {
       showToast("No orders available to export.", "error");
@@ -663,6 +710,7 @@ function AdminPanel() {
     showToast("✅ Shipping manifest CSV generated and downloaded!", "success");
   };
 
+<<<<<<< HEAD
   const getFilteredOrders = () => {
     return orders.filter(order => {
       const status = order.status || 'PENDING';
@@ -949,6 +997,8 @@ function AdminPanel() {
     printWindow.document.close();
   };
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   // Orders Fulfillment Operations
   const handleOrderStatusShift = async (order, targetStatus, providedExtraData = {}) => {
     const orderId = order.$id || order.id;
@@ -1123,6 +1173,7 @@ function AdminPanel() {
     }
   };
 
+<<<<<<< HEAD
   const handleDeleteRestock = async (documentId) => {
     if (!documentId) return;
     setActionLoading(true);
@@ -1162,6 +1213,8 @@ function AdminPanel() {
     }
   });
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   return (
     <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 p-6 md:p-12 relative selection:bg-neutral-950 selection:text-white">
       <div className="relative z-20 max-w-4xl mx-auto space-y-8">
@@ -1206,12 +1259,15 @@ function AdminPanel() {
               Campaign Panel
             </button>
             <button 
+<<<<<<< HEAD
               onClick={() => { setActiveTab('slider'); loadSlides(); }}
               className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'slider' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
             >
               Hero Slider
             </button>
             <button 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               onClick={() => { setActiveTab('telemetry'); loadStoreTelemetry(); }}
               className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'telemetry' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
             >
@@ -1302,6 +1358,7 @@ function AdminPanel() {
               {/* Category */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Category</label>
+<<<<<<< HEAD
                 {!isCustomCategory ? (
                   <div className="relative">
                     <select
@@ -1351,6 +1408,18 @@ function AdminPanel() {
                   </div>
                 )}
                 {errors.category && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.category.message}</span>}
+=======
+                <select
+                  disabled={actionLoading}
+                  className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
+                  {...register('category')}
+                >
+                  <option value="printed-tshirt">PRINTED T-SHIRT</option>
+                  <option value="oversized-tshirt">OVERSIZED T-SHIRT</option>
+                  <option value="shirts">SHIRT</option>
+                  <option value="hoodies">HOODIES & SWEATSHIRTS</option>
+                </select>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               </div>
 
               {/* Custom URL Slug */}
@@ -1748,9 +1817,16 @@ function AdminPanel() {
                             className="w-full bg-white border border-neutral-950 text-xs font-mono font-bold text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 uppercase cursor-pointer rounded-none px-2 py-2"
                           >
                             <option value="ALL">ALL CATEGORIES</option>
+<<<<<<< HEAD
                             {allCategories.map(cat => (
                               <option key={cat.value} value={cat.value}>{cat.label}</option>
                             ))}
+=======
+                            <option value="printed-tshirt">PRINTED T-SHIRT</option>
+                            <option value="oversized-tshirt">OVERSIZED T-SHIRT</option>
+                            <option value="shirts">SHIRT</option>
+                            <option value="hoodies">HOODIES & SWEATSHIRTS</option>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                           </select>
                         </div>
                         {/* Tag Selector */}
@@ -1899,6 +1975,7 @@ function AdminPanel() {
                     className="w-full bg-[#fafafb] border border-neutral-200 focus:border-neutral-950 text-xs font-semibold px-4 py-2.5 outline-hidden placeholder-neutral-400 uppercase tracking-wider rounded-lg font-sans"
                   />
                 </div>
+<<<<<<< HEAD
                 <div className="flex flex-wrap gap-2 shrink-0">
                   <button
                     type="button"
@@ -1915,6 +1992,15 @@ function AdminPanel() {
                     Export Orders list to CSV
                   </button>
                 </div>
+=======
+                <button
+                  type="button"
+                  onClick={handleExportOrdersToCSV}
+                  className="bg-neutral-950 hover:bg-neutral-855 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 shrink-0 text-center"
+                >
+                  Export Orders list to CSV
+                </button>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
               </div>
 
               {/* Order Status Filters */}
@@ -1940,7 +2026,37 @@ function AdminPanel() {
               </div>
 
               {(() => {
+<<<<<<< HEAD
                 const filteredOrders = getFilteredOrders();
+=======
+                const filteredOrders = orders.filter(order => {
+                  const status = order.status || 'PENDING';
+                  if (orderFilter !== 'ALL' && status !== orderFilter) return false;
+                  
+                  if (orderSearchQuery.trim()) {
+                    const query = orderSearchQuery.toLowerCase().trim();
+                    const uniqueId = order.$id || order.id || '';
+                    let orderNumber = order.order_number || '';
+                    try {
+                      const parsed = JSON.parse(order.address);
+                      if (parsed && typeof parsed === 'object' && parsed.metadata && parsed.metadata.order_number) {
+                        orderNumber = parsed.metadata.order_number;
+                      }
+                    } catch (err) {
+                      console.warn("JSON address parsing failed for search:", err.message);
+                    }
+                    const customerName = order.customerName || '';
+                    const email = order.email || '';
+                    
+                    return uniqueId.toLowerCase().includes(query) ||
+                           orderNumber.toLowerCase().includes(query) ||
+                           customerName.toLowerCase().includes(query) ||
+                           email.toLowerCase().includes(query);
+                  }
+                  
+                  return true;
+                });
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
                 if (filteredOrders.length === 0) {
                   return (
@@ -2061,8 +2177,12 @@ function AdminPanel() {
 
                           {/* Actions to shift status */}
                           <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-neutral-200/40">
+<<<<<<< HEAD
                             {/* Reset to Pending button */}
                             {(order.status !== 'PENDING' && order.status !== 'CANCELLED') && (
+=======
+                            {(order.status && order.status !== 'PENDING') && (
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'PENDING')}
@@ -2071,6 +2191,7 @@ function AdminPanel() {
                                 Reset to Pending
                               </button>
                             )}
+<<<<<<< HEAD
                             
                             {order.status === 'CANCELLED' && (
                               <button
@@ -2109,6 +2230,9 @@ function AdminPanel() {
 
                             {/* Processing State transitions */}
                             {order.status === 'PROCESSING' && (
+=======
+                            {order.status !== 'SHIPPED' && (
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               <button
                                 disabled={actionLoading}
                                 onClick={() => {
@@ -2117,11 +2241,16 @@ function AdminPanel() {
                                   setAdminTrackingUrl('');
                                   setIsShippedModalOpen(true);
                                 }}
+<<<<<<< HEAD
                                 className="bg-neutral-950 hover:bg-neutral-855 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
+=======
+                                className="bg-neutral-950 hover:bg-neutral-800 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               >
                                 Mark as Shipped
                               </button>
                             )}
+<<<<<<< HEAD
 
                             {/* Shipped State transitions */}
                             {order.status === 'SHIPPED' && (
@@ -2149,12 +2278,23 @@ function AdminPanel() {
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'DELIVERED')}
                                 className="bg-emerald-600 hover:bg-emerald-755 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-emerald-600 cursor-pointer transition-colors disabled:opacity-50"
+=======
+                            {order.status !== 'DELIVERED' && (
+                              <button
+                                disabled={actionLoading}
+                                onClick={() => handleOrderStatusShift(order, 'DELIVERED')}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-emerald-700 cursor-pointer transition-colors disabled:opacity-50"
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               >
                                 Mark as Delivered
                               </button>
                             )}
+<<<<<<< HEAD
 
                             {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+=======
+                            {order.status !== 'CANCELLED' && (
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               <button
                                 disabled={actionLoading}
                                 onClick={() => {
@@ -2163,12 +2303,20 @@ function AdminPanel() {
                                   setAdminCancelCustomText('');
                                   setIsAdminCancelModalOpen(true);
                                 }}
+<<<<<<< HEAD
                                 className="bg-rose-600 hover:bg-rose-750 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
+=======
+                                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               >
                                 Cancel Order
                               </button>
                             )}
                           </div>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                         </div>
                       );
                     })}
@@ -2320,17 +2468,25 @@ function AdminPanel() {
                         <thead>
                           <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
                             <th className="p-4">Email Address</th>
+<<<<<<< HEAD
                             <th className="p-4">Product</th>
                             <th className="p-4">Size</th>
                             <th className="p-4">Time Requested</th>
                             <th className="p-4">Status</th>
                             <th className="p-4 text-right">Actions</th>
+=======
+                            <th className="p-4">Product ID</th>
+                            <th className="p-4">Size</th>
+                            <th className="p-4">Time Requested</th>
+                            <th className="p-4">Status</th>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                           </tr>
                         </thead>
                         <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
                           {restockNotifications.map((n, idx) => (
                             <tr key={n.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
                               <td className="p-4 font-bold text-neutral-900 select-all lowercase">{n.email}</td>
+<<<<<<< HEAD
                               <td className="p-4">
                                 <Link 
                                   to={`/product/${n.productId}`} 
@@ -2365,6 +2521,9 @@ function AdminPanel() {
                                   })()}
                                 </Link>
                               </td>
+=======
+                              <td className="p-4 font-mono text-[10px]">{n.productId}</td>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                               <td className="p-4 font-black text-indigo-600">{n.size}</td>
                               <td className="p-4 text-[10px] font-mono text-neutral-500">{n.requestedAt ? new Date(n.requestedAt).toLocaleString('en-IN') : 'N/A'}</td>
                               <td className="p-4">
@@ -2372,6 +2531,7 @@ function AdminPanel() {
                                   {n.notified ? 'NOTIFIED' : 'PENDING'}
                                 </span>
                               </td>
+<<<<<<< HEAD
                               <td className="p-4 text-right space-x-2">
                                 {!n.notified && (
                                   <button
@@ -2390,6 +2550,8 @@ function AdminPanel() {
                                   Delete
                                 </button>
                               </td>
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
                             </tr>
                           ))}
                         </tbody>
@@ -2495,6 +2657,7 @@ function AdminPanel() {
             </div>
           )}
 
+<<<<<<< HEAD
           {/* ==========================================
               TAB 5: HERO SLIDER MANAGEMENT
               ========================================== */}
@@ -2645,6 +2808,8 @@ function AdminPanel() {
               </div>
             </div>
           )}
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         </div>
 
 
@@ -2777,6 +2942,7 @@ function AdminPanel() {
           </div>
         </div>
       )}
+<<<<<<< HEAD
 
       {/* Admin Delete Order Confirmation Modal */}
       {isDeleteOrderModalOpen && deleteTargetOrder && (
@@ -2819,6 +2985,8 @@ function AdminPanel() {
           </div>
         </div>
       )}
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
       {isShippedModalOpen && shippedTargetOrder && (
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}

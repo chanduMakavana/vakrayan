@@ -10,6 +10,7 @@ function BestSellers() {
   const products = useSelector(state => state.products.items || [])
   const fetched = useSelector(state => state.products.fetched)
   const wishlist = useSelector(state => state.wishlist || [])
+<<<<<<< HEAD
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
 
   const loading = !fetched && products.length === 0;
@@ -41,6 +42,14 @@ function BestSellers() {
   const sortedProducts = sortInStockFirst(products);
   const featuredProducts = sortedProducts.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1');
   const displayedProducts = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : sortedProducts.slice(0, 4);
+=======
+  const { user, isAuthenticated } = useSelector(state => state.auth)
+
+  const loading = !fetched && products.length === 0;
+
+  const featuredProducts = products.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1');
+  const displayedProducts = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : products.slice(0, 4);
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   return (
     <section id="drops" className="bg-[#fafafb] py-16 px-4 md:px-12 border-t border-neutral-200/50 scroll-mt-20 selection:bg-neutral-900 selection:text-white">
@@ -89,6 +98,7 @@ function BestSellers() {
   // Tags Array Handler
   const activeTag = product.tag || "";
 
+<<<<<<< HEAD
   let stocks = {};
   try {
     stocks = JSON.parse(product?.sizes_stock || '{}');
@@ -101,6 +111,8 @@ function BestSellers() {
     isAllOutOfStock = totalStock === 0;
   }
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   return (
     <div 
       key={uniqueId} 
@@ -155,6 +167,7 @@ function BestSellers() {
           )}
         </button>
 
+<<<<<<< HEAD
         {/* Edit Button for Admin Mode */}
         {adminMode && (
           <button
@@ -168,6 +181,8 @@ function BestSellers() {
           </button>
         )}
 
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         {/* Active Tag Badge */}
         {activeTag && (
           <div className="absolute top-4 left-4 z-20 flex items-center bg-neutral-950 px-2 py-0.5 select-none">
@@ -177,6 +192,7 @@ function BestSellers() {
           </div>
         )}
 
+<<<<<<< HEAD
         {/* Out of Stock Overlay */}
         {isAllOutOfStock && (
           <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
@@ -188,6 +204,10 @@ function BestSellers() {
 
         {/* Image Flip */}
         <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
+=======
+        {/* Image Flip */}
+        <div className="w-full h-full relative">
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
           <img
             src={frontView}
             alt={product.name}
@@ -206,6 +226,7 @@ function BestSellers() {
       </div>
 
       {/* Metadata Content */}
+<<<<<<< HEAD
       <div className="mt-3 px-1 flex flex-col justify-between grow">
         <div>
           <div className="flex items-center justify-between gap-2 mb-1">
@@ -215,10 +236,25 @@ function BestSellers() {
           </div>
           
           <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
+=======
+      <div className="mt-5 px-1 flex flex-col justify-between grow">
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-[9px] font-sans text-neutral-400 font-extrabold tracking-widest uppercase">
+              {product.category?.replace('-', ' ') || "HQ MERCH"}
+            </span>
+            <span className="text-[9px] font-sans text-neutral-300 font-bold uppercase tracking-widest">
+              VOL. I
+            </span>
+          </div>
+          
+          <h3 className="text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
             {product.name}
           </h3>
         </div>
         
+<<<<<<< HEAD
         <div className="mt-2 pt-2 border-t border-neutral-100 flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
           <div className="flex items-baseline gap-1.5">
             <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
@@ -242,6 +278,35 @@ function BestSellers() {
           </div>
           <span className="text-[8px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
             incl. taxes
+=======
+        <div className="mt-3 pt-3 border-t border-neutral-100 flex items-end justify-between gap-4">
+          <div className="flex flex-col">
+            <span className="text-[8px] font-mono font-bold text-neutral-400 uppercase tracking-widest">PRICE</span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-sm font-mono font-black text-neutral-950">
+                ₹{Number(product.price).toLocaleString('en-IN')}
+              </span>
+              {(() => {
+                const priceNum = Number(product.price || 0);
+                const compareNum = Number(product.compare_at_price || 0);
+                const showCompare = compareNum > priceNum;
+                const compareDisplay = showCompare
+                  ? compareNum
+                  : (product.discount_percent > 0
+                      ? Math.round(priceNum / (1 - product.discount_percent / 100))
+                      : null);
+                return compareDisplay ? (
+                  <span className="text-[10px] font-mono text-neutral-400 line-through font-bold">
+                    ₹{compareDisplay.toLocaleString('en-IN')}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+          </div>
+          
+          <span className="text-[10px] font-sans font-bold tracking-widest text-neutral-400 group-hover:text-neutral-950 transition-colors duration-300 uppercase pb-0.5">
+            DETAILS &rarr;
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
           </span>
         </div>
       </div>

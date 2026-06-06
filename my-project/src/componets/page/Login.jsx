@@ -6,7 +6,10 @@ import { login as loginAction } from '../../features/login' // Alias used to avo
 import authService from '../../appwrite/auth'
 import cartService from '../../appwrite/cart'
 import { setCartItems } from '../../features/addToCart'
+<<<<<<< HEAD
 import { useToast } from '../../context/ToastContext'
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
 function Login() {
   const {
@@ -18,13 +21,19 @@ function Login() {
 
   const navigate = useNavigate()
   const dispatch = useDispatch()
+<<<<<<< HEAD
   const { showToast } = useToast()
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
   const { isAuthenticated } = useSelector((state) => state.auth)
 
   // Local states for form handling and error management
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState("")
+<<<<<<< HEAD
   const [isForgotPassword, setIsForgotPassword] = useState(false)
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   const onSubmit = async (data) => {
     setServerError("") 
@@ -61,6 +70,7 @@ function Login() {
     }
   };  
 
+<<<<<<< HEAD
   const onForgotSubmit = async (data) => {
     setServerError("");
     setLoading(true);
@@ -89,6 +99,8 @@ function Login() {
       setLoading(false);
     }
   };
+=======
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
   useEffect(() => {
     if (isAuthenticated) navigate('/');
@@ -101,12 +113,17 @@ function Login() {
       <div className="relative z-20 w-full max-w-md bg-white p-8 rounded-2xl border border-neutral-200/60 shadow-xl">
 
         <div className="text-center mb-8">
+<<<<<<< HEAD
           <h2 className="text-xs tracking-[0.5em] text-[var(--theme-accent)] font-black uppercase mb-2">
             {isForgotPassword ? "Credentials Recovery" : "Welcome Back"}
           </h2>
           <h1 className="text-3xl font-black tracking-widest text-neutral-900 uppercase">
             {isForgotPassword ? "RESET PASSWORD" : "CREW SIGN IN"}
           </h1>
+=======
+          <h2 className="text-xs tracking-[0.5em] text-[var(--theme-accent)] font-black uppercase mb-2">Welcome Back</h2>
+          <h1 className="text-3xl font-black tracking-widest text-neutral-900 uppercase">CREW SIGN IN</h1>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
         </div>
 
         {/* Server error feedback */}
@@ -116,6 +133,7 @@ function Login() {
           </div>
         )}
 
+<<<<<<< HEAD
         {isForgotPassword ? (
           <form onSubmit={handleSubmit(onForgotSubmit)} className="flex flex-col gap-5">
             {/* Email Input */}
@@ -253,6 +271,66 @@ function Login() {
             </button>
           </>
         )}
+=======
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+
+          {/* Email Input */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Email Address</label>
+            <input
+              type="text"
+              placeholder="YOU@EXAMPLE.COM"
+              disabled={loading}
+              className={`w-full bg-[#fbfbfb] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
+              {...register("email", {
+                required: "Email is required",
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: "Invalid email format"
+                }
+              })}
+            />
+            {errors.email && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.email.message}</span>}
+          </div>
+
+          {/* Password Input */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Password</label>
+              <a href="#" className="text-[10px] font-bold text-neutral-400 hover:text-[var(--theme-primary)] tracking-wider uppercase transition-colors">Forgot?</a>
+            </div>
+            <input
+              type="password"
+              placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+              disabled={loading}
+              className={`w-full bg-[#fbfbfb] border ${errors.password ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden transition-colors disabled:opacity-50`}
+              {...register("password", { required: "Password is required" })}
+            />
+            {errors.password && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.password.message}</span>}
+          </div>
+
+          {/* Remember Me Checkbox */}
+          <div className="flex items-center gap-3 mt-1 select-none">
+            <input
+              type="checkbox"
+              id="remember"
+              disabled={loading}
+              className="accent-neutral-950 rounded border-neutral-200 bg-[#fbfbfb] cursor-pointer h-4 w-4 disabled:opacity-50"
+              {...register("remember")}
+            />
+            <label htmlFor="remember" className="text-[11px] text-neutral-400 tracking-widest font-bold uppercase cursor-pointer">Remember Device</label>
+          </div>
+
+          {/* Submit button with dynamic loading text */}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] active:scale-[0.98] disabled:scale-100 disabled:bg-[var(--theme-primary)]/40 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md mt-4 cursor-pointer transition-all duration-200"
+          >
+            {loading ? 'AUTHENTICATING...' : 'SIGN IN'}
+          </button>
+        </form>
+>>>>>>> 61e2559d0e1cd6e0dbf11f31859e58bc8057f893
 
         <div className="text-center mt-8 pt-6 border-t border-neutral-100">
           <p className="text-xs text-neutral-500 tracking-wider">
