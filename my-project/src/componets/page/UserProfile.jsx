@@ -628,14 +628,35 @@ function UserProfile() {
                       <div 
                         key={uniqueId || idx}
                         onClick={() => navigate(`/order/${uniqueId}`)}
-                        className="bg-white p-5 rounded-xl border border-neutral-200/50 shadow-xs hover:shadow-md cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-300 group relative"
+                        className="bg-white p-5 rounded-xl border border-neutral-200/50 shadow-xs hover:shadow-md cursor-pointer flex flex-row items-center gap-4 transition-all duration-300 group relative"
                       >
-                        <div className="space-y-2.5 flex-1">
+                        {/* Order Item Image(s) */}
+                        <div className="flex -space-x-3 overflow-hidden shrink-0 border border-neutral-100 p-1 bg-neutral-50 rounded-lg">
+                          {parsedItems.slice(0, 3).map((item, itemIdx) => {
+                            const matchingProd = products.find(p => (p.$id || p.id) === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
+                            const imgUrl = matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image || item.product_Image || item.product_image || 'https://placehold.co/100x120?text=HQ';
+                            return (
+                              <img 
+                                key={itemIdx}
+                                src={imgUrl}
+                                alt={item.name}
+                                className="w-10 h-14 object-cover rounded-md border border-white shadow-xs"
+                              />
+                            );
+                          })}
+                          {parsedItems.length > 3 && (
+                            <div className="w-10 h-14 bg-neutral-900 text-white rounded-md border border-white flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
+                              +{parsedItems.length - 3}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2.5 flex-1 min-w-0">
                           <div className="space-y-0.5">
                             <span className="text-[10px] text-neutral-400 block font-medium">
                               Order Date: {orderDate} / ID: {orderNum}
                             </span>
-                            <h4 className="text-xs font-semibold text-neutral-800 leading-relaxed">
+                            <h4 className="text-xs font-semibold text-neutral-800 leading-relaxed truncate">
                               {parsedItems.map(i => `${i.name} (${i.size || 'M'})`).join(' , ')}
                             </h4>
                           </div>
@@ -697,8 +718,8 @@ function UserProfile() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-4 justify-between sm:justify-end shrink-0">
-                          <div className="text-left sm:text-right">
+                        <div className="flex items-center gap-4 justify-end shrink-0">
+                          <div className="text-right">
                             <span className="text-[10px] text-neutral-400 block font-medium">Total Paid</span>
                             <span className="text-sm font-semibold text-neutral-900">
                               ₹{Number(order.total || 0).toLocaleString('en-IN')}

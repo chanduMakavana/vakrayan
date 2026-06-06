@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import productsService from '../../appwrite/products';
 import ordersService from '../../appwrite/orders';
@@ -11,6 +11,7 @@ import couponUsageService from '../../appwrite/couponUsage';
 import cartService from '../../appwrite/cart';
 import storageService from '../../appwrite/storage';
 import slidesService from '../../appwrite/slides';
+import { FiFileText } from 'react-icons/fi';
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
@@ -24,6 +25,7 @@ const DEFAULT_CATEGORIES = [
 
 function AdminPanel() {
   const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
+  const location = useLocation();
   const { showToast } = useToast();
   const [editingId, setEditingId] = useState(null);
   const [products, setProducts] = useState([]);
@@ -53,6 +55,8 @@ function AdminPanel() {
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [isSweepProductModalOpen, setIsSweepProductModalOpen] = useState(false);
   const [sweepTargetProductId, setSweepTargetProductId] = useState(null);
+  const [deleteTargetOrder, setDeleteTargetOrder] = useState(null);
+  const [isDeleteOrderModalOpen, setIsDeleteOrderModalOpen] = useState(false);
 
   // Drops Manager Search & Filter States
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -499,6 +503,25 @@ function AdminPanel() {
     }
   };
 
+  useEffect(() => {
+    if (isAdmin && products.length > 0) {
+      const searchParams = new URLSearchParams(location.search);
+      const editIdFromQuery = searchParams.get('edit');
+      const targetEditId = location.state?.editProductId || editIdFromQuery;
+      
+      if (targetEditId) {
+        const found = products.find(p => p.id === targetEditId || p.$id === targetEditId);
+        if (found) {
+          setActiveTab('products');
+          handleEdit(targetEditId);
+          
+          // Clean up location state and URL query parameter to prevent loop/stale edit state
+          window.history.replaceState({}, document.title);
+        }
+      }
+    }
+  }, [location, products, isAdmin]);
+
   const handleCancelEdit = () => {
     reset();
     SIZE_OPTIONS.forEach(size => {
@@ -545,6 +568,29 @@ function AdminPanel() {
     } finally {
       setSweepTargetProductId(null);
       await loadProductCatalog();
+    }
+  };
+
+  const handleRemoveOrder = (order) => {
+    setDeleteTargetOrder(order);
+    setIsDeleteOrderModalOpen(true);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!deleteTargetOrder) return;
+    const orderId = deleteTargetOrder.$id || deleteTargetOrder.id;
+    setIsDeleteOrderModalOpen(false);
+    setActionLoading(true);
+    try {
+      await ordersService.deleteOrder(orderId);
+      showToast('🗑️ Order records purged from database!', 'success');
+    } catch (err) {
+      console.error("Failed to delete order:", err.message);
+      showToast("Failed to delete order. Check Appwrite connection.", "error");
+    } finally {
+      setDeleteTargetOrder(null);
+      setActionLoading(false);
+      loadCustomerOrders();
     }
   };
 
@@ -615,6 +661,292 @@ function AdminPanel() {
     link.click();
     document.body.removeChild(link);
     showToast("✅ Shipping manifest CSV generated and downloaded!", "success");
+  };
+
+  const getFilteredOrders = () => {
+    return orders.filter(order => {
+      const status = order.status || 'PENDING';
+      if (orderFilter !== 'ALL' && status !== orderFilter) return false;
+      
+      if (orderSearchQuery.trim()) {
+        const query = orderSearchQuery.toLowerCase().trim();
+        const uniqueId = order.$id || order.id || '';
+        let orderNumber = order.order_number || '';
+        try {
+          const parsed = JSON.parse(order.address);
+          if (parsed && typeof parsed === 'object' && parsed.metadata && parsed.metadata.order_number) {
+            orderNumber = parsed.metadata.order_number;
+          }
+        } catch (err) {
+          console.warn("JSON address parsing failed for search:", err.message);
+        }
+        const customerName = order.customerName || '';
+        const email = order.email || '';
+        
+        return uniqueId.toLowerCase().includes(query) ||
+               orderNumber.toLowerCase().includes(query) ||
+               customerName.toLowerCase().includes(query) ||
+               email.toLowerCase().includes(query);
+      }
+      
+      return true;
+    });
+  };
+
+  const handlePrintShippingLabels = () => {
+    const filtered = getFilteredOrders();
+    if (filtered.length === 0) {
+      showToast("No orders available to print.", "error");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      showToast("Pop-up blocker is preventing shipping slips from opening.", "error");
+      return;
+    }
+
+    const labelsHtml = filtered.map(order => {
+      let addressText = order.address || '';
+      let metadata = {
+        order_number: order.order_number || `ORD-${new Date(order.$createdAt || '2026-01-01').getFullYear()}-${order.$id?.substring(0, 6).toUpperCase() || 'UNKNOWN'}`,
+        customer_name: order.customerName || 'Customer',
+        customer_phone: order.phone || '',
+        customer_email: order.email || ''
+      };
+
+      try {
+        const parsed = JSON.parse(order.address);
+        if (parsed && typeof parsed === 'object' && 'customerAddress' in parsed) {
+          let rawAddr = parsed.customerAddress;
+          if (typeof rawAddr === 'string' && rawAddr.trim().startsWith('{')) {
+            try {
+              const innerParsed = JSON.parse(rawAddr);
+              if (innerParsed && typeof innerParsed === 'object') {
+                const line = innerParsed.line || '';
+                const city = innerParsed.city || '';
+                const state = innerParsed.state || '';
+                const pincode = innerParsed.pincode || '';
+                const country = innerParsed.country || 'India';
+                rawAddr = [line, city, state, pincode, country].filter(Boolean).join(', ');
+              }
+            } catch (innerErr) {
+              console.warn("Could not parse nested customer address:", innerErr.message);
+            }
+          }
+          addressText = rawAddr;
+          if (parsed.metadata) {
+            metadata = { ...metadata, ...parsed.metadata };
+          }
+        }
+      } catch (outerErr) {
+        console.warn("Could not parse order address or metadata JSON:", outerErr.message);
+      }
+
+      if (typeof addressText === 'string') {
+        addressText = addressText.replace(/\[Payment:\s*\w+\]/i, '').trim();
+        if (addressText.endsWith(',')) {
+          addressText = addressText.slice(0, -1).trim();
+        }
+      }
+
+      let parsedItems = [];
+      try {
+        parsedItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
+      } catch {
+        parsedItems = [];
+      }
+
+      // Group identical products by name and size to ensure correct quantities per size
+      const groupedItemsMap = {};
+      parsedItems.forEach(item => {
+        const name = (item.name || '').trim();
+        const sizeStr = (item.size || 'M').trim();
+        const key = `${name.toLowerCase()}||${sizeStr.toLowerCase()}`;
+        if (!name) return;
+
+        if (!groupedItemsMap[key]) {
+          groupedItemsMap[key] = {
+            name: name,
+            size: sizeStr,
+            quantity: 0
+          };
+        }
+        groupedItemsMap[key].quantity += Number(item.quantity || 0);
+      });
+
+      const itemsListHtml = Object.values(groupedItemsMap).map(item => {
+        return `
+          <div style="font-size: 11px; font-weight: bold; border-bottom: 1px dashed #ddd; padding: 4px 0; display: flex; justify-content: space-between;">
+            <span>${item.name.toUpperCase()} (${item.size.toUpperCase()})</span>
+            <span>QTY: ${item.quantity}</span>
+          </div>
+        `;
+      }).join('');
+
+      const isCod = order.paymentMethod === 'COD' || (!order.paymentMethod && !order.address?.includes('[Payment: ONLINE]'));
+      const paymentType = isCod ? 'COD' : 'PREPAID';
+
+      const codInstructionHtml = isCod
+        ? `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 14px; margin-top: 10px; background-color: #000; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">
+             COLLECT CASH: ₹${Number(order.total).toLocaleString('en-IN')}
+           </div>`
+        : `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 11px; margin-top: 10px; color: #000; text-transform: uppercase; letter-spacing: 0.5px;">
+             PREPAID - DO NOT COLLECT CASH
+           </div>`;
+
+      const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
+
+      return `
+        <div class="label-card">
+          <div class="header">
+            <div class="store-name">AASHIS</div>
+            <div class="carrier">${paymentType}</div>
+          </div>
+          
+          <div class="barcode-area">
+            <div class="order-num"># ${metadata.order_number}</div>
+            <div style="font-size: 9px; font-family: monospace; color: #666; margin-top: 2px;">ID: ${order.$id || order.id}</div>
+          </div>
+
+          <div class="address-section">
+            <div class="section-title">SHIP TO:</div>
+            <div class="customer-name">${metadata.customer_name.toUpperCase()}</div>
+            <div class="address-text">${addressText.toUpperCase()}</div>
+            <div class="phone-text">PHONE: ${metadata.customer_phone || 'N/A'}</div>
+          </div>
+
+          <div class="items-section">
+            <div class="section-title">PACKAGE CONTENT:</div>
+            ${itemsListHtml}
+          </div>
+
+          ${codInstructionHtml}
+
+          <div class="footer">
+            <div>DATE: ${new Date(orderDate).toLocaleDateString('en-IN')}</div>
+            <div style="font-weight: bold;">TOTAL: ₹${Number(order.total).toLocaleString('en-IN')}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Shipping Slips - Bulk Print</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+          <style>
+            body { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 20px; background-color: #f3f4f6; }
+            .label-card {
+              background-color: #fff;
+              width: 380px;
+              min-height: 480px;
+              border: 2px solid #000;
+              margin: 0 auto 30px auto;
+              padding: 15px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              page-break-after: always;
+              break-inside: avoid;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+            .store-name {
+              font-size: 20px;
+              font-weight: 950;
+              letter-spacing: 1.5px;
+            }
+            .carrier {
+              font-size: 11px;
+              font-weight: 900;
+              background-color: #000;
+              color: #fff;
+              padding: 3px 8px;
+              letter-spacing: 1px;
+            }
+            .barcode-area {
+              text-align: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+            .order-num {
+              font-size: 16px;
+              font-weight: 900;
+              letter-spacing: 1px;
+            }
+            .address-section {
+              border-bottom: 2px solid #000;
+              padding-bottom: 12px;
+              margin-bottom: 10px;
+              flex-grow: 1;
+            }
+            .section-title {
+              font-size: 9px;
+              font-weight: 900;
+              color: #555;
+              letter-spacing: 1px;
+              margin-bottom: 5px;
+            }
+            .customer-name {
+              font-size: 14px;
+              font-weight: 900;
+              margin-bottom: 4px;
+            }
+            .address-text {
+              font-size: 11px;
+              font-weight: 700;
+              line-height: 1.4;
+              color: #111;
+            }
+            .phone-text {
+              font-size: 11px;
+              font-weight: 900;
+              margin-top: 6px;
+              font-family: monospace;
+            }
+            .items-section {
+              border-bottom: 2px solid #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+              max-height: 180px;
+              overflow: hidden;
+            }
+            .footer {
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              font-weight: bold;
+              font-family: monospace;
+            }
+            @media print {
+              body { background-color: #fff; padding: 0; margin: 0; }
+              .label-card { margin: 0 auto; border: 2px solid #000; box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          ${labelsHtml}
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   // Orders Fulfillment Operations
@@ -788,6 +1120,36 @@ function AdminPanel() {
       showToast('🗑️ Coupon deactivated.', 'success');
     } catch (err) {
       console.error("Failed to delete coupon:", err);
+    }
+  };
+
+  const handleDeleteRestock = async (documentId) => {
+    if (!documentId) return;
+    setActionLoading(true);
+    try {
+      await restockService.deleteRestockNotification(documentId);
+      showToast('🗑️ Restock request deleted successfully.', 'success');
+      await loadStoreTelemetry();
+    } catch (err) {
+      console.error("Failed to delete restock notification:", err.message);
+      showToast("Failed to delete restock notification.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmRestock = async (documentId) => {
+    if (!documentId) return;
+    setActionLoading(true);
+    try {
+      await restockService.updateRestockNotification(documentId, { notified: true });
+      showToast('✔️ Restock request marked as notified.', 'success');
+      await loadStoreTelemetry();
+    } catch (err) {
+      console.error("Failed to confirm restock notification:", err.message);
+      showToast("Failed to confirm restock notification.", "error");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1537,13 +1899,22 @@ function AdminPanel() {
                     className="w-full bg-[#fafafb] border border-neutral-200 focus:border-neutral-950 text-xs font-semibold px-4 py-2.5 outline-hidden placeholder-neutral-400 uppercase tracking-wider rounded-lg font-sans"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={handleExportOrdersToCSV}
-                  className="bg-neutral-950 hover:bg-neutral-855 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 shrink-0 text-center"
-                >
-                  Export Orders list to CSV
-                </button>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handlePrintShippingLabels}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center flex items-center gap-1.5 shadow-xs"
+                  >
+                    <FiFileText className="text-xs" /> Print Shipping Slips
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportOrdersToCSV}
+                    className="bg-neutral-950 hover:bg-neutral-855 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center"
+                  >
+                    Export Orders list to CSV
+                  </button>
+                </div>
               </div>
 
               {/* Order Status Filters */}
@@ -1569,33 +1940,7 @@ function AdminPanel() {
               </div>
 
               {(() => {
-                const filteredOrders = orders.filter(order => {
-                  const status = order.status || 'PENDING';
-                  if (orderFilter !== 'ALL' && status !== orderFilter) return false;
-                  
-                  if (orderSearchQuery.trim()) {
-                    const query = orderSearchQuery.toLowerCase().trim();
-                    const uniqueId = order.$id || order.id || '';
-                    let orderNumber = order.order_number || '';
-                    try {
-                      const parsed = JSON.parse(order.address);
-                      if (parsed && typeof parsed === 'object' && parsed.metadata && parsed.metadata.order_number) {
-                        orderNumber = parsed.metadata.order_number;
-                      }
-                    } catch (err) {
-                      console.warn("JSON address parsing failed for search:", err.message);
-                    }
-                    const customerName = order.customerName || '';
-                    const email = order.email || '';
-                    
-                    return uniqueId.toLowerCase().includes(query) ||
-                           orderNumber.toLowerCase().includes(query) ||
-                           customerName.toLowerCase().includes(query) ||
-                           email.toLowerCase().includes(query);
-                  }
-                  
-                  return true;
-                });
+                const filteredOrders = getFilteredOrders();
 
                 if (filteredOrders.length === 0) {
                   return (
@@ -1716,7 +2061,7 @@ function AdminPanel() {
 
                           {/* Actions to shift status */}
                           <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-neutral-200/40">
-                            {(order.status && order.status !== 'PENDING') && (
+                            {(order.status === 'SHIPPED' || order.status === 'CANCELLED') && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'PENDING')}
@@ -1725,7 +2070,16 @@ function AdminPanel() {
                                 Reset to Pending
                               </button>
                             )}
-                            {order.status !== 'SHIPPED' && (
+                            {order.status === 'CANCELLED' && (
+                              <button
+                                disabled={actionLoading}
+                                onClick={() => handleRemoveOrder(order)}
+                                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-none border border-rose-600 cursor-pointer transition-colors disabled:opacity-50"
+                              >
+                                Delete Order
+                              </button>
+                            )}
+                            {order.status === 'PENDING' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => {
@@ -1739,7 +2093,7 @@ function AdminPanel() {
                                 Mark as Shipped
                               </button>
                             )}
-                            {order.status !== 'DELIVERED' && (
+                            {order.status === 'SHIPPED' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'DELIVERED')}
@@ -1748,7 +2102,7 @@ function AdminPanel() {
                                 Mark as Delivered
                               </button>
                             )}
-                            {order.status !== 'CANCELLED' && (
+                            {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => {
@@ -1915,23 +2269,75 @@ function AdminPanel() {
                         <thead>
                           <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
                             <th className="p-4">Email Address</th>
-                            <th className="p-4">Product ID</th>
+                            <th className="p-4">Product</th>
                             <th className="p-4">Size</th>
                             <th className="p-4">Time Requested</th>
                             <th className="p-4">Status</th>
+                            <th className="p-4 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
                           {restockNotifications.map((n, idx) => (
                             <tr key={n.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
                               <td className="p-4 font-bold text-neutral-900 select-all lowercase">{n.email}</td>
-                              <td className="p-4 font-mono text-[10px]">{n.productId}</td>
+                              <td className="p-4">
+                                <Link 
+                                  to={`/product/${n.productId}`} 
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-3 font-bold text-neutral-900 hover:text-[var(--theme-primary)] hover:underline transition-colors cursor-pointer"
+                                >
+                                  {(() => {
+                                    const foundProd = products.find(p => p.$id === n.productId || p.id === n.productId);
+                                    const img = foundProd?.front_image_link || foundProd?.image_url || foundProd?.image;
+                                    return (
+                                      <>
+                                        {img ? (
+                                          <img 
+                                            src={img} 
+                                            alt={foundProd?.name || 'Product'} 
+                                            className="w-10 h-12 object-cover border border-neutral-200 shrink-0 bg-neutral-50"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-12 bg-neutral-100 border border-neutral-200 shrink-0 flex items-center justify-center text-[8px] font-bold text-neutral-400">
+                                            NO IMG
+                                          </div>
+                                        )}
+                                        <div className="flex flex-col min-w-0">
+                                          <span className="text-xs uppercase truncate max-w-[180px] block">
+                                            {foundProd ? foundProd.name : "Unknown Product"}
+                                          </span>
+                                          <span className="font-mono text-[9px] text-neutral-400 mt-0.5 block">{n.productId}</span>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </Link>
+                              </td>
                               <td className="p-4 font-black text-indigo-600">{n.size}</td>
                               <td className="p-4 text-[10px] font-mono text-neutral-500">{n.requestedAt ? new Date(n.requestedAt).toLocaleString('en-IN') : 'N/A'}</td>
                               <td className="p-4">
                                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${n.notified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}>
                                   {n.notified ? 'NOTIFIED' : 'PENDING'}
                                 </span>
+                              </td>
+                              <td className="p-4 text-right space-x-2">
+                                {!n.notified && (
+                                  <button
+                                    disabled={actionLoading}
+                                    onClick={() => handleConfirmRestock(n.$id)}
+                                    className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline cursor-pointer disabled:opacity-50 text-[9px] tracking-widest uppercase font-mono border border-emerald-100 hover:border-emerald-350 px-2.5 py-1 transition-all bg-emerald-50/20 rounded-sm"
+                                  >
+                                    Confirm
+                                  </button>
+                                )}
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleDeleteRestock(n.$id)}
+                                  className="text-rose-650 hover:text-rose-800 font-bold hover:underline cursor-pointer disabled:opacity-50 text-[9px] tracking-widest uppercase font-mono border border-rose-100 hover:border-rose-350 px-2.5 py-1 transition-all bg-rose-50/20 rounded-sm"
+                                >
+                                  Delete
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -2312,6 +2718,48 @@ function AdminPanel() {
               <button
                 type="button"
                 onClick={confirmSweepProductItem}
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Delete Order Confirmation Modal */}
+      {isDeleteOrderModalOpen && deleteTargetOrder && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          {/* Backdrop overlay */}
+          <div 
+            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            onClick={() => setIsDeleteOrderModalOpen(false)}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative z-60 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">DELETE CANCELLED ORDER</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Delete Order?
+              </h2>
+              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+                Are you sure you want to permanently delete order #{deleteTargetOrder.order_number || deleteTargetOrder.$id?.substring(0,6).toUpperCase()} from the store databases? This action is irreversible.
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setIsDeleteOrderModalOpen(false)}
+                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteOrder}
                 className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
               >
                 Delete

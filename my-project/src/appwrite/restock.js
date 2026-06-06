@@ -52,6 +52,37 @@ export class RestockService {
             return [];
         }
     }
+
+    // Delete a restock notification request by ID
+    async deleteRestockNotification(documentId) {
+        try {
+            if (!conf.appwriteRestockCollectionId) return null;
+            return await this.databases.deleteDocument(
+                conf.appwriteDatabaseId,
+                conf.appwriteRestockCollectionId,
+                documentId
+            );
+        } catch (error) {
+            console.error("Appwrite service :: deleteRestockNotification :: error", error.message);
+            throw error;
+        }
+    }
+
+    // Update a restock notification request (e.g. to mark as notified)
+    async updateRestockNotification(documentId, data) {
+        try {
+            if (!conf.appwriteRestockCollectionId) return null;
+            return await this.databases.updateDocument(
+                conf.appwriteDatabaseId,
+                conf.appwriteRestockCollectionId,
+                documentId,
+                data
+            );
+        } catch (error) {
+            console.error("Appwrite service :: updateRestockNotification :: error", error.message);
+            throw error;
+        }
+    }
 }
 
 const restockService = new RestockService();

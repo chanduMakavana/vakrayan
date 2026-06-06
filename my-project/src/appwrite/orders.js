@@ -194,6 +194,21 @@ export class OrdersService {
             throw error;
         }
     }
+
+    // ➡️ 6. Delete an order document by ID
+    async deleteOrder(documentId) {
+        try {
+            if (!conf.appwriteOrdersCollectionId) return null;
+            return await this.databases.deleteDocument(
+                conf.appwriteDatabaseId,
+                conf.appwriteOrdersCollectionId,
+                documentId
+            );
+        } catch (error) {
+            console.error("Appwrite service :: deleteOrder :: error", error.message);
+            throw error;
+        }
+    }
 }
 
 const ordersService = new OrdersService();

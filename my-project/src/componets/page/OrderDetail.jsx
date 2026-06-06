@@ -231,6 +231,13 @@ function OrderDetail() {
       console.warn("Could not parse order address or metadata JSON:", outerErr.message);
     }
 
+    if (typeof addressText === 'string') {
+      addressText = addressText.replace(/\[Payment:\s*\w+\]/i, '').trim();
+      if (addressText.endsWith(',')) {
+        addressText = addressText.slice(0, -1).trim();
+      }
+    }
+
     return { addressText, metadata };
   };
 
@@ -238,6 +245,161 @@ function OrderDetail() {
 
   const handleCancelOrder = () => {
     setIsCancelModalOpen(true);
+  };
+
+  const handlePrintInvoice = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      showToast("Pop-up blocker is preventing invoice opening.", "error");
+      return;
+    }
+
+    const itemsHtml = parsedItems.map(item => `
+      <tr style="border-bottom: 1px solid #eee;">
+        <td style="padding: 12px 0; font-weight: bold; text-transform: uppercase;">${item.name}</td>
+        <td style="padding: 12px 0; font-family: monospace; text-align: center;">${(item.size || 'M').toUpperCase()}</td>
+        <td style="padding: 12px 0; font-family: monospace; text-align: center;">${item.quantity}</td>
+        <td style="padding: 12px 0; font-family: monospace; text-align: right;">₹${Number(item.price).toLocaleString('en-IN')}</td>
+        <td style="padding: 12px 0; font-family: monospace; text-align: right; font-weight: bold;">₹${Number(item.price * item.quantity).toLocaleString('en-IN')}</td>
+      </tr>
+    `).join('');
+
+    const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
+    const isCod = order.paymentMethod === 'COD';
+    const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
+    const codFee = isCod ? 30 : 0;
+    const baseShippingCharge = isCod ? Math.max(0, totalShipping - 30) : totalShipping;
+    const subtotal = Number(metadata.subtotal || order.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0));
+    const discountVal = Number(order.discountAmount || order.discount_amount || metadata.discount || 0);
+    const taxAmount = Math.round(Number(metadata.tax_amount || order.tax_amount || (Number(order.total) * 0.18 / 1.18)));
+
+    const discountRow = (order.couponApplied && order.couponApplied !== 'NONE' && discountVal > 0) ? `
+      <div class="total-row" style="color: #059669; font-weight: bold;">
+        <span>COUPON SAVINGS (${order.couponApplied})</span>
+        <span style="font-family: monospace;">- ₹${discountVal.toLocaleString('en-IN')}</span>
+      </div>
+    ` : '';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Invoice - ${metadata.order_number}</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+          <style>
+            body { font-family: 'Inter', system-ui, sans-serif; color: #000; padding: 40px; margin: 0; line-height: 1.5; }
+            .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .logo { font-size: 24px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+            .invoice-title { font-size: 16px; font-weight: 800; letter-spacing: 1px; text-align: right; text-transform: uppercase; }
+            .details { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+            .details h3 { font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #666; text-transform: uppercase; margin: 0 0 8px 0; }
+            .details p { font-size: 12px; font-weight: 600; margin: 0 0 4px 0; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+            th { border-bottom: 2px solid #eee; padding: 12px 0; text-align: left; font-size: 10px; font-weight: 900; color: #666; text-transform: uppercase; }
+            .totals { font-size: 12px; font-weight: bold; border-top: 2px solid #000; padding-top: 20px; }
+            .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; }
+            .grand-total { font-size: 18px; font-weight: 900; border-top: 1px solid #eee; padding-top: 12px; margin-top: 12px; }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div style="max-width: 800px; margin: 0 auto;">
+            <div class="header">
+              <div>
+                <div class="logo">AASHIS</div>
+                <div style="font-size: 10px; color: #666; font-weight: bold; margin-top: 5px; text-transform: uppercase;">Premium Drop & Boutique</div>
+              </div>
+              <div class="invoice-title">
+                TAX INVOICE<br/>
+                <span style="font-family: monospace; font-size: 12px; font-weight: normal; color: #666;"># ${metadata.order_number}</span>
+              </div>
+            </div>
+
+            <div class="details">
+              <div>
+                <h3>Sold By</h3>
+                <p style="font-weight: 800; color: #000;">AASHIS</p>
+                <p>Surat, Gujarat, India</p>
+                <p>Pincode: 395006</p>
+                <p>GSTIN: 24AASHIS1234F1Z0</p>
+              </div>
+              <div>
+                <h3>Billed To</h3>
+                <p style="font-weight: 800; color: #000;">${metadata.customer_name || 'Customer'}</p>
+                <p style="text-transform: lowercase;">${metadata.customer_email || order.email || ''}</p>
+                <p>${addressText || ''}</p>
+                <p>Phone: ${metadata.customer_phone || ''}</p>
+              </div>
+              <div style="text-align: right;">
+                <h3>Invoice Details</h3>
+                <p>Date: ${new Date(orderDate).toLocaleDateString('en-IN')}</p>
+                <p>Payment Mode: ${order.paymentMethod === 'COD' ? 'CASH ON DELIVERY (COD)' : 'RAZORPAY ONLINE'}</p>
+                ${order.paymentMethod !== 'COD' ? `<p>Transaction ID: ${metadata.razorpay_payment_id || order.razorpayPaymentId || 'N/A'}</p>` : ''}
+                <p>Order Status: ${(order.status || 'PENDING').toUpperCase()}</p>
+              </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Item Description</th>
+                  <th style="text-align: center; width: 60px;">Size</th>
+                  <th style="text-align: center; width: 60px;">Qty</th>
+                  <th style="text-align: right; width: 120px;">Unit Price</th>
+                  <th style="text-align: right; width: 120px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody style="font-size: 12px; font-weight: 600;">
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div style="width: 350px; margin-left: auto;" class="totals">
+              <div class="total-row">
+                <span style="color: #666;">Cart Value</span>
+                <span style="font-family: monospace;">₹${subtotal.toLocaleString('en-IN')}</span>
+              </div>
+              ${discountRow}
+
+              <div class="total-row">
+                <span style="color: #666;">Shipping & Delivery</span>
+                <span style="font-family: monospace; font-weight: bold;">${baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}</span>
+              </div>
+              ${isCod ? `
+              <div class="total-row">
+                <span style="color: #666;">COD Handling Fee</span>
+                <span style="font-family: monospace; font-weight: bold;">₹30</span>
+              </div>
+              ` : ''}
+
+              <div class="total-row" style="font-size: 11px; color: #666; margin-top: 4px;">
+                <span>GST (18% INCLUSIVE)</span>
+                <span style="font-family: monospace;">₹${taxAmount.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div class="total-row grand-total">
+                <span>Net Amount Paid</span>
+                <span style="font-family: monospace; font-size: 20px; font-weight: 900;">₹${Number(order.total).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 80px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; font-size: 10px; color: #888; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">
+              Thank you for shopping with AASHIS!<br/>
+              This is a system generated tax invoice. No signature is required.
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const submitCancelOrder = async () => {
@@ -349,6 +511,14 @@ function OrderDetail() {
                       className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                     >
                       Cancel Order
+                    </button>
+                  )}
+                  {order.status === 'DELIVERED' && (
+                    <button
+                      onClick={handlePrintInvoice}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                    >
+                      <FiFileText className="text-xs" /> Download Invoice
                     </button>
                   )}
                 </div>
@@ -470,50 +640,67 @@ function OrderDetail() {
               </h3>
 
               <div className="divide-y divide-neutral-100 border border-neutral-100 rounded-2xl overflow-hidden bg-neutral-50/20 p-4 space-y-4">
-                {parsedItems.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center py-2 text-xs pt-4 first:pt-0">
-                    <div className="space-y-1">
-                      <h4 className="font-black text-neutral-950 uppercase tracking-wide">
-                        {item.name}
-                      </h4>
-                      <p className="text-[9px] font-mono text-neutral-500 uppercase">
-                        Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
-                      </p>
-                      {order.status === 'DELIVERED' && (() => {
-                        let productId = item.product_id;
-                        if (!productId) {
-                          const matchingProd = products.find(p => p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
-                          productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
-                        }
+                {parsedItems.map((item, idx) => {
+                  const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
+                  const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
 
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (productId) {
-                                setReviewModalItem({ name: item.name, productId });
-                                setModalRating(5);
-                                setModalComment('');
-                                setModalFit('true');
-                                setModalComfort(5);
-                                setModalQuality(5);
-                                setModalBreathable(5);
-                              } else {
-                                showToast("Failed to locate product in current catalog.", "error");
-                              }
-                            }}
-                            className="mt-1.5 inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer border border-neutral-950"
-                          >
-                            Write Review
-                          </button>
-                        );
-                      })()}
+                  return (
+                    <div key={idx} className="flex justify-between items-center py-4 text-xs first:pt-0 last:pb-0">
+                      <div className="flex gap-4 items-center">
+                        {img ? (
+                          <img 
+                            src={img} 
+                            alt={item.name} 
+                            className="w-12 h-16 object-cover border border-neutral-200 shrink-0 bg-neutral-50"
+                          />
+                        ) : (
+                          <div className="w-12 h-16 bg-neutral-100 border border-neutral-200 shrink-0 flex items-center justify-center text-[8px] font-bold text-neutral-400">
+                            NO IMG
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <h4 className="font-black text-neutral-950 uppercase tracking-wide">
+                            {item.name}
+                          </h4>
+                          <p className="text-[9px] font-mono text-neutral-500 uppercase">
+                            Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
+                          </p>
+                          {order.status === 'DELIVERED' && (() => {
+                            let productId = item.product_id;
+                            if (!productId) {
+                              productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
+                            }
+
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (productId) {
+                                    setReviewModalItem({ name: item.name, productId });
+                                    setModalRating(5);
+                                    setModalComment('');
+                                    setModalFit('true');
+                                    setModalComfort(5);
+                                    setModalQuality(5);
+                                    setModalBreathable(5);
+                                  } else {
+                                    showToast("Failed to locate product in current catalog.", "error");
+                                  }
+                                }}
+                                className="mt-1.5 inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer border border-neutral-950"
+                              >
+                                Write Review
+                              </button>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      <span className="font-mono font-black text-neutral-950 text-sm shrink-0">
+                        ₹{Number(item.price * item.quantity).toLocaleString('en-IN')}
+                      </span>
                     </div>
-                    <span className="font-mono font-black text-neutral-950 text-sm shrink-0">
-                      ₹{Number(item.price * item.quantity).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -533,17 +720,18 @@ function OrderDetail() {
                   </span>
                 </div>
               )}
+
               <div className="flex justify-between">
-                <span>GST (18% EXCLUSIVE)</span>
-                <span className="text-neutral-950 font-bold">
-                  ₹{Math.round(Number(metadata.tax_amount || 0)).toLocaleString('en-IN')}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>DISPATCH EXPRESS</span>
-                <span className="text-emerald-600 font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded">
-                  FREE DISPATCH
-                </span>
+                <span>SHIPPING & DELIVERY</span>
+                {Number(metadata.shipping_charge || 0) > 0 ? (
+                  <span className="text-neutral-950 font-bold font-mono">
+                    ₹{Number(metadata.shipping_charge)}
+                  </span>
+                ) : (
+                  <span className="text-emerald-600 font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded animate-scale-up">
+                    FREE SHIPPING
+                  </span>
+                )}
               </div>
               <div className="flex justify-between">
                 <span>PAYMENT METHOD</span>
@@ -579,8 +767,13 @@ function OrderDetail() {
               )}
               <hr className="border-neutral-100" />
               <div className="flex justify-between items-baseline pt-2">
-                <span className="text-sm font-black text-neutral-950 uppercase tracking-wide">Net deposited amount</span>
-                <span className="text-2xl font-black text-neutral-950 tracking-tight">
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-neutral-950 uppercase tracking-wide">Net deposited amount</span>
+                  <span className="text-[9px] text-neutral-400 font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
+                    (incl. of all taxes)
+                  </span>
+                </div>
+                <span className="text-2xl font-black text-neutral-950 tracking-tight font-mono">
                   ₹{Number(order.total || 0).toLocaleString('en-IN')}
                 </span>
               </div>

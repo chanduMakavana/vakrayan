@@ -26,6 +26,18 @@ const generateOrderNumber = () => {
   return `ORD-${year}-${randomNum}`;
 };
 
+const isCodAvailableForPincode = (pin, stateName = '') => {
+  if (!pin) return true;
+  const state = stateName.toUpperCase().trim();
+  if (pin.startsWith('19') || pin.startsWith('79') || pin.startsWith('744')) {
+    return false;
+  }
+  if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP'].includes(state)) {
+    return false;
+  }
+  return true;
+};
+
 function Checkout() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
@@ -53,6 +65,7 @@ function Checkout() {
   }, [checkoutStatus])
   const [processingStep, setProcessingStep] = useState(0)
   const [selectedPayment, setSelectedPayment] = useState('COD') // COD | ONLINE
+  const [codAvailable, setCodAvailable] = useState(true)
   const [razorpayModalOpen, setRazorpayModalOpen] = useState(false)
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
@@ -100,7 +113,46 @@ function Checkout() {
     setValue('pincode', addr.pincode || '');
     setValue('state', addr.state || '');
     setValue('country', addr.country || 'India');
+
+    const pin = String(addr.pincode || '').trim();
+    const state = String(addr.state || '').trim();
+    const isCodAllowed = isCodAvailableForPincode(pin, state);
+    setCodAvailable(isCodAllowed);
+    if (!isCodAllowed) {
+      setSelectedPayment('ONLINE');
+      showToast("COD is not serviceable for this remote route. Switched to Online Payment.", "warning");
+    }
   }, [setValue, user]);
+
+  const handlePincodeChange = async (val) => {
+    const cleaned = val.replace(/\D/g, '');
+    if (cleaned.length === 6) {
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${cleaned}`);
+        const data = await response.json();
+        if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+          const po = data[0].PostOffice[0];
+          if (po.District) {
+            setValue('city', po.District.toUpperCase(), { shouldValidate: true });
+          }
+          if (po.State) {
+            setValue('state', po.State.toUpperCase(), { shouldValidate: true });
+          }
+          
+          const isCodAllowed = isCodAvailableForPincode(cleaned, po.State);
+          setCodAvailable(isCodAllowed);
+          if (!isCodAllowed) {
+            setSelectedPayment('ONLINE');
+            showToast("COD is not serviceable for this remote route. Switched to Online Payment.", "warning");
+          } else {
+            showToast(`📍 PIN code verified: ${po.District}, ${po.State}`, "success");
+          }
+        }
+      } catch (err) {
+        console.warn("Pincode autofill error:", err);
+      }
+    }
+  };
 
   // Load saved addresses on mount/session load
   useEffect(() => {
@@ -162,9 +214,16 @@ function Checkout() {
 
   const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
   const discountAmount = cartTotalAmount * (discountPercent / 100)
-  const netBeforeTax = cartTotalAmount - discountAmount
-  const taxAmount = netBeforeTax * 0.18
-  const finalAmount = netBeforeTax + taxAmount
+  const discountedAmount = cartTotalAmount - discountAmount
+
+  // Calculate Shipping Expenses & COD Fees
+  const baseShippingCharge = discountedAmount >= 999 ? 0 : 99;
+  const codFee = selectedPayment === 'COD' ? 30 : 0;
+  const shippingCharge = baseShippingCharge + codFee;
+
+  const finalAmount = discountedAmount + shippingCharge
+  const taxAmount = finalAmount * 0.18 / 1.18
+  const netBeforeTax = finalAmount - taxAmount
 
   const steps = [
     "Checking shipping details...",
@@ -234,6 +293,37 @@ function Checkout() {
 
   const onSubmit = async (data) => {
     if (!user) return
+
+    // 0. Live Pincode Deliverability Check
+    const pin = (data.pincode || '').trim();
+    if (!/^[1-9][0-9]{5}$/.test(pin)) {
+      showToast("Please enter a valid 6-digit Indian PIN code.", "error");
+      return;
+    }
+
+    let resolvedState = '';
+    try {
+      const pinResponse = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const pinData = await pinResponse.json();
+      if (pinData && pinData[0] && pinData[0].Status === 'Error') {
+        showToast(`Sorry, PIN code ${pin} is invalid or not serviceable. Please enter a valid deliverable PIN code.`, "error");
+        return;
+      }
+      if (pinData && pinData[0] && pinData[0].PostOffice && pinData[0].PostOffice.length > 0) {
+        resolvedState = pinData[0].PostOffice[0].State || '';
+      }
+    } catch (err) {
+      console.warn("Pincode API down, using format verification fallback:", err.message);
+    }
+
+    // Verify COD serviceability
+    if (selectedPayment === 'COD') {
+      const isCodAllowed = isCodAvailableForPincode(pin, resolvedState);
+      if (!isCodAllowed) {
+        showToast("Cash on Delivery (COD) is not serviceable for this remote route. Please use Online Payment.", "error");
+        return;
+      }
+    }
 
     // 0. Live Stock Validation — fetch fresh product data from Appwrite at submit time
     // This eliminates the TOCTOU race condition where two users could both pass
@@ -347,6 +437,13 @@ function Checkout() {
 
     try {
       const orderNumber = generateOrderNumber();
+      const discountedAmount = cartTotalAmount - discountAmount;
+      const baseShipping = discountedAmount >= 999 ? 0 : 99;
+      const currentCodFee = method === 'COD' ? 30 : 0;
+      const currentShippingCharge = baseShipping + currentCodFee;
+      const calculatedFinalAmount = discountedAmount + currentShippingCharge;
+      const calculatedTax = calculatedFinalAmount * 0.18 / 1.18;
+
       const serializedAddress = JSON.stringify({
         customerAddress: `${formData.address.trim()}, ${formData.city.trim()}, ${formData.state?.trim() || ''} - ${formData.pincode.trim()}, ${formData.country?.trim() || 'India'} [Payment: ${method}]`,
         metadata: {
@@ -354,8 +451,8 @@ function Checkout() {
           tracking_number: '',
           tracking_url: '',
           subtotal: Math.round(cartTotalAmount),
-          tax_amount: Math.round(taxAmount),
-          shipping_charge: 0,
+          tax_amount: Math.round(calculatedTax),
+          shipping_charge: Math.round(currentShippingCharge),
           coupon_code: couponApplied || 'NONE'
         }
       });
@@ -373,10 +470,11 @@ function Checkout() {
             size: i.size,
             quantity: Number(i.quantity),
             price: Number(i.price),
-            product_id: i.product_id
+            product_id: i.product_id,
+            product_Image: i.product_Image || i.product_image || i.image || i.front_image_link || ''
           }))
         ),
-        total: Math.round(finalAmount),
+        total: Math.round(calculatedFinalAmount),
         status: 'PENDING',
         couponApplied: couponApplied || 'NONE',
         coupon_code: couponApplied || 'NONE',
@@ -395,8 +493,8 @@ function Checkout() {
         // Dynamic additions for blueprint compatibility
         order_number: orderNumber,
         subtotal: Math.round(cartTotalAmount),
-        tax_amount: Math.round(taxAmount),
-        shipping_charge: 0,
+        tax_amount: Math.round(calculatedTax),
+        shipping_charge: Math.round(currentShippingCharge),
         tracking_number: '',
         tracking_url: ''
       };
@@ -739,7 +837,8 @@ function Checkout() {
                       pattern: {
                         value: /^[0-9]{6}$/,
                         message: 'Must be a 6-digit pin code'
-                      }
+                      },
+                      onChange: (e) => handlePincodeChange(e.target.value)
                     })}
                   />
                   {errors.pincode && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.pincode.message}</span>}
@@ -777,23 +876,37 @@ function Checkout() {
                     
                     {/* COD Option */}
                     <div 
-                      onClick={() => setSelectedPayment('COD')}
-                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
-                        selectedPayment === 'COD' 
-                        ? 'border-neutral-950 bg-neutral-50/50 shadow-sm' 
-                        : 'border-neutral-200 hover:border-neutral-300 bg-[#fbfbfb]'
+                      onClick={() => {
+                        if (codAvailable) {
+                          setSelectedPayment('COD');
+                        } else {
+                          showToast("Cash on Delivery is not serviceable for this remote route.", "error");
+                        }
+                      }}
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                        !codAvailable
+                        ? 'opacity-50 cursor-not-allowed border-neutral-200 bg-neutral-100'
+                        : selectedPayment === 'COD' 
+                        ? 'cursor-pointer border-neutral-950 bg-neutral-50/50 shadow-sm' 
+                        : 'cursor-pointer border-neutral-200 hover:border-neutral-300 bg-[#fbfbfb]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black uppercase tracking-wider text-neutral-950 font-black">Cash on Delivery (COD)</span>
-                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                          selectedPayment === 'COD' ? 'border-neutral-950 bg-neutral-950' : 'border-neutral-300'
-                        }`}>
-                          {selectedPayment === 'COD' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
+                        <span className={`text-xs font-black uppercase tracking-wider ${!codAvailable ? 'text-neutral-400' : 'text-neutral-950 font-black'}`}>
+                          Cash on Delivery (COD) {!codAvailable && '(NOT AVAILABLE)'}
+                        </span>
+                        {codAvailable && (
+                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                            selectedPayment === 'COD' ? 'border-neutral-950 bg-neutral-950' : 'border-neutral-300'
+                          }`}>
+                            {selectedPayment === 'COD' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                          </div>
+                        )}
                       </div>
                       <p className="text-[9px] font-mono uppercase text-neutral-500 leading-normal">
-                        Free domestic express shipping. Pay at your doorstep using cash or UPI.
+                        {codAvailable
+                          ? 'Pay at your doorstep using cash or UPI. (Handling fee of ₹30 applies)'
+                          : 'COD is not serviceable for this remote route. Please pay online.'}
                       </p>
                     </div>
 
@@ -815,7 +928,7 @@ function Checkout() {
                         </div>
                       </div>
                       <p className="text-[9px] font-mono uppercase text-neutral-500 leading-normal">
-                        Secure transaction gateway. Direct UPI, Credit Cards, and wallets routing.
+                        Secure transaction gateway. Direct UPI, Credit Cards, and wallets routing. (FREE SHIPPING)
                       </p>
                     </div>
 
@@ -937,23 +1050,32 @@ function Checkout() {
                     </span>
                   </div>
                 )}
+
                 <div className="flex justify-between">
-                  <span>GST (18% EXCLUSIVE)</span>
+                  <span>SHIPPING & DELIVERY</span>
                   <span className="font-mono text-neutral-900 font-bold">
-                    ₹{Math.round(taxAmount).toLocaleString('en-IN')}
+                    {baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>SHIPPING EXPENSES</span>
-                  <span className="font-mono text-emerald-600 font-black tracking-wider text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
-                    FREE DISPATCH
-                  </span>
-                </div>
+
+                {codFee > 0 && (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>COD HANDLING FEE</span>
+                    <span className="font-mono text-neutral-900 font-bold">
+                      ₹{codFee}
+                    </span>
+                  </div>
+                )}
                 
                 <hr className="border-neutral-100" />
 
                 <div className="flex justify-between items-baseline pt-2">
-                  <span className="text-sm font-black text-neutral-950">NET AMOUNT</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-black text-neutral-950">NET AMOUNT</span>
+                    <span className="text-[9px] text-neutral-400 font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
+                      (incl. of all taxes)
+                    </span>
+                  </div>
                   <span className="text-2xl font-mono font-black text-neutral-950 tracking-tight">
                     ₹{Math.round(finalAmount).toLocaleString('en-IN')}
                   </span>

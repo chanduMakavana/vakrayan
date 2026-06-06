@@ -57,6 +57,19 @@ function SignUp() {
       setLoading(false)
     }
   }
+
+  const handleGoogleSignIn = async () => {
+    setServerError("");
+    setLoading(true);
+    try {
+      await authService.loginWithGoogle();
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      setServerError(error?.message || "Google authentication failed. Please try again.");
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
@@ -155,6 +168,27 @@ function SignUp() {
             {loading ? 'REGISTERING...' : 'REGISTER NOW'}
           </button>
         </form>
+
+        <div className="relative flex py-4 items-center">
+          <div className="flex-grow border-t border-neutral-200/60"></div>
+          <span className="flex-shrink mx-4 text-[10px] font-black text-neutral-400 tracking-widest uppercase">OR</span>
+          <div className="flex-grow border-t border-neutral-200/60"></div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-neutral-50 active:scale-[0.98] disabled:scale-100 border border-neutral-200 text-neutral-800 font-bold text-xs tracking-widest uppercase py-4 rounded-xl shadow-md cursor-pointer transition-all duration-200"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 15.01 1 12 1 7.35 1 3.39 3.65 1.5 7.5l3.86 3C6.31 7.57 8.91 5.04 12 5.04z" />
+            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.1 2.66-2.33 3.48l3.6 2.79c2.1-1.94 3.79-4.8 3.79-8.42z" />
+            <path fill="#FBBC05" d="M5.36 14.5c-.24-.72-.38-1.49-.38-2.3s.14-1.58.38-2.3L1.5 6.9C.54 8.88 0 11.08 0 13.5s.54 4.62 1.5 6.6l3.86-3.1z" />
+            <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.6-2.79c-1.1.74-2.52 1.18-4.36 1.18-3.09 0-5.69-2.53-6.64-5.46L1.5 16.1C3.39 19.96 7.35 22.61 12 23z" />
+          </svg>
+          {loading ? 'CONNECTING...' : 'Continue with Google'}
+        </button>
 
         <div className="text-center mt-8 pt-6 border-t border-neutral-100">
           <p className="text-xs text-neutral-500 tracking-wider">

@@ -83,6 +83,18 @@ export class AuthService {
             throw error;
         }
     }
+
+    // Initiate Google OAuth2 login session
+    async loginWithGoogle() {
+        try {
+            const successUrl = `${window.location.origin}/`;
+            const failureUrl = `${window.location.origin}/login`;
+            return this.account.createOAuth2Session('google', successUrl, failureUrl);
+        } catch (error) {
+            console.error("Appwrite service :: loginWithGoogle :: error", error.message);
+            throw error;
+        }
+    }
 }
 
 const authService = new AuthService();

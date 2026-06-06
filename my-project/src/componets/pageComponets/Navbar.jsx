@@ -5,7 +5,7 @@ import { CgShoppingCart } from 'react-icons/cg';
 import { BsFillPersonFill, BsHeart, BsHeartFill } from 'react-icons/bs';
 import { HiMenuAlt3, HiX, HiPlus, HiMinus } from 'react-icons/hi';
 import { useDispatch, useSelector } from 'react-redux';
-import { logout as logoutAction } from '../../features/login'; 
+import { logout as logoutAction, toggleAdminMode } from '../../features/login'; 
 import authService from '../../appwrite/auth';
 import cartService from '../../appwrite/cart';
 import productsService from '../../appwrite/products';
@@ -25,7 +25,7 @@ function Navbar() {
   const { showToast } = useToast();
 
   // Retrieve auth state from Redux store and Appwrite cloud session (hoisted for scoping checks)
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const { user, isAuthenticated, adminMode } = useSelector(state => state.auth);
   const cartItems = useSelector(state => state.cart || []);
   const products = useSelector(state => state.products.items || []);
   const cartCount = cartItems.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
@@ -328,6 +328,28 @@ function Navbar() {
 
           {/* Action Icons */}
           <div className="flex items-center gap-6 text-neutral-500 text-lg">
+            {/* Admin Mode Toggle Switch */}
+            {isAdmin && (
+              <div className="flex items-center gap-2 mr-1">
+                <span className="text-[9px] font-mono font-black tracking-widest text-neutral-450 uppercase select-none">
+                  ADMIN
+                </span>
+                <button
+                  onClick={() => dispatch(toggleAdminMode())}
+                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-250 ease-in-out focus:outline-hidden ${
+                    adminMode ? 'bg-neutral-950' : 'bg-neutral-200'
+                  }`}
+                  title={adminMode ? "Disable Admin Mode" : "Enable Admin Mode"}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-xs transition duration-250 ease-in-out ${
+                      adminMode ? 'translate-x-3' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
+
             <ImSearch className="hover:text-neutral-900 cursor-pointer transition-colors duration-200" onClick={() => setSearchOpen(!searchOpen)} />
 
 
@@ -446,6 +468,27 @@ function Navbar() {
               <li className="pt-4 border-t border-neutral-200/60 w-4/5 text-center flex flex-col gap-2">
                 <span className="text-xs text-neutral-800 font-black uppercase">{user.name}</span>
                 <span className="text-xs text-neutral-500 font-light lowercase">{user.email}</span>
+                
+                {isAdmin && (
+                  <div className="flex justify-center items-center gap-3 py-2 border-y border-neutral-100 my-1">
+                    <span className="text-[10px] font-mono font-black tracking-widest text-neutral-450 uppercase select-none">
+                      ADMIN MODE
+                    </span>
+                    <button
+                      onClick={() => dispatch(toggleAdminMode())}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-250 ease-in-out focus:outline-hidden ${
+                        adminMode ? 'bg-neutral-950' : 'bg-neutral-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-250 ease-in-out ${
+                          adminMode ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
+
                 <Link to="/profile" onClick={() => setIsOpen(false)} className="text-xs font-black text-neutral-900 uppercase tracking-widest mt-1">
                   My Profile
                 </Link>
@@ -649,7 +692,7 @@ function Navbar() {
               wishlist.map((item) => (
                 <div key={item.$id || item.id} className="flex gap-4 p-4 border border-neutral-950/10 rounded-none hover:border-neutral-950 transition-all duration-200">
                   <img 
-                    src={item.product_Image || item.image || 'https://placehold.co/100x125'} 
+                    src={item.front_image_link || item.image_url || item.product_Image || item.product_image || item.image || 'https://placehold.co/100x125'} 
                     alt={item.name} 
                     className="w-20 h-24 object-cover rounded-none border border-neutral-200 shrink-0"
                   />

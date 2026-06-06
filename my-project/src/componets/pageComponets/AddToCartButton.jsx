@@ -19,6 +19,25 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     // UI Visual States Management
     const [status, setStatus] = useState('idle') // states: 'idle' | 'loading' | 'success'
 
+    // Parse stocks mapping
+    let stocks = {};
+    try {
+        stocks = JSON.parse(product?.sizes_stock || '{}');
+    } catch {
+        stocks = {};
+    }
+
+    // Check if completely out of stock across all defined sizes
+    let isAllOutOfStock = false;
+    if (product && product.sizes && product.sizes.length > 0) {
+        const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+        isAllOutOfStock = totalStock === 0;
+    }
+
+    // Check if selected size (or default fallback) is out of stock
+    const baseSize = selectedSize || product?.sizes?.[0] || 'M';
+    const isSelectedSizeOutOfStock = stocks[baseSize] === 0;
+
     const handleAdd = async (e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -34,10 +53,10 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
         try {
             setStatus('loading')
 
-            const baseSize = selectedSize || product.sizes?.[0] || 'M'
-            let targetSize = baseSize
+            const baseSizeVal = selectedSize || product.sizes?.[0] || 'M'
+            let targetSize = baseSizeVal
             if (selectedColor) {
-                targetSize = `${baseSize} / ${selectedColor.toUpperCase()}`
+                targetSize = `${baseSizeVal} / ${selectedColor.toUpperCase()}`
             }
             const targetProductId = product.$id || product.id
             const existingCartItem = cartItems.find(
@@ -45,16 +64,10 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             )
 
             // Stock Validation check
-            let stocks = {};
-            try {
-                stocks = JSON.parse(product.sizes_stock || '{}');
-            } catch {
-                stocks = {};
-            }
-            const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+            const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
             const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
             if (currentQuantityInCart + 1 > availableStock) {
-                showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSize}.`, "error");
+                showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "error");
                 setStatus('idle');
                 return;
             }
@@ -102,6 +115,17 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     // 🎴 CASE 1: OVERLAY VARIANT (Product Grid Card Layout)
     // ==========================================
     if (variant === "overlay") {
+        if (isAllOutOfStock) {
+            return (
+                <button
+                    disabled
+                    className="text-xs tracking-widest uppercase py-3 px-6 rounded-none transform translate-y-4 group-hover:translate-y-0 shadow-2xl font-black bg-neutral-100 text-neutral-400 cursor-not-allowed select-none min-w-35 flex items-center justify-center border border-neutral-250/20"
+                >
+                    <span>SOLD OUT</span>
+                </button>
+            )
+        }
+
         return (
             <motion.button
                 {...buttonClickSpring}
@@ -133,6 +157,17 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
     // ==========================================
     // 🕹️ CASE 2: DEFAULT VARIANT (Product Details Stage Terminal)
     // ==========================================
+    if (isAllOutOfStock || isSelectedSizeOutOfStock) {
+        return (
+            <button
+                disabled
+                className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed select-none font-sans"
+            >
+                <span>{isAllOutOfStock ? 'SOLD OUT' : 'OUT OF STOCK'}</span>
+            </button>
+        )
+    }
+
     return (
         <motion.button
             {...buttonClickSpring}

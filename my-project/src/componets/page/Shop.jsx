@@ -19,7 +19,7 @@ function Shop() {
 
   const products = useSelector(state => state.products.items || [])
   const wishlist = useSelector(state => state.wishlist || [])
-  const { user, isAuthenticated } = useSelector(state => state.auth)
+  const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
   const reduxFetched = useSelector(state => state.products.fetched)
   
   const [loading, setLoading] = useState(!reduxFetched)
@@ -138,6 +138,26 @@ function Shop() {
 
   // 3. Sort Results
   const filteredProducts = baseFiltered.sort((a, b) => {
+    const isOutOfStock = (product) => {
+      let stocks = {};
+      try {
+        stocks = JSON.parse(product?.sizes_stock || '{}');
+      } catch {
+        stocks = {};
+      }
+      if (product && product.sizes && product.sizes.length > 0) {
+        const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+        return totalStock === 0;
+      }
+      return false;
+    };
+
+    const aOut = isOutOfStock(a);
+    const bOut = isOutOfStock(b);
+
+    if (aOut && !bOut) return 1;
+    if (!aOut && bOut) return -1;
+
     if (sortBy === 'popularity') {
       return Number(b.total_sold || 0) - Number(a.total_sold || 0)
     }
@@ -316,6 +336,18 @@ function Shop() {
                 const backView = product.back_image_links?.[0] || product.back_image_link || frontView
                 const activeTag = product.tag || ""
 
+                let stocks = {};
+                try {
+                  stocks = JSON.parse(product?.sizes_stock || '{}');
+                } catch {
+                  stocks = {};
+                }
+                let isAllOutOfStock = false;
+                if (product && product.sizes && product.sizes.length > 0) {
+                  const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+                  isAllOutOfStock = totalStock === 0;
+                }
+
                 let swatches = [];
                 if (product.color_hex) {
                   if (product.color_hex.startsWith('[')) {
@@ -391,6 +423,19 @@ function Shop() {
                         )}
                       </button>
 
+                      {/* Edit Button for Admin Mode */}
+                      {adminMode && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/admin', { state: { editProductId: uniqueId } });
+                          }}
+                          className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
+                        >
+                          ✏️ EDIT
+                        </button>
+                      )}
+
                       {/* Active Tag Badge */}
                       {activeTag && (
                         <div className="absolute top-4 left-4 z-20 flex items-center bg-neutral-950 px-2 py-0.5 select-none">
@@ -400,8 +445,17 @@ function Shop() {
                         </div>
                       )}
 
+                      {/* Out of Stock Overlay */}
+                      {isAllOutOfStock && (
+                        <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+                          <span className="bg-white/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
+                            SOLD OUT
+                          </span>
+                        </div>
+                      )}
+
                       {/* Image Flip */}
-                      <div className="w-full h-full relative">
+                      <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
                         <img
                           src={frontView}
                           alt={product.name}
@@ -420,61 +474,42 @@ function Shop() {
                     </div>
 
                     {/* Metadata Content */}
-                    <div className="mt-5 px-1 flex flex-col justify-between grow">
+                    <div className="mt-3 px-1 flex flex-col justify-between grow">
                       <div>
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="text-[9px] font-sans text-neutral-400 font-extrabold tracking-widest uppercase">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-[8px] font-mono text-neutral-400 tracking-wider uppercase">
                             {product.category?.replace('-', ' ') || "HQ MERCH"}
                           </span>
-                          <span className="text-[9px] font-sans text-neutral-300 font-bold uppercase tracking-widest">
-                            VOL. I
-                          </span>
                         </div>
                         
-                        <h3 className="text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
+                        <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
                           {product.name}
                         </h3>
-                        {swatches.length > 0 && (
-                          <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                            {swatches.map((swatch, idx) => (
-                              <span
-                                key={idx}
-                                title={swatch.name}
-                                className="w-2 h-2 rounded-full border border-neutral-950/15 block shrink-0"
-                                style={{ backgroundColor: swatch.hex }}
-                              />
-                            ))}
-                          </div>
-                        )}
                       </div>
                       
-                      <div className="mt-3 pt-3 border-t border-neutral-100 flex items-end justify-between gap-4">
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-mono font-bold text-neutral-400 uppercase tracking-widest">PRICE</span>
-                          <div className="flex items-baseline gap-2 mt-0.5">
-                            <span className="text-sm font-mono font-black text-neutral-950">
-                              ₹{Number(product.price).toLocaleString('en-IN')}
-                            </span>
-                            {(() => {
-                              const priceNum = Number(product.price || 0);
-                              const compareNum = Number(product.compare_at_price || 0);
-                              const showCompare = compareNum > priceNum;
-                              const compareDisplay = showCompare
-                                ? compareNum
-                                : (product.discount_percent > 0
-                                    ? Math.round(priceNum / (1 - product.discount_percent / 100))
-                                    : null);
-                              return compareDisplay ? (
-                                <span className="text-[10px] font-mono text-neutral-400 line-through font-bold">
-                                  ₹{compareDisplay.toLocaleString('en-IN')}
-                                </span>
-                              ) : null;
-                            })()}
-                          </div>
+                      <div className="mt-2 pt-2 border-t border-neutral-100 flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
+                            ₹{Number(product.price).toLocaleString('en-IN')}
+                          </span>
+                          {(() => {
+                            const priceNum = Number(product.price || 0);
+                            const compareNum = Number(product.compare_at_price || 0);
+                            const showCompare = compareNum > priceNum;
+                            const compareDisplay = showCompare
+                              ? compareNum
+                              : (product.discount_percent > 0
+                                  ? Math.round(priceNum / (1 - product.discount_percent / 100))
+                                  : null);
+                            return compareDisplay ? (
+                              <span className="text-[9px] font-mono text-neutral-400 line-through">
+                                ₹{compareDisplay.toLocaleString('en-IN')}
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
-                        
-                        <span className="text-[10px] font-sans font-bold tracking-widest text-neutral-400 group-hover:text-neutral-950 transition-colors duration-300 uppercase pb-0.5">
-                          DETAILS &rarr;
+                        <span className="text-[8px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
+                          incl. taxes
                         </span>
                       </div>
                     </div>

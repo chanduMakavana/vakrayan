@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiShield, FiTruck, FiScissors, FiArrowLeft } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiShield, FiTruck, FiScissors, FiArrowLeft, FiMapPin } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../appwrite/products';
 import reviewsService from '../../appwrite/reviews';
@@ -22,7 +22,7 @@ function ProductDetail() {
   const dispatch = useDispatch();
   const products = useSelector(state => state.products.items || []);
   const wishlist = useSelector(state => state.wishlist || []);
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const { user, isAuthenticated, adminMode } = useSelector(state => state.auth);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -115,6 +115,149 @@ function ProductDetail() {
   const [sizingExpanded, setSizingExpanded] = useState(false);
   const [shippingExpanded, setShippingExpanded] = useState(false);
 
+  // Pincode Checker States
+  const [pincodeInput, setPincodeInput] = useState(() => localStorage.getItem('checked_pincode') || '');
+  const [pinChecking, setPinChecking] = useState(false);
+  const [pinResult, setPinResult] = useState(null);
+  const [pinError, setPinError] = useState('');
+
+  const isCodAvailableForPincode = (pin, stateName = '') => {
+    if (!pin) return true;
+    const state = stateName.toUpperCase().trim();
+    if (pin.startsWith('19') || pin.startsWith('79') || pin.startsWith('744')) {
+      return false;
+    }
+    if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP'].includes(state)) {
+      return false;
+    }
+    return true;
+  };
+
+  const calculateDeliveryDetails = (pin, stateName = '', districtName = '') => {
+    const state = stateName.toUpperCase().trim();
+    const firstDigit = pin[0];
+
+    let minTransit = 3;
+    let maxTransit = 5;
+    let desc = 'Standard Dispatch';
+    let carrier = 'Bluedart Express';
+
+    if (pin === '395006') {
+      minTransit = 0;
+      maxTransit = 1;
+      desc = 'Surat Warehouse Local Dispatch';
+      carrier = 'Surat Local Express / Self Pickup';
+    } else if (state === 'GUJARAT' || pin.startsWith('39')) {
+      minTransit = 1;
+      maxTransit = 2;
+      desc = 'Gujarat Regional Delivery';
+      carrier = 'Delhivery Express';
+    } else if (state === 'MAHARASHTRA' || state === 'RAJASTHAN' || state === 'MADHYA PRADESH' || firstDigit === '4' || pin.startsWith('30') || pin.startsWith('31') || pin.startsWith('32') || pin.startsWith('33') || pin.startsWith('34')) {
+      minTransit = 2;
+      maxTransit = 3;
+      desc = 'West/Central India Express Shipping';
+      carrier = 'Delhivery Air';
+    } else if (['DELHI', 'HARYANA', 'PUNJAB', 'UTTAR PRADESH', 'KARNATAKA', 'TELANGANA', 'ANDHRA PRADESH', 'TAMIL NADU'].includes(state) || ['1', '2', '5'].includes(firstDigit)) {
+      minTransit = 3;
+      maxTransit = 4;
+      desc = 'Metro Connect Express Delivery';
+      carrier = 'Bluedart Air';
+    } else if (['7', '8'].includes(firstDigit)) {
+      minTransit = 4;
+      maxTransit = 5;
+      desc = 'East India Connect';
+      carrier = 'Xpressbees Courier';
+    } else {
+      minTransit = 5;
+      maxTransit = 7;
+      desc = 'National Connect Remote Delivery';
+      carrier = 'India Post Speed Post';
+    }
+
+    // Today is order placement date.
+    // Dispatch delay: 1 day minimum, 2 days maximum.
+    const today = new Date();
+    const minDeliveryDate = new Date();
+    minDeliveryDate.setDate(today.getDate() + 1 + minTransit);
+
+    const maxDeliveryDate = new Date();
+    maxDeliveryDate.setDate(today.getDate() + 2 + maxTransit);
+
+    const options = { weekday: 'short', day: 'numeric', month: 'short' };
+    const dateRange = `${minDeliveryDate.toLocaleDateString('en-IN', options)} - ${maxDeliveryDate.toLocaleDateString('en-IN', options)}`;
+
+    return { days: `${minTransit + 1}-${maxTransit + 2} Days`, dateRange, desc, carrier };
+  };
+
+  const performPincodeCheck = async (pin) => {
+    if (!/^[1-9][0-9]{5}$/.test(pin)) {
+      setPinError('Please enter a valid 6-digit Indian pincode.');
+      setPinResult(null);
+      return;
+    }
+    setPinChecking(true);
+    setPinError('');
+    setPinResult(null);
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await response.json();
+      if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+        const po = data[0].PostOffice[0];
+        const details = calculateDeliveryDetails(pin, po.State, po.District);
+        const isCodAllowed = isCodAvailableForPincode(pin, po.State);
+        setPinResult({
+          pincode: pin,
+          location: `${po.District}, ${po.State}`,
+          days: details.days,
+          dateRange: details.dateRange,
+          desc: details.desc,
+          carrier: details.carrier,
+          codAvailable: isCodAllowed,
+          status: 'success'
+        });
+        localStorage.setItem('checked_pincode', pin);
+      } else {
+        const details = calculateDeliveryDetails(pin);
+        const isCodAllowed = isCodAvailableForPincode(pin);
+        setPinResult({
+          pincode: pin,
+          location: 'Nationwide Delivery Route',
+          days: details.days,
+          dateRange: details.dateRange,
+          desc: `${details.desc} (Pincode verified via offline check)`,
+          carrier: details.carrier,
+          codAvailable: isCodAllowed,
+          status: 'warning'
+        });
+        localStorage.setItem('checked_pincode', pin);
+      }
+    } catch (err) {
+      console.warn("Pincode API down, using offline verification:", err);
+      const details = calculateDeliveryDetails(pin);
+      const isCodAllowed = isCodAvailableForPincode(pin);
+      setPinResult({
+        pincode: pin,
+        location: 'Nationwide Delivery Route',
+        days: details.days,
+        dateRange: details.dateRange,
+        desc: `${details.desc} (Pincode verified offline)`,
+        carrier: details.carrier,
+        codAvailable: isCodAllowed,
+        status: 'warning'
+      });
+      localStorage.setItem('checked_pincode', pin);
+    } finally {
+      setPinChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    const stored = localStorage.getItem('checked_pincode');
+    if (stored && /^[1-9][0-9]{5}$/.test(stored)) {
+      performPincodeCheck(stored);
+    }
+  }, []);
+
   // Loupe Zoom Magnifier State
   const [zoomStyle, setZoomStyle] = useState({ transformOrigin: 'center center', scale: '1' });
 
@@ -149,9 +292,16 @@ function ProductDetail() {
            setProduct(cachedProduct);
            setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
            
-           if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
-             setSelectedSize(cachedProduct.sizes[0]);
-           }
+            if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
+              let stockMap = {};
+              try {
+                stockMap = JSON.parse(cachedProduct.sizes_stock || '{}');
+              } catch {
+                stockMap = {};
+              }
+              const firstInStockSize = cachedProduct.sizes.find(sz => stockMap[sz] > 0);
+              setSelectedSize(firstInStockSize || cachedProduct.sizes[0]);
+            }
 
            // Initialize selectedColor if Option B JSON exists
            if (cachedProduct.color_hex && cachedProduct.color_hex.startsWith('[')) {
@@ -187,9 +337,16 @@ function ProductDetail() {
          setProduct(mainProductData);
          setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
          
-         if (mainProductData.sizes && mainProductData.sizes.length > 0) {
-           setSelectedSize(mainProductData.sizes[0]);
-         }
+          if (mainProductData.sizes && mainProductData.sizes.length > 0) {
+            let stockMap = {};
+            try {
+              stockMap = JSON.parse(mainProductData.sizes_stock || '{}');
+            } catch {
+              stockMap = {};
+            }
+            const firstInStockSize = mainProductData.sizes.find(sz => stockMap[sz] > 0);
+            setSelectedSize(firstInStockSize || mainProductData.sizes[0]);
+          }
 
          // Initialize selectedColor if Option B JSON exists
          if (mainProductData.color_hex && mainProductData.color_hex.startsWith('[')) {
@@ -492,6 +649,21 @@ function ProductDetail() {
     };
   })();
 
+  // Parse stocks mapping
+  let stocks = {};
+  try {
+    stocks = JSON.parse(product?.sizes_stock || '{}');
+  } catch {
+    stocks = {};
+  }
+
+  // Check if completely out of stock across all defined sizes
+  let isAllOutOfStock = false;
+  if (product && product.sizes && product.sizes.length > 0) {
+    const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+    isAllOutOfStock = totalStock === 0;
+  }
+
   const galleryImages = activeVariant
     ? [activeVariant.front, activeVariant.back].filter(Boolean)
     : [
@@ -579,10 +751,25 @@ function ProductDetail() {
                     {product.tag}
                   </span>
                 )}
-                <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  In Stock
-                </span>
+                {isAllOutOfStock ? (
+                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-2.5 py-0.5 rounded-none border border-rose-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    SOLD OUT
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-2.5 py-0.5 rounded-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    In Stock
+                  </span>
+                )}
+                {adminMode && (
+                  <button
+                    onClick={() => navigate('/admin', { state: { editProductId: product.$id || product.id } })}
+                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-2.5 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all"
+                  >
+                    ✏️ Edit Drop
+                  </button>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -632,16 +819,19 @@ function ProductDetail() {
                   : product.discount_percent;
 
                 return (
-                  <div className="flex items-baseline gap-3 pt-1">
+                  <div className="flex items-baseline gap-3 pt-1 flex-wrap">
                     <span className="text-2xl font-mono font-bold text-neutral-950">
                       ₹{priceNum.toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[9px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
+                      incl. of all taxes
                     </span>
                     {compareDisplay && (
                       <>
                         <span className="text-sm text-neutral-400 line-through font-mono font-medium">
                           ₹{compareDisplay.toLocaleString('en-IN')}
                         </span>
-                        <span className="text-[10px] text-rose-600 font-mono font-bold tracking-wider bg-rose-50 px-2 py-0.5 rounded-none border border-rose-100">
+                        <span className="text-[10px] text-rose-600 font-mono font-bold tracking-wider bg-rose-50 px-2.5 py-0.5 rounded-none border border-rose-100">
                           {discountDisplay}% OFF
                         </span>
                       </>
@@ -709,16 +899,17 @@ function ProductDetail() {
                               setActiveImage(variant.front);
                             }
                           }}
-                          className={`w-8 h-8 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
+                          className={`w-10 h-12 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
                             selectedColor === variant.name
                               ? 'border-neutral-950 scale-110 shadow-sm'
                               : 'border-neutral-200 hover:border-neutral-400'
                           }`}
                           title={variant.name}
                         >
-                          <span
-                            className="w-full h-full block"
-                            style={{ backgroundColor: variant.hex }}
+                          <img
+                            src={variant.front || 'https://placehold.co/100x120?text=Color'}
+                            alt={variant.name}
+                            className="w-full h-full object-cover object-center"
                           />
                         </button>
                       ))}
@@ -746,16 +937,17 @@ function ProductDetail() {
                                 navigate(`/product/${siblingId}`);
                               }
                             }}
-                            className={`w-8 h-8 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
+                            className={`w-10 h-12 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
                               isCurrent
                                 ? 'border-neutral-950 scale-110 shadow-sm'
                                 : 'border-neutral-200 hover:border-neutral-400'
                             }`}
                             title={sibling.color_name}
                           >
-                            <span
-                              className="w-full h-full block"
-                              style={{ backgroundColor: sibling.color_hex || '#CCC' }}
+                            <img
+                              src={sibling.front_image_link || sibling.image_url || sibling.image || 'https://placehold.co/100x120?text=Color'}
+                              alt={sibling.color_name}
+                              className="w-full h-full object-cover object-center"
                             />
                           </button>
                         );
@@ -797,12 +989,6 @@ function ProductDetail() {
                         className="text-xs text-neutral-950 font-mono font-bold border-b border-neutral-950 cursor-pointer pb-0.5 hover:text-neutral-600 transition-colors uppercase tracking-wider"
                       >
                         Size Guide
-                      </span>
-                      <span 
-                        onClick={() => setSizeAdvisorOpen(true)}
-                        className="text-xs text-neutral-950 font-mono font-bold border-b border-neutral-950 cursor-pointer pb-0.5 hover:text-neutral-600 transition-colors uppercase tracking-wider"
-                      >
-                        Size Advisor
                       </span>
                     </div>
                   </div>
@@ -978,6 +1164,94 @@ function ProductDetail() {
                   7-Day exchange and return policy active.
                 </p>
               </div>
+            </div>
+
+            {/* Pincode Checker Component */}
+            <div className="pt-4 pb-2 border-t border-neutral-150 space-y-3">
+              <span className="text-[8px] font-bold text-neutral-400 block tracking-widest uppercase">CHECK DELIVERY AVAILABILITY</span>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+                    <FiMapPin className="text-xs" />
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={pincodeInput}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setPincodeInput(val);
+                      if (val.length === 6) {
+                        performPincodeCheck(val);
+                      }
+                    }}
+                    placeholder="ENTER 6-DIGIT PINCODE"
+                    className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-950 focus:bg-white rounded-none pl-8 pr-4 py-2 text-xs font-mono text-neutral-900 placeholder-neutral-400 outline-none tracking-widest transition-all"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => performPincodeCheck(pincodeInput)}
+                  disabled={pinChecking || pincodeInput.length !== 6}
+                  className="bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] px-5 py-2 uppercase transition-all tracking-wider disabled:bg-neutral-200 disabled:text-neutral-400 cursor-pointer shrink-0 rounded-none border border-neutral-950 disabled:border-neutral-200"
+                >
+                  {pinChecking ? 'CHECKING...' : 'CHECK'}
+                </button>
+              </div>
+
+              {pinError && (
+                <p className="text-[9px] text-rose-500 font-mono tracking-widest uppercase animate-pulse">
+                  {pinError}
+                </p>
+              )}
+
+              {pinResult && (
+                <div className="p-3 bg-neutral-50/70 border border-neutral-200/50 rounded-none text-xs space-y-1.5 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[9px] tracking-wider text-neutral-400 uppercase">DELIVERY FOR:</span>
+                    <span className="font-mono text-[9px] font-black text-neutral-800 uppercase bg-neutral-100 px-1.5 py-0.5 rounded-sm">
+                      {pinResult.pincode}
+                    </span>
+                  </div>
+                  
+                  {pinResult.location && (
+                    <div className="text-[10px] font-black text-neutral-800 uppercase">
+                      📍 {pinResult.location}
+                    </div>
+                  )}
+
+                  <div className="flex items-start gap-1.5 pt-1 text-neutral-600">
+                    <FiTruck className="text-xs shrink-0 mt-0.5 text-neutral-800" />
+                    <div>
+                      <p className="text-neutral-900 font-black text-[11px] uppercase tracking-wide">
+                        ESTIMATED ARRIVAL: {pinResult.dateRange}
+                      </p>
+                      <p className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest mt-0.5">
+                        {pinResult.desc} (dispatched in 1-2 days) · via {pinResult.carrier}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-1.5 border-t border-dashed border-neutral-200 space-y-1">
+                    {pinResult.codAvailable ? (
+                      <div className="text-[9px] text-emerald-600 font-black uppercase tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        ✓ Cash on Delivery (COD) Available
+                      </div>
+                    ) : (
+                      <div className="text-[9px] text-amber-600 font-black uppercase tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        ⚠️ Cash on Delivery (COD) Not Available (Prepaid Only)
+                      </div>
+                    )}
+                    
+                    <div className="text-[9px] text-neutral-500 font-black uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+                      Free delivery on orders ₹999 & above (else ₹99)
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Collapsible Accordions */}
@@ -1157,103 +1431,107 @@ function ProductDetail() {
             {/* COLUMN 1: RATINGS SCORECARD & WRITE REVIEW (5 Columns) */}
             <div className="lg:col-span-5 space-y-6">
               {/* Ratings Summary Card */}
-              <div className="bg-white p-6 rounded-none border border-neutral-950/15 flex items-center gap-6">
-                <div className="text-center">
-                  <div className="text-4xl font-mono font-bold tracking-tight text-neutral-950">
-                    {(() => {
-                      if (reviews.length === 0) return '5.0';
-                      const sum = reviews.reduce((acc, r) => {
-                        const val = Number(r.rating);
-                        return acc + (isNaN(val) ? 5 : val);
-                      }, 0);
-                      return (sum / reviews.length).toFixed(1);
-                    })()}
+              {reviews.length > 0 && (
+                <div className="bg-white p-6 rounded-none border border-neutral-950/15 flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="text-4xl font-mono font-bold tracking-tight text-neutral-950">
+                      {(() => {
+                        if (reviews.length === 0) return '5.0';
+                        const sum = reviews.reduce((acc, r) => {
+                          const val = Number(r.rating);
+                          return acc + (isNaN(val) ? 5 : val);
+                        }, 0);
+                        return (sum / reviews.length).toFixed(1);
+                      })()}
+                    </div>
+                    <div className="flex gap-0.5 justify-center mt-1">
+                      {[1, 2, 3, 4, 5].map((star) => {
+                        const sum = reviews.reduce((acc, r) => {
+                          const val = Number(r.rating);
+                          return acc + (isNaN(val) ? 5 : val);
+                        }, 0);
+                        const avg = reviews.length > 0 ? sum / reviews.length : 5.0;
+                        const isFilled = star <= Math.round(avg);
+                        return (
+                          <FaStar key={star} className={`text-xs ${isFilled ? 'text-amber-400' : 'text-neutral-200'}`} />
+                        );
+                      })}
+                    </div>
+                    <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase mt-2 block">
+                      Average Rating
+                    </span>
                   </div>
-                  <div className="flex gap-0.5 justify-center mt-1">
-                    {[1, 2, 3, 4, 5].map((star) => {
-                      const sum = reviews.reduce((acc, r) => {
+                  <div className="w-px bg-neutral-950/10 self-stretch" />
+                  <div className="flex-1 space-y-1.5">
+                    {[5, 4, 3, 2, 1].map((stars) => {
+                      const count = reviews.filter(r => {
                         const val = Number(r.rating);
-                        return acc + (isNaN(val) ? 5 : val);
-                      }, 0);
-                      const avg = reviews.length > 0 ? sum / reviews.length : 5.0;
-                      const isFilled = star <= Math.round(avg);
+                        const ratingClean = isNaN(val) ? 5 : Math.round(val);
+                        return ratingClean === stars;
+                      }).length;
+                      const percent = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
                       return (
-                        <FaStar key={star} className={`text-xs ${isFilled ? 'text-amber-400' : 'text-neutral-200'}`} />
+                        <div key={stars} className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono font-bold">
+                          <span className="w-3 text-right">{stars}★</span>
+                          <div className="flex-1 h-1.5 bg-neutral-100 rounded-none overflow-hidden">
+                            <div className="h-full bg-neutral-950 rounded-none" style={{ width: `${percent}%` }} />
+                          </div>
+                          <span className="w-4 text-right">{count}</span>
+                        </div>
                       );
                     })}
                   </div>
-                  <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase mt-2 block">
-                    Average Rating
-                  </span>
                 </div>
-                <div className="flex-1 w-px bg-neutral-950/10 self-stretch" />
-                <div className="flex-1 space-y-1.5">
-                  {[5, 4, 3, 2, 1].map((stars) => {
-                    const count = reviews.filter(r => {
-                      const val = Number(r.rating);
-                      const ratingClean = isNaN(val) ? 5 : Math.round(val);
-                      return ratingClean === stars;
-                    }).length;
-                    const percent = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
-                    return (
-                      <div key={stars} className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono font-bold">
-                        <span className="w-3 text-right">{stars}★</span>
-                        <div className="flex-1 h-1.5 bg-neutral-100 rounded-none overflow-hidden">
-                          <div className="h-full bg-neutral-950 rounded-none" style={{ width: `${percent}%` }} />
-                        </div>
-                        <span className="w-4 text-right">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
 
               {/* Sizing & Fit Stats (True to Size) */}
-              <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-neutral-850">
-                    Fit Statistics
-                  </h3>
-                  <span className="text-[9px] text-emerald-600 font-mono font-bold bg-emerald-50 border border-emerald-250 px-2 py-0.5 rounded-none">
-                    {fitStats.verifiedFitPercent}% Verified Fit
-                  </span>
-                </div>
-                
-                <div className="space-y-4 pt-2">
-                  {/* Slider indicator */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-neutral-500">
-                      <span>Tight ({fitStats.fitTightPercent}%)</span>
-                      <span className="text-neutral-950 font-bold">True To Size ({fitStats.fitTruePercent}%)</span>
-                      <span>Loose ({fitStats.fitLoosePercent}%)</span>
-                    </div>
-                    <div className="relative h-2 bg-neutral-100 rounded-none overflow-hidden flex">
-                      {/* Tight segment */}
-                      <div className="h-full bg-rose-300 transition-all duration-550" style={{ width: `${fitStats.fitTightPercent}%` }} />
-                      {/* True to Size segment */}
-                      <div className="h-full bg-neutral-950 transition-all duration-550" style={{ width: `${fitStats.fitTruePercent}%` }} />
-                      {/* Loose segment */}
-                      <div className="h-full bg-amber-300 transition-all duration-550" style={{ width: `${fitStats.fitLoosePercent}%` }} />
-                    </div>
+              {reviews.length > 0 && (
+                <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-neutral-855">
+                      Fit Statistics
+                    </h3>
+                    <span className="text-[9px] text-emerald-600 font-mono font-bold bg-emerald-50 border border-emerald-250 px-2 py-0.5 rounded-none">
+                      {fitStats.verifiedFitPercent}% Verified Fit
+                    </span>
                   </div>
+                  
+                  <div className="space-y-4 pt-2">
+                    {/* Slider indicator */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-neutral-500">
+                        <span>Tight ({fitStats.fitTightPercent}%)</span>
+                        <span className="text-neutral-950 font-bold">True To Size ({fitStats.fitTruePercent}%)</span>
+                        <span>Loose ({fitStats.fitLoosePercent}%)</span>
+                      </div>
+                      <div className="relative h-2 bg-neutral-100 rounded-none overflow-hidden flex">
+                        {/* Tight segment */}
+                        <div className="h-full bg-rose-300 transition-all duration-550" style={{ width: `${fitStats.fitTightPercent}%` }} />
+                        {/* True to Size segment */}
+                        <div className="h-full bg-neutral-950 transition-all duration-550" style={{ width: `${fitStats.fitTruePercent}%` }} />
+                        {/* Loose segment */}
+                        <div className="h-full bg-amber-300 transition-all duration-550" style={{ width: `${fitStats.fitLoosePercent}%` }} />
+                      </div>
+                    </div>
 
-                  {/* Rating parameters */}
-                  <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-                    <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
-                      <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgComfort}</span>
-                      <span className="text-[9px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mt-1">Comfort</span>
-                    </div>
-                    <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
-                      <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgQuality}</span>
-                      <span className="text-[9px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mt-1">Quality</span>
-                    </div>
-                    <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
-                      <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgBreathable}</span>
-                      <span className="text-[9px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mt-1">Breathable</span>
+                    {/* Rating parameters */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 text-center">
+                      <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
+                        <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgComfort}</span>
+                        <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Comfort</span>
+                      </div>
+                      <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
+                        <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgQuality}</span>
+                        <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Quality</span>
+                      </div>
+                      <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
+                        <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgBreathable}</span>
+                        <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Breathable</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Write Review Panel */}
               <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
@@ -1788,11 +2066,17 @@ function ProductDetail() {
                 <div className="pt-2">
                   <button
                     onClick={() => {
-                      if (product.sizes?.includes(advRecommendation)) {
+                      let stockMap = {};
+                      try {
+                        stockMap = JSON.parse(product.sizes_stock || '{}');
+                      } catch {
+                        stockMap = {};
+                      }
+                      if (product.sizes?.includes(advRecommendation) && stockMap[advRecommendation] > 0) {
                         setSelectedSize(advRecommendation);
                         showToast(`Applied Recommended Size "${advRecommendation}"!`, "success");
                       } else {
-                        showToast(`Recommended size "${advRecommendation}" is not in stock for this product.`, "error");
+                        showToast(`Recommended size "${advRecommendation}" is out of stock.`, "error");
                       }
                       setSizeAdvisorOpen(false);
                       setAdvHeight('');
