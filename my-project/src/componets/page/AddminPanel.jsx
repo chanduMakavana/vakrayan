@@ -51,6 +51,20 @@ function AdminPanel() {
   const [adminTrackingNumber, setAdminTrackingNumber] = useState('');
   const [adminTrackingUrl, setAdminTrackingUrl] = useState('');
 
+  // Admin Return/Exchange Rejection Modal States
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectTargetOrder, setRejectTargetOrder] = useState(null);
+  const [rejectTargetItemIndex, setRejectTargetItemIndex] = useState(null);
+  const [adminRejectReason, setAdminRejectReason] = useState('Product has visible wear / tags removed');
+  const [adminRejectCustomText, setAdminRejectCustomText] = useState('');
+
+  // Admin Return/Exchange Approval Modal States
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [approveTargetOrder, setApproveTargetOrder] = useState(null);
+  const [approveTargetRequest, setApproveTargetRequest] = useState(null);
+  const [adminApproveInstructions, setAdminApproveInstructions] = useState('Reverse Pickup Scheduled (Courier agent will collect the package in 24-48 hours. Please keep tags intact.)');
+  const [adminApproveCustomText, setAdminApproveCustomText] = useState('');
+
   // Admin Search & Custom Dialog States
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [isSweepProductModalOpen, setIsSweepProductModalOpen] = useState(false);
@@ -95,6 +109,191 @@ function AdminPanel() {
   const [slideMobileImage, setSlideMobileImage] = useState("");
   const [slideLink, setSlideLink] = useState("");
   const [slideUploading, setSlideUploading] = useState(false);
+
+  // Category manager states
+  const [categoryImages, setCategoryImages] = useState({});
+  const [editingCategory, setEditingCategory] = useState(null); // value of category being edited
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [newCategoryImageUrls, setNewCategoryImageUrls] = useState({}); // { categoryValue: inputUrl }
+  const [categoryUploading, setCategoryUploading] = useState({}); // { categoryValue: boolean }
+  const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
+  const [deleteTargetCategory, setDeleteTargetCategory] = useState(null); // { value, label }
+  const [deletedCategories, setDeletedCategories] = useState([]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('category_images')) || {};
+      setCategoryImages(saved);
+      const deleted = JSON.parse(localStorage.getItem('deleted_categories')) || [];
+      setDeletedCategories(deleted);
+    } catch (e) {
+      console.error("Failed to parse category configuration metadata:", e);
+    }
+  }, []);
+
+  const handleSaveCategoryImage = (catValue, url) => {
+    const updated = { ...categoryImages, [catValue]: url.trim() };
+    setCategoryImages(updated);
+    localStorage.setItem('category_images', JSON.stringify(updated));
+    showToast("✓ Category cover image mapping updated!", "success");
+  };
+
+  const handleCategoryImageUpload = async (e, catValue) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCategoryUploading(prev => ({ ...prev, [catValue]: true }));
+    try {
+      const response = await storageService.uploadFile(file);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        setNewCategoryImageUrls(prev => ({ ...prev, [catValue]: fileUrl }));
+        // Auto save it
+        const updated = { ...categoryImages, [catValue]: fileUrl };
+        setCategoryImages(updated);
+        localStorage.setItem('category_images', JSON.stringify(updated));
+        showToast("✓ Category cover uploaded and saved successfully!", "success");
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Category image upload failed:", err);
+      showToast("Appwrite Storage upload failed.", "error");
+    } finally {
+      setCategoryUploading(prev => ({ ...prev, [catValue]: false }));
+    }
+  };
+
+  const handleRenameCategory = async (oldSlug, newName) => {
+    if (!newName.trim()) {
+      showToast("Category name cannot be empty.", "error");
+      return;
+    }
+
+    const newSlug = newName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    if (!newSlug) {
+      showToast("Invalid category name.", "error");
+      return;
+    }
+
+    if (newSlug === oldSlug) {
+      setEditingCategory(null);
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const targetProducts = products.filter(p => p.category === oldSlug);
+      
+      if (targetProducts.length === 0) {
+        showToast("No products found under this category to rename.", "error");
+        setEditingCategory(null);
+        setActionLoading(false);
+        return;
+      }
+
+      showToast(`Renaming category for ${targetProducts.length} products...`, "info");
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const p of targetProducts) {
+        try {
+          await productsService.updateProduct(p.$id || p.id, { category: newSlug });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to update product ${p.$id || p.id} category:`, err);
+          errorCount++;
+        }
+      }
+
+      // Update custom category image override mapping if it exists
+      if (categoryImages[oldSlug]) {
+        const updatedImages = { ...categoryImages };
+        updatedImages[newSlug] = updatedImages[oldSlug];
+        delete updatedImages[oldSlug];
+        setCategoryImages(updatedImages);
+        localStorage.setItem('category_images', JSON.stringify(updatedImages));
+      }
+
+      showToast(`✓ Category renamed! Success: ${successCount}, Failed: ${errorCount}`, "success");
+      setEditingCategory(null);
+      await loadProductCatalog();
+    } catch (err) {
+      console.error("Failed to rename category:", err);
+      showToast("Failed to rename category.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deleteTargetCategory) return;
+    const { value: targetSlug, label } = deleteTargetCategory;
+
+    setActionLoading(true);
+    setIsDeleteCategoryModalOpen(false);
+
+    try {
+      const targetProducts = products.filter(p => p.category === targetSlug);
+
+      if (targetProducts.length > 0) {
+        showToast(`Clearing category for ${targetProducts.length} products...`, "info");
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const p of targetProducts) {
+          try {
+            await productsService.updateProduct(p.$id || p.id, { category: "" });
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to clear category for product ${p.$id || p.id}:`, err);
+            errorCount++;
+          }
+        }
+        showToast(`✓ Category cleared from products! Success: ${successCount}, Failed: ${errorCount}`, "success");
+      }
+
+      // Clear cover image override from localStorage
+      if (categoryImages[targetSlug]) {
+        const updated = { ...categoryImages };
+        delete updated[targetSlug];
+        setCategoryImages(updated);
+        localStorage.setItem('category_images', JSON.stringify(updated));
+      }
+
+      // Add targetSlug to deleted_categories in localStorage to exclude it from rendering
+      const updatedDeleted = [...deletedCategories, targetSlug];
+      setDeletedCategories(updatedDeleted);
+      localStorage.setItem('deleted_categories', JSON.stringify(updatedDeleted));
+
+      showToast(`✓ Category "${label}" deleted successfully!`, "success");
+      setDeleteTargetCategory(null);
+      await loadProductCatalog();
+    } catch (err) {
+      console.error("Failed to delete category:", err);
+      showToast("Failed to delete category.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getCategoryImagePreview = (catValue) => {
+    if (categoryImages[catValue]) return categoryImages[catValue];
+    
+    if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg';
+    if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg';
+    if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg';
+    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=150&q=80';
+    
+    const firstProd = products.find(p => p.category === catValue);
+    return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/150x150?text=FITS';
+  };
 
   const loadSlides = async () => {
     try {
@@ -339,6 +538,7 @@ function AdminPanel() {
       category: slugifyCategory(data.category),
       front_image_link: data.front_image_link.trim(),
       description: data.description?.trim() || "",
+      return_policy: data.return_policy || "7 Day Return",
       sizes: selectedSizes,
       back_image_links: backImageLinks,
       sizes_stock: JSON.stringify(stockMap), // Stringified stock mapping
@@ -371,6 +571,7 @@ function AdminPanel() {
           delete stripped.compare_at_price;
           delete stripped.is_featured;
           delete stripped.slug;
+          delete stripped.return_policy;
           return await productsService.updateProduct(id, stripped);
         }
         throw err;
@@ -394,6 +595,7 @@ function AdminPanel() {
           delete stripped.compare_at_price;
           delete stripped.is_featured;
           delete stripped.slug;
+          delete stripped.return_policy;
           return await productsService.createProduct(stripped);
         }
         throw err;
@@ -420,6 +622,7 @@ function AdminPanel() {
       setValue('compare_at_price', '');
       setValue('is_featured', false);
       setValue('slug', '');
+      setValue('return_policy', '7 Day Return');
       setColorVariants([]);
       setEditingId(null);
       setIsCustomCategory(false);
@@ -444,7 +647,13 @@ function AdminPanel() {
       setValue('search_keywords', tagsArray.join(', '));
       setValue('category', product.category);
       setValue('front_image_link', product.front_image_link || product.image_url || product.image || '');
-      setValue('description', product.description || '');
+      const rawDesc = product.description || '';
+      const rpMatch = rawDesc.match(/\[RETURN_POLICY\]:\s*(.+)/);
+      const returnPolicy = product.return_policy || (rpMatch ? rpMatch[1].trim() : '7 Day Return');
+      const cleanDesc = rawDesc.replace(/\[RETURN_POLICY\]:\s*(.+)/, '').trim();
+
+      setValue('description', cleanDesc);
+      setValue('return_policy', returnPolicy);
       
       // Hydrate Stocks
       let parsedStock = {};
@@ -541,6 +750,7 @@ function AdminPanel() {
     setValue('color_hex', '');
     setValue('fit_type', '');
     setValue('fabric_gsm', '');
+    setValue('return_policy', '7 Day Return');
     setColorVariants([]);
     setVName('');
     setVHex('');
@@ -1073,6 +1283,158 @@ function AdminPanel() {
     setShippedTargetOrder(null);
   };
 
+  const handleApproveReturnExchange = async (order, requestItem, instructions = "") => {
+    setActionLoading(true);
+    try {
+      let liveProduct = null;
+      if (requestItem.productId) {
+        liveProduct = await productsService.getProductById(requestItem.productId);
+      }
+      
+      let stocks = {};
+      if (liveProduct) {
+        try {
+          stocks = JSON.parse(liveProduct.sizes_stock || '{}');
+        } catch {
+          stocks = {};
+        }
+      }
+      
+      if (requestItem.type === 'EXCHANGE') {
+        const targetSize = requestItem.exchangeTargetSize;
+        const currentTargetStock = stocks[targetSize] !== undefined ? Number(stocks[targetSize]) : 0;
+        if (currentTargetStock <= 0) {
+          showToast(`Cannot approve exchange. Desired size ${targetSize} is out of stock!`, 'error');
+          setActionLoading(false);
+          return;
+        }
+        
+        const originalSize = requestItem.originalSize;
+        if (stocks[originalSize] !== undefined) {
+          stocks[originalSize] = stocks[originalSize] + 1;
+        } else {
+          stocks[originalSize] = 1;
+        }
+        stocks[targetSize] = Math.max(0, currentTargetStock - 1);
+        
+        await productsService.updateProduct(requestItem.productId, {
+          sizes_stock: JSON.stringify(stocks)
+        });
+      } else if (requestItem.type === 'RETURN') {
+        const originalSize = requestItem.originalSize;
+        if (stocks[originalSize] !== undefined) {
+          stocks[originalSize] = stocks[originalSize] + 1;
+        } else {
+          stocks[originalSize] = 1;
+        }
+        
+        await productsService.updateProduct(requestItem.productId, {
+          sizes_stock: JSON.stringify(stocks)
+        });
+      }
+      
+      let parsedAddr = {};
+      try {
+        parsedAddr = JSON.parse(order.address);
+      } catch {
+        parsedAddr = {};
+      }
+      
+      let currentRequests = parsedAddr.metadata?.return_requests || [];
+      currentRequests = currentRequests.map(r => {
+        if (r.itemIndex === requestItem.itemIndex) {
+          return { 
+            ...r, 
+            status: 'APPROVED', 
+            adminComment: instructions,
+            updatedAt: new Date().toISOString() 
+          };
+        }
+        return r;
+      });
+      
+      const nextStatus = requestItem.type === 'RETURN' ? 'RETURNED' : 'EXCHANGED';
+      
+      await ordersService.updateOrderStatus(order.$id || order.id, nextStatus, {
+        return_requests: currentRequests
+      });
+      
+      showToast(`✅ Request Approved! Order status transitioned to ${nextStatus}.`, 'success');
+      await loadProductCatalog();
+      loadCustomerOrders();
+    } catch (err) {
+      console.error("Failed to approve request:", err);
+      showToast("Verification server timed out. Check connection.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const submitAdminApproveRequest = async () => {
+    if (!approveTargetOrder || !approveTargetRequest) return;
+    
+    let finalInstructions = adminApproveInstructions;
+    if (adminApproveInstructions === "Other") {
+      finalInstructions = adminApproveCustomText.trim() || "Approved by Admin";
+    } else if (adminApproveCustomText.trim()) {
+      finalInstructions = `${adminApproveInstructions} - ${adminApproveCustomText.trim()}`;
+    }
+    
+    setIsApproveModalOpen(false);
+    await handleApproveReturnExchange(approveTargetOrder, approveTargetRequest, finalInstructions);
+    setApproveTargetOrder(null);
+    setApproveTargetRequest(null);
+  };
+
+  const submitAdminRejectRequest = async () => {
+    if (!rejectTargetOrder || rejectTargetItemIndex === null) return;
+    
+    let finalReason = adminRejectReason;
+    if (adminRejectReason === "Other") {
+      finalReason = adminRejectCustomText.trim() || "Rejected by Admin";
+    } else if (adminRejectCustomText.trim()) {
+      finalReason = `${adminRejectReason} - ${adminRejectCustomText.trim()}`;
+    }
+    
+    setIsRejectModalOpen(false);
+    setActionLoading(true);
+    try {
+      let parsedAddr = {};
+      try {
+        parsedAddr = JSON.parse(rejectTargetOrder.address);
+      } catch {
+        parsedAddr = {};
+      }
+      
+      let currentRequests = parsedAddr.metadata?.return_requests || [];
+      currentRequests = currentRequests.map(r => {
+        if (r.itemIndex === rejectTargetItemIndex) {
+          return { 
+            ...r, 
+            status: 'REJECTED', 
+            adminComment: finalReason,
+            updatedAt: new Date().toISOString() 
+          };
+        }
+        return r;
+      });
+      
+      await ordersService.updateOrderStatus(rejectTargetOrder.$id || rejectTargetOrder.id, 'DELIVERED', {
+        return_requests: currentRequests
+      });
+      
+      showToast("❌ Request Rejected. Order status reverted to DELIVERED.", "success");
+      loadCustomerOrders();
+    } catch (err) {
+      console.error("Failed to reject request:", err);
+      showToast("Failed to record request rejection.", "error");
+    } finally {
+      setActionLoading(false);
+      setRejectTargetOrder(null);
+      setRejectTargetItemIndex(null);
+    }
+  };
+
   // Campaign & Coupons Operations
   const saveCampaignPromoText = async () => {
     try {
@@ -1216,6 +1578,12 @@ function AdminPanel() {
               className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'telemetry' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
             >
               Activity Logs
+            </button>
+            <button 
+              onClick={() => { setActiveTab('categories'); }}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'categories' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+            >
+              Category Manager
             </button>
           </div>
 
@@ -1661,6 +2029,20 @@ function AdminPanel() {
                 />
               </div>
 
+              {/* Return Policy Select Input */}
+              <div className="flex flex-col gap-1.5 md:col-span-2">
+                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Return Policy *</label>
+                <select
+                  disabled={actionLoading}
+                  className="w-full bg-[#fbfbfb] border border-neutral-250 hover:border-neutral-450 focus:border-neutral-950 rounded-xl px-4 py-3.5 text-sm text-neutral-900 outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50 uppercase cursor-pointer"
+                  {...register('return_policy')}
+                >
+                  <option value="7 Day Return">7 Day Return</option>
+                  <option value="No Return">No Return</option>
+                  <option value="Exchange Only">Exchange Only</option>
+                </select>
+              </div>
+
               {/* Form actions and submission */}
               <div className="md:col-span-2 mt-2 flex gap-3">
                 <button
@@ -1860,7 +2242,7 @@ function AdminPanel() {
               </div>
 
               {/* Telemetry Cards Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
                   <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">TOTAL SALES REVENUE</span>
                   <span className="text-lg font-black text-neutral-900">
@@ -1880,6 +2262,13 @@ function AdminPanel() {
                   <span className="text-[8px] font-bold text-neutral-450 uppercase tracking-wider">Awaiting shipping</span>
                 </div>
                 <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
+                  <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">RETURN/EXCHANGE REQS</span>
+                  <span className="text-lg font-black text-indigo-600">
+                    {orders.filter(o => o.status === 'RETURN_REQUESTED' || o.status === 'EXCHANGE_REQUESTED').length} REQS
+                  </span>
+                  <span className="text-[8px] font-bold text-neutral-450 uppercase tracking-wider">Requires resolution</span>
+                </div>
+                <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
                   <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">CANCELLED ORDERS</span>
                   <span className="text-lg font-black text-rose-600">
                     {orders.filter(o => o.status === 'CANCELLED').length} ORDERS
@@ -1887,6 +2276,124 @@ function AdminPanel() {
                   <span className="text-[8px] font-bold text-neutral-450 uppercase tracking-wider">Cancelled order count</span>
                 </div>
               </div>
+
+              {/* Sales Revenue Trend Chart */}
+              {(() => {
+                const chartData = [];
+                for (let i = 6; i >= 0; i--) {
+                  const d = new Date();
+                  d.setDate(d.getDate() - i);
+                  const dateStr = d.toISOString().split('T')[0];
+                  
+                  const total = orders
+                    .filter(o => {
+                      if (o.status === 'CANCELLED') return false;
+                      const oDate = new Date(o.$createdAt || o.createdAt);
+                      return oDate.toISOString().split('T')[0] === dateStr;
+                    })
+                    .reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+                  const label = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+                  chartData.push({ date: dateStr, label, revenue: total });
+                }
+
+                const maxRevenue = Math.max(...chartData.map(d => d.revenue), 1000);
+                const points = chartData.map((d, i) => {
+                  const x = 50 + (i / 6) * 410;
+                  const y = 120 - (d.revenue / maxRevenue) * 90;
+                  return { ...d, x, y };
+                });
+                const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+                const areaPoints = `50,120 ${polylinePoints} 460,120`;
+
+                return (
+                  <div className="bg-white border border-neutral-200 p-6 rounded-xl space-y-4 shadow-xs">
+                    <div className="flex justify-between items-center pb-2 border-b border-neutral-150">
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs font-black tracking-[0.2em] text-neutral-900 uppercase">📈 Sales Revenue Trend</h3>
+                        <p className="text-[9px] font-mono font-bold text-neutral-400 uppercase">Daily revenue trajectory from active customer orders (last 7 days)</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[8px] font-mono text-neutral-400 block uppercase">PEAK DAILY VALUE</span>
+                        <span className="text-xs font-mono font-black text-neutral-900">₹{Math.max(...chartData.map(d => d.revenue)).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    <div className="relative pt-2">
+                      <svg viewBox="0 0 500 150" className="w-full h-36 sm:h-48 overflow-visible">
+                        <defs>
+                          <linearGradient id="salesChartGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#000000" stopOpacity="0.1" />
+                            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        
+                        {/* Grid Lines */}
+                        <line x1="50" y1="30" x2="460" y2="30" stroke="#f1f5f9" strokeWidth="1" />
+                        <line x1="50" y1="75" x2="460" y2="75" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                        <line x1="50" y1="120" x2="460" y2="120" stroke="#e2e8f0" strokeWidth="1.5" />
+                        
+                        {/* Y-Axis Labels */}
+                        <text x="42" y="33" textAnchor="end" className="text-[8px] font-mono font-bold fill-neutral-450">₹{Math.round(maxRevenue).toLocaleString('en-IN')}</text>
+                        <text x="42" y="78" textAnchor="end" className="text-[8px] font-mono font-bold fill-neutral-450">₹{Math.round(maxRevenue / 2).toLocaleString('en-IN')}</text>
+                        <text x="42" y="123" textAnchor="end" className="text-[8px] font-mono font-bold fill-neutral-450">₹0</text>
+                        
+                        {/* Area under line */}
+                        <polygon points={areaPoints} fill="url(#salesChartGrad)" />
+                        
+                        {/* Trend Line path */}
+                        <polyline 
+                          points={polylinePoints} 
+                          fill="none" 
+                          stroke="#000000" 
+                          strokeWidth="2.5" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                        />
+                        
+                        {/* Circles & Labels */}
+                        {points.map((p, i) => (
+                          <g key={i} className="group cursor-pointer">
+                            <circle 
+                              cx={p.x} 
+                              cy={p.y} 
+                              r="3.5" 
+                              className="fill-white stroke-black stroke-2 hover:r-5 hover:fill-black transition-all duration-150"
+                            />
+                            {/* Tooltip on Hover */}
+                            <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                              <rect 
+                                x={p.x - 35} 
+                                y={p.y - 24} 
+                                width="70" 
+                                height="16" 
+                                rx="3" 
+                                fill="#0f172a" 
+                              />
+                              <text 
+                                x={p.x} 
+                                y={p.y - 13} 
+                                textAnchor="middle" 
+                                className="text-[7.5px] font-mono font-black fill-white"
+                              >
+                                ₹{p.revenue.toLocaleString('en-IN')}
+                              </text>
+                            </g>
+                            <text 
+                              x={p.x} 
+                              y="135" 
+                              textAnchor="middle" 
+                              className="text-[8px] font-mono font-bold fill-neutral-450 uppercase"
+                            >
+                              {p.label}
+                            </text>
+                          </g>
+                        ))}
+                      </svg>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Search and Export Utilities Row */}
               <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-white border border-neutral-200 p-4 rounded-xl">
@@ -1919,7 +2426,7 @@ function AdminPanel() {
 
               {/* Order Status Filters */}
               <div className="flex flex-wrap gap-2 border-b border-neutral-200/60 pb-4">
-                {['ALL', 'PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((filterVal) => {
+                {['ALL', 'PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'EXCHANGE_REQUESTED', 'RETURNED', 'EXCHANGED'].map((filterVal) => {
                   const count = filterVal === 'ALL' 
                     ? orders.length 
                     : orders.filter(o => (o.status || 'PENDING') === filterVal).length;
@@ -1967,11 +2474,12 @@ function AdminPanel() {
                       let displayAddress = order.address || '';
                       let orderNumber = order.order_number || uniqueOrderId?.substring(0, 12).toUpperCase();
                       let cancelReason = '';
+                      let parsedAddr = {};
                       try {
-                        const parsedAddr = JSON.parse(order.address);
-                        if (parsedAddr && typeof parsedAddr === 'object') {
-                          // New format: { customerAddress: '...', metadata: {...} }
-                          let rawAddr = parsedAddr.customerAddress || order.address;
+                        const parsed = JSON.parse(order.address);
+                        if (parsed && typeof parsed === 'object') {
+                          parsedAddr = parsed;
+                          let rawAddr = parsed.customerAddress || order.address;
                           // Handle if customerAddress is itself a JSON string
                           if (typeof rawAddr === 'string' && rawAddr.trim().startsWith('{')) {
                             try {
@@ -2018,6 +2526,12 @@ function AdminPanel() {
                                 ? 'bg-amber-50 text-amber-600 border border-amber-250' 
                                 : order.status === 'CANCELLED'
                                 ? 'bg-neutral-100 text-neutral-500 border border-neutral-300'
+                                : order.status === 'RETURN_REQUESTED' || order.status === 'EXCHANGE_REQUESTED'
+                                ? 'bg-amber-100 text-amber-700 border border-amber-300 animate-pulse font-bold'
+                                : order.status === 'RETURNED' || order.status === 'RETURN_APPROVED'
+                                ? 'bg-rose-50 text-rose-600 border border-rose-250 font-bold'
+                                : order.status === 'EXCHANGED' || order.status === 'EXCHANGE_APPROVED'
+                                ? 'bg-indigo-50 text-indigo-600 border border-indigo-250 font-bold'
                                 : 'bg-rose-50 text-rose-600 border border-rose-250 animate-pulse'
                               }`}>
                                 {order.status || 'PENDING'}
@@ -2031,6 +2545,95 @@ function AdminPanel() {
                             <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg text-rose-700 text-[10px] font-medium uppercase tracking-wide">
                               <span className="font-bold block text-[8px] text-rose-500">CANCELLATION REASON</span>
                               &ldquo;{cancelReason}&rdquo;
+                            </div>
+                          )}
+
+                          {/* Active Return/Exchange Requests */}
+                          {Array.isArray(parsedAddr.metadata?.return_requests) && parsedAddr.metadata.return_requests.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200/80 p-4 rounded-xl space-y-3">
+                              <span className="text-[8px] font-bold text-amber-700 block tracking-widest uppercase">⚠️ Active Return/Exchange Requests</span>
+                              <div className="space-y-2">
+                                {parsedAddr.metadata.return_requests.map((request, reqIdx) => (
+                                  <div key={reqIdx} className="text-xs border-b border-amber-200/40 pb-2 last:border-b-0 last:pb-0 space-y-1 font-medium uppercase tracking-wide">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-black text-neutral-900">
+                                        {request.type === 'RETURN' ? '↩️ Return' : '🔄 Exchange'} for {request.productName}
+                                      </span>
+                                      <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase ${
+                                        request.status === 'PENDING'
+                                        ? 'bg-amber-100 text-amber-700 border-amber-250 animate-pulse'
+                                        : request.status === 'APPROVED'
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-250'
+                                        : 'bg-rose-50 text-rose-600 border-rose-250'
+                                      }`}>
+                                        {request.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-neutral-500 text-[10px] font-mono">
+                                      Original Size: {request.originalSize} 
+                                      {request.type === 'EXCHANGE' && ` · Desired Size: ${request.exchangeTargetSize}`}
+                                    </p>
+                                    <p className="text-neutral-700 text-[10px] normal-case italic font-medium">
+                                      Reason: "{request.reason}"
+                                    </p>
+                                    
+                                    {/* Uploaded Condition Verification Photos */}
+                                    {Array.isArray(request.images) && request.images.length > 0 && (
+                                      <div className="pt-1.5 pb-1">
+                                        <span className="text-[9px] text-neutral-500 font-mono block mb-1">📷 Verification Images:</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {request.images.map((imgUrl, imgIdx) => (
+                                            <a href={imgUrl} target="_blank" rel="noopener noreferrer" key={imgIdx} className="block hover:opacity-90 transition-opacity">
+                                              <img 
+                                                src={imgUrl} 
+                                                alt={`Verification proof ${imgIdx + 1}`} 
+                                                className="w-16 h-20 object-cover border border-amber-300 rounded hover:scale-105 transition-all cursor-pointer" 
+                                              />
+                                            </a>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {request.status === 'PENDING' && (
+                                      <div className="flex gap-2 pt-1.5">
+                                        <button
+                                          disabled={actionLoading}
+                                          onClick={() => {
+                                            setApproveTargetOrder(order);
+                                            setApproveTargetRequest(request);
+                                            setAdminApproveInstructions('Reverse Pickup Scheduled (Courier agent will collect the package in 24-48 hours. Please keep tags intact.)');
+                                            setAdminApproveCustomText('');
+                                            setIsApproveModalOpen(true);
+                                          }}
+                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-[9px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                                        >
+                                          Approve
+                                        </button>
+                                        <button
+                                          disabled={actionLoading}
+                                          onClick={() => {
+                                            setRejectTargetOrder(order);
+                                            setRejectTargetItemIndex(request.itemIndex);
+                                            setAdminRejectReason('Product has visible wear / tags removed');
+                                            setAdminRejectCustomText('');
+                                            setIsRejectModalOpen(true);
+                                          }}
+                                          className="bg-rose-600 hover:bg-rose-700 text-white font-mono font-bold text-[9px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                                        >
+                                          Reject
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {request.status === 'REJECTED' && request.adminComment && (
+                                      <p className="text-[9px] font-sans text-rose-600 font-semibold normal-case">
+                                        Rejection Note: {request.adminComment}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
 
@@ -2645,6 +3248,226 @@ function AdminPanel() {
               </div>
             </div>
           )}
+
+          {activeTab === 'categories' && (
+            <div className="space-y-8 animate-fade-in text-neutral-900">
+              <div className="pb-4 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Category Manager</h2>
+                  <p className="text-[10px] text-neutral-400 font-mono mt-1 uppercase">Configure custom category cover image overrides and rename categories across products.</p>
+                </div>
+                {deletedCategories.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeletedCategories([]);
+                      localStorage.removeItem('deleted_categories');
+                      showToast("✓ All deleted categories restored!", "success");
+                    }}
+                    className="border border-neutral-950 hover:bg-neutral-950 hover:text-white text-neutral-950 text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-all cursor-pointer select-none shrink-0"
+                  >
+                    🔄 Restore Defaults ({deletedCategories.length})
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white border border-neutral-950 p-6 rounded-none space-y-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-neutral-900">
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase w-16">Preview</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase">Category Information</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase w-28 text-center">Live Drops</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase">Cover Image Override</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase text-right w-40">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {(() => {
+                        const uniqueProductCategories = Array.from(
+                          new Set(products.map(p => p.category).filter(Boolean))
+                        );
+
+                        const categoriesList = [...DEFAULT_CATEGORIES];
+                        uniqueProductCategories.forEach(cat => {
+                          const value = cat.toLowerCase().trim();
+                          if (!categoriesList.some(item => item.value === value)) {
+                            const label = cat.replace(/-/g, ' ').toUpperCase();
+                            categoriesList.push({ value, label });
+                          }
+                        });
+
+                        const activeCategoriesList = categoriesList.filter(
+                          c => !deletedCategories.includes(c.value)
+                        );
+
+                        return activeCategoriesList.map((cat) => {
+                          const productCount = products.filter(p => p.category === cat.value).length;
+                          const currentImageUrl = getCategoryImagePreview(cat.value);
+                          const inputUrl = newCategoryImageUrls[cat.value] || categoryImages[cat.value] || "";
+                          const isEditing = editingCategory === cat.value;
+                          const isUploading = categoryUploading[cat.value] || false;
+
+                          return (
+                            <tr key={cat.value} className="align-middle">
+                              {/* Preview Column */}
+                              <td className="py-4 pr-4">
+                                <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-950/10">
+                                  <img 
+                                    src={currentImageUrl} 
+                                    alt={cat.label} 
+                                    className="w-full h-full object-cover object-center" 
+                                    onError={(e) => {
+                                      e.target.src = 'https://placehold.co/150x150?text=FITS';
+                                    }}
+                                  />
+                                </div>
+                              </td>
+
+                              {/* Info Column */}
+                              <td className="py-4 pr-4">
+                                {isEditing ? (
+                                  <div className="flex flex-col gap-2 max-w-xs">
+                                    <input
+                                      type="text"
+                                      value={editCategoryName}
+                                      onChange={(e) => setEditCategoryName(e.target.value)}
+                                      className="bg-white border border-neutral-950 rounded-none px-3 py-1.5 text-xs text-neutral-900 font-bold outline-hidden uppercase tracking-wider"
+                                      placeholder="New Category Name..."
+                                      autoFocus
+                                    />
+                                    <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest leading-relaxed">
+                                      WARNING: This will update category tags on all matching live drops.
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1">
+                                    <h4 className="text-xs font-bold text-neutral-950 uppercase tracking-wider">{cat.label}</h4>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[9px] font-mono text-neutral-400 uppercase">SLUG:</span>
+                                      <code className="text-[9px] font-mono bg-neutral-100 text-neutral-600 px-1 py-0.5 rounded-sm">{cat.value}</code>
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Live Drops Column */}
+                              <td className="py-4 pr-4 text-center">
+                                <span className="inline-block px-2.5 py-1 text-[9px] font-mono font-bold tracking-widest rounded-none bg-neutral-100 text-neutral-800 uppercase">
+                                  {productCount} Drop{productCount !== 1 ? 's' : ''}
+                                </span>
+                              </td>
+
+                              {/* Image Override Column */}
+                              <td className="py-4 pr-4">
+                                <div className="flex flex-col gap-2 max-w-sm">
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Paste Category Image Cover URL..."
+                                      value={inputUrl}
+                                      onChange={(e) => {
+                                        const urlVal = e.target.value;
+                                        setNewCategoryImageUrls(prev => ({ ...prev, [cat.value]: urlVal }));
+                                      }}
+                                      className="grow bg-white border border-neutral-200 rounded-none px-3 py-1.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveCategoryImage(cat.value, inputUrl)}
+                                      className="bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors shrink-0 cursor-pointer"
+                                    >
+                                      Save Cover
+                                    </button>
+                                  </div>
+                                  
+                                  {/* Upload local image field */}
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-[9px] font-mono font-black text-neutral-500 uppercase tracking-widest hover:text-neutral-900 transition-colors cursor-pointer border border-dashed border-neutral-300 px-3 py-1 hover:border-neutral-600">
+                                      {isUploading ? "Uploading to Cloud..." : "📁 Upload Cover Image file"}
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => handleCategoryImageUpload(e, cat.value)}
+                                        disabled={isUploading}
+                                      />
+                                    </label>
+                                    {categoryImages[cat.value] && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = { ...categoryImages };
+                                          delete updated[cat.value];
+                                          setCategoryImages(updated);
+                                          localStorage.setItem('category_images', JSON.stringify(updated));
+                                          setNewCategoryImageUrls(prev => ({ ...prev, [cat.value]: "" }));
+                                          showToast("✓ Custom cover override cleared.", "success");
+                                        }}
+                                        className="text-[9px] font-mono text-red-500 hover:text-red-700 uppercase tracking-widest cursor-pointer ml-auto"
+                                      >
+                                        Clear Custom Cover
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Actions Column */}
+                              <td className="py-4 text-right">
+                                {isEditing ? (
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRenameCategory(cat.value, editCategoryName)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors cursor-pointer"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingCategory(null)}
+                                      className="border border-neutral-300 hover:bg-neutral-50 text-neutral-600 text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingCategory(cat.value);
+                                        setEditCategoryName(cat.label);
+                                      }}
+                                      className="border border-neutral-950 hover:bg-neutral-50 text-neutral-950 text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-none uppercase transition-colors cursor-pointer"
+                                    >
+                                      ✏️ Rename
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDeleteTargetCategory(cat);
+                                        setIsDeleteCategoryModalOpen(true);
+                                      }}
+                                      className="border border-rose-600 hover:bg-rose-50 text-rose-600 text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-none uppercase transition-colors cursor-pointer"
+                                    >
+                                      🗑️ Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
 
@@ -2882,6 +3705,246 @@ function AdminPanel() {
                 className="w-full py-3 bg-neutral-950 hover:bg-neutral-850 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
               >
                 Dispatch shipment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Delete Category Confirmation Modal */}
+      {isDeleteCategoryModalOpen && deleteTargetCategory && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          {/* Backdrop overlay */}
+          <div 
+            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            onClick={() => {
+              setIsDeleteCategoryModalOpen(false);
+              setDeleteTargetCategory(null);
+            }}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative z-60 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">DELETE CATEGORY</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Delete "{deleteTargetCategory.label}"?
+              </h2>
+              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-2.5 leading-relaxed">
+                This will clear the category field on all <strong className="text-neutral-950 font-bold">{products.filter(p => p.category === deleteTargetCategory.value).length}</strong> product drops belonging to it.
+              </p>
+              <p className="text-[9.5px] text-red-600 font-mono uppercase tracking-wider mt-2 leading-relaxed">
+                ⚠️ WARNING: The products will remain in the catalog but will be marked as "Uncategorized". Any cover override will also be permanently deleted.
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteCategoryModalOpen(false);
+                  setDeleteTargetCategory(null);
+                }}
+                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteCategory}
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Return/Exchange Rejection Modal Popup */}
+      {isRejectModalOpen && rejectTargetOrder && rejectTargetItemIndex !== null && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          {/* Backdrop overlay */}
+          <div 
+            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            onClick={() => {
+              setIsRejectModalOpen(false);
+              setRejectTargetOrder(null);
+              setRejectTargetItemIndex(null);
+            }}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative z-60 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up max-h-[90vh] overflow-y-auto">
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Reject Return/Exchange Request
+              </h2>
+              <p className="text-[9px] text-neutral-450 uppercase tracking-wider mt-0.5 leading-relaxed">
+                Please select or enter the reason for rejecting this return/exchange request. This reason will be displayed to the customer.
+              </p>
+            </div>
+            
+            {/* Options List */}
+            <div className="space-y-2.5 font-sans">
+              {[
+                "Product has visible wear / tags removed",
+                "Product matches all parameters ordered",
+                "Return/Exchange time window exceeded",
+                "Item is marked as non-returnable",
+                "Other"
+              ].map((opt) => (
+                <label 
+                  key={opt} 
+                  className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
+                    adminRejectReason === opt
+                    ? 'border-neutral-950 bg-neutral-50/50'
+                    : 'border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <input 
+                    type="radio" 
+                    name="admin_reject_option"
+                    checked={adminRejectReason === opt}
+                    onChange={() => setAdminRejectReason(opt)}
+                    className="mt-0.5 accent-neutral-950"
+                  />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-800 leading-normal select-none">
+                    {opt}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {/* Custom Explanation Textarea */}
+            <div className="space-y-2">
+              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+                ADDITIONAL SPEC DETAIL / CUSTOM REASON
+              </label>
+              <textarea
+                value={adminRejectCustomText}
+                onChange={(e) => setAdminRejectCustomText(e.target.value)}
+                placeholder="ENTER CUSTOM REJECTION DETAIL..."
+                rows={3}
+                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 font-sans tracking-wide resize-none"
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRejectModalOpen(false);
+                  setRejectTargetOrder(null);
+                  setRejectTargetItemIndex(null);
+                }}
+                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+              >
+                Cancel Action
+              </button>
+              <button
+                type="button"
+                onClick={submitAdminRejectRequest}
+                className="w-full py-3 bg-neutral-950 hover:bg-neutral-855 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Reject Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Return/Exchange Approval Modal Popup */}
+      {isApproveModalOpen && approveTargetOrder && approveTargetRequest && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
+          {/* Backdrop overlay */}
+          <div 
+            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            onClick={() => {
+              setIsApproveModalOpen(false);
+              setApproveTargetOrder(null);
+              setApproveTargetRequest(null);
+            }}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative z-60 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up max-h-[90vh] overflow-y-auto">
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Approve {approveTargetRequest.type === 'RETURN' ? 'Return' : 'Exchange'} Request
+              </h2>
+              <p className="text-[9px] text-neutral-455 uppercase tracking-wider mt-0.5 leading-relaxed">
+                Choose return shipping instructions or reverse pickup details. This message will be sent to the customer's order tracking page.
+              </p>
+            </div>
+            
+            {/* Options List */}
+            <div className="space-y-2.5 font-sans">
+              {[
+                "Reverse Pickup Scheduled (Courier agent will collect the package in 24-48 hours. Please keep tags intact.)",
+                "Self-Ship Required (Please ship the product to our warehouse address: Shop No 5, Active Towers, Mumbai - 400001, and share tracking receipt.)",
+                "Refund Initiated Directly (No physical return required for this specific drop.)",
+                "Other"
+              ].map((opt) => (
+                <label 
+                  key={opt} 
+                  className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
+                    adminApproveInstructions === opt
+                    ? 'border-neutral-950 bg-neutral-50/50'
+                    : 'border-neutral-200 hover:border-neutral-400'
+                  }`}
+                >
+                  <input 
+                    type="radio" 
+                    name="admin_approve_option"
+                    checked={adminApproveInstructions === opt}
+                    onChange={() => setAdminApproveInstructions(opt)}
+                    className="mt-0.5 accent-neutral-950"
+                  />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-800 leading-normal select-none">
+                    {opt}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {/* Custom Explanation Textarea */}
+            <div className="space-y-2">
+              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+                ADDITIONAL INSTRUCTIONS / CUSTOM LOGISTICS DETAIL
+              </label>
+              <textarea
+                value={adminApproveCustomText}
+                onChange={(e) => setAdminApproveCustomText(e.target.value)}
+                placeholder="ENTER RETURN SHIPPING INSTRUCTIONS OR REVERSE TRACKING URL..."
+                rows={3}
+                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 font-sans tracking-wide resize-none"
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsApproveModalOpen(false);
+                  setApproveTargetOrder(null);
+                  setApproveTargetRequest(null);
+                }}
+                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+              >
+                Cancel Action
+              </button>
+              <button
+                type="button"
+                onClick={submitAdminApproveRequest}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Approve Request
               </button>
             </div>
           </div>

@@ -28,6 +28,26 @@ function Shop() {
   const [selectedTag, setSelectedTag] = useState(tagParam || 'all')
   const [sortBy, setSortBy] = useState('newest') // newest | price-low | price-high
 
+  // Dynamic Filtering, Sorting & Layout Toggles
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const [minPriceFilter, setMinPriceFilter] = useState(0)
+  const [maxPriceFilter, setMaxPriceFilter] = useState(3000)
+  const [selectedSizes, setSelectedSizes] = useState([])
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [cols, setCols] = useState(4) // 2 | 3 | 4 columns on desktop
+
+  const maxPriceLimit = products.length > 0 ? Math.ceil(Math.max(...products.map(p => Number(p.price || 0))) / 500) * 500 : 3000
+
+  // Sync maxPriceFilter when products are loaded
+  useEffect(() => {
+    if (products.length > 0) {
+      const highest = Math.max(...products.map(p => Number(p.price || 0)))
+      if (highest > 0) {
+        setMaxPriceFilter(Math.ceil(highest / 500) * 500)
+      }
+    }
+  }, [products])
+
   const getLocalStorageFallbackData = () => {
     return JSON.parse(localStorage.getItem('products')) || []
   }
@@ -87,7 +107,32 @@ function Shop() {
     // Tag Filter
     const matchesTag = selectedTag === 'all' || (product.tag && product.tag.toUpperCase() === selectedTag.toUpperCase())
 
-    return matchesCategory && matchesTag
+    // Price Filter
+    const priceNum = Number(product.price || 0)
+    const matchesPrice = priceNum >= minPriceFilter && priceNum <= maxPriceFilter
+
+    // Stock & Size parsing
+    let stocks = {};
+    try {
+      stocks = JSON.parse(product?.sizes_stock || '{}');
+    } catch {
+      stocks = {};
+    }
+
+    // Size Filter
+    const matchesSize = selectedSizes.length === 0 || selectedSizes.some(sz => Number(stocks[sz] || 0) > 0);
+
+    // In-Stock Filter
+    let isAllOutOfStock = false;
+    if (product.sizes && product.sizes.length > 0) {
+      const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+      isAllOutOfStock = totalStock === 0;
+    } else {
+      isAllOutOfStock = true;
+    }
+    const matchesStock = !inStockOnly || !isAllOutOfStock;
+
+    return matchesCategory && matchesTag && matchesPrice && matchesSize && matchesStock
   })
 
   // 2. Apply Fuzzy Search using Fuse.js (Amazon-style typo-tolerant engine)
@@ -167,8 +212,24 @@ function Shop() {
     if (sortBy === 'price-high') {
       return Number(b.price) - Number(a.price)
     }
-    return new Date(b.$createdAt || '1970-01-01') - new Date(a.$createdAt || '1970-01-01')
   })
+
+  const hasActiveFilters = 
+    selectedCategory !== 'all' || 
+    selectedTag !== 'all' || 
+    searchQuery.trim() !== '' || 
+    minPriceFilter > 0 || 
+    maxPriceFilter < maxPriceLimit || 
+    selectedSizes.length > 0 || 
+    inStockOnly
+
+  const gridClass = `grid grid-cols-2 ${
+    cols === 2 
+      ? 'md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-16' 
+      : cols === 3 
+        ? 'md:grid-cols-3 lg:grid-cols-3 gap-x-10 gap-y-16' 
+        : 'md:grid-cols-4 lg:grid-cols-4 gap-x-8 gap-y-16'
+  }`
 
   // Debounced search analytics — declared after filteredProducts so length is accessible
   useEffect(() => {
@@ -208,6 +269,24 @@ function Shop() {
     }
   })
 
+  const getCategoryImage = (catValue) => {
+    try {
+      const overrides = JSON.parse(localStorage.getItem('category_images')) || {};
+      if (overrides[catValue]) return overrides[catValue];
+    } catch (e) {
+      console.error("Error reading category_images from localStorage:", e);
+    }
+
+    if (catValue === 'all') return 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=150&q=80';
+    if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg';
+    if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg';
+    if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg';
+    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=150&q=80';
+    
+    const firstProd = products.find(p => p.category === catValue);
+    return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/150x150?text=FITS';
+  }
+
   return (
     <>
       <Navbar />
@@ -227,21 +306,71 @@ function Shop() {
 
           {/* Filtering Controller Unit */}
           <div className="bg-white border border-neutral-950/10 p-6 rounded-none flex flex-col gap-6">
-            {/* Category Select Tabs */}
-            <div className="border-b border-neutral-950/10 flex flex-wrap gap-x-8 gap-y-2 pb-3">
-              {categoriesList.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => setSelectedCategory(c.value)}
-                  className={`text-[10px] font-mono tracking-widest uppercase transition-all duration-300 pb-2 border-b-2 cursor-pointer ${
-                    selectedCategory === c.value
-                      ? 'border-neutral-950 text-neutral-950 font-bold'
-                      : 'border-transparent text-neutral-400 hover:text-neutral-950'
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
+            {/* Premium Bento Category Cards Row */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch gap-4 pb-4 border-b border-neutral-950/10 w-full">
+              {categoriesList.filter(c => {
+                try {
+                  const deleted = JSON.parse(localStorage.getItem('deleted_categories')) || [];
+                  return !deleted.includes(c.value);
+                } catch (e) {
+                  return true;
+                }
+              }).map((c) => {
+                const img = getCategoryImage(c.value);
+                const isActive = selectedCategory === c.value;
+                const count = c.value === 'all' 
+                  ? products.length 
+                  : products.filter(p => p.category === c.value).length;
+                
+                const shortLabel = c.label
+                  .replace(' & SWEATSHIRTS', '')
+                  .replace(' PRODUCTS', '')
+                  .replace(' T-SHIRTS', 'S')
+                  .replace(' T-SHIRT', '');
+
+                return (
+                  <button
+                    key={c.value}
+                    onClick={() => setSelectedCategory(c.value)}
+                    className={`group relative h-24 sm:h-28 flex-1 min-w-[130px] sm:min-w-[160px] overflow-hidden rounded-none cursor-pointer transition-all duration-300 border ${
+                      isActive 
+                        ? 'border-neutral-950 ring-2 ring-neutral-950/10 scale-[1.02] shadow-sm' 
+                        : 'border-neutral-200 hover:border-neutral-450 hover:scale-[1.01]'
+                    }`}
+                  >
+                    {/* Background Image */}
+                    <img 
+                      src={img} 
+                      alt={c.label} 
+                      className={`absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110 ${
+                        isActive ? 'scale-[1.05]' : ''
+                      }`}
+                    />
+                    
+                    {/* Glassmorphism / Gradient Overlay */}
+                    <div className={`absolute inset-0 transition-colors duration-300 ${
+                      isActive 
+                        ? 'bg-neutral-950/50 backdrop-blur-[1px]' 
+                        : 'bg-neutral-950/35 backdrop-blur-none group-hover:bg-neutral-950/45 group-hover:backdrop-blur-[0.5px]'
+                    }`} />
+
+                    {/* Bottom Border Accent when Active */}
+                    {isActive && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-neutral-950" />
+                    )}
+
+                    {/* Content text */}
+                    <div className="absolute inset-0 p-4 flex flex-col justify-end text-left z-10">
+                      <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase font-black text-white leading-tight">
+                        {shortLabel}
+                      </span>
+                      <span className="text-[7.5px] font-mono tracking-widest text-white/75 uppercase font-bold mt-0.5">
+                        {count} item{count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Tags Select Pills */}
@@ -268,34 +397,160 @@ function Shop() {
             </div>
 
             {/* Search & Sort Controls Row */}
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-end gap-5 pt-2">
-              {/* Minimal Underline Search Input */}
-              <div className="relative flex-1 max-w-md">
-                <input
-                  type="text"
-                  placeholder="SEARCH THE ARCHIVE..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent border-b border-neutral-300 focus:border-neutral-950 py-2.5 text-xs text-neutral-950 placeholder-neutral-400 outline-hidden tracking-widest font-mono uppercase transition-colors"
-                />
+            <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-end gap-5 pt-2">
+              {/* Minimal Underline Search Input & Filter Toggle */}
+              <div className="flex items-end gap-4 flex-1 max-w-xl">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="SEARCH THE ARCHIVE..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-transparent border-b border-neutral-300 focus:border-neutral-950 py-2.5 text-xs text-neutral-950 placeholder-neutral-400 outline-hidden tracking-widest font-mono uppercase transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={() => setFilterDrawerOpen(true)}
+                  className="bg-neutral-950 hover:bg-neutral-800 text-white font-mono text-[10px] tracking-widest uppercase px-4 py-2.5 flex items-center gap-1.5 transition-all select-none cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span>FILTERS</span>
+                </button>
               </div>
 
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">SORT BY:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-white border border-neutral-950/15 text-[10px] font-mono font-bold tracking-wider uppercase px-3 py-2 outline-hidden cursor-pointer text-neutral-800 rounded-none hover:border-neutral-950"
-                >
-                  <option value="newest">NEWEST RELEASES</option>
-                  <option value="popularity">POPULARITY</option>
-                  <option value="price-low">PRICE: LOW TO HIGH</option>
-                  <option value="price-high">PRICE: HIGH TO LOW</option>
-                </select>
+              {/* Sort & Grid Layout Controls */}
+              <div className="flex flex-wrap items-center gap-6">
+                {/* Grid Column Selector (Desktop Only) */}
+                <div className="hidden lg:flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">VIEW:</span>
+                  <div className="flex border border-neutral-950/15 bg-white">
+                    {[2, 3, 4].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setCols(n)}
+                        className={`text-[9px] font-mono font-bold px-3 py-1.5 border-r last:border-r-0 border-neutral-950/15 hover:bg-neutral-50 cursor-pointer transition-colors ${
+                          cols === n ? 'bg-neutral-950 text-white hover:bg-neutral-900 border-none' : 'text-neutral-700 bg-white'
+                        }`}
+                      >
+                        {n} COL
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">SORT BY:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-white border border-neutral-950/15 text-[10px] font-mono font-bold tracking-wider uppercase px-3 py-2 outline-hidden cursor-pointer text-neutral-800 rounded-none hover:border-neutral-950"
+                  >
+                    <option value="newest">NEWEST RELEASES</option>
+                    <option value="popularity">POPULARITY</option>
+                    <option value="price-low">PRICE: LOW TO HIGH</option>
+                    <option value="price-high">PRICE: HIGH TO LOW</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Active Filter Badges */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 bg-[#fafafb] p-4 border border-neutral-950/5">
+              <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest mr-1.5">ACTIVE:</span>
+              
+              {selectedCategory !== 'all' && (
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                  <span>CAT: {selectedCategory.replace('-', ' ')}</span>
+                  <button 
+                    onClick={() => setSelectedCategory('all')}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {selectedTag !== 'all' && (
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                  <span>TAG: {selectedTag}</span>
+                  <button 
+                    onClick={() => setSelectedTag('all')}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {searchQuery.trim() !== '' && (
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                  <span>SEARCH: "{searchQuery}"</span>
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {(minPriceFilter > 0 || maxPriceFilter < maxPriceLimit) && (
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                  <span>PRICE: ₹{minPriceFilter} - ₹{maxPriceFilter}</span>
+                  <button 
+                    onClick={() => { setMinPriceFilter(0); setMaxPriceFilter(maxPriceLimit); }}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {selectedSizes.map(size => (
+                <div key={size} className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                  <span>SIZE: {size}</span>
+                  <button 
+                    onClick={() => setSelectedSizes(selectedSizes.filter(s => s !== size))}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              {inStockOnly && (
+                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                  <span>IN STOCK</span>
+                  <button 
+                    onClick={() => setInStockOnly(false)}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSelectedTag('all');
+                  setSearchQuery('');
+                  setMinPriceFilter(0);
+                  setMaxPriceFilter(maxPriceLimit);
+                  setSelectedSizes([]);
+                  setInStockOnly(false);
+                }}
+                className="text-[9px] font-mono font-bold text-rose-600 hover:text-rose-800 uppercase tracking-widest ml-3 border-b border-rose-200 hover:border-rose-800 cursor-pointer"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
 
           {/* Catalog Count Indicator */}
           <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-neutral-400 uppercase">
@@ -305,7 +560,7 @@ function Shop() {
 
           {/* Page Loading State */}
           {loading && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-16">
+            <div className={gridClass}>
               {Array.from({ length: 8 }).map((_, index) => (
                 <ProductCardSkeleton key={index} />
               ))}
@@ -329,7 +584,7 @@ function Shop() {
 
           {/* Catalog Products Matrix Grid */}
           {!loading && filteredProducts.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-16">
+            <div className={gridClass}>
               {filteredProducts.map((product) => {
                 const uniqueId = product.$id || product.id
                 const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View'
@@ -519,6 +774,192 @@ function Shop() {
             </div>
           )}
 
+        </div>
+      </div>
+
+      {/* Sidebar Filter Drawer */}
+      <div className={`fixed inset-0 z-[100] transition-opacity duration-300 ease-in-out ${filterDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        {/* Backdrop overlay */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setFilterDrawerOpen(false)}></div>
+        
+        {/* Drawer Content */}
+        <div className={`absolute top-0 left-0 h-full w-full sm:w-[380px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${filterDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          {/* Header */}
+          <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-neutral-900 font-mono">
+              ⚙️ FILTERS
+            </h3>
+            <button 
+              onClick={() => setFilterDrawerOpen(false)}
+              className="text-neutral-400 hover:text-neutral-950 p-2 transition-colors cursor-pointer text-sm font-bold uppercase font-mono"
+            >
+              ✕ CLOSE
+            </button>
+          </div>
+
+          {/* Drawer Body (Scrollable filters) */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* Price Range Filter */}
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">
+                PRICE RANGE
+              </label>
+              
+              {/* Display Range & Input Boxes */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-1">
+                  <span className="text-[9px] font-mono text-neutral-400 block uppercase">MIN PRICE</span>
+                  <div className="flex items-center border border-neutral-200 px-2 py-1 bg-[#fafafb]">
+                    <span className="text-xs font-mono font-bold text-neutral-500 mr-1">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={maxPriceLimit}
+                      value={minPriceFilter}
+                      onChange={(e) => {
+                        const val = Math.min(Number(e.target.value || 0), maxPriceFilter);
+                        setMinPriceFilter(val);
+                      }}
+                      className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-neutral-900 border-none p-0"
+                    />
+                  </div>
+                </div>
+                
+                <div className="text-neutral-400 font-bold self-end pb-2.5 font-mono text-xs">TO</div>
+
+                <div className="flex-1 space-y-1">
+                  <span className="text-[9px] font-mono text-neutral-400 block uppercase">MAX PRICE</span>
+                  <div className="flex items-center border border-neutral-200 px-2 py-1 bg-[#fafafb]">
+                    <span className="text-xs font-mono font-bold text-neutral-500 mr-1">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={maxPriceLimit}
+                      value={maxPriceFilter}
+                      onChange={(e) => {
+                        const val = Math.max(Number(e.target.value || 0), minPriceFilter);
+                        setMaxPriceFilter(val);
+                      }}
+                      className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-neutral-900 border-none p-0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sliders container */}
+              <div className="space-y-3 pt-1">
+                {/* Min Slider */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-mono text-neutral-400 uppercase">
+                    <span>Min Limit</span>
+                    <span className="font-bold text-neutral-800">₹{minPriceFilter}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={maxPriceLimit}
+                    step="50"
+                    value={minPriceFilter}
+                    onChange={(e) => {
+                      const val = Math.min(Number(e.target.value), maxPriceFilter);
+                      setMinPriceFilter(val);
+                    }}
+                    className="w-full accent-neutral-900 cursor-pointer h-1.5 bg-neutral-100 appearance-none rounded-lg"
+                  />
+                </div>
+
+                {/* Max Slider */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-mono text-neutral-400 uppercase">
+                    <span>Max Limit</span>
+                    <span className="font-bold text-neutral-800">₹{maxPriceFilter}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={maxPriceLimit}
+                    step="50"
+                    value={maxPriceFilter}
+                    onChange={(e) => {
+                      const val = Math.max(Number(e.target.value), minPriceFilter);
+                      setMaxPriceFilter(val);
+                    }}
+                    className="w-full accent-neutral-900 cursor-pointer h-1.5 bg-neutral-100 appearance-none rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Size Filter */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">
+                SELECT SIZES
+              </label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((size) => {
+                  const isSelected = selectedSizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedSizes(selectedSizes.filter(s => s !== size));
+                        } else {
+                          setSelectedSizes([...selectedSizes, size]);
+                        }
+                      }}
+                      className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer ${
+                        isSelected
+                          ? 'bg-neutral-950 text-white border-neutral-950'
+                          : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* In Stock Availability Filter */}
+            <div className="space-y-3 pt-2">
+              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">
+                AVAILABILITY
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={inStockOnly}
+                  onChange={(e) => setInStockOnly(e.target.checked)}
+                  className="w-4 h-4 rounded-none accent-neutral-950 cursor-pointer border-neutral-300"
+                />
+                <span className="text-xs font-mono font-bold tracking-wider text-neutral-800 uppercase">
+                  SHOW IN-STOCK ONLY
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Drawer Footer (Sticky Actions) */}
+          <div className="p-6 border-t border-neutral-100 bg-neutral-50/50 space-y-3">
+            <button
+              onClick={() => setFilterDrawerOpen(false)}
+              className="w-full py-3.5 bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-mono font-bold uppercase tracking-[0.15em] rounded-none text-center transition-all cursor-pointer"
+            >
+              Apply Filters
+            </button>
+            <button
+              onClick={() => {
+                setMinPriceFilter(0);
+                setMaxPriceFilter(maxPriceLimit);
+                setSelectedSizes([]);
+                setInStockOnly(false);
+              }}
+              className="w-full py-3 bg-white border border-neutral-950 hover:bg-neutral-50 text-[10px] font-mono font-bold uppercase tracking-[0.15em] text-neutral-950 rounded-none text-center transition-all cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          </div>
         </div>
       </div>
 

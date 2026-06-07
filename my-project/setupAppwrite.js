@@ -67,7 +67,6 @@ async function ensureBucketExists() {
     }
 }
 
-await ensureBucketExists();
 // -------------------------------------------
 
 if (!PROJECT_ID || !DATABASE_ID) {
@@ -322,6 +321,11 @@ async function run() {
     console.log(`📡 Connection URL: ${ENDPOINT}`);
     console.log(`🔒 Project ID: ${PROJECT_ID}`);
     console.log(`🗃️ Database ID: ${DATABASE_ID}\n`);
+
+    // Ensure storage bucket is created
+    console.log("📦 Verifying storage bucket configuration...");
+    await ensureBucketExists();
+    console.log("");
 
     for (const coll of schema) {
         console.log(`🛠️ Processing collection: "${coll.name}" (${coll.id})...`);

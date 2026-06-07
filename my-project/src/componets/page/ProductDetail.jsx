@@ -671,6 +671,11 @@ function ProductDetail() {
         ...(Array.isArray(product.back_image_links) ? product.back_image_links : [product.back_image_link])
       ].filter(Boolean);
 
+  const rawDescription = product?.description || "";
+  const returnPolicyMatch = rawDescription.match(/\[RETURN_POLICY\]:\s*(.+)/);
+  const returnPolicy = product?.return_policy || (returnPolicyMatch ? returnPolicyMatch[1].trim() : "7 Day Return");
+  const displayDescription = rawDescription.replace(/\[RETURN_POLICY\]:\s*(.+)/, "").trim();
+
   return (
     <div className="w-full min-h-screen bg-white text-neutral-900 font-sans pb-20">
       <Navbar />
@@ -1159,9 +1164,14 @@ function ProductDetail() {
               </div>
 
               <div className="flex items-center gap-2 text-neutral-500 text-xs bg-neutral-50 border border-neutral-100 p-3 rounded-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
+                  returnPolicy === "No Return" ? "bg-rose-500" :
+                  returnPolicy === "Exchange Only" ? "bg-amber-500" : "bg-emerald-500"
+                }`} />
                 <p className="font-mono text-[10px] uppercase tracking-wide">
-                  7-Day exchange and return policy active.
+                  {returnPolicy === "No Return" ? "No return or exchange active." :
+                   returnPolicy === "Exchange Only" ? "7-Day exchange only active." :
+                   "7-Day exchange and return policy active."}
                 </p>
               </div>
             </div>
@@ -1258,7 +1268,7 @@ function ProductDetail() {
             <div className="border-t border-b border-neutral-200 divide-y divide-neutral-200">
 
               {/* DESCRIPTION */}
-              {product.description && (
+              {displayDescription && (
                 <div className="py-3.5">
                   <button
                     onClick={() => setDescExpanded(!descExpanded)}
@@ -1269,7 +1279,7 @@ function ProductDetail() {
                   </button>
                   <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
                     <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-none border border-neutral-950/10">
-                      {product.description}
+                      {displayDescription}
                     </p>
                   </div>
                 </div>
@@ -1312,7 +1322,13 @@ function ProductDetail() {
                   <div className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-none border border-neutral-950/10 space-y-2">
                     <p>&bull; Free express shipping on all orders nationwide.</p>
                     <p>&bull; Dispatched in custom protective packaging.</p>
-                    <p>&bull; Easy 7-day swap guarantee for perfect size matches.</p>
+                    {returnPolicy === "No Return" ? (
+                      <p className="text-rose-600 font-bold">&bull; return policy: No returns or exchanges accepted on this drop.</p>
+                    ) : returnPolicy === "Exchange Only" ? (
+                      <p>&bull; return policy: Exchange only (valid for 7 days).</p>
+                    ) : (
+                      <p>&bull; return policy: Easy 7-day return guarantee.</p>
+                    )}
                   </div>
                 </div>
               </div>

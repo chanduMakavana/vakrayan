@@ -70,6 +70,49 @@ function OrderDetail() {
   const [cancellationReasonOption, setCancellationReasonOption] = useState("Ordered wrong size / color details");
   const [customCancellationText, setCustomCancellationText] = useState("");
 
+  // Return / Exchange modal states
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestItem, setRequestItem] = useState(null);
+  const [requestReason, setRequestReason] = useState("Wrong size received");
+  const [customRequestText, setCustomRequestText] = useState("");
+  const [exchangeTargetSize, setExchangeTargetSize] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestFrontImage, setRequestFrontImage] = useState('');
+  const [requestBackImage, setRequestBackImage] = useState('');
+  const [uploadingFront, setUploadingFront] = useState(false);
+  const [uploadingBack, setUploadingBack] = useState(false);
+
+  const handleRequestImageUpload = async (e, type) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'front') setUploadingFront(true);
+    else setUploadingBack(true);
+
+    try {
+      const compressedFile = await compressImage(file, 850, 850, 0.7);
+      const response = await storageService.uploadFile(compressedFile);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        if (type === 'front') {
+          setRequestFrontImage(fileUrl);
+          showToast("✓ Front product image uploaded successfully!", "success");
+        } else {
+          setRequestBackImage(fileUrl);
+          showToast("✓ Back product image uploaded successfully!", "success");
+        }
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Return image upload failed:", err);
+      showToast("Appwrite Storage upload failed.", "error");
+    } finally {
+      if (type === 'front') setUploadingFront(false);
+      else setUploadingBack(false);
+    }
+  };
+
   const handleModalReviewSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthenticated || !user) {
@@ -251,6 +294,92 @@ function OrderDetail() {
   const remoteSurcharge = (remainingShipping === 80 || remainingShipping === 179) ? 80 : 0;
   const baseShippingCharge = Math.max(0, remainingShipping - remoteSurcharge);
 
+  const isReturnExchangeEligible = () => {
+    if (order.status !== 'DELIVERED') return false;
+    const updateTime = order.$updatedAt || order.$createdAt || order.createdAt;
+    if (!updateTime) return false;
+    const deliveryDate = new Date(updateTime);
+    const currentDate = new Date();
+    const diffTime = Math.abs(currentDate - deliveryDate);
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays <= 7;
+  };
+
+  const getReturnExchangeDaysLeft = () => {
+    const updateTime = order.$updatedAt || order.$createdAt || order.createdAt;
+    if (!updateTime) return 0;
+    const deliveryDate = new Date(updateTime);
+    const currentDate = new Date();
+    const diffTime = currentDate - deliveryDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const daysLeft = Math.max(0, Math.ceil(7 - diffDays));
+    return daysLeft;
+  };
+
+  const submitReturnExchangeRequest = async () => {
+    if (!requestItem) return;
+    if (requestItem.type === 'EXCHANGE' && !exchangeTargetSize) {
+      showToast("Please select a target size for exchange.", "error");
+      return;
+    }
+    if (!requestFrontImage.trim() || !requestBackImage.trim()) {
+      showToast("Please upload both front and back photos to verify item condition.", "error");
+      return;
+    }
+    
+    let finalReason = requestReason;
+    if (requestReason === "Other (Explain in box below)") {
+      finalReason = customRequestText.trim() || "Other reason unspecified";
+    } else if (customRequestText.trim()) {
+      finalReason = `${requestReason} - ${customRequestText.trim()}`;
+    }
+    
+    setSubmittingRequest(true);
+    try {
+      let currentRequests = [];
+      if (metadata.return_requests) {
+        currentRequests = Array.isArray(metadata.return_requests) 
+          ? [...metadata.return_requests] 
+          : [];
+      }
+      
+      currentRequests = currentRequests.filter(r => r.itemIndex !== requestItem.index);
+      
+      const newRequest = {
+        itemIndex: requestItem.index,
+        productId: requestItem.product_id,
+        productName: requestItem.name,
+        originalSize: requestItem.size,
+        type: requestItem.type,
+        reason: finalReason,
+        exchangeTargetSize: requestItem.type === 'EXCHANGE' ? exchangeTargetSize : "",
+        images: [requestFrontImage.trim(), requestBackImage.trim()].filter(Boolean),
+        status: 'PENDING',
+        createdAt: new Date().toISOString()
+      };
+      
+      currentRequests.push(newRequest);
+      const targetStatus = requestItem.type === 'RETURN' ? 'RETURN_REQUESTED' : 'EXCHANGE_REQUESTED';
+      const response = await ordersService.updateOrderStatus(order.$id || order.id, targetStatus, {
+        return_requests: currentRequests
+      });
+      
+      if (response) {
+        showToast(`${requestItem.type === 'RETURN' ? 'Return' : 'Exchange'} request submitted successfully!`, 'success');
+        setIsRequestModalOpen(false);
+        const orderData = await ordersService.getOrderById(id);
+        if (orderData) {
+          setOrder(orderData);
+        }
+      }
+    } catch (err) {
+      console.error("Return/Exchange request failed:", err);
+      showToast("Failed to submit request. Please try again.", "error");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
   const handleCancelOrder = () => {
     setIsCancelModalOpen(true);
   };
@@ -292,25 +421,29 @@ function OrderDetail() {
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
           <style>
-            body { font-family: 'Inter', system-ui, sans-serif; color: #000; padding: 40px; margin: 0; line-height: 1.5; }
-            .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .logo { font-size: 24px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-            .invoice-title { font-size: 16px; font-weight: 800; letter-spacing: 1px; text-align: right; text-transform: uppercase; }
-            .details { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 40px; }
-            .details h3 { font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #666; text-transform: uppercase; margin: 0 0 8px 0; }
-            .details p { font-size: 12px; font-weight: 600; margin: 0 0 4px 0; text-transform: uppercase; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
-            th { border-bottom: 2px solid #eee; padding: 12px 0; text-align: left; font-size: 10px; font-weight: 900; color: #666; text-transform: uppercase; }
-            .totals { font-size: 12px; font-weight: bold; border-top: 2px solid #000; padding-top: 20px; }
-            .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; text-transform: uppercase; }
-            .grand-total { font-size: 18px; font-weight: 900; border-top: 1px solid #eee; padding-top: 12px; margin-top: 12px; }
+            body { font-family: 'Inter', system-ui, sans-serif; color: #000; padding: 20px 0; margin: 0; line-height: 1.4; font-size: 11.5px; }
+            .header { border-bottom: 2.5px solid #000; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .logo { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; line-height: 1; }
+            .invoice-title { font-size: 15px; font-weight: 900; letter-spacing: 1px; text-align: right; text-transform: uppercase; line-height: 1.2; }
+            .details { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr; gap: 16px; margin-bottom: 30px; }
+            .details h3 { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: #555; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+            .details p { font-size: 11px; font-weight: 600; margin: 0 0 3px 0; text-transform: uppercase; color: #111; word-break: break-word; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th { border-bottom: 2px solid #000; padding: 10px 0; text-align: left; font-size: 9px; font-weight: 900; color: #000; text-transform: uppercase; }
+            td { padding: 10px 0; font-size: 11px; }
+            .totals { font-size: 11px; font-weight: bold; border-top: 2px solid #000; padding-top: 15px; }
+            .total-row { display: flex; justify-content: space-between; margin-bottom: 6px; text-transform: uppercase; }
+            .grand-total { font-size: 16px; font-weight: 900; border-top: 1px solid #000; padding-top: 10px; margin-top: 10px; color: #000; }
             @media print {
-              body { padding: 20px; }
+              body { padding: 0; margin: 0; width: 100%; font-size: 11px; }
+              .details p { font-size: 10px; }
+              td { padding: 8px 0; font-size: 10px; }
+              .grand-total { font-size: 15px; }
             }
           </style>
         </head>
         <body>
-          <div style="max-width: 800px; margin: 0 auto;">
+          <div style="max-width: 680px; margin: 0 auto; width: 100%;">
             <div class="header">
               <div>
                 <div class="logo">AASHIS</div>
@@ -385,13 +518,8 @@ function OrderDetail() {
               </div>
               ` : ''}
 
-              <div class="total-row" style="font-size: 11px; color: #666; margin-top: 4px;">
-                <span>GST (18% INCLUSIVE)</span>
-                <span style="font-family: monospace;">₹${taxAmount.toLocaleString('en-IN')}</span>
-              </div>
-
               <div class="total-row grand-total">
-                <span>Net Amount Paid</span>
+                <span>Net Amount Paid <span style="font-size: 10px; font-weight: normal; color: #555; text-transform: none;">(incl. GST)</span></span>
                 <span style="font-family: monospace; font-size: 20px; font-weight: 900;">₹${Number(order.total).toLocaleString('en-IN')}</span>
               </div>
             </div>
@@ -472,13 +600,27 @@ function OrderDetail() {
   const totalItemsCount = parsedItems.reduce((acc, i) => acc + Number(i.quantity || 1), 0);
 
   // Status index for visual track
-  const statusSteps = [
-    { key: 'PENDING', label: 'Order Confirmed', desc: 'Order placed successfully.' },
-    { key: 'PROCESSING', label: 'Processed & Packed', desc: 'Packed and ready for dispatch.' },
-    { key: 'SHIPPED', label: 'Shipped & Outward', desc: 'Order handed over to courier partner.' },
-    { key: 'IN_TRANSIT', label: 'In Transit', desc: 'In transit to delivery address.' },
-    { key: 'DELIVERED', label: 'Delivered Fits', desc: 'Order delivered successfully.' }
+  let statusSteps = [
+    { key: 'PENDING', label: 'Order Confirmed', desc: 'Order placed successfully.', icon: 'file' },
+    { key: 'PROCESSING', label: 'Processed & Packed', desc: 'Packed and ready for dispatch.', icon: 'file' },
+    { key: 'SHIPPED', label: 'Shipped & Outward', desc: 'Order handed over to courier partner.', icon: 'truck' },
+    { key: 'IN_TRANSIT', label: 'In Transit', desc: 'In transit to delivery address.', icon: 'truck' },
+    { key: 'DELIVERED', label: 'Delivered Fits', desc: 'Order delivered successfully.', icon: 'check' }
   ];
+
+  if (order.status === 'RETURN_REQUESTED' || order.status === 'RETURNED') {
+    statusSteps = [
+      { key: 'DELIVERED', label: 'Fits Delivered', desc: 'Order delivered successfully.', icon: 'check' },
+      { key: 'RETURN_REQUESTED', label: 'Return Requested', desc: 'Return request submitted with condition photos.', icon: 'file' },
+      { key: 'RETURNED', label: 'Return Approved & Refunded', desc: 'Admin approved the return. Refund or reverse pickup complete.', icon: 'check' }
+    ];
+  } else if (order.status === 'EXCHANGE_REQUESTED' || order.status === 'EXCHANGED') {
+    statusSteps = [
+      { key: 'DELIVERED', label: 'Fits Delivered', desc: 'Order delivered successfully.', icon: 'check' },
+      { key: 'EXCHANGE_REQUESTED', label: 'Exchange Requested', desc: 'Exchange request submitted for desired size.', icon: 'file' },
+      { key: 'EXCHANGED', label: 'Exchange Approved', desc: 'Admin approved the exchange. Exchange product dispatched.', icon: 'truck' }
+    ];
+  }
 
   const foundIdx = statusSteps.findIndex(s => s.key === order.status);
   const currentStepIdx = foundIdx !== -1 ? foundIdx : 0;
@@ -523,7 +665,7 @@ function OrderDetail() {
                       Cancel Order
                     </button>
                   )}
-                  {order.status === 'DELIVERED' && (
+                  {order.status !== 'CANCELLED' && (
                     <button
                       onClick={handlePrintInvoice}
                       className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
@@ -573,26 +715,27 @@ function OrderDetail() {
                   <div className="absolute left-[35px] top-4 bottom-4 w-1 bg-neutral-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-[var(--theme-primary)] transition-all duration-1000 ease-out" 
-                      style={{ height: `${(currentStepIdx / 4) * 100}%` }}
+                      style={{ height: `${(currentStepIdx / (statusSteps.length - 1)) * 100}%` }}
                     />
                   </div>
 
                   {statusSteps.map((step, idx) => {
                     const isActive = idx <= currentStepIdx;
                     const isCurrent = idx === currentStepIdx;
+                    const isFinalStep = step.key === 'DELIVERED' || step.key === 'RETURNED' || step.key === 'EXCHANGED';
                     return (
                       <div key={step.key} className="flex gap-6 items-start relative z-10">
                         {/* Checkpoint Dot */}
                         <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
                           isCurrent 
-                          ? 'bg-[var(--theme-primary)] border-[var(--theme-primary)] text-white shadow-lg scale-110 animate-pulse' 
+                          ? `bg-[var(--theme-primary)] border-[var(--theme-primary)] text-white shadow-lg scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
                           : isActive 
                           ? 'bg-neutral-900 border-neutral-900 text-white' 
                           : 'bg-white border-neutral-200 text-neutral-400'
                         }`}>
-                          {idx === 4 ? (
+                          {step.icon === 'check' ? (
                             <FiCheckCircle className="text-sm" />
-                          ) : idx === 2 ? (
+                          ) : step.icon === 'truck' ? (
                             <FiTruck className="text-sm" />
                           ) : (
                             <FiFileText className="text-sm" />
@@ -675,32 +818,118 @@ function OrderDetail() {
                           <p className="text-[9px] font-mono text-neutral-500 uppercase">
                             Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
                           </p>
-                          {order.status === 'DELIVERED' && (() => {
+                           {order.status === 'DELIVERED' && (() => {
                             let productId = item.product_id;
                             if (!productId) {
                               productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
                             }
+                            
+                            const itemPolicy = matchingProd?.return_policy || "7 Day Return";
+                            const existingRequest = Array.isArray(metadata.return_requests)
+                              ? metadata.return_requests.find(r => r.itemIndex === idx)
+                              : null;
+                            const eligible = isReturnExchangeEligible();
+                            const daysLeft = getReturnExchangeDaysLeft();
 
                             return (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (productId) {
-                                    setReviewModalItem({ name: item.name, productId });
-                                    setModalRating(5);
-                                    setModalComment('');
-                                    setModalFit('true');
-                                    setModalComfort(5);
-                                    setModalQuality(5);
-                                    setModalBreathable(5);
-                                  } else {
-                                    showToast("Failed to locate product in current catalog.", "error");
-                                  }
-                                }}
-                                className="mt-1.5 inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer border border-neutral-950"
-                              >
-                                Write Review
-                              </button>
+                              <div className="space-y-2 pt-1.5">
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (productId) {
+                                        setReviewModalItem({ name: item.name, productId });
+                                        setModalRating(5);
+                                        setModalComment('');
+                                        setModalFit('true');
+                                        setModalComfort(5);
+                                        setModalQuality(5);
+                                        setModalBreathable(5);
+                                      } else {
+                                        showToast("Failed to locate product in current catalog.", "error");
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer border border-neutral-950"
+                                  >
+                                    Write Review
+                                  </button>
+
+                                  {!existingRequest && eligible && (
+                                    <>
+                                      {(itemPolicy === "7 Day Return" || itemPolicy === "default") && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setRequestItem({ ...item, index: idx, type: 'RETURN', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
+                                            setRequestReason("Wrong size received");
+                                            setCustomRequestText("");
+                                            setExchangeTargetSize("");
+                                            setRequestFrontImage("");
+                                            setRequestBackImage("");
+                                            setIsRequestModalOpen(true);
+                                          }}
+                                          className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-250 font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer"
+                                        >
+                                          ↩️ Return
+                                        </button>
+                                      )}
+                                      {(itemPolicy === "7 Day Return" || itemPolicy === "default" || itemPolicy === "Exchange Only") && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setRequestItem({ ...item, index: idx, type: 'EXCHANGE', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
+                                            setRequestReason("Wrong size received");
+                                            setCustomRequestText("");
+                                            setExchangeTargetSize("");
+                                            setRequestFrontImage("");
+                                            setRequestBackImage("");
+                                            setIsRequestModalOpen(true);
+                                          }}
+                                          className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-250 font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer"
+                                        >
+                                          🔄 Exchange
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+
+                                {existingRequest && (
+                                  <div className="pt-1.5">
+                                    <span className={`inline-block font-mono text-[9px] font-bold px-2 py-0.5 border ${
+                                      existingRequest.status === 'PENDING'
+                                      ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                      : existingRequest.status === 'APPROVED'
+                                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                      : 'bg-rose-50 text-rose-600 border-rose-200'
+                                    } uppercase`}>
+                                      {existingRequest.type === 'RETURN' ? 'Return' : 'Exchange'} Request - {existingRequest.status}
+                                      {existingRequest.exchangeTargetSize && ` to Size ${existingRequest.exchangeTargetSize}`}
+                                    </span>
+                                    {existingRequest.adminComment && (
+                                      <p className="text-[9px] font-sans text-neutral-500 mt-1 font-semibold normal-case">
+                                        Admin note: {existingRequest.adminComment}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {!existingRequest && !eligible && (
+                                  <div className="pt-1">
+                                    {itemPolicy === "No Return" ? (
+                                      <span className="text-[9px] font-mono font-semibold text-neutral-450 uppercase">🔒 Non-Returnable Item</span>
+                                    ) : (
+                                      <span className="text-[9px] font-mono font-semibold text-neutral-400 uppercase">Return window expired</span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {!existingRequest && eligible && itemPolicy !== "No Return" && (
+                                  <p className="text-[8px] font-mono text-neutral-400 uppercase">
+                                    Window active (ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'})
+                                  </p>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>
@@ -1124,6 +1353,208 @@ function OrderDetail() {
               </form>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* Return / Exchange Request Modal */}
+      {isRequestModalOpen && requestItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-4 animate-scale-up text-neutral-900 max-h-[90vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsRequestModalOpen(false)}
+              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div>
+              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+                {requestItem.type} REQUEST PANEL
+              </span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'} {requestItem.name}
+              </h2>
+              <span className="text-xs font-mono text-neutral-500 uppercase block mt-0.5">
+                Current Size: {requestItem.size} · Price: ₹{requestItem.price}
+              </span>
+            </div>
+
+            <hr className="border-neutral-100" />
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitReturnExchangeRequest();
+              }}
+              className="space-y-4 font-sans text-neutral-900"
+            >
+              {/* Reason Selector */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Reason for {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'}</span>
+                <select
+                  value={requestReason}
+                  onChange={(e) => setRequestReason(e.target.value)}
+                  className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-955 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden font-medium"
+                >
+                  <option value="Wrong size received">Wrong size received</option>
+                  <option value="Defective / Damaged product">Defective / Damaged product</option>
+                  <option value="Incorrect product delivered">Incorrect product delivered</option>
+                  <option value="Quality not up to standard">Quality not up to standard</option>
+                  <option value="Other (Explain in box below)">Other (Explain in box below)</option>
+                </select>
+              </div>
+
+              {/* Target Size (For Exchange Only) */}
+              {requestItem.type === 'EXCHANGE' && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Select Desired Size</span>
+                  <select
+                    value={exchangeTargetSize}
+                    onChange={(e) => setExchangeTargetSize(e.target.value)}
+                    required
+                    className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-955 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden font-medium"
+                  >
+                    <option value="">-- Choose New Size --</option>
+                    {requestItem.sizes && requestItem.sizes
+                      .filter(s => s !== requestItem.size)
+                      .map((size) => (
+                        <option key={size} value={size}>{size}</option>
+                      ))
+                    }
+                  </select>
+                  <span className="text-[8px] font-mono text-neutral-450 uppercase">
+                    Exchange is subject to catalog inventory availability during approval.
+                  </span>
+                </div>
+              )}
+
+              {/* Detailed Notes */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Additional Comments (Optional)</span>
+                <textarea
+                  value={customRequestText}
+                  onChange={(e) => setCustomRequestText(e.target.value)}
+                  placeholder="Explain any details here..."
+                  rows={3}
+                  className="w-full bg-[#fbfbfb] border border-neutral-955/20 focus:border-neutral-955 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden resize-none transition-colors"
+                />
+              </div>
+
+              {/* Product Photos Upload Verification (Required) */}
+              <div className="space-y-4">
+                <span className="text-xs font-mono font-bold text-neutral-500 uppercase block">
+                  Upload Product Photos <span className="text-rose-500 font-sans font-bold">*</span> (Required)
+                </span>
+                
+                {/* Front Image Upload */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-mono font-bold text-neutral-450 uppercase">Front View Photo</span>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={requestFrontImage}
+                      readOnly
+                      placeholder={uploadingFront ? "Uploading front view..." : "No front photo selected"}
+                      className="flex-1 bg-[#fbfbfb] border border-neutral-955/20 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden truncate"
+                    />
+                    <label className="shrink-0 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
+                      {uploadingFront ? 'Uploading...' : 'Choose Photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleRequestImageUpload(e, 'front')}
+                        disabled={uploadingFront}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {requestFrontImage && (
+                    <div className="relative group w-12 h-16 mt-1">
+                      <img 
+                        src={requestFrontImage} 
+                        alt="Front verification proof" 
+                        className="w-full h-full object-cover border border-neutral-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRequestFrontImage("")}
+                        className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors shadow-sm"
+                        title="Remove image"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Back Image Upload */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-mono font-bold text-neutral-450 uppercase">Back View Photo</span>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={requestBackImage}
+                      readOnly
+                      placeholder={uploadingBack ? "Uploading back view..." : "No back photo selected"}
+                      className="flex-1 bg-[#fbfbfb] border border-neutral-955/20 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden truncate"
+                    />
+                    <label className="shrink-0 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
+                      {uploadingBack ? 'Uploading...' : 'Choose Photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleRequestImageUpload(e, 'back')}
+                        disabled={uploadingBack}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {requestBackImage && (
+                    <div className="relative group w-12 h-16 mt-1">
+                      <img 
+                        src={requestBackImage} 
+                        alt="Back verification proof" 
+                        className="w-full h-full object-cover border border-neutral-200" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRequestBackImage("")}
+                        className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors shadow-sm"
+                        title="Remove image"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[9px] text-neutral-455 font-medium">
+                  Select from Camera or Gallery. Photos will be compressed automatically. Both front and back views are required.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={submittingRequest}
+                  className="flex-1 bg-neutral-950 hover:bg-neutral-800 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer text-center py-2.5 shadow-md"
+                >
+                  {submittingRequest ? 'Submitting...' : 'Submit Request'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="px-4 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer py-2.5"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

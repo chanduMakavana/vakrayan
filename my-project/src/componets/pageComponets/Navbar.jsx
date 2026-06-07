@@ -35,6 +35,17 @@ function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchVal, setSearchVal] = useState('');
 
+  // Search autocomplete suggestions
+  const suggestions = searchVal.trim().length >= 2
+    ? products.filter(p => {
+        const query = searchVal.toLowerCase();
+        return (
+          (p.name && p.name.toLowerCase().includes(query)) ||
+          (p.category && p.category.toLowerCase().includes(query))
+        );
+      }).slice(0, 6)
+    : [];
+
   // Extended Interactive States (Cart & Wishlist Drawers)
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [wishlistDrawerOpen, setWishlistDrawerOpen] = useState(false);
@@ -160,7 +171,7 @@ function Navbar() {
           price: Number(product.price),
           quantity: 1,
           subtotal: Number(product.price),
-          product_Image: product.product_Image || product.image || 'https://placehold.co/400x500',
+          product_Image: product.front_image_link || product.image_url || product.product_Image || product.product_image || product.image || 'https://placehold.co/400x500',
           size: size
         };
         const response = await cartService.addToCart(cartPayload);
@@ -511,8 +522,8 @@ function Navbar() {
       </nav>
 
       {/* Dynamic Slide-down Search Bar */}
-      <div className={`bg-white text-neutral-950 z-45 sticky top-[73px] transition-all duration-300 ease-in-out overflow-hidden ${searchOpen ? 'max-h-16 py-3 border-b border-neutral-950' : 'max-h-0 py-0'}`}>
-        <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between gap-4">
+      <div className={`bg-white text-neutral-950 z-45 sticky top-[73px] transition-all duration-300 ease-in-out ${searchOpen ? 'max-h-16 py-3 border-b border-neutral-950 overflow-visible' : 'max-h-0 py-0 overflow-hidden'}`}>
+        <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between gap-4 relative">
           <input 
             type="text" 
             placeholder="TYPE TO SEARCH THE STYLES ARCHIVE..." 
@@ -521,6 +532,49 @@ function Navbar() {
             className="bg-transparent border-b border-neutral-200 focus:border-neutral-950 text-xs tracking-widest font-mono uppercase py-2 outline-hidden w-full text-neutral-950 placeholder-neutral-400"
           />
           <button type="submit" className="text-[10px] font-mono font-bold tracking-widest bg-neutral-950 border border-neutral-950 text-white px-4 py-2 hover:bg-white hover:text-neutral-950 transition-colors uppercase shrink-0 rounded-none">SEARCH</button>
+
+          {/* Autocomplete Dropdown suggestions */}
+          {searchVal.trim().length >= 2 && (
+            <div className="absolute top-full left-6 right-6 md:left-12 md:right-12 mt-3 bg-white/95 backdrop-blur-md border border-neutral-950/15 shadow-2xl z-50 max-h-80 overflow-y-auto divide-y divide-neutral-100 no-print rounded-none">
+              {suggestions.length > 0 ? (
+                suggestions.map((p) => {
+                  const img = p.front_image_link || p.image_url || p.product_Image || p.product_image || p.image || 'https://placehold.co/100x125';
+                  return (
+                    <div 
+                      key={p.$id || p.id}
+                      onClick={() => {
+                        navigate(`/product/${p.$id || p.id}`);
+                        setSearchOpen(false);
+                        setSearchVal('');
+                      }}
+                      className="flex items-center gap-4 p-3.5 hover:bg-neutral-50 cursor-pointer transition-all duration-150 text-left"
+                    >
+                      <img 
+                        src={img} 
+                        alt={p.name} 
+                        className="w-10 h-12 object-cover border border-neutral-200 shrink-0 bg-neutral-50"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-neutral-950 truncate">
+                          {p.name}
+                        </h4>
+                        <p className="text-[9px] font-mono font-bold text-neutral-450 uppercase tracking-widest mt-0.5">
+                          {p.category || 'Styles Archive'}
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono font-black text-neutral-950 shrink-0">
+                        ₹{Number(p.price).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-6 text-center text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-[0.2em]">
+                  No matching styles found in archive
+                </div>
+              )}
+            </div>
+          )}
         </form>
       </div>
 
@@ -560,61 +614,66 @@ function Navbar() {
                 </button>
               </div>
             ) : (
-              cartItems.map((item) => (
-                <div key={item.$id} className="flex gap-4 p-4 border border-neutral-950/10 rounded-none hover:border-neutral-950 transition-all duration-200">
-                  <img 
-                    src={item.product_Image || 'https://placehold.co/100x125'} 
-                    alt={item.name} 
-                    className="w-20 h-24 object-cover rounded-none border border-neutral-200 shrink-0"
-                  />
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start gap-2">
-                        <h4 className="text-xs font-bold uppercase tracking-wide text-neutral-950 line-clamp-2">
-                          {item.name}
-                        </h4>
-                        <button 
-                          onClick={() => handleCartRemove(item.$id)}
-                          disabled={removingIds.has(item.$id)}
-                          className="text-rose-500 hover:text-rose-700 transition-colors p-1 cursor-pointer disabled:opacity-50"
-                        >
-                          {removingIds.has(item.$id) ? (
-                            <span className="w-3.5 h-3.5 border-2 border-rose-500 border-t-transparent rounded-none animate-spin block" />
-                          ) : (
-                            <HiX className="text-base" />
-                          )}
-                        </button>
+              cartItems.map((item) => {
+                const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id);
+                const imgUrl = item.product_Image || item.product_image || item.image || item.front_image_link || item.image_url || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image || 'https://placehold.co/100x125';
+                
+                return (
+                  <div key={item.$id} className="flex gap-4 p-4 border border-neutral-950/10 rounded-none hover:border-neutral-950 transition-all duration-200">
+                    <img 
+                      src={imgUrl} 
+                      alt={item.name} 
+                      className="w-20 h-24 object-cover rounded-none border border-neutral-200 shrink-0"
+                    />
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start gap-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wide text-neutral-950 line-clamp-2">
+                            {item.name}
+                          </h4>
+                          <button 
+                            onClick={() => handleCartRemove(item.$id)}
+                            disabled={removingIds.has(item.$id)}
+                            className="text-rose-500 hover:text-rose-700 transition-colors p-1 cursor-pointer disabled:opacity-50"
+                          >
+                            {removingIds.has(item.$id) ? (
+                              <span className="w-3.5 h-3.5 border-2 border-rose-500 border-t-transparent rounded-none animate-spin block" />
+                            ) : (
+                              <HiX className="text-base" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1 font-mono">
+                          Size: {item.size || 'M'} | ₹{item.price}
+                        </p>
                       </div>
-                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1 font-mono">
-                        Size: {item.size || 'M'} | ₹{item.price}
-                      </p>
-                    </div>
 
-                    <div className="flex justify-between items-center mt-2">
-                      <div className="flex items-center border border-neutral-950/15 rounded-none overflow-hidden bg-neutral-50">
-                        <button 
-                          onClick={() => handleCartQuantityShift(item, 'decrease')}
-                          className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
-                        >
-                          <HiMinus className="text-xs" />
-                        </button>
-                        <span className="px-3 text-xs font-mono font-bold text-neutral-900">
-                          {item.quantity}
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="flex items-center border border-neutral-950/15 rounded-none overflow-hidden bg-neutral-50">
+                          <button 
+                            onClick={() => handleCartQuantityShift(item, 'decrease')}
+                            className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                          >
+                            <HiMinus className="text-xs" />
+                          </button>
+                          <span className="px-3 text-xs font-mono font-bold text-neutral-900">
+                            {item.quantity}
+                          </span>
+                          <button 
+                            onClick={() => handleCartQuantityShift(item, 'increase')}
+                            className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
+                          >
+                            <HiPlus className="text-xs" />
+                          </button>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-neutral-900">
+                          ₹{item.subtotal}
                         </span>
-                        <button 
-                          onClick={() => handleCartQuantityShift(item, 'increase')}
-                          className="p-2 text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer"
-                        >
-                          <HiPlus className="text-xs" />
-                        </button>
                       </div>
-                      <span className="text-xs font-mono font-bold text-neutral-900">
-                        ₹{item.subtotal}
-                      </span>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

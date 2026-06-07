@@ -980,26 +980,31 @@ function Checkout() {
 
               {/* Items List */}
               <div className="space-y-4 max-h-72 overflow-y-auto pr-2 scrollbar-none">
-                {cartItems.map((item) => (
-                  <div key={item.$id} className="flex gap-3 items-center">
-                    <img 
-                      src={item.product_Image || 'https://placehold.co/100x100'} 
-                      alt={item.name} 
-                      className="w-12 h-16 object-cover border border-neutral-200 rounded-lg shrink-0" 
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-black uppercase text-neutral-900 truncate tracking-wide">
-                        {item.name}
-                      </h4>
-                      <p className="text-[9px] font-mono text-neutral-500 uppercase">
-                        Size: {item.size || 'M'} · Qty: {item.quantity}
-                      </p>
+                {cartItems.map((item) => {
+                  const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id);
+                  const imgUrl = item.product_Image || item.product_image || item.image || item.front_image_link || item.image_url || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image || 'https://placehold.co/100x100';
+                  
+                  return (
+                    <div key={item.$id} className="flex gap-3 items-center">
+                      <img 
+                        src={imgUrl} 
+                        alt={item.name} 
+                        className="w-12 h-16 object-cover border border-neutral-200 rounded-lg shrink-0" 
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-black uppercase text-neutral-900 truncate tracking-wide">
+                          {item.name}
+                        </h4>
+                        <p className="text-[9px] font-mono text-neutral-500 uppercase">
+                          Size: {item.size || 'M'} · Qty: {item.quantity}
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono font-black text-neutral-900">
+                        ₹{item.subtotal?.toLocaleString('en-IN')}
+                      </span>
                     </div>
-                    <span className="text-xs font-mono font-black text-neutral-900">
-                      ₹{item.subtotal?.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <hr className="border-neutral-100" />

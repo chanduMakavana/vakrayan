@@ -72,6 +72,8 @@ function AddToCartPage() {
 
   const discountAmount = cartTotalAmount * (discountPercent / 100);
   const finalAmount = cartTotalAmount - discountAmount;
+  const baseShippingFee = finalAmount >= 999 ? 0 : 99;
+  const grandTotal = finalAmount + baseShippingFee;
 
   // ➡️ 1. INITIAL FETCH: use Redux user directly — no redundant API call
   const fetchCartStage = async () => {
@@ -228,6 +230,8 @@ function AddToCartPage() {
             
             {cartItems.map((item) => {
               const uniqueId = item.$id;
+              const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id);
+              const imgUrl = item.product_Image || item.product_image || item.image || item.front_image_link || item.image_url || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image || 'https://placehold.co/400x500?text=No+Preview';
               
               return (
                 <div 
@@ -245,7 +249,7 @@ function AddToCartPage() {
                   {/* Image */}
                   <div className="w-20 h-26 sm:w-24 sm:h-32 rounded-lg overflow-hidden bg-neutral-100 border border-neutral-200/30 shrink-0">
                     <img 
-                      src={item.product_Image || 'https://placehold.co/400x500?text=No+Preview'} 
+                      src={imgUrl} 
                       alt={item.name} 
                       className="w-full h-full object-cover object-center"
                     />
@@ -322,10 +326,21 @@ function AddToCartPage() {
               )}
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span className="text-emerald-600 font-semibold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
-                  FREE SHIPPING
-                </span>
+                {baseShippingFee > 0 ? (
+                  <span className="text-neutral-900 font-semibold font-mono">
+                    ₹{baseShippingFee}
+                  </span>
+                ) : (
+                  <span className="text-emerald-600 font-semibold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">
+                    FREE SHIPPING
+                  </span>
+                )}
               </div>
+              {baseShippingFee > 0 && (
+                <div className="text-[10px] text-indigo-600 font-semibold text-right">
+                  Add ₹{(999 - finalAmount).toLocaleString('en-IN')} more to unlock FREE SHIPPING!
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Estimated Tax</span>
                 <span className="text-neutral-400">Included</span>
@@ -336,7 +351,7 @@ function AddToCartPage() {
               <div className="flex justify-between items-baseline pt-2">
                 <span className="text-sm font-semibold text-neutral-800">Total</span>
                 <span className="text-xl font-bold text-neutral-950">
-                  ₹{finalAmount.toLocaleString('en-IN')}
+                  ₹{grandTotal.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
