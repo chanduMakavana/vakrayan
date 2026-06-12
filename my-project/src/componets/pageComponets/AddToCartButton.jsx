@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { CgShoppingCart } from 'react-icons/cg'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
@@ -8,8 +7,9 @@ import { addCartItemState } from '../../features/addToCart'
 import { playZip } from '../../utils/sensoryHelper'
 import { useToast } from '../../context/ToastContext'
 
+const generateGuestCartId = () => `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
 function AddToCartButton({ product, selectedSize, selectedColor, variant = "default" }) {
-    const navigate = useNavigate()
     const dispatch = useDispatch()
     const { showToast } = useToast()
 
@@ -29,13 +29,18 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
 
     // Check if completely out of stock across all defined sizes
     let isAllOutOfStock = false;
-    if (product && product.sizes && product.sizes.length > 0) {
-        const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+    const unionSizes = product ? Array.from(new Set([
+        ...(product.sizes || []),
+        ...Object.keys(stocks)
+    ])).filter(sz => ['XS', 'S', 'M', 'L', 'XL', 'XXL'].includes(sz)) : [];
+
+    if (unionSizes.length > 0) {
+        const totalStock = unionSizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
         isAllOutOfStock = totalStock === 0;
     }
 
     // Check if selected size (or default fallback) is out of stock
-    const baseSize = selectedSize || product?.sizes?.[0] || 'M';
+    const baseSize = selectedSize || unionSizes[0] || 'M';
     const isSelectedSizeOutOfStock = stocks[baseSize] === 0;
 
     const handleAdd = async (e) => {
@@ -45,8 +50,69 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
         if (!product) return
 
         if (!isAuthenticated || !user) {
-            showToast("Please login to secure your drop.", "error")
-            navigate('/login')
+            try {
+                setStatus('loading')
+                const baseSizeVal = selectedSize || product.sizes?.[0] || 'M'
+                let targetSize = baseSizeVal
+                if (selectedColor) {
+                    targetSize = `${baseSizeVal} / ${selectedColor.toUpperCase()}`
+                }
+                const targetProductId = product.$id || product.id
+                
+                let guestItems = []
+                try {
+                    const saved = localStorage.getItem('guest_cart_items')
+                    guestItems = saved ? JSON.parse(saved) : []
+                } catch {
+                    guestItems = []
+                }
+
+                const existingCartItem = guestItems.find(
+                    item => item.product_id === targetProductId && item.size === targetSize
+                )
+
+                const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
+                if (currentQuantityInCart + 1 > availableStock) {
+                    showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "error");
+                    setStatus('idle');
+                    return;
+                }
+
+                let response;
+                if (existingCartItem) {
+                    existingCartItem.quantity += 1;
+                    existingCartItem.subtotal = Number(existingCartItem.price) * existingCartItem.quantity;
+                    response = existingCartItem;
+                } else {
+                    const itemPrice = Number(product.price);
+                    response = {
+                        $id: generateGuestCartId(),
+                        name: product.name,
+                        userId: 'guest',
+                        size: targetSize,
+                        price: itemPrice,
+                        quantity: 1,
+                        subtotal: itemPrice,
+                        product_id: targetProductId,
+                        product_Image: product.front_image_link || product.image_url || product.image
+                    };
+                    guestItems.push(response);
+                }
+
+                localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+                dispatch(addCartItemState(response))
+                playZip()
+                window.dispatchEvent(new Event('cart-item-added'))
+                setStatus('success')
+                setTimeout(() => {
+                    setStatus('idle')
+                }, 1500)
+            } catch (error) {
+                console.error("Guest cart insertion failure:", error)
+                setStatus('idle')
+                showToast(error.message || "Failed to add to cart.", "error")
+            }
             return
         }
 
@@ -119,7 +185,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             return (
                 <button
                     disabled
-                    className="text-xs tracking-widest uppercase py-3 px-6 rounded-none transform translate-y-4 group-hover:translate-y-0 shadow-2xl font-black bg-neutral-100 text-neutral-400 cursor-not-allowed select-none min-w-35 flex items-center justify-center border border-neutral-250/20"
+                    className="text-xs tracking-widest uppercase py-3 px-6 rounded-none transform translate-y-4 group-hover:translate-y-0 shadow-2xl font-black bg-[var(--color-subtle)] text-[var(--color-muted)] cursor-not-allowed select-none min-w-35 flex items-center justify-center border border-[var(--color-border)]"
                 >
                     <span>SOLD OUT</span>
                 </button>
@@ -134,7 +200,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
                 className={`text-xs tracking-widest uppercase py-3 px-6 rounded-none transform translate-y-4 group-hover:translate-y-0 shadow-2xl font-black cursor-pointer select-none transition-all duration-300 min-w-35 flex items-center justify-center ${
                     status === 'success' 
                     ? 'bg-emerald-500 text-white' 
-                    : 'bg-white text-black hover:bg-neutral-200'
+                    : 'bg-[var(--color-surface)] text-black hover:bg-[var(--color-border)]'
                 }`}
             >
                 <AnimatePresence mode="wait">
@@ -161,7 +227,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
         return (
             <button
                 disabled
-                className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed select-none font-sans"
+                className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] cursor-not-allowed select-none font-sans"
             >
                 <span>{isAllOutOfStock ? 'SOLD OUT' : 'OUT OF STOCK'}</span>
             </button>
@@ -176,7 +242,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             className={`w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none transition-all select-none cursor-pointer ${
                 status === 'success'
                 ? 'bg-emerald-500 text-white border border-emerald-500'
-                : 'bg-neutral-950 text-white hover:bg-neutral-800 border border-neutral-950'
+                : 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] border border-[var(--color-accent)]'
             }`}
         >
             <AnimatePresence mode="wait">

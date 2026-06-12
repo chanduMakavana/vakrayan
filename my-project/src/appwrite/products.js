@@ -90,6 +90,33 @@ export class ProductsService {
         }
     }
 
+    // Retrieve details for a specific product by slug or ID
+    async getProductBySlugOrId(idOrSlug) {
+        try {
+            // First try listing documents by slug
+            const response = await this.databases.listDocuments(
+                conf.appwriteDatabaseId,
+                conf.appwriteProductsCollectionId,
+                [
+                    Query.equal('slug', idOrSlug),
+                    Query.limit(1)
+                ]
+            );
+            if (response.documents && response.documents.length > 0) {
+                return response.documents[0];
+            }
+            // Fallback to getProductById
+            return await this.getProductById(idOrSlug);
+        } catch (error) {
+            console.warn("Slug lookup failed, falling back to ID lookup:", error.message);
+            try {
+                return await this.getProductById(idOrSlug);
+            } catch {
+                throw error;
+            }
+        }
+    }
+
     // Log query search analytics for marketing insight
     async logSearch(query, resultsCount, userId) {
         const payload = {

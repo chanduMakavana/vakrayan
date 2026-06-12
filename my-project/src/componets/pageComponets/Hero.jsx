@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import slidesService from '../../appwrite/slides'
 
@@ -141,7 +141,7 @@ function Hero() {
 
   if (!imagesLoaded) {
     return (
-      <div className="w-full h-[55vh] md:h-[75vh] relative overflow-hidden bg-neutral-900 animate-pulse">
+      <div className="w-full h-[65vh] md:h-[80vh] relative overflow-hidden bg-neutral-900 animate-pulse">
         {/* Skeleton Left Arrow Control */}
         <div className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-neutral-800/80 rounded-full" />
         
@@ -162,7 +162,7 @@ function Hero() {
   }
 
   return (
-    <div className='w-full h-[55vh] md:h-[75vh] relative overflow-hidden bg-neutral-955'>
+    <div className='w-full h-[65vh] md:h-[80vh] relative overflow-hidden bg-neutral-955'>
       
       {/* Dynamic Background Image Slider with Horizontal Slide */}
       <div className="absolute inset-0 z-0 overflow-hidden">
@@ -186,6 +186,7 @@ function Hero() {
               alt="Streetwear Banner"
               className="w-full h-full object-cover select-none"
             />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 pointer-events-none" />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -196,7 +197,7 @@ function Hero() {
           {/* Arrow Controls */}
           <button
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-3 rounded-full backdrop-blur-xs transition-colors cursor-pointer border border-white/10"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-3.5 rounded-full backdrop-blur-xs transition-all cursor-pointer border border-white/10 hover:scale-110"
             aria-label="Previous slide"
           >
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -206,7 +207,7 @@ function Hero() {
           
           <button
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-3 rounded-full backdrop-blur-xs transition-colors cursor-pointer border border-white/10"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-black/30 hover:bg-black/50 text-white p-3.5 rounded-full backdrop-blur-xs transition-all cursor-pointer border border-white/10 hover:scale-110"
             aria-label="Next slide"
           >
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -223,8 +224,8 @@ function Hero() {
                   e.stopPropagation()
                   setCurrentIndex(idx)
                 }}
-                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                  currentIndex === idx ? 'bg-white scale-125' : 'bg-white/40 hover:bg-white/60'
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  currentIndex === idx ? 'bg-[var(--color-surface)] w-6 rounded-full' : 'w-2.5 bg-[var(--color-surface)]/40 hover:bg-[var(--color-surface)]/60'
                 } cursor-pointer`}
                 aria-label={`Go to slide ${idx + 1}`}
               />

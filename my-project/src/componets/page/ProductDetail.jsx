@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiShield, FiTruck, FiScissors, FiArrowLeft, FiMapPin } from 'react-icons/fi';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../appwrite/products';
 import reviewsService from '../../appwrite/reviews';
@@ -8,31 +8,106 @@ import ordersService from '../../appwrite/orders';
 import wishlistService from '../../appwrite/wishlist';
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice';
 import AddToCartButton from '../pageComponets/AddToCartButton';
-import Navbar from '../pageComponets/Navbar';
 import Footer from '../pageComponets/Footer';
 import restockService from '../../appwrite/restock';
 import { FaStar } from 'react-icons/fa';
 import { useToast } from '../../context/ToastContext';
 import storageService, { compressImage } from '../../appwrite/storage';
+import { sendWebhookNotification } from '../../utils/webhookHelper';
+import cartService from '../../appwrite/cart';
+import { addCartItemState } from '../../features/addToCart';
+
+
+const isCodAvailableForPincode = (pin, stateName = '') => {
+  if (!pin) return true;
+  const state = stateName.toUpperCase().trim();
+  if (pin.startsWith('19') || pin.startsWith('79') || pin.startsWith('744')) {
+    return false;
+  }
+  if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP'].includes(state)) {
+    return false;
+  }
+  return true;
+};
+
+const calculateDeliveryDetails = (pin, stateName = '') => {
+  const state = stateName.toUpperCase().trim();
+  const firstDigit = pin[0];
+
+  let minTransit;
+  let maxTransit;
+  let desc;
+  let carrier;
+
+  if (pin === '395006') {
+    minTransit = 0;
+    maxTransit = 1;
+    desc = 'Surat Warehouse Local Dispatch';
+    carrier = 'Surat Local Express / Self Pickup';
+  } else if (state === 'GUJARAT' || pin.startsWith('39')) {
+    minTransit = 1;
+    maxTransit = 2;
+    desc = 'Gujarat Regional Delivery';
+    carrier = 'Delhivery Express';
+  } else if (state === 'MAHARASHTRA' || state === 'RAJASTHAN' || state === 'MADHYA PRADESH' || firstDigit === '4' || pin.startsWith('30') || pin.startsWith('31') || pin.startsWith('32') || pin.startsWith('33') || pin.startsWith('34')) {
+    minTransit = 2;
+    maxTransit = 3;
+    desc = 'West/Central India Express Shipping';
+    carrier = 'Delhivery Air';
+  } else if (['DELHI', 'HARYANA', 'PUNJAB', 'UTTAR PRADESH', 'KARNATAKA', 'TELANGANA', 'ANDHRA PRADESH', 'TAMIL NADU'].includes(state) || ['1', '2', '5'].includes(firstDigit)) {
+    minTransit = 3;
+    maxTransit = 4;
+    desc = 'Metro Connect Express Delivery';
+    carrier = 'Bluedart Air';
+  } else if (['7', '8'].includes(firstDigit)) {
+    minTransit = 4;
+    maxTransit = 5;
+    desc = 'East India Connect';
+    carrier = 'Xpressbees Courier';
+  } else {
+    minTransit = 5;
+    maxTransit = 7;
+    desc = 'National Connect Remote Delivery';
+    carrier = 'India Post Speed Post';
+  }
+
+  const today = new Date();
+  const minDeliveryDate = new Date();
+  minDeliveryDate.setDate(today.getDate() + 1 + minTransit);
+
+  const maxDeliveryDate = new Date();
+  maxDeliveryDate.setDate(today.getDate() + 2 + maxTransit);
+
+  const options = { weekday: 'short', day: 'numeric', month: 'short' };
+  const dateRange = `${minDeliveryDate.toLocaleDateString('en-IN', options)} - ${maxDeliveryDate.toLocaleDateString('en-IN', options)}`;
+
+  return { days: `${minTransit + 1}-${maxTransit + 2} Days`, dateRange, desc, carrier };
+};
 
 function ProductDetail() {
-  const { id } = useParams();
+  const { idOrSlug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const colorParam = searchParams.get('color');
   const products = useSelector(state => state.products.items || []);
   const wishlist = useSelector(state => state.wishlist || []);
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth);
+  const cartItems = useSelector(state => state.cart || []);
 
   const [product, setProduct] = useState(null);
+  const id = product?.$id || product?.id;
+
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [activeVariant, setActiveVariant] = useState(null);
   const [groupProducts, setGroupProducts] = useState([]);
+  const [activeReviewImage, setActiveReviewImage] = useState(null);
 
-  // Restock Notifications State & Handler
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifyStatus, setNotifyStatus] = useState('idle');
   const [notifyError, setNotifyError] = useState('');
@@ -59,6 +134,15 @@ function ProductDetail() {
         size
       );
       setNotifyStatus('success');
+      
+      // Dispatch restock.requested webhook notification
+      sendWebhookNotification('restock.requested', {
+        email: notifyEmail.trim(),
+        productId: product.$id || product.id,
+        productName: product.name,
+        size: size
+      });
+      
       setNotifyEmail('');
     } catch (err) {
       console.error("Restock log failure:", err);
@@ -67,8 +151,8 @@ function ProductDetail() {
     }
   };
 
-  // Product Reviews State
   const [reviews, setReviews] = useState([]);
+  const [showAllReviews, setShowAllReviews] = useState(false);
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState('');
   const [newReviewTitle, setNewReviewTitle] = useState('');
@@ -77,14 +161,12 @@ function ProductDetail() {
   const [hasDeliveredOrder, setHasDeliveredOrder] = useState(false);
   const [checkingOrder, setCheckingOrder] = useState(true);
 
-  // Fit & characteristic rating inputs states
-  const [newFit, setNewFit] = useState('true'); // 'tight', 'true', or 'loose'
+  const [newFit, setNewFit] = useState('true');
   const [newComfort, setNewComfort] = useState(5);
   const [newQuality, setNewQuality] = useState(5);
   const [newBreathable, setNewBreathable] = useState(5);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Virtual Size Advisor & Wishlist Integration
   const [sizeAdvisorOpen, setSizeAdvisorOpen] = useState(false);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
   const [advHeight, setAdvHeight] = useState('');
@@ -99,6 +181,20 @@ function ProductDetail() {
     return () => window.removeEventListener('wishlist-updated', handleUpdate);
   }, []);
 
+  // Reset and prefill restock notification form when size or product changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setNotifyStatus('idle');
+      setNotifyError('');
+      if (isAuthenticated && user && user.email) {
+        setNotifyEmail(user.email);
+      } else {
+        setNotifyEmail('');
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedSize, id, isAuthenticated, user]);
+
   const calculateRecommendation = () => {
     const h = Number(advHeight) / 100;
     const w = Number(advWeight);
@@ -110,86 +206,15 @@ function ProductDetail() {
   };
   
 
-  // Interactive detail accordions
   const [descExpanded, setDescExpanded] = useState(true);
-  const [sizingExpanded, setSizingExpanded] = useState(false);
   const [shippingExpanded, setShippingExpanded] = useState(false);
 
-  // Pincode Checker States
   const [pincodeInput, setPincodeInput] = useState(() => localStorage.getItem('checked_pincode') || '');
   const [pinChecking, setPinChecking] = useState(false);
   const [pinResult, setPinResult] = useState(null);
   const [pinError, setPinError] = useState('');
 
-  const isCodAvailableForPincode = (pin, stateName = '') => {
-    if (!pin) return true;
-    const state = stateName.toUpperCase().trim();
-    if (pin.startsWith('19') || pin.startsWith('79') || pin.startsWith('744')) {
-      return false;
-    }
-    if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP'].includes(state)) {
-      return false;
-    }
-    return true;
-  };
-
-  const calculateDeliveryDetails = (pin, stateName = '', districtName = '') => {
-    const state = stateName.toUpperCase().trim();
-    const firstDigit = pin[0];
-
-    let minTransit = 3;
-    let maxTransit = 5;
-    let desc = 'Standard Dispatch';
-    let carrier = 'Bluedart Express';
-
-    if (pin === '395006') {
-      minTransit = 0;
-      maxTransit = 1;
-      desc = 'Surat Warehouse Local Dispatch';
-      carrier = 'Surat Local Express / Self Pickup';
-    } else if (state === 'GUJARAT' || pin.startsWith('39')) {
-      minTransit = 1;
-      maxTransit = 2;
-      desc = 'Gujarat Regional Delivery';
-      carrier = 'Delhivery Express';
-    } else if (state === 'MAHARASHTRA' || state === 'RAJASTHAN' || state === 'MADHYA PRADESH' || firstDigit === '4' || pin.startsWith('30') || pin.startsWith('31') || pin.startsWith('32') || pin.startsWith('33') || pin.startsWith('34')) {
-      minTransit = 2;
-      maxTransit = 3;
-      desc = 'West/Central India Express Shipping';
-      carrier = 'Delhivery Air';
-    } else if (['DELHI', 'HARYANA', 'PUNJAB', 'UTTAR PRADESH', 'KARNATAKA', 'TELANGANA', 'ANDHRA PRADESH', 'TAMIL NADU'].includes(state) || ['1', '2', '5'].includes(firstDigit)) {
-      minTransit = 3;
-      maxTransit = 4;
-      desc = 'Metro Connect Express Delivery';
-      carrier = 'Bluedart Air';
-    } else if (['7', '8'].includes(firstDigit)) {
-      minTransit = 4;
-      maxTransit = 5;
-      desc = 'East India Connect';
-      carrier = 'Xpressbees Courier';
-    } else {
-      minTransit = 5;
-      maxTransit = 7;
-      desc = 'National Connect Remote Delivery';
-      carrier = 'India Post Speed Post';
-    }
-
-    // Today is order placement date.
-    // Dispatch delay: 1 day minimum, 2 days maximum.
-    const today = new Date();
-    const minDeliveryDate = new Date();
-    minDeliveryDate.setDate(today.getDate() + 1 + minTransit);
-
-    const maxDeliveryDate = new Date();
-    maxDeliveryDate.setDate(today.getDate() + 2 + maxTransit);
-
-    const options = { weekday: 'short', day: 'numeric', month: 'short' };
-    const dateRange = `${minDeliveryDate.toLocaleDateString('en-IN', options)} - ${maxDeliveryDate.toLocaleDateString('en-IN', options)}`;
-
-    return { days: `${minTransit + 1}-${maxTransit + 2} Days`, dateRange, desc, carrier };
-  };
-
-  const performPincodeCheck = async (pin) => {
+  const performPincodeCheck = useCallback(async (pin) => {
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
       setPinError('Please enter a valid 6-digit Indian pincode.');
       setPinResult(null);
@@ -203,7 +228,7 @@ function ProductDetail() {
       const data = await response.json();
       if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
         const po = data[0].PostOffice[0];
-        const details = calculateDeliveryDetails(pin, po.State, po.District);
+        const details = calculateDeliveryDetails(pin, po.State);
         const isCodAllowed = isCodAvailableForPincode(pin, po.State);
         setPinResult({
           pincode: pin,
@@ -249,16 +274,18 @@ function ProductDetail() {
     } finally {
       setPinChecking(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem('checked_pincode');
     if (stored && /^[1-9][0-9]{5}$/.test(stored)) {
-      performPincodeCheck(stored);
+      const timer = setTimeout(() => {
+        performPincodeCheck(stored);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [performPincodeCheck]);
 
-  // Loupe Zoom Magnifier State
   const [zoomStyle, setZoomStyle] = useState({ transformOrigin: 'center center', scale: '1' });
 
   const [suggestProduct, setSuggestProduct] = useState(null);
@@ -285,85 +312,61 @@ function ProductDetail() {
      try {
        if (isMounted) setLoading(true);
 
-       // Attempt Redux Cache pre-matching first
-       const cachedProduct = products.find(p => p.$id === id || p.id === id);
+       const cachedProduct = products.find(p => p.slug === idOrSlug || p.$id === idOrSlug || p.id === idOrSlug);
        if (cachedProduct) {
          if (isMounted) {
            setProduct(cachedProduct);
            setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
            
-            if (cachedProduct.sizes && cachedProduct.sizes.length > 0) {
-              let stockMap = {};
-              try {
-                stockMap = JSON.parse(cachedProduct.sizes_stock || '{}');
-              } catch {
-                stockMap = {};
-              }
-              const firstInStockSize = cachedProduct.sizes.find(sz => stockMap[sz] > 0);
-              setSelectedSize(firstInStockSize || cachedProduct.sizes[0]);
-            }
-
-           // Initialize selectedColor if Option B JSON exists
-           if (cachedProduct.color_hex && cachedProduct.color_hex.startsWith('[')) {
+             let stockMap = {};
              try {
-               const parsed = JSON.parse(cachedProduct.color_hex);
-               if (Array.isArray(parsed) && parsed.length > 0) {
-                 setSelectedColor(parsed[0].name);
-                 setActiveVariant(parsed[0]);
-                 setActiveImage(parsed[0].front || cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
-               }
-             } catch (e) {
-               console.warn("Error parsing color_hex:", e);
+               stockMap = JSON.parse(cachedProduct.sizes_stock || '{}');
+             } catch {
+               stockMap = {};
              }
-           } else {
-             setSelectedColor(cachedProduct.color_name || '');
-             setActiveVariant(null);
-           }
+             const unionSizes = Array.from(new Set([
+               ...(cachedProduct.sizes || []),
+               ...Object.keys(stockMap)
+             ])).filter(sz => ['XS', 'S', 'M', 'L', 'XL', 'XXL'].includes(sz));
 
-           const cachedCategory = cachedProduct.category || "";
-           const filteredSuggestions = products.filter(
-             item => cachedCategory && item.category === cachedCategory && (item.$id || item.id) !== (cachedProduct.$id || cachedProduct.id)
-           );
-           setSuggestProduct(filteredSuggestions);
-           setLoading(false);
+             const firstInStockSize = unionSizes.find(sz => stockMap[sz] > 0);
+             setSelectedSize(firstInStockSize || unionSizes[0] || '');
+
+            setSelectedColor(cachedProduct.color_name || '');
+            setActiveVariant(null);
+ 
+            const cachedCategory = cachedProduct.category || "";
+            const filteredSuggestions = products.filter(
+              item => cachedCategory && item.category === cachedCategory && (item.$id || item.id) !== (cachedProduct.$id || cachedProduct.id)
+            );
+            setSuggestProduct(filteredSuggestions);
+            setLoading(false);
          }
          return;
        }
 
-       // Database fallback queries
-       const mainProductData = await productsService.getProductById(id);
+       const mainProductData = await productsService.getProductBySlugOrId(idOrSlug);
 
        if (mainProductData && isMounted) {
          setProduct(mainProductData);
          setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
          
-          if (mainProductData.sizes && mainProductData.sizes.length > 0) {
-            let stockMap = {};
-            try {
-              stockMap = JSON.parse(mainProductData.sizes_stock || '{}');
-            } catch {
-              stockMap = {};
-            }
-            const firstInStockSize = mainProductData.sizes.find(sz => stockMap[sz] > 0);
-            setSelectedSize(firstInStockSize || mainProductData.sizes[0]);
-          }
-
-         // Initialize selectedColor if Option B JSON exists
-         if (mainProductData.color_hex && mainProductData.color_hex.startsWith('[')) {
+           let stockMap = {};
            try {
-             const parsed = JSON.parse(mainProductData.color_hex);
-             if (Array.isArray(parsed) && parsed.length > 0) {
-               setSelectedColor(parsed[0].name);
-               setActiveVariant(parsed[0]);
-               setActiveImage(parsed[0].front || mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
-             }
-           } catch (e) {
-             console.warn("Error parsing color_hex:", e);
+             stockMap = JSON.parse(mainProductData.sizes_stock || '{}');
+           } catch {
+             stockMap = {};
            }
-         } else {
-           setSelectedColor(mainProductData.color_name || '');
-           setActiveVariant(null);
-         }
+           const unionSizes = Array.from(new Set([
+             ...(mainProductData.sizes || []),
+             ...Object.keys(stockMap)
+           ])).filter(sz => ['XS', 'S', 'M', 'L', 'XL', 'XXL'].includes(sz));
+
+           const firstInStockSize = unionSizes.find(sz => stockMap[sz] > 0);
+           setSelectedSize(firstInStockSize || unionSizes[0] || '');
+
+          setSelectedColor(mainProductData.color_name || '');
+          setActiveVariant(null);
 
          const mainCategory = mainProductData.category || "";
          const response = await productsService.getProducts();
@@ -386,27 +389,31 @@ function ProductDetail() {
      }
    }
 
-   if (id) {
+   if (idOrSlug) {
      loadCompleteProductStage();
    }
    return () => {
      isMounted = false;
    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [idOrSlug, products, navigate, showToast, colorParam]);
 
   useEffect(() => {
     if (product && product.color_group_id && products.length > 0) {
       const siblings = products.filter(
         p => p.color_group_id === product.color_group_id
       );
-      setGroupProducts(siblings);
+      const timer = setTimeout(() => {
+        setGroupProducts(siblings);
+      }, 0);
+      return () => clearTimeout(timer);
     } else {
-      setGroupProducts([]);
+      const timer = setTimeout(() => {
+        setGroupProducts([]);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [product, products]);
 
-  // Load reviews on mount
   useEffect(() => {
     let isMounted = true;
     async function loadReviews() {
@@ -425,7 +432,146 @@ function ProductDetail() {
     };
   }, [id]);
 
-  // Check if user has a delivered order for this product
+  // Recently Viewed logging on product load
+  useEffect(() => {
+    if (product) {
+      const productId = product.$id || product.id;
+      if (productId) {
+        let viewed;
+        try {
+          const saved = localStorage.getItem('recently_viewed');
+          viewed = saved ? JSON.parse(saved) : [];
+        } catch {
+          viewed = [];
+        }
+        viewed = viewed.filter(vId => vId !== productId);
+        viewed.unshift(productId);
+        viewed = viewed.slice(0, 8); // Track top 8 products
+        localStorage.setItem('recently_viewed', JSON.stringify(viewed));
+      }
+    }
+  }, [product]);
+
+  // Handle auto-checkout from pending guest Buy Now post-login
+  useEffect(() => {
+    if (isAuthenticated && user && product) {
+      const pendingStr = sessionStorage.getItem('buy_now_pending');
+      if (pendingStr) {
+        try {
+          const pending = JSON.parse(pendingStr);
+          const currentId = product.$id || product.id;
+          if (pending && pending.productId === currentId) {
+            sessionStorage.removeItem('buy_now_pending');
+            setTimeout(() => {
+              if (pending.size) setSelectedSize(pending.size);
+              if (pending.color) setSelectedColor(pending.color);
+            }, 0);
+            
+            const targetProductId = currentId;
+            const baseSizeVal = pending.size || 'M';
+            let targetSize = baseSizeVal;
+            if (pending.color) {
+              targetSize = `${baseSizeVal} / ${pending.color.toUpperCase()}`;
+            }
+
+            const executePendingBuyNow = async () => {
+              try {
+                const existingCartItem = cartItems.find(
+                  item => item.product_id === targetProductId && item.size === targetSize
+                );
+
+                let response;
+                if (existingCartItem) {
+                  response = existingCartItem;
+                } else {
+                  response = await cartService.addToCart({
+                    name: product.name,
+                    size: targetSize,
+                    price: product.price,
+                    product_id: targetProductId,
+                    product_Image: product.front_image_link || product.image_url || product.image,
+                    userId: user.$id,
+                    existingCartItem: null
+                  });
+                  if (response) {
+                    dispatch(addCartItemState(response));
+                  }
+                }
+
+                if (response?.$id) {
+                  sessionStorage.setItem('selected_cart_item_ids', JSON.stringify([response.$id]));
+                  navigate('/checkout');
+                }
+              } catch (e) {
+                console.error("Failed to execute pending Buy Now:", e);
+              }
+            };
+            
+            executePendingBuyNow();
+          }
+        } catch (e) {
+          console.warn("Could not process pending Buy Now:", e);
+        }
+      }
+    }
+  }, [isAuthenticated, user, product, cartItems, dispatch, navigate]);
+
+  const handleBuyNow = async () => {
+    if (!product) return;
+    
+    if (!isAuthenticated || !user) {
+      sessionStorage.setItem('buy_now_pending', JSON.stringify({
+        productId: product.$id || product.id,
+        size: selectedSize || product.sizes?.[0] || 'M',
+        color: selectedColor || ''
+      }));
+      showToast("Please sign in to complete your checkout.", "info");
+      navigate('/login', { state: { from: location } });
+      return;
+    }
+
+    const baseSizeVal = selectedSize || product.sizes?.[0] || 'M';
+    let targetSize = baseSizeVal;
+    if (selectedColor) {
+      targetSize = `${baseSizeVal} / ${selectedColor.toUpperCase()}`;
+    }
+    
+    try {
+      const targetProductId = product.$id || product.id;
+      
+      const existingCartItem = cartItems.find(
+        item => item.product_id === targetProductId && item.size === targetSize
+      );
+
+      let response;
+      if (existingCartItem) {
+        response = existingCartItem;
+      } else {
+        response = await cartService.addToCart({
+          name: product.name,
+          size: targetSize,
+          price: product.price,
+          product_id: targetProductId,
+          product_Image: product.front_image_link || product.image_url || product.image,
+          userId: user.$id,
+          existingCartItem: null
+        });
+        
+        if (response) {
+          dispatch(addCartItemState(response));
+        }
+      }
+
+      if (response?.$id) {
+        sessionStorage.setItem('selected_cart_item_ids', JSON.stringify([response.$id]));
+        navigate('/checkout');
+      }
+    } catch (error) {
+      console.error("Buy now failure:", error);
+      showToast(error.message || "Failed to process Buy Now.", "error");
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     async function checkPurchased() {
@@ -527,7 +673,6 @@ function ProductDetail() {
 
     setUploadingImage(true);
     try {
-      // Compress reviews images to save storage and improve loading speed
       const compressedFile = await compressImage(file, 800, 800, 0.7);
 
       const response = await storageService.uploadFile(compressedFile);
@@ -551,11 +696,10 @@ function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-white text-neutral-900 font-sans">
-        <Navbar />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans">
         <div className="flex flex-col items-center justify-center gap-4 py-32">
-          <div className="w-6 h-6 border-2 border-neutral-950 border-t-transparent rounded-none animate-spin" />
-          <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-mono font-bold uppercase">
+          <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-none animate-spin" />
+          <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-mono font-bold uppercase">
             Loading product details...
           </div>
         </div>
@@ -565,20 +709,18 @@ function ProductDetail() {
 
   if (!product) {
     return (
-      <div className="w-full min-h-screen bg-white text-neutral-900 font-sans">
-        <Navbar />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans">
         <div className="flex flex-col items-center justify-center gap-6 py-32 text-center">
-          <p className="text-xs uppercase tracking-widest text-neutral-400 font-mono font-bold">
+          <p className="text-xs uppercase tracking-widest text-[var(--color-muted)] font-mono font-bold">
             Requested drop not found.
           </p>
-          <Link to="/" className="text-xs font-mono font-bold uppercase tracking-widest text-neutral-950 border-b border-neutral-950 pb-0.5 hover:text-neutral-600 transition-colors">
+          <Link to="/" className="text-xs font-mono font-bold uppercase tracking-widest text-[var(--color-text)] border-b border-[var(--color-text)] pb-0.5 hover:text-[var(--color-muted)] transition-colors">
             Back to Shop
           </Link>
         </div>
       </div>
     );
   }
-  // Dynamic Fit Statistics & Characteristics Calculation
   const fitStats = (() => {
     let fitTightCount = 0;
     let fitTrueCount = 0;
@@ -605,7 +747,7 @@ function ProductDetail() {
           breathVal = Number(parsed.breathable);
         }
       } catch {
-        // legacy review comment
+        // ignore legacy structure
       }
 
       if (fitVal === 'tight') fitTightCount++;
@@ -649,7 +791,6 @@ function ProductDetail() {
     };
   })();
 
-  // Parse stocks mapping
   let stocks = {};
   try {
     stocks = JSON.parse(product?.sizes_stock || '{}');
@@ -657,10 +798,19 @@ function ProductDetail() {
     stocks = {};
   }
 
-  // Check if completely out of stock across all defined sizes
+  const displaySizes = (() => {
+    if (!product) return [];
+    const union = new Set([
+      ...(product.sizes || []),
+      ...Object.keys(stocks)
+    ]);
+    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+    return sizeOrder.filter(size => union.has(size));
+  })();
+
   let isAllOutOfStock = false;
-  if (product && product.sizes && product.sizes.length > 0) {
-    const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+  if (displaySizes.length > 0) {
+    const totalStock = displaySizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
     isAllOutOfStock = totalStock === 0;
   }
 
@@ -677,33 +827,36 @@ function ProductDetail() {
   const displayDescription = rawDescription.replace(/\[RETURN_POLICY\]:\s*(.+)/, "").trim();
 
   return (
-    <div className="w-full min-h-screen bg-white text-neutral-900 font-sans pb-20">
-      <Navbar />
+    <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20">
 
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 space-y-8">
 
-        {/* Breadcrumbs Navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200/60">
-          <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-neutral-500 hover:text-neutral-900 transition-colors uppercase group">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
+          <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase group">
             <FiArrowLeft className="text-sm group-hover:-translate-x-1 transition-transform" />
             Back to Shop
           </Link>
-          <div className="text-[11px] text-neutral-500 flex items-center gap-2 uppercase tracking-wide">
-            <span>Shop</span>
-            <span>/</span>
-            <span>{product.category?.replace('-', ' ')}</span>
-            <span>/</span>
-            <span className="text-neutral-800 font-semibold">{product.name}</span>
+          <div className="text-[11px] text-[var(--color-muted)] flex items-center gap-2 uppercase tracking-wide overflow-x-auto scrollbar-none w-full sm:w-auto whitespace-nowrap">
+            <Link to="/shop" className="hover:text-[var(--color-accent)] transition-colors font-bold shrink-0">Shop</Link>
+            <span className="shrink-0">/</span>
+            {product.category && (
+              <>
+                <Link to={`/category/${product.category}`} className="hover:text-[var(--color-accent)] transition-colors font-bold shrink-0">
+                  {product.category.replace(/-/g, ' ')}
+                </Link>
+                <span className="shrink-0">/</span>
+              </>
+            )}
+            <span className="text-[var(--color-text)] font-semibold truncate shrink-0 max-w-[150px] sm:max-w-xs" title={product.name}>
+              {product.name}
+            </span>
           </div>
         </div>
 
-        {/* Core Product Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* COLUMN 1: Image Gallery */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:col-span-7">
 
-            {/* Thumbnails */}
             {galleryImages.length > 1 && (
               <div className="md:col-span-2 order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
                 {galleryImages.map((imgUrl, idx) => (
@@ -711,7 +864,7 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => setActiveImage(imgUrl)}
-                    className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImage === imgUrl ? 'border-neutral-950 scale-95 shadow-sm' : 'border-neutral-200 hover:border-neutral-950'}`}
+                    className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImage === imgUrl ? 'border-neutral-950 scale-95 shadow-sm' : 'border-[var(--color-border)] hover:border-[var(--color-accent)]'}`}
                   >
                     <img src={imgUrl} alt="Garment view" className="w-full h-full object-cover" />
                   </button>
@@ -719,19 +872,20 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Main Viewport */}
             <div
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
-              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-white border border-neutral-950/10 relative group cursor-zoom-in`}
+              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group cursor-zoom-in`}
             >
-              <div className="absolute top-4 right-4 bg-white border border-neutral-950/15 text-neutral-800 font-mono text-[9px] tracking-wider px-2 py-1 rounded-none z-10 pointer-events-none uppercase">
+              <div className="absolute top-4 right-4 bg-[var(--color-surface)] border border-neutral-950/15 text-[var(--color-text)] font-mono text-[9px] tracking-wider px-2 py-1 rounded-none z-10 pointer-events-none uppercase">
                 Hover to Zoom
               </div>
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
                   src={activeImage}
                   alt={product.name}
+                  fetchPriority="high"
+                  decoding="sync"
                   style={{
                     transformOrigin: zoomStyle.transformOrigin,
                     transform: `scale(${zoomStyle.scale})`
@@ -742,35 +896,33 @@ function ProductDetail() {
             </div>
           </div>
 
-          {/* COLUMN 2: Details & Purchasing */}
           <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
 
-            {/* Header info */}
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-none">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1.5 rounded-none whitespace-nowrap">
                   {product.category?.replace('-', ' ')}
                 </span>
                 {product.tag && (
-                  <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-none border border-neutral-950">
+                  <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1.5 rounded-none border border-neutral-950 whitespace-nowrap">
                     {product.tag}
                   </span>
                 )}
                 {isAllOutOfStock ? (
-                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-2.5 py-0.5 rounded-none border border-rose-100">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-3 py-1.5 rounded-none border border-rose-100 whitespace-nowrap">
+                    <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-rose-500 animate-pulse" />
                     SOLD OUT
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-2.5 py-0.5 rounded-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    In Stock
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-none whitespace-nowrap">
+                    <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-emerald-500 animate-ping" />
+                    IN STOCK
                   </span>
                 )}
                 {adminMode && (
                   <button
                     onClick={() => navigate('/admin', { state: { editProductId: product.$id || product.id } })}
-                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-2.5 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all"
+                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1.5 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
                   >
                     ✏️ Edit Drop
                   </button>
@@ -783,7 +935,6 @@ function ProductDetail() {
                 </h1>
               </div>
 
-              {/* Product Star Summary Row */}
               <div className="flex items-center gap-2 pt-1">
                 <div className="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map((star) => {
@@ -804,7 +955,7 @@ function ProductDetail() {
                     e.preventDefault();
                     document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' });
                   }}
-                  className="text-[10px] font-mono font-bold text-neutral-500 hover:text-neutral-950 hover:underline transition-colors uppercase tracking-wider"
+                  className="text-[10px] font-mono font-bold text-[var(--color-muted)] hover:text-neutral-950 hover:underline transition-colors uppercase tracking-wider"
                 >
                   ({reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'})
                 </a>
@@ -828,12 +979,12 @@ function ProductDetail() {
                     <span className="text-2xl font-mono font-bold text-neutral-950">
                       ₹{priceNum.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-[9px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
+                    <span className="text-[9px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
                       incl. of all taxes
                     </span>
                     {compareDisplay && (
                       <>
-                        <span className="text-sm text-neutral-400 line-through font-mono font-medium">
+                        <span className="text-sm text-[var(--color-muted)] line-through font-mono font-medium">
                           ₹{compareDisplay.toLocaleString('en-IN')}
                         </span>
                         <span className="text-[10px] text-rose-600 font-mono font-bold tracking-wider bg-rose-50 px-2.5 py-0.5 rounded-none border border-rose-100">
@@ -846,15 +997,14 @@ function ProductDetail() {
               })()}
             </div>
 
-            {/* Share and Copy Utilities */}
             <div className="flex items-center gap-3 pt-2 pb-4">
-              <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest font-bold">Share Drop:</span>
+              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">Share Drop:</span>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
                   showToast("📋 Drop link copied to clipboard!", "success");
                 }}
-                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200 bg-white hover:border-neutral-950 hover:bg-neutral-50 px-2.5 py-1 transition-all cursor-pointer font-sans"
+                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] px-2.5 py-1 transition-all cursor-pointer font-sans"
               >
                 Copy Link
               </button>
@@ -868,91 +1018,42 @@ function ProductDetail() {
               </a>
             </div>
 
-            <div className="border-t border-neutral-200/50" />
+            <div className="border-t border-[var(--color-border)]/50" />
 
-            {/* Color Swatch Selection */}
             {(() => {
-              let isOptionB = false;
-              let optionBVariants = [];
-              if (product.color_hex && product.color_hex.startsWith('[')) {
-                try {
-                  const parsed = JSON.parse(product.color_hex);
-                  if (Array.isArray(parsed)) {
-                    isOptionB = true;
-                    optionBVariants = parsed;
-                  }
-                } catch (e) {
-                  console.warn("Failed parsing Option B variants:", e);
-                }
-              }
-
-              if (isOptionB && optionBVariants.length > 0) {
-                return (
-                  <div className="space-y-3 pb-4">
-                    <h4 className="text-xs font-mono font-bold text-neutral-400 uppercase tracking-widest">
-                      COLOR: <span className="text-neutral-950 font-sans font-extrabold">{selectedColor || 'SELECT COLOR'}</span>
-                    </h4>
-                    <div className="flex gap-2.5 flex-wrap">
-                      {optionBVariants.map((variant, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setSelectedColor(variant.name);
-                            setActiveVariant(variant);
-                            if (variant.front) {
-                              setActiveImage(variant.front);
-                            }
-                          }}
-                          className={`w-10 h-12 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
-                            selectedColor === variant.name
-                              ? 'border-neutral-950 scale-110 shadow-sm'
-                              : 'border-neutral-200 hover:border-neutral-400'
-                          }`}
-                          title={variant.name}
-                        >
-                          <img
-                            src={variant.front || 'https://placehold.co/100x120?text=Color'}
-                            alt={variant.name}
-                            className="w-full h-full object-cover object-center"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
 
               if (product.color_group_id && groupProducts.length > 1) {
                 return (
                   <div className="space-y-3 pb-4">
-                    <h4 className="text-xs font-mono font-bold text-neutral-400 uppercase tracking-widest">
-                      COLOR ARCHIVE: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name || 'ORIGINAL'}</span>
+                    <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
+                      COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name || 'ORIGINAL'}</span>
                     </h4>
-                    <div className="flex gap-2.5 flex-wrap">
+                    <div className="flex gap-3 flex-wrap">
                       {groupProducts.map((sibling) => {
                         const siblingId = sibling.$id || sibling.id;
                         const isCurrent = siblingId === (product.$id || product.id);
+                        const siblingImage = sibling.front_image_link || sibling.image_url || sibling.image || 'https://placehold.co/100x125';
                         return (
                           <button
                             key={siblingId}
                             type="button"
                             onClick={() => {
                               if (!isCurrent) {
-                                navigate(`/product/${siblingId}`);
+                                navigate(`/product/${sibling.slug || siblingId}`, { replace: true });
                               }
                             }}
-                            className={`w-10 h-12 rounded-none border flex items-center justify-center p-0.5 cursor-pointer transition-all ${
+                            className={`w-16 h-20 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
                               isCurrent
-                                ? 'border-neutral-950 scale-110 shadow-sm'
-                                : 'border-neutral-200 hover:border-neutral-400'
+                                ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 scale-105 shadow-md'
+                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102'
                             }`}
                             title={sibling.color_name}
                           >
-                            <img
-                              src={sibling.front_image_link || sibling.image_url || sibling.image || 'https://placehold.co/100x120?text=Color'}
-                              alt={sibling.color_name}
-                              className="w-full h-full object-cover object-center"
+                            <img 
+                              src={siblingImage} 
+                              alt={sibling.color_name} 
+                              className="w-full h-full object-cover"
+                              loading="lazy"
                             />
                           </button>
                         );
@@ -963,11 +1064,22 @@ function ProductDetail() {
               }
 
               if (product.color_name) {
+                const img = product.front_image_link || product.image_url || product.image || 'https://placehold.co/100x125';
                 return (
-                  <div className="space-y-1.5 pb-4">
-                    <h4 className="text-xs font-mono font-bold text-neutral-400 uppercase tracking-widest">
+                  <div className="space-y-3 pb-4">
+                    <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name}</span>
                     </h4>
+                    <div className="flex gap-3">
+                      <div className="w-16 h-20 rounded-lg border-2 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 overflow-hidden shadow-md">
+                        <img
+                          src={img}
+                          alt={product.color_name}
+                          className="w-full h-full object-cover"
+                          title={product.color_name}
+                        />
+                      </div>
+                    </div>
                   </div>
                 );
               }
@@ -975,8 +1087,7 @@ function ProductDetail() {
               return null;
             })()}
 
-            {/* Sizing selection */}
-            {product.sizes && product.sizes.length > 0 && (() => {
+            {displaySizes && displaySizes.length > 0 && (() => {
               let stockMap = {};
               try {
                 stockMap = JSON.parse(product.sizes_stock || '{}');
@@ -987,18 +1098,18 @@ function ProductDetail() {
               return (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-bold text-neutral-700">Select Size</h4>
+                    <h4 className="text-xs font-bold text-[var(--color-text)]">Select Size</h4>
                     <div className="flex gap-4">
                       <span 
                         onClick={() => setIsSizeChartOpen(true)}
-                        className="text-xs text-neutral-950 font-mono font-bold border-b border-neutral-950 cursor-pointer pb-0.5 hover:text-neutral-600 transition-colors uppercase tracking-wider"
+                        className="text-xs text-neutral-950 font-mono font-bold border-b border-neutral-950 cursor-pointer pb-0.5 hover:text-[var(--color-muted)] transition-colors uppercase tracking-wider"
                       >
                         Size Guide
                       </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-6 gap-2">
-                    {product.sizes.map((size) => {
+                    {displaySizes.map((size) => {
                       const isSoldOut = stockMap[size] === 0;
                       return (
                         <button
@@ -1007,12 +1118,12 @@ function ProductDetail() {
                           onClick={() => setSelectedSize(size)}
                           className={`py-2.5 rounded-none font-bold text-xs tracking-wider transition-all duration-200 cursor-pointer border ${
                             isSoldOut && selectedSize === size
-                            ? 'bg-neutral-200 text-neutral-600 border-neutral-400 line-through font-extrabold'
+                            ? 'bg-neutral-200 text-[var(--color-muted)] border-neutral-400 line-through font-extrabold'
                             : isSoldOut 
-                            ? 'bg-neutral-50 text-neutral-400 border-neutral-200 line-through hover:border-neutral-400' 
+                            ? 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] line-through hover:border-neutral-400' 
                             : selectedSize === size 
                             ? 'bg-neutral-950 text-white border-neutral-950 shadow-md' 
-                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-neutral-950'
+                            : 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-neutral-400 hover:text-neutral-950'
                           }`}
                         >
                           {size}
@@ -1024,64 +1135,19 @@ function ProductDetail() {
                   {selectedSize && (() => {
                     const stockVal = stockMap[selectedSize] !== undefined ? Number(stockMap[selectedSize]) : 10;
                     if (stockVal === 0) {
-                      return (
-                        <div className="space-y-3 mt-2 animate-fade-in">
-                          <div className="p-3 bg-neutral-900 border border-neutral-800 text-white rounded-none flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                            <p className="text-[10px] text-neutral-300 font-bold uppercase tracking-wider font-mono">
-                              ✕ Size {selectedSize} is Out of Stock
-                            </p>
-                          </div>
-                          
-                          {notifyStatus !== 'success' ? (
-                            <form onSubmit={(e) => handleNotifyMe(e, selectedSize)} className="space-y-1.5">
-                              <label className="text-[9px] text-neutral-500 font-mono font-bold uppercase tracking-wider block">
-                                Get notified when we restock this size:
-                              </label>
-                              <div className="flex rounded-none overflow-hidden border border-neutral-950/20 bg-white focus-within:border-neutral-950 transition-colors">
-                                <input 
-                                  type="email" 
-                                  value={notifyEmail}
-                                  onChange={(e) => setNotifyEmail(e.target.value)}
-                                  placeholder="ENTER YOUR EMAIL" 
-                                  disabled={notifyStatus === 'loading'}
-                                  className="bg-transparent text-neutral-800 placeholder-neutral-400 text-[10px] tracking-wider px-4 py-3 w-full outline-none font-mono"
-                                />
-                                <button 
-                                  type="submit" 
-                                  disabled={notifyStatus === 'loading'}
-                                  className="bg-neutral-950 text-white font-mono font-bold text-xs px-5 uppercase hover:bg-neutral-850 transition-colors cursor-pointer disabled:bg-neutral-300 rounded-none"
-                                >
-                                  {notifyStatus === 'loading' ? 'Saving...' : 'Notify Me'}
-                                </button>
-                              </div>
-                              {notifyError && (
-                                <p className="text-[9px] text-rose-500 font-mono tracking-widest uppercase pt-0.5 animate-pulse">
-                                  {notifyError}
-                                </p>
-                              )}
-                            </form>
-                          ) : (
-                            <div className="p-3 bg-emerald-950 text-emerald-400 border border-emerald-900 rounded-none text-[10px] font-mono font-bold uppercase tracking-widest leading-normal animate-scale-up">
-                              ✓ Notification registered successfully!<br />
-                              <span className="text-emerald-500 font-mono text-[9px] font-medium tracking-wider">We'll alert you the second this size drops again.</span>
-                            </div>
-                          )}
-                        </div>
-                      );
+                      return null; // Rendered below Add to Cart instead
                     }
                     if (stockVal < 5) {
                       const fillPercent = (stockVal / 5) * 100;
                       return (
                         <div className="space-y-2 mt-2.5 animate-fade-in">
-                          <div className="flex justify-between items-center text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 animate-pulse">
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 animate-pulse">
                             <span className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              ⚠️ Extremely Low Stock in Size {selectedSize}!
+                              <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-rose-500" />
+                              <span>⚠️ Low Stock in Size {selectedSize}!</span>
                             </span>
                             <span>Only {stockVal} items left</span>
                           </div>
-                          {/* Premium warning bar */}
                           <div className="w-full h-[3px] bg-rose-100 rounded-none overflow-hidden">
                             <div 
                               style={{ width: `${fillPercent}%` }} 
@@ -1104,84 +1170,143 @@ function ProductDetail() {
               );
             })()}
 
-            {/* Cart Operations */}
             <div className="space-y-4 pt-2 border-t border-neutral-150">
-              <div className="flex gap-4 items-center">
-                <div className="flex-1 transform active:scale-[0.99] transition-transform duration-150">
-                  <AddToCartButton
-                    product={product}
-                    selectedSize={selectedSize}
-                    selectedColor={selectedColor}
-                  />
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex gap-3 w-full sm:w-auto sm:flex-1">
+                    <div className="flex-1 transform active:scale-[0.99] transition-transform duration-150">
+                      <AddToCartButton
+                        product={product}
+                        selectedSize={selectedSize}
+                        selectedColor={selectedColor}
+                      />
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const productId = product.$id || product.id;
+                        const exists = wishlist.some(item => item.$id === productId || item.id === productId);
+                        let updated;
+                        if (exists) {
+                          dispatch(removeWishlistItemState(productId));
+                          const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                          updated = saved.filter(item => item.$id !== productId && item.id !== productId);
+                          localStorage.setItem('wishlist', JSON.stringify(updated));
+                          if (isAuthenticated && user) {
+                            try {
+                              await wishlistService.removeFromWishlist(user.$id, productId);
+                            } catch (e) {
+                              console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                            }
+                          }
+                        } else {
+                          dispatch(addWishlistItemState(product));
+                          const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                          updated = [...saved, product];
+                          localStorage.setItem('wishlist', JSON.stringify(updated));
+                          if (isAuthenticated && user) {
+                            try {
+                              await wishlistService.addToWishlist(user.$id, productId);
+                            } catch (e) {
+                              console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                            }
+                          }
+                        }
+                      }}
+                      className="w-[50px] shrink-0 bg-[var(--color-surface)] border border-neutral-950 hover:bg-[var(--color-surface)] rounded-none shadow-xs transition-all group cursor-pointer text-center flex items-center justify-center"
+                      title="Save Fit to Wishlist"
+                    >
+                      {wishlist.some(item => item.$id === (product.$id || product.id) || item.id === (product.$id || product.id)) ? (
+                        <svg className="w-5 h-5 text-rose-500 fill-current" viewBox="0 0 24 24">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5 text-[var(--color-muted)] group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* One-Click Buy Now Button */}
+                  <div className="w-full sm:flex-1 transform active:scale-[0.99] transition-transform duration-150">
+                    <button
+                      type="button"
+                      onClick={handleBuyNow}
+                      className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950"
+                    >
+                      ⚡ Buy Now
+                    </button>
+                  </div>
                 </div>
-                
-                {/* Wishlist Detail Toggle */}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const productId = product.$id || product.id;
-                    const exists = wishlist.some(item => item.$id === productId || item.id === productId);
-                    let updated;
-                    if (exists) {
-                      dispatch(removeWishlistItemState(productId));
-                      const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                      updated = saved.filter(item => item.$id !== productId && item.id !== productId);
-                      localStorage.setItem('wishlist', JSON.stringify(updated));
-                      if (isAuthenticated && user) {
-                        try {
-                          await wishlistService.removeFromWishlist(user.$id, productId);
-                        } catch (e) {
-                          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
-                        }
-                      }
-                    } else {
-                      dispatch(addWishlistItemState(product));
-                      const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                      updated = [...saved, product];
-                      localStorage.setItem('wishlist', JSON.stringify(updated));
-                      if (isAuthenticated && user) {
-                        try {
-                          await wishlistService.addToWishlist(user.$id, productId);
-                        } catch (e) {
-                          console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
-                        }
-                      }
-                    }
-                  }}
-                  className="p-3 bg-white border border-neutral-950 hover:bg-neutral-50 rounded-none shadow-xs transition-all group shrink-0 cursor-pointer"
-                  title="Save Fit to Wishlist"
-                >
-                  {wishlist.some(item => item.$id === (product.$id || product.id) || item.id === (product.$id || product.id)) ? (
-                    <svg className="w-5 h-5 text-rose-500 fill-current" viewBox="0 0 24 24">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 text-neutral-400 group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                    </svg>
-                  )}
-                </button>
-              </div>
 
-              <div className="flex items-center gap-2 text-neutral-500 text-xs bg-neutral-50 border border-neutral-100 p-3 rounded-none">
+              {/* OUT OF STOCK RESTOCK ALERTS FORM */}
+              {((selectedSize && stocks[selectedSize] === 0) || isAllOutOfStock) && (
+                <div className="p-4 bg-neutral-900 border border-neutral-850 text-white rounded-none space-y-3 mt-3 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    <p className="text-[10px] text-neutral-300 font-bold uppercase tracking-wider font-mono">
+                      ✕ {isAllOutOfStock ? 'This product is Sold Out' : `Size ${selectedSize} is Out of Stock`}
+                    </p>
+                  </div>
+                  
+                  {notifyStatus !== 'success' ? (
+                    <form onSubmit={(e) => handleNotifyMe(e, selectedSize || 'ALL')} className="space-y-1.5">
+                      <label className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block">
+                        Get notified when we restock:
+                      </label>
+                      <div className="flex rounded-none overflow-hidden border border-neutral-700 bg-neutral-950 focus-within:border-white transition-colors">
+                        <input 
+                          type="email" 
+                          value={notifyEmail}
+                          onChange={(e) => setNotifyEmail(e.target.value)}
+                          placeholder="ENTER YOUR EMAIL" 
+                          disabled={notifyStatus === 'loading'}
+                          className="bg-transparent text-white placeholder-neutral-500 text-[10px] tracking-wider px-4 py-3 w-full outline-none font-mono"
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={notifyStatus === 'loading'}
+                          className="bg-white text-black font-mono font-bold text-xs px-5 uppercase hover:bg-neutral-200 transition-colors cursor-pointer disabled:bg-neutral-800 disabled:text-neutral-500 rounded-none"
+                        >
+                          {notifyStatus === 'loading' ? 'Saving...' : 'Notify Me'}
+                        </button>
+                      </div>
+                      {notifyError && (
+                        <p className="text-[9px] text-rose-400 font-mono tracking-widest uppercase pt-0.5 animate-pulse">
+                          {notifyError}
+                        </p>
+                      )}
+                    </form>
+                  ) : (
+                    <div className="p-3 bg-emerald-950 text-emerald-400 border border-emerald-900 rounded-none text-[10px] font-mono font-bold uppercase tracking-widest leading-normal animate-scale-up">
+                      ✓ Notification registered successfully!<br />
+                      <span className="text-emerald-500 font-mono text-[9px] font-medium tracking-wider">We'll alert you the second this size drops again.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
                   returnPolicy === "No Return" ? "bg-rose-500" :
-                  returnPolicy === "Exchange Only" ? "bg-amber-500" : "bg-emerald-500"
+                  returnPolicy === "Exchange Only" ? "bg-amber-500" :
+                  returnPolicy === "Return Only" ? "bg-blue-500" : "bg-emerald-500"
                 }`} />
                 <p className="font-mono text-[10px] uppercase tracking-wide">
                   {returnPolicy === "No Return" ? "No return or exchange active." :
                    returnPolicy === "Exchange Only" ? "7-Day exchange only active." :
-                   "7-Day exchange and return policy active."}
+                   returnPolicy === "Return Only" ? "7-Day return only active." :
+                   "7-Day returns & exchanges active."}
                 </p>
               </div>
             </div>
 
-            {/* Pincode Checker Component */}
             <div className="pt-4 pb-2 border-t border-neutral-150 space-y-3">
-              <span className="text-[8px] font-bold text-neutral-400 block tracking-widest uppercase">CHECK DELIVERY AVAILABILITY</span>
+              <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest uppercase">CHECK DELIVERY AVAILABILITY</span>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--color-muted)]">
                     <FiMapPin className="text-xs" />
                   </div>
                   <input
@@ -1196,14 +1321,14 @@ function ProductDetail() {
                       }
                     }}
                     placeholder="ENTER 6-DIGIT PINCODE"
-                    className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-950 focus:bg-white rounded-none pl-8 pr-4 py-2 text-xs font-mono text-neutral-900 placeholder-neutral-400 outline-none tracking-widest transition-all"
+                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)] rounded-none pl-8 pr-4 py-2 text-xs font-mono text-[var(--color-text)] placeholder-[var(--color-muted)] outline-none tracking-widest transition-all"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => performPincodeCheck(pincodeInput)}
                   disabled={pinChecking || pincodeInput.length !== 6}
-                  className="bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] px-5 py-2 uppercase transition-all tracking-wider disabled:bg-neutral-200 disabled:text-neutral-400 cursor-pointer shrink-0 rounded-none border border-neutral-950 disabled:border-neutral-200"
+                  className="bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] px-5 py-2 uppercase transition-all tracking-wider disabled:bg-neutral-200 disabled:text-[var(--color-muted)] cursor-pointer shrink-0 rounded-none border border-neutral-950 disabled:border-[var(--color-border)]"
                 >
                   {pinChecking ? 'CHECKING...' : 'CHECK'}
                 </button>
@@ -1216,33 +1341,33 @@ function ProductDetail() {
               )}
 
               {pinResult && (
-                <div className="p-3 bg-neutral-50/70 border border-neutral-200/50 rounded-none text-xs space-y-1.5 animate-fade-in">
+                <div className="p-4 bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 rounded-2xl text-xs space-y-1.5 animate-fade-in shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[9px] tracking-wider text-neutral-400 uppercase">DELIVERY FOR:</span>
-                    <span className="font-mono text-[9px] font-black text-neutral-800 uppercase bg-neutral-100 px-1.5 py-0.5 rounded-sm">
+                    <span className="font-mono text-[9px] tracking-wider text-[var(--color-muted)] uppercase">DELIVERY FOR:</span>
+                    <span className="font-mono text-[9px] font-black text-[var(--color-text)] uppercase bg-neutral-100 px-1.5 py-0.5 rounded-sm">
                       {pinResult.pincode}
                     </span>
                   </div>
                   
                   {pinResult.location && (
-                    <div className="text-[10px] font-black text-neutral-800 uppercase">
+                    <div className="text-[10px] font-black text-[var(--color-text)] uppercase">
                       📍 {pinResult.location}
                     </div>
                   )}
 
-                  <div className="flex items-start gap-1.5 pt-1 text-neutral-600">
-                    <FiTruck className="text-xs shrink-0 mt-0.5 text-neutral-800" />
+                  <div className="flex items-start gap-1.5 pt-1 text-[var(--color-muted)]">
+                    <FiTruck className="text-xs shrink-0 mt-0.5 text-[var(--color-text)]" />
                     <div>
-                      <p className="text-neutral-900 font-black text-[11px] uppercase tracking-wide">
+                      <p className="text-[var(--color-text)] font-black text-[11px] uppercase tracking-wide">
                         ESTIMATED ARRIVAL: {pinResult.dateRange}
                       </p>
-                      <p className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest mt-0.5">
+                      <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest mt-0.5">
                         {pinResult.desc} (dispatched in 1-2 days) · via {pinResult.carrier}
                       </p>
                     </div>
                   </div>
                   
-                  <div className="pt-1.5 border-t border-dashed border-neutral-200 space-y-1">
+                  <div className="pt-1.5 border-t border-dashed border-[var(--color-border)] space-y-1">
                     {pinResult.codAvailable ? (
                       <div className="text-[9px] text-emerald-600 font-black uppercase tracking-wider flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
@@ -1255,7 +1380,7 @@ function ProductDetail() {
                       </div>
                     )}
                     
-                    <div className="text-[9px] text-neutral-500 font-black uppercase tracking-wider flex items-center gap-1">
+                    <div className="text-[9px] text-[var(--color-muted)] font-black uppercase tracking-wider flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
                       Free delivery on orders ₹999 & above (else ₹99)
                     </div>
@@ -1264,129 +1389,104 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Collapsible Accordions */}
-            <div className="border-t border-b border-neutral-200 divide-y divide-neutral-200">
+            <div className="border-t border-b border-[var(--color-border)] divide-y divide-neutral-200">
 
-              {/* DESCRIPTION */}
               {displayDescription && (
                 <div className="py-3.5">
                   <button
                     onClick={() => setDescExpanded(!descExpanded)}
-                    className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-neutral-800 uppercase focus:outline-none"
+                    className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none"
                   >
                     <span>Description</span>
                     {descExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                   </button>
                   <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-none border border-neutral-950/10">
+                    <p className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] p-4 rounded-none border border-neutral-950/10">
                       {displayDescription}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* SIZING */}
-              <div className="py-3.5">
-                <button
-                  onClick={() => setSizingExpanded(!sizingExpanded)}
-                  className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-neutral-800 uppercase focus:outline-none"
-                >
-                  <span><FiScissors className="inline mr-2 text-sm" /> Size & Fit Details</span>
-                  {sizingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
-                </button>
-                <div className={`transition-all duration-300 overflow-hidden ${sizingExpanded ? 'max-h-60 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-none border border-neutral-950/15 space-y-2">
-                    {product.fit_type && (
-                      <p className="font-mono text-[10px] tracking-wide uppercase"><strong className="text-neutral-900 font-sans text-xs">SILHOUETTE / FIT:</strong> {product.fit_type}</p>
-                    )}
-                    {product.fabric_gsm && (
-                      <p className="font-mono text-[10px] tracking-wide uppercase"><strong className="text-neutral-900 font-sans text-xs">FABRIC WEIGHT / GSM:</strong> {product.fabric_gsm}</p>
-                    )}
-                    <p>&bull; Premium relaxed signature styling with dropped shoulders.</p>
-                    <p>&bull; Heavyweight combed knit weave tailored for comfort.</p>
-                    <p>&bull; Pre-shrunk industrial washed fabrics.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* SHIPPING */}
               <div className="py-3.5">
                 <button
                   onClick={() => setShippingExpanded(!shippingExpanded)}
-                  className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-neutral-800 uppercase focus:outline-none"
+                  className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none cursor-pointer"
                 >
-                  <span><FiTruck className="inline mr-2 text-sm" /> Shipping & Returns</span>
+                  <span><FiTruck className="inline mr-2 text-sm" /> Returns & Exchanges</span>
                   {shippingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                 </button>
-                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-4 rounded-none border border-neutral-950/10 space-y-2">
-                    <p>&bull; Free express shipping on all orders nationwide.</p>
-                    <p>&bull; Dispatched in custom protective packaging.</p>
-                    {returnPolicy === "No Return" ? (
-                      <p className="text-rose-600 font-bold">&bull; return policy: No returns or exchanges accepted on this drop.</p>
-                    ) : returnPolicy === "Exchange Only" ? (
-                      <p>&bull; return policy: Exchange only (valid for 7 days).</p>
+                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-[350px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)]/40 border border-white/20 backdrop-blur-md p-4 rounded-xl shadow-2xs space-y-2.5">
+                    {returnPolicy === "No Return" || returnPolicy.toLowerCase().includes("no return") ? (
+                      <>
+                        <p className="text-rose-600 font-bold">&bull; Return policy: All sales are final. No returns or exchanges accepted.</p>
+                        <p>&bull; Please refer to the size chart carefully before placing your order.</p>
+                        <p>&bull; Replacement or refund is only applicable if you receive a damaged or wrong product (with unboxing video proof).</p>
+                      </>
+                    ) : returnPolicy === "Return Only" || returnPolicy.toLowerCase().includes("return only") || returnPolicy.toLowerCase().includes("no exchange") ? (
+                      <>
+                        <p className="text-amber-700 font-semibold">&bull; Return policy: Easy 7-day return guarantee for a full refund.</p>
+                        <p>&bull; No direct exchanges available; please return the item and place a new order.</p>
+                        <p>&bull; Items must be kept in original condition with tags to process the return.</p>
+                      </>
+                    ) : returnPolicy === "Exchange Only" || returnPolicy.toLowerCase().includes("exchange only") ? (
+                      <>
+                        <p className="text-amber-700 font-semibold">&bull; Exchange policy: Easy 7-day size or defect exchanges.</p>
+                        <p>&bull; All sales are final; no monetary refunds are processed.</p>
+                        <p>&bull; Exchange request must be created within 7 days of delivery with original tags.</p>
+                      </>
                     ) : (
-                      <p>&bull; return policy: Easy 7-day return guarantee.</p>
+                      <>
+                        <p className="text-emerald-700 font-semibold">&bull; Return & Exchange policy: Easy 7-day hassle-free returns and exchanges.</p>
+                        <p>&bull; In case of sizing issues or defects, request an exchange within 7 days of delivery.</p>
+                        <p>&bull; Items must be unused, unwashed, and with original tags intact.</p>
+                      </>
                     )}
                   </div>
                 </div>
               </div>
 
-            </div>
-
-            {/* Trust Footer */}
-            <div className="flex items-center gap-3 text-xs text-neutral-500 border border-neutral-950/15 bg-white p-4 rounded-none">
-              <FiShield className="text-lg text-neutral-700 shrink-0" />
-              <div className="leading-tight">
-                <span className="font-bold font-sans text-neutral-800 block mb-0.5">Authentic Quality Guaranteed</span>
-                All products are certified authentic and engineered with high-grade materials.
-              </div>
             </div>
 
           </div>
 
         </div>
 
-        {/* You May Also Like Section */}
         {suggestProduct && suggestProduct.length > 0 && (
-          <div className="pt-12 border-t border-neutral-200/60 space-y-6">
+          <div className="pt-12 border-t border-[var(--color-border)] space-y-6">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900">
+              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--color-text)]">
                 You May Also Like
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
               {suggestProduct.map((item) => {
                 const uniqueId = item.$id || item.id;
                 const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';
                 const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
-                const activeTag = item.tag || "";
+                const activeTag = item.tag || (item.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
 
                 return (
                   <div 
                     key={uniqueId} 
                     onClick={() => {
-                      navigate(`/product/${uniqueId}`);
+                      navigate(`/product/${item.slug || uniqueId}`);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }} 
-                    className="group relative flex flex-col bg-white rounded-none p-2 border border-neutral-950/10 hover:border-neutral-950 transition-all duration-300 cursor-pointer overflow-hidden"
+                    className="group relative flex flex-col bg-[var(--color-surface)] rounded-none p-2 border border-neutral-950/10 hover:border-[var(--color-accent)] transition-all duration-300 cursor-pointer overflow-hidden"
                   >
-                    {/* Viewport Image */}
-                    <div className="w-full aspect-3/4 rounded-none overflow-hidden bg-neutral-100 relative border border-neutral-200/50">
+                    <div className="w-full aspect-3/4 rounded-none overflow-hidden bg-neutral-100 relative border border-[var(--color-border)]/50">
                       
-                      {/* Tag Badge */}
                       {activeTag && (
-                        <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 bg-white border border-neutral-950 px-2 py-0.5 rounded-none">
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-950 animate-pulse animate-duration-1000" />
-                          <span className="text-neutral-950 font-mono font-bold text-[9px] uppercase tracking-wider">
+                        <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
+                          <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
                             {activeTag}
                           </span>
                         </div>
                       )}
 
-                      {/* Image Flip */}
                       <div className="w-full h-full relative overflow-hidden">
                         <img
                           src={frontView}
@@ -1403,13 +1503,12 @@ function ProductDetail() {
                       </div>
                     </div>
 
-                    {/* Meta */}
                     <div className="mt-3 px-1 pb-1 flex flex-col justify-between grow">
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-mono font-bold uppercase tracking-wider block mb-0.5">
+                        <span className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider block mb-0.5">
                           {item.category?.replace('-', ' ') || "Collection"}
                         </span>
-                        <h3 className="text-xs font-bold text-neutral-950 uppercase group-hover:text-neutral-600 transition-colors truncate">
+                        <h3 className="text-xs font-bold text-neutral-950 uppercase group-hover:text-[var(--color-muted)] transition-colors truncate">
                           {item.name}
                         </h3>
                       </div>
@@ -1420,8 +1519,8 @@ function ProductDetail() {
                             ₹{Number(item.price).toLocaleString('en-IN')}
                           </span>
                         </div>
-                        <span className="text-[9px] font-mono font-bold text-neutral-400 group-hover:text-neutral-950 transition-colors">
-                          View details &rarr;
+                        <span className="text-[9px] font-sans font-bold uppercase tracking-wide text-[var(--color-muted)] whitespace-nowrap">
+                          INCL. TAXES
                         </span>
                       </div>
                     </div>
@@ -1433,22 +1532,118 @@ function ProductDetail() {
           </div>
         )}
 
-        {/* ==========================================
-            PRODUCT REVIEWS & RATINGS SECTION
-            ========================================== */}
-        <div id="reviews-section" className="pt-16 border-t border-neutral-200/60 space-y-8">
+        {/* Recently Viewed Products */}
+        {(() => {
+          const saved = localStorage.getItem('recently_viewed');
+          let viewedIds = [];
+          if (saved) {
+            try {
+              viewedIds = JSON.parse(saved);
+            } catch {
+              viewedIds = [];
+            }
+          }
+          const currentId = product?.$id || product?.id;
+          const filteredIds = viewedIds.filter(id => id !== currentId);
+          
+          const viewedProducts = filteredIds
+            .map(id => products.find(p => p.$id === id || p.id === id))
+            .filter(Boolean)
+            .slice(0, 4);
+
+          if (viewedProducts.length === 0) return null;
+
+          return (
+            <div className="pt-12 border-t border-[var(--color-border)] space-y-6">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--color-text)] font-display uppercase">
+                  Recently Viewed
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+                {viewedProducts.map((item) => {
+                  const uniqueId = item.$id || item.id;
+                  const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';
+                  const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
+                  const activeTag = item.tag || (item.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
+
+                  return (
+                    <div 
+                      key={uniqueId} 
+                      onClick={() => {
+                        navigate(`/product/${item.slug || uniqueId}`);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }} 
+                      className="group relative flex flex-col bg-[var(--color-surface)] rounded-none p-2 border border-neutral-955/10 hover:border-[var(--color-accent)] transition-all duration-300 cursor-pointer overflow-hidden rounded-xl hover:shadow-md"
+                    >
+                      <div className="w-full aspect-[3/4] overflow-hidden bg-neutral-100 relative border border-[var(--color-border)]/50 rounded-xl">
+                        
+                        {activeTag ? (
+                          <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
+                            <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
+                              {activeTag}
+                            </span>
+                          </div>
+                        ) : null}
+
+                        <div className="w-full h-full relative overflow-hidden">
+                          <img
+                            src={frontView}
+                            alt={item.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
+                          />
+                          <img  
+                            src={backView}
+                            alt={`${item.name} alternate frame`}
+                            loading="lazy"
+                            className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 px-1 flex flex-col justify-between grow">
+                        <div>
+                          <span className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider block mb-0.5">
+                            {item.category?.replace('-', ' ') || "Collection"}
+                          </span>
+                          <h3 className="text-xs font-bold text-neutral-950 uppercase group-hover:text-[var(--color-muted)] transition-colors truncate">
+                            {item.name}
+                          </h3>
+                        </div>
+                        
+                        <div className="mt-3 pt-2 border-t border-neutral-950/10 flex items-center justify-between gap-4">
+                          <div className="flex items-baseline gap-1.5 font-mono">
+                            <span className="text-sm font-bold text-neutral-950">
+                              ₹{Number(item.price).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-sans font-bold uppercase tracking-wide text-[var(--color-muted)] whitespace-nowrap">
+                            INCL. TAXES
+                          </span>
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        <div id="reviews-section" className="pt-16 border-t border-[var(--color-border)] space-y-8">
           <div>
-            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900">
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--color-text)]">
               Customer Reviews ({reviews.length})
             </h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* COLUMN 1: RATINGS SCORECARD & WRITE REVIEW (5 Columns) */}
             <div className="lg:col-span-5 space-y-6">
-              {/* Ratings Summary Card */}
               {reviews.length > 0 && (
-                <div className="bg-white p-6 rounded-none border border-neutral-950/15 flex items-center gap-6">
+                <div className="bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl flex items-center gap-6 shadow-sm">
                   <div className="text-center">
                     <div className="text-4xl font-mono font-bold tracking-tight text-neutral-950">
                       {(() => {
@@ -1473,7 +1668,7 @@ function ProductDetail() {
                         );
                       })}
                     </div>
-                    <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase mt-2 block">
+                    <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase mt-2 block">
                       Average Rating
                     </span>
                   </div>
@@ -1487,7 +1682,7 @@ function ProductDetail() {
                       }).length;
                       const percent = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
                       return (
-                        <div key={stars} className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono font-bold">
+                        <div key={stars} className="flex items-center gap-2 text-[10px] text-[var(--color-muted)] font-mono font-bold">
                           <span className="w-3 text-right">{stars}★</span>
                           <div className="flex-1 h-1.5 bg-neutral-100 rounded-none overflow-hidden">
                             <div className="h-full bg-neutral-950 rounded-none" style={{ width: `${percent}%` }} />
@@ -1500,9 +1695,8 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Sizing & Fit Stats (True to Size) */}
               {reviews.length > 0 && (
-                <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
+                <div className="bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl space-y-4 shadow-sm">
                   <div className="flex justify-between items-center">
                     <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-neutral-855">
                       Fit Statistics
@@ -1513,34 +1707,29 @@ function ProductDetail() {
                   </div>
                   
                   <div className="space-y-4 pt-2">
-                    {/* Slider indicator */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-neutral-500">
+                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-[var(--color-muted)]">
                         <span>Tight ({fitStats.fitTightPercent}%)</span>
                         <span className="text-neutral-950 font-bold">True To Size ({fitStats.fitTruePercent}%)</span>
                         <span>Loose ({fitStats.fitLoosePercent}%)</span>
                       </div>
                       <div className="relative h-2 bg-neutral-100 rounded-none overflow-hidden flex">
-                        {/* Tight segment */}
                         <div className="h-full bg-rose-300 transition-all duration-550" style={{ width: `${fitStats.fitTightPercent}%` }} />
-                        {/* True to Size segment */}
                         <div className="h-full bg-neutral-950 transition-all duration-550" style={{ width: `${fitStats.fitTruePercent}%` }} />
-                        {/* Loose segment */}
                         <div className="h-full bg-amber-300 transition-all duration-550" style={{ width: `${fitStats.fitLoosePercent}%` }} />
                       </div>
                     </div>
 
-                    {/* Rating parameters */}
                     <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-                      <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
+                      <div className="p-3 bg-[var(--color-surface)] rounded-none border border-neutral-950/10">
                         <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgComfort}</span>
                         <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Comfort</span>
                       </div>
-                      <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
+                      <div className="p-3 bg-[var(--color-surface)] rounded-none border border-neutral-950/10">
                         <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgQuality}</span>
                         <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Quality</span>
                       </div>
-                      <div className="p-3 bg-neutral-50 rounded-none border border-neutral-950/10">
+                      <div className="p-3 bg-[var(--color-surface)] rounded-none border border-neutral-950/10">
                         <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgBreathable}</span>
                         <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Breathable</span>
                       </div>
@@ -1549,14 +1738,13 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Write Review Panel */}
-              <div className="bg-white p-6 rounded-none border border-neutral-950/15 space-y-4">
-                <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-neutral-850">
+              <div className="bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl space-y-4 shadow-sm">
+                <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-[var(--color-text)]">
                   Write a Review
                 </h3>
                 {!isAuthenticated ? (
-                  <div className="text-center py-6 border border-dashed border-neutral-200 bg-neutral-50/50 rounded-none">
-                    <p className="text-xs font-mono font-bold text-neutral-500 uppercase tracking-widest mb-3">
+                  <div className="text-center py-6 border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 rounded-none">
+                    <p className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest mb-3">
                       Log in to leave a review
                     </p>
                     <Link
@@ -1569,13 +1757,12 @@ function ProductDetail() {
                 ) : checkingOrder ? (
                   <div className="flex flex-col items-center justify-center py-6 gap-2">
                     <div className="w-4 h-4 border-2 border-neutral-950 border-t-transparent rounded-none animate-spin" />
-                    <span className="text-[10px] tracking-widest font-mono text-neutral-400 uppercase">Verifying purchase history...</span>
+                    <span className="text-[10px] tracking-widest font-mono text-[var(--color-muted)] uppercase">Verifying purchase history...</span>
                   </div>
                 ) : hasDeliveredOrder ? (
                   <form onSubmit={handleReviewSubmit} className="space-y-4">
-                    {/* Star Rating Select */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Your Rating</span>
+                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Your Rating</span>
                       <div className="flex gap-2">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
@@ -1590,9 +1777,8 @@ function ProductDetail() {
                       </div>
                     </div>
 
-                    {/* Fit Selection */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Size Fit Preference</span>
+                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Size Fit Preference</span>
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           { key: 'tight', label: 'TIGHT' },
@@ -1606,7 +1792,7 @@ function ProductDetail() {
                             className={`py-2 rounded-none font-bold text-[10px] tracking-wider transition-all cursor-pointer border uppercase font-mono ${
                               newFit === item.key
                                 ? 'bg-neutral-950 text-white border-neutral-950'
-                                : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                                : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                             }`}
                           >
                             {item.label}
@@ -1615,11 +1801,9 @@ function ProductDetail() {
                       </div>
                     </div>
 
-                    {/* Characteristic Metrics (Comfort, Quality, Breathable) */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Comfort */}
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Comfort Rating</span>
+                        <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Comfort Rating</span>
                         <div className="flex gap-1.5">
                           {[1, 2, 3, 4, 5].map((val) => (
                             <button
@@ -1629,7 +1813,7 @@ function ProductDetail() {
                               className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
                                 newComfort === val
                                   ? 'bg-neutral-950 text-white border-neutral-950'
-                                  : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                                  : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                               }`}
                             >
                               {val}
@@ -1638,9 +1822,8 @@ function ProductDetail() {
                         </div>
                       </div>
 
-                      {/* Quality */}
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Quality Rating</span>
+                        <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Quality Rating</span>
                         <div className="flex gap-1.5">
                           {[1, 2, 3, 4, 5].map((val) => (
                             <button
@@ -1650,7 +1833,7 @@ function ProductDetail() {
                               className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
                                 newQuality === val
                                   ? 'bg-neutral-950 text-white border-neutral-950'
-                                  : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                                  : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                               }`}
                             >
                               {val}
@@ -1659,9 +1842,8 @@ function ProductDetail() {
                         </div>
                       </div>
 
-                      {/* Breathable */}
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Breathable Rating</span>
+                        <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Breathable Rating</span>
                         <div className="flex gap-1.5">
                           {[1, 2, 3, 4, 5].map((val) => (
                             <button
@@ -1671,7 +1853,7 @@ function ProductDetail() {
                               className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
                                 newBreathable === val
                                   ? 'bg-neutral-950 text-white border-neutral-950'
-                                  : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                                  : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                               }`}
                             >
                               {val}
@@ -1681,40 +1863,37 @@ function ProductDetail() {
                       </div>
                     </div>
 
-                    {/* Review Title Input */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Review Title</span>
+                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Review Title</span>
                       <input
                         type="text"
                         value={newReviewTitle}
                         onChange={(e) => setNewReviewTitle(e.target.value)}
                         placeholder="Summarize your experience..."
-                        className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden transition-colors font-sans"
+                        className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden transition-colors font-sans"
                       />
                     </div>
 
-                    {/* Review Comment Textarea */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Your Review</span>
+                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Your Review</span>
                       <textarea
                         rows="3"
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Write your product experience here..."
-                        className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2.5 text-xs text-neutral-850 outline-hidden resize-none transition-colors font-sans"
+                        className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors font-sans"
                       />
                     </div>
 
-                    {/* Review Image URLs */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Customer Image URLs (comma-separated, optional)</span>
+                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Customer Image URLs (comma-separated, optional)</span>
                       <div className="flex gap-2 items-center">
                         <input
                           type="text"
                           value={newReviewImages}
                           onChange={(e) => setNewReviewImages(e.target.value)}
                           placeholder="https://example.com/pic1.jpg, https://example.com/pic2.jpg"
-                          className="flex-1 bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden transition-colors font-sans"
+                          className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden transition-colors font-sans"
                         />
                         <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center">
                           {uploadingImage ? 'Uploading...' : 'Upload File'}
@@ -1727,7 +1906,7 @@ function ProductDetail() {
                           />
                         </label>
                       </div>
-                      <span className="text-[8px] font-mono text-neutral-450 uppercase tracking-wide">
+                      <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wide">
                         TIP: PASTE DIRECT HTTPS LINKS OR CHOOSE A LOCAL IMAGE TO UPLOAD TEMPORARILY.
                       </span>
                     </div>
@@ -1741,11 +1920,11 @@ function ProductDetail() {
                     </button>
                   </form>
                 ) : (
-                  <div className="text-center py-6 px-4 border border-dashed border-neutral-200 bg-neutral-50/50 rounded-none space-y-3">
+                  <div className="text-center py-6 px-4 border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 rounded-none space-y-3">
                     <p className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider leading-relaxed">
                       Review Lock Active
                     </p>
-                    <p className="text-xs text-neutral-500 leading-relaxed font-sans">
+                    <p className="text-xs text-[var(--color-muted)] leading-relaxed font-sans">
                       Reviews are restricted to verified purchasers of this item. To submit a review, you must have an order for this product marked as <strong className="text-neutral-950 font-bold">Delivered</strong> in your profile history.
                     </p>
                   </div>
@@ -1753,17 +1932,16 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* COLUMN 2: REVIEWS FEED LIST (7 Columns) */}
             <div className="lg:col-span-7 space-y-4">
               {reviews.length === 0 ? (
-                <div className="py-16 text-center border border-dashed border-neutral-200 rounded-none bg-neutral-50/50">
-                  <p className="text-xs text-neutral-500 font-mono font-bold">
+                <div className="py-16 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-surface)]/50">
+                  <p className="text-xs text-[var(--color-muted)] font-mono font-bold">
                     No reviews have been written for this product yet.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-none">
-                  {reviews.map((rev) => {
+                <div className="space-y-4">
+                  {reviews.slice(0, showAllReviews ? reviews.length : 3).map((rev) => {
                     const uniqueId = rev.$id || rev.id;
                     const formattedDate = new Date(rev.$createdAt || '1970-01-01').toLocaleDateString('en-US', {
                       year: 'numeric',
@@ -1808,19 +1986,19 @@ function ProductDetail() {
                     }
 
                     return (
-                      <div key={uniqueId} className="bg-white p-5 rounded-none border border-neutral-950/10 space-y-2 hover:border-neutral-950 transition-colors duration-200">
+                      <div key={uniqueId} className="bg-[var(--color-surface)]/60 backdrop-blur-md border border-[var(--color-border)] p-6 rounded-2xl space-y-4 hover:border-[var(--color-accent)] hover:shadow-md transition-all duration-300">
                         <div className="flex justify-between items-start flex-wrap gap-2">
                           <div className="space-y-0.5">
-                            <span className="text-[10px] font-mono text-neutral-400 block font-bold">
+                            <span className="text-[10px] font-mono text-[var(--color-muted)] block font-bold">
                               {formattedDate}
                             </span>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-bold text-neutral-950 uppercase font-sans">
+                              <span className="text-xs font-bold text-[var(--color-text)] uppercase font-sans">
                                 {rev.userName}
                               </span>
                               {verifiedPurchase && (
-                                <span className="inline-flex items-center gap-0.5 text-[8px] text-emerald-600 font-mono font-bold bg-emerald-50 border border-emerald-250 px-1 py-0.2 uppercase">
-                                  ✓ VERIFIED BUYER
+                                <span className="inline-flex items-center text-[8px] text-emerald-700 font-mono font-bold bg-emerald-50 border border-emerald-100 px-1.5 py-0.2 tracking-widest uppercase">
+                                  ✓ Verified Buyer
                                 </span>
                               )}
                             </div>
@@ -1829,65 +2007,82 @@ function ProductDetail() {
                             {[1, 2, 3, 4, 5].map((star) => (
                               <FaStar
                                 key={star}
-                                className={`text-[10px] ${star <= (isNaN(Number(rev.rating)) ? 5 : Number(rev.rating)) ? 'text-amber-400' : 'text-neutral-100'}`}
+                                className={`text-[10px] ${star <= (isNaN(Number(rev.rating)) ? 5 : Number(rev.rating)) ? 'text-amber-400' : 'text-neutral-200'}`}
                               />
                             ))}
                           </div>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {titleText && (
-                            <h4 className="text-xs font-mono font-bold text-neutral-950 uppercase tracking-wider">
-                              {titleText}
+                            <h4 className="text-xs font-mono font-bold text-[var(--color-text)] uppercase tracking-wide">
+                              &ldquo;{titleText}&rdquo;
                             </h4>
                           )}
 
-                          {/* Fit & Characteristics Rating Badges */}
                           {(fitPreference || comfortRating > 0 || qualityRating > 0 || breathableRating > 0) && (
                             <div className="flex flex-wrap gap-1.5 pt-0.5 pb-1">
                               {fitPreference && (
-                                <span className="text-[8px] font-mono font-bold uppercase bg-neutral-50 text-neutral-500 border border-neutral-200 px-2 py-0.5 rounded-none">
-                                  Fit: {fitPreference === 'true' ? 'True to Size' : fitPreference}
+                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
+                                  Cut Profile: {fitPreference === 'true' ? 'Optimal True size' : fitPreference === 'tight' ? 'Compressed Cut' : 'Oversized Silhouette'}
                                 </span>
                               )}
                               {comfortRating > 0 && (
-                                <span className="text-[8px] font-mono font-bold uppercase bg-neutral-50 text-neutral-500 border border-neutral-200 px-2 py-0.5 rounded-none">
+                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
                                   Comfort: {comfortRating}/5
                                 </span>
                               )}
                               {qualityRating > 0 && (
-                                <span className="text-[8px] font-mono font-bold uppercase bg-neutral-50 text-neutral-500 border border-neutral-200 px-2 py-0.5 rounded-none">
-                                  Quality: {qualityRating}/5
+                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
+                                  Material: {qualityRating}/5
                                 </span>
                               )}
                               {breathableRating > 0 && (
-                                <span className="text-[8px] font-mono font-bold uppercase bg-neutral-50 text-neutral-500 border border-neutral-200 px-2 py-0.5 rounded-none">
+                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
                                   Breathable: {breathableRating}/5
                                 </span>
                               )}
                             </div>
                           )}
 
-                          <p className="text-xs text-neutral-600 leading-relaxed bg-neutral-50 p-3 rounded-none border border-neutral-950/5 whitespace-pre-wrap">
+                          <p className="text-xs text-[var(--color-text)]/90 leading-relaxed font-sans whitespace-pre-wrap pl-0.5">
                             {commentText}
                           </p>
                         </div>
                         {imagesList && imagesList.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
+                          <div className="flex flex-wrap gap-2.5 pt-1">
                             {imagesList.map((img, idx) => (
-                              <a key={idx} href={img} target="_blank" rel="noopener noreferrer" className="block border border-neutral-950/10 hover:border-neutral-950 transition-colors">
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setActiveReviewImage(img)}
+                                className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-zoom-in shadow-xs bg-[var(--color-surface)]/20"
+                              >
                                 <img
                                   src={img}
                                   alt={`Customer image ${idx + 1}`}
-                                  className="w-12 h-12 object-cover"
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
-                              </a>
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                  <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md text-xs font-mono">🔍</span>
+                                </div>
+                              </button>
                             ))}
                           </div>
                         )}
                       </div>
                     );
                   })}
+                  
+                  {reviews.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllReviews(!showAllReviews)}
+                      className="w-full mt-6 py-3 border border-[var(--color-border)] rounded-xl text-xs font-bold text-[var(--color-text)] uppercase tracking-widest hover:bg-[var(--color-surface)] hover:border-[var(--color-accent)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {showAllReviews ? 'Show Less' : `View All Reviews (${reviews.length})`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1895,30 +2090,26 @@ function ProductDetail() {
         </div>
       </div>
 
-      {/* Size Chart Guide Modal */}
       {isSizeChartOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-          {/* Backdrop overlay */}
           <div 
             className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity" 
             onClick={() => setIsSizeChartOpen(false)}
           />
 
-          {/* Modal Box */}
-          <div className="relative bg-white rounded-none max-w-md w-full shadow-2xl p-6 border border-neutral-950 z-10 animate-scale-up space-y-6 text-neutral-900">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+          <div className="relative bg-[var(--color-surface)] rounded-none max-w-md w-full shadow-2xl p-6 border border-neutral-950 z-10 animate-scale-up space-y-6 text-[var(--color-text)]">
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
               <div>
                 <h3 className="text-sm font-mono font-bold uppercase tracking-[0.2em] text-neutral-950">
                   📏 STREETWEAR SIZE GUIDE
                 </h3>
-                <p className="text-[10px] text-neutral-400 font-mono font-bold uppercase tracking-wider mt-0.5">
+                <p className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider mt-0.5">
                   Size chart for boxy and oversized fits
                 </p>
               </div>
               <button 
                 onClick={() => setIsSizeChartOpen(false)}
-                className="text-neutral-400 hover:text-neutral-950 p-2 transition-colors cursor-pointer"
+                className="text-[var(--color-muted)] hover:text-neutral-950 p-2 transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -1926,18 +2117,17 @@ function ProductDetail() {
               </button>
             </div>
 
-            {/* Table Spec list */}
             <div className="overflow-hidden border border-neutral-950">
               <table className="w-full text-left text-xs font-mono uppercase font-bold">
                 <thead>
-                  <tr className="bg-neutral-50 border-b border-neutral-955 text-[10px] font-black text-neutral-500">
+                  <tr className="bg-[var(--color-surface)] border-b border-neutral-955 text-[10px] font-black text-[var(--color-muted)]">
                     <th className="p-3">SIZE</th>
                     <th className="p-3">CHEST (IN)</th>
                     <th className="p-3">SHOULDER (IN)</th>
                     <th className="p-3">LENGTH (IN)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-100 font-bold text-neutral-850">
+                <tbody className="divide-y divide-neutral-100 font-bold text-[var(--color-text)]">
                   {[
                     { size: 'XS', chest: '42', shoulder: '19', length: '27.5' },
                     { size: 'S', chest: '44', shoulder: '20', length: '28' },
@@ -1948,8 +2138,8 @@ function ProductDetail() {
                   ].map((row) => (
                     <tr 
                       key={row.size} 
-                      className={`hover:bg-neutral-50 transition-colors ${
-                        selectedSize === row.size ? 'bg-neutral-50 font-black text-neutral-950' : ''
+                      className={`hover:bg-[var(--color-surface)] transition-colors ${
+                        selectedSize === row.size ? 'bg-[var(--color-surface)] font-black text-neutral-950' : ''
                       }`}
                     >
                       <td className="p-3 font-sans font-black">{row.size} {selectedSize === row.size && '•'}</td>
@@ -1962,9 +2152,8 @@ function ProductDetail() {
               </table>
             </div>
 
-            {/* Pro Tip Alert */}
-            <div className="bg-neutral-50 border border-neutral-200 p-4 text-[10px] uppercase font-bold text-neutral-500 tracking-wide leading-relaxed">
-              <span className="font-black text-neutral-900 block mb-0.5">💡 STREETWEAR FIT MEMENTO</span>
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-[10px] uppercase font-bold text-[var(--color-muted)] tracking-wide leading-relaxed">
+              <span className="font-black text-[var(--color-text)] block mb-0.5">💡 STREETWEAR FIT MEMENTO</span>
               Our cuts are designed for a relaxed, slightly boxy drop-shoulder aesthetic. For a fitted standard silhouette, we recommend choosing one size smaller.
             </div>
 
@@ -1979,10 +2168,8 @@ function ProductDetail() {
         </div>
       )}
 
-      {/* Sizing Advisor Modal */}
       {sizeAdvisorOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-          {/* Backdrop overlay */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity" onClick={() => {
             setSizeAdvisorOpen(false);
             setAdvHeight('');
@@ -1991,15 +2178,13 @@ function ProductDetail() {
             setAdvRecommendation('');
           }}></div>
 
-          {/* Modal Box */}
-          <div className="relative bg-white rounded-none max-w-md w-full shadow-2xl p-6 border border-neutral-950 z-10 animate-fade-in space-y-6">
-            {/* Header */}
+          <div className="relative bg-[var(--color-surface)] rounded-none max-w-md w-full shadow-2xl p-6 border border-neutral-950 z-10 animate-fade-in space-y-6">
             <div className="flex items-center justify-between border-b border-neutral-950/10 pb-4">
               <div>
                 <h3 className="text-sm font-mono font-bold uppercase tracking-[0.2em] text-neutral-950">
                   👔 VIRTUAL SIZE ADVISOR
                 </h3>
-                <p className="text-[10px] text-neutral-400 font-mono font-bold uppercase tracking-wider mt-0.5">
+                <p className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider mt-0.5">
                   Calculate Your Perfect Fit
                 </p>
               </div>
@@ -2011,7 +2196,7 @@ function ProductDetail() {
                   setAdvBmi(null);
                   setAdvRecommendation('');
                 }}
-                className="text-neutral-400 hover:text-neutral-950 p-2 transition-colors cursor-pointer"
+                className="text-[var(--color-muted)] hover:text-neutral-950 p-2 transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -2019,10 +2204,9 @@ function ProductDetail() {
               </button>
             </div>
 
-            {/* Form body */}
             <div className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">
+                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)]">
                   Height (cm)
                 </label>
                 <input 
@@ -2030,12 +2214,12 @@ function ProductDetail() {
                   placeholder="e.g. 175" 
                   value={advHeight}
                   onChange={(e) => setAdvHeight(e.target.value)}
-                  className="bg-neutral-50 border border-neutral-950/15 focus:border-neutral-950 focus:bg-white rounded-none px-4 py-3 text-xs font-mono font-bold outline-none transition-all text-neutral-950"
+                  className="bg-[var(--color-surface)] border border-neutral-950/15 focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)] rounded-none px-4 py-3 text-xs font-mono font-bold outline-none transition-all text-neutral-950"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500">
+                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)]">
                   Weight (kg)
                 </label>
                 <input 
@@ -2043,28 +2227,27 @@ function ProductDetail() {
                   placeholder="e.g. 70" 
                   value={advWeight}
                   onChange={(e) => setAdvWeight(e.target.value)}
-                  className="bg-neutral-50 border border-neutral-950/15 focus:border-neutral-950 focus:bg-white rounded-none px-4 py-3 text-xs font-mono font-bold outline-none transition-all text-neutral-950"
+                  className="bg-[var(--color-surface)] border border-neutral-950/15 focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)] rounded-none px-4 py-3 text-xs font-mono font-bold outline-none transition-all text-neutral-950"
                 />
               </div>
 
               <button
                 onClick={calculateRecommendation}
                 disabled={!advHeight || !advWeight}
-                className="w-full py-3.5 bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-mono font-bold uppercase tracking-widest rounded-none transition-all cursor-pointer disabled:bg-neutral-100 disabled:text-neutral-400 disabled:cursor-not-allowed border border-neutral-950"
+                className="w-full py-3.5 bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-mono font-bold uppercase tracking-widest rounded-none transition-all cursor-pointer disabled:bg-neutral-100 disabled:text-[var(--color-muted)] disabled:cursor-not-allowed border border-neutral-950"
               >
                 Calculate Size
               </button>
             </div>
 
-            {/* Recommendations display */}
             {advBmi && (
-              <div className="p-5 bg-neutral-50 border border-neutral-950/15 rounded-none text-center space-y-3 animate-fade-in">
-                <div className="text-xs font-mono font-bold text-neutral-400 uppercase tracking-widest">
+              <div className="p-5 bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 rounded-2xl text-center space-y-3 animate-fade-in shadow-sm">
+                <div className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                   Your BMI: <span className="text-neutral-950 font-bold">{advBmi}</span>
                 </div>
                 
                 <div className="space-y-1">
-                  <div className="text-[10px] text-neutral-450 font-mono font-bold uppercase tracking-wider">
+                  <div className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider">
                     Recommended Size
                   </div>
                   <div className="text-3xl font-mono font-black text-neutral-950 tracking-wide">
@@ -2072,7 +2255,7 @@ function ProductDetail() {
                   </div>
                 </div>
 
-                <p className="text-[10px] font-medium text-neutral-500 leading-relaxed max-w-xs mx-auto">
+                <p className="text-[10px] font-medium text-[var(--color-muted)] leading-relaxed max-w-xs mx-auto">
                   {advRecommendation === 'S' && "Based on lightweight dimensions, 'S' provides a sleek look."}
                   {advRecommendation === 'M' && "Based on balanced dimensions, 'M' guarantees standard relaxed styling."}
                   {advRecommendation === 'L' && "Based on solid dimensions, 'L' guarantees comfortable signatures drops."}
@@ -2082,7 +2265,7 @@ function ProductDetail() {
                 <div className="pt-2">
                   <button
                     onClick={() => {
-                      let stockMap = {};
+                      let stockMap;
                       try {
                         stockMap = JSON.parse(product.sizes_stock || '{}');
                       } catch {
@@ -2107,6 +2290,30 @@ function ProductDetail() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Premium Glassmorphic Review Image Lightbox Modal */}
+      {activeReviewImage && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-md transition-opacity cursor-zoom-out" 
+            onClick={() => setActiveReviewImage(null)}
+          />
+          <div className="relative max-w-3xl w-full max-h-[85vh] flex items-center justify-center z-10 animate-scale-up p-2 bg-[var(--color-surface)]/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl">
+            <button 
+              type="button"
+              className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors cursor-pointer border border-white/10 backdrop-blur-xs"
+              onClick={() => setActiveReviewImage(null)}
+            >
+              <FiX className="text-lg" />
+            </button>
+            <img 
+              src={activeReviewImage} 
+              alt="High-resolution review zoom" 
+              className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-lg"
+            />
           </div>
         </div>
       )}

@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useDispatch, useSelector } from 'react-redux'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginAction } from '../../features/login'
 import authService from '../../appwrite/auth'
 import { setCartItems } from '../../features/addToCart'
+import cartService from '../../appwrite/cart'
+import { sendWebhookNotification } from '../../utils/webhookHelper'
+import { mergeLocalCartToDb } from '../../utils/cartMergeHelper'
 
 function SignUp() {
   const {
@@ -17,6 +20,7 @@ function SignUp() {
 
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const { isAuthenticated } = useSelector((state) => state.auth)
   const [serverError, setServerError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -37,12 +41,34 @@ function SignUp() {
         const userData = await authService.getCurrentUser()
         if (userData) {
           dispatch(loginAction({ user: userData }))
-          dispatch(setCartItems([])) // Fresh signup starts with an empty cart
+          
+          try {
+            await mergeLocalCartToDb(userData.$id);
+            const cartItems = await cartService.getCartItems(userData.$id);
+            dispatch(setCartItems(cartItems));
+          } catch (err) {
+            console.error("Cart merge or retrieval on signup failed:", err);
+            dispatch(setCartItems([]));
+          }
+          
+          // Dispatch user.signup webhook notification
+          const hasSentKey = `sent_signup_${userData.$id || userData.id}`;
+          localStorage.setItem(hasSentKey, 'true');
+          authService.updatePreferences({ ...(userData.prefs || {}), signup_notified: true })
+            .catch(err => console.warn('Failed to update signup_notified preference in manual signup:', err.message));
+
+          sendWebhookNotification('user.signup', {
+            name: userData.name || data.name.trim(),
+            email: userData.email || data.email.trim(),
+            userId: userData.$id || userData.id
+          });
         }
       }
       
       reset()
-      navigate('/')
+      const from = location.state?.from?.pathname || '/';
+      sessionStorage.setItem('just_logged_in', 'true');
+      navigate(from, { replace: true })
     } catch (error) {
       console.error("SignUp Error:", error)
       if (error?.message?.toLowerCase().includes("email") || error?.status === 409) {
@@ -71,18 +97,21 @@ function SignUp() {
   };
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/');
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) {
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, location]);
 
   return (
-    <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-neutral-900 selection:text-white">
-      <div className="absolute inset-0 bg-white/95 backdrop-blur-xs z-10" />
+    <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-[var(--color-accent)] selection:text-white animate-gradient-shift bg-[length:200%_200%]">
+      <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-xs z-10" />
 
-      <div className="relative z-20 w-full max-w-md bg-white p-8 rounded-2xl border border-neutral-200/60 shadow-xl">
+      <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)]/80 backdrop-blur-xl p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl">
         
         <div className="text-center mb-8">
-          <h2 className="text-xs tracking-[0.5em] text-[var(--theme-accent)] font-black uppercase mb-2">Join The Movement</h2>
-          <h1 className="text-3xl font-black tracking-widest text-neutral-900 uppercase">CREATE ACCOUNT</h1>
+          <h2 className="text-xs tracking-[0.5em] text-[var(--color-accent)] font-black uppercase mb-2">Join The Movement</h2>
+          <h1 className="text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">CREATE ACCOUNT</h1>
         </div>
 
         {/* Server error feedback */}
@@ -96,12 +125,12 @@ function SignUp() {
           
           {/* Full Name Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Full Name</label>
+            <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Full Name</label>
             <input 
               type="text" 
               placeholder="ENTER YOUR NAME" 
               disabled={loading}
-              className={`w-full bg-[#fbfbfb] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors uppercase font-medium disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-medium disabled:opacity-50`}
               {...register("name", { required: "Name is required" })}
             />
             {errors.name && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -109,12 +138,12 @@ function SignUp() {
 
           {/* Email Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Email Address</label>
+            <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Email Address</label>
             <input 
               type="text" 
               placeholder="YOU@EXAMPLE.COM" 
               disabled={loading}
-              className={`w-full bg-[#fbfbfb] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
               {...register("email", { 
                 required: "Email is required",
                 pattern: {
@@ -128,12 +157,12 @@ function SignUp() {
 
           {/* Password Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Password</label>
+            <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Password</label>
             <input 
               type="password" 
               placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" 
               disabled={loading}
-              className={`w-full bg-[#fbfbfb] border ${errors.password ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200 focus:border-[var(--theme-primary)]'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden transition-colors disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.password ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden transition-colors disabled:opacity-50`}
               {...register("password", { 
                 required: "Password is required",
                 minLength: { value: 6, message: "Password must be at least 6 characters" }
@@ -149,11 +178,11 @@ function SignUp() {
                 type="checkbox" 
                 id="terms" 
                 disabled={loading}
-                className="mt-0.5 accent-neutral-900 rounded border-neutral-200 bg-[#fbfbfb] cursor-pointer h-4 w-4 disabled:opacity-50"
+                className="mt-0.5 accent-[var(--color-accent)] rounded border-[var(--color-border)] bg-[var(--color-subtle)] cursor-pointer h-4 w-4 disabled:opacity-50"
                 {...register("terms", { required: "You must accept the terms" })}
               />
-              <label htmlFor="terms" className="text-[11px] text-neutral-400 tracking-wide leading-tight cursor-pointer font-bold uppercase">
-                I AGREE TO THE <span className="text-neutral-900 font-black hover:underline">TERMS OF SERVICE</span> AND <span className="text-neutral-900 font-black hover:underline">PRIVACY POLICY</span>
+              <label htmlFor="terms" className="text-[11px] text-[var(--color-muted)] tracking-wide leading-tight cursor-pointer font-bold uppercase">
+                I AGREE TO THE <span className="text-[var(--color-text)] font-black hover:underline">TERMS OF SERVICE</span> AND <span className="text-[var(--color-text)] font-black hover:underline">PRIVACY POLICY</span>
               </label>
             </div>
             {errors.terms && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider mt-1">{errors.terms.message}</span>}
@@ -163,23 +192,23 @@ function SignUp() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] active:scale-[0.98] disabled:scale-100 disabled:bg-[var(--theme-primary)]/40 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md mt-2 cursor-pointer transition-all duration-200"
+            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] disabled:scale-100 disabled:bg-[var(--color-accent)]/40 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md mt-2 cursor-pointer transition-all duration-200"
           >
             {loading ? 'REGISTERING...' : 'REGISTER NOW'}
           </button>
         </form>
 
         <div className="relative flex py-4 items-center">
-          <div className="flex-grow border-t border-neutral-200/60"></div>
-          <span className="flex-shrink mx-4 text-[10px] font-black text-neutral-400 tracking-widest uppercase">OR</span>
-          <div className="flex-grow border-t border-neutral-200/60"></div>
+          <div className="flex-grow border-t border-[var(--color-border)]"></div>
+          <span className="flex-shrink mx-4 text-[10px] font-black text-[var(--color-muted)] tracking-widest uppercase">OR</span>
+          <div className="flex-grow border-t border-[var(--color-border)]"></div>
         </div>
 
         <button
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-neutral-50 active:scale-[0.98] disabled:scale-100 border border-neutral-200 text-neutral-800 font-bold text-xs tracking-widest uppercase py-4 rounded-xl shadow-md cursor-pointer transition-all duration-200"
+          className="w-full flex items-center justify-center gap-3 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] active:scale-[0.98] disabled:scale-100 border border-[var(--color-border)] text-[var(--color-text)] font-bold text-xs tracking-widest uppercase py-4 rounded-xl shadow-md cursor-pointer transition-all duration-200"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 15.01 1 12 1 7.35 1 3.39 3.65 1.5 7.5l3.86 3C6.31 7.57 8.91 5.04 12 5.04z" />
@@ -190,10 +219,10 @@ function SignUp() {
           {loading ? 'CONNECTING...' : 'Continue with Google'}
         </button>
 
-        <div className="text-center mt-8 pt-6 border-t border-neutral-100">
-          <p className="text-xs text-neutral-500 tracking-wider">
+        <div className="text-center mt-8 pt-6 border-t border-[var(--color-border)]">
+          <p className="text-xs text-[var(--color-muted)] tracking-wider">
             ALREADY PART OF THE CREW?{' '}
-            <Link to="/login" className="text-neutral-900 font-black tracking-widest hover:text-[var(--theme-primary)] transition-colors ml-1 uppercase">
+            <Link to="/login" className="text-[var(--color-text)] font-black tracking-widest hover:text-[var(--color-accent)] transition-colors ml-1 uppercase">
               LOG IN &rarr;
             </Link>
           </p>

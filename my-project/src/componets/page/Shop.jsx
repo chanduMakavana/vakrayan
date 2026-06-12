@@ -3,12 +3,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import productsService from '../../appwrite/products'
 import wishlistService from '../../appwrite/wishlist'
-import Navbar from '../pageComponets/Navbar'
 import Footer from '../pageComponets/Footer'
 import ProductCardSkeleton from '../pageComponets/ProductCardSkeleton'
 import { setProducts } from '../../features/productsSlice'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import Fuse from 'fuse.js'
+import { scatterProducts } from '../../utils/colorHelper'
+
+
 
 function Shop() {
   const navigate = useNavigate()
@@ -35,6 +37,7 @@ function Shop() {
   const [selectedSizes, setSelectedSizes] = useState([])
   const [inStockOnly, setInStockOnly] = useState(false)
   const [cols, setCols] = useState(4) // 2 | 3 | 4 columns on desktop
+  const [mobileSortOpen, setMobileSortOpen] = useState(false)
 
   const maxPriceLimit = products.length > 0 ? Math.ceil(Math.max(...products.map(p => Number(p.price || 0))) / 500) * 500 : 3000
 
@@ -43,7 +46,9 @@ function Shop() {
     if (products.length > 0) {
       const highest = Math.max(...products.map(p => Number(p.price || 0)))
       if (highest > 0) {
-        setMaxPriceFilter(Math.ceil(highest / 500) * 500)
+        setTimeout(() => {
+          setMaxPriceFilter(Math.ceil(highest / 500) * 500)
+        }, 0)
       }
     }
   }, [products])
@@ -81,8 +86,22 @@ function Shop() {
   }, [reduxFetched])
 
   useEffect(() => {
+    setTimeout(() => {
+      setSelectedCategory(urlCategory || 'all')
+    }, 0)
+  }, [urlCategory])
+
+  useEffect(() => {
     if (urlCategory) {
-      setTimeout(() => setSelectedCategory(urlCategory), 0)
+      const element = document.getElementById('shop-products-grid')
+      if (element) {
+        const t = setTimeout(() => {
+          const yOffset = -100; // Offset for sticky navbar height + margin
+          const y = element.getBoundingClientRect().top + (window.scrollY || window.pageYOffset) + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }, 150);
+        return () => clearTimeout(t);
+      }
     }
   }, [urlCategory])
 
@@ -123,7 +142,7 @@ function Shop() {
     const matchesSize = selectedSizes.length === 0 || selectedSizes.some(sz => Number(stocks[sz] || 0) > 0);
 
     // In-Stock Filter
-    let isAllOutOfStock = false;
+    let isAllOutOfStock;
     if (product.sizes && product.sizes.length > 0) {
       const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
       isAllOutOfStock = totalStock === 0;
@@ -223,12 +242,12 @@ function Shop() {
     selectedSizes.length > 0 || 
     inStockOnly
 
-  const gridClass = `grid grid-cols-2 ${
+  const gridClass = `grid grid-cols-2 gap-x-2 gap-y-4 sm:gap-x-4 sm:gap-y-8 ${
     cols === 2 
-      ? 'md:grid-cols-2 lg:grid-cols-2 gap-x-12 gap-y-16' 
+      ? 'md:grid-cols-2 lg:grid-cols-2 md:gap-x-12 md:gap-y-16' 
       : cols === 3 
-        ? 'md:grid-cols-3 lg:grid-cols-3 gap-x-10 gap-y-16' 
-        : 'md:grid-cols-4 lg:grid-cols-4 gap-x-8 gap-y-16'
+        ? 'md:grid-cols-3 lg:grid-cols-3 md:gap-x-10 md:gap-y-16' 
+        : 'md:grid-cols-4 lg:grid-cols-4 md:gap-x-8 md:gap-y-16'
   }`
 
   // Debounced search analytics — declared after filteredProducts so length is accessible
@@ -269,109 +288,83 @@ function Shop() {
     }
   })
 
-  const getCategoryImage = (catValue) => {
-    try {
-      const overrides = JSON.parse(localStorage.getItem('category_images')) || {};
-      if (overrides[catValue]) return overrides[catValue];
-    } catch (e) {
-      console.error("Error reading category_images from localStorage:", e);
-    }
-
-    if (catValue === 'all') return 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=150&q=80';
-    if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg';
-    if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg';
-    if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg';
-    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=150&q=80';
-    
-    const firstProd = products.find(p => p.category === catValue);
-    return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/150x150?text=FITS';
-  }
-
   return (
     <>
-      <Navbar />
       
-      <div className="w-full min-h-screen bg-white text-neutral-900 font-sans relative selection:bg-neutral-900 selection:text-white pb-20">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
           {/* Headline Title */}
-          <div className="text-center md:text-left space-y-2 border-b border-neutral-200/50 pb-6">
-            <h4 className="text-xs tracking-[0.4em] text-[var(--theme-accent)] font-black uppercase">
+          <div className="text-center md:text-left space-y-2 border-b border-[var(--color-border)] pb-6">
+            <h4 className="text-xs tracking-[0.4em] text-[var(--color-accent)] font-black uppercase">
               Streetwear Archives // HQ
             </h4>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight uppercase leading-none text-neutral-900">
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight uppercase leading-none text-[var(--color-text)]">
               Shop Collection
             </h1>
           </div>
 
-          {/* Filtering Controller Unit */}
-          <div className="bg-white border border-neutral-950/10 p-6 rounded-none flex flex-col gap-6">
-            {/* Premium Bento Category Cards Row */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch gap-4 pb-4 border-b border-neutral-950/10 w-full">
-              {categoriesList.filter(c => {
-                try {
-                  const deleted = JSON.parse(localStorage.getItem('deleted_categories')) || [];
-                  return !deleted.includes(c.value);
-                } catch (e) {
-                  return true;
-                }
-              }).map((c) => {
-                const img = getCategoryImage(c.value);
-                const isActive = selectedCategory === c.value;
-                const count = c.value === 'all' 
-                  ? products.length 
-                  : products.filter(p => p.category === c.value).length;
-                
-                const shortLabel = c.label
-                  .replace(' & SWEATSHIRTS', '')
-                  .replace(' PRODUCTS', '')
-                  .replace(' T-SHIRTS', 'S')
-                  .replace(' T-SHIRT', '');
-
-                return (
-                  <button
-                    key={c.value}
-                    onClick={() => setSelectedCategory(c.value)}
-                    className={`group relative h-24 sm:h-28 flex-1 min-w-[130px] sm:min-w-[160px] overflow-hidden rounded-none cursor-pointer transition-all duration-300 border ${
-                      isActive 
-                        ? 'border-neutral-950 ring-2 ring-neutral-950/10 scale-[1.02] shadow-sm' 
-                        : 'border-neutral-200 hover:border-neutral-450 hover:scale-[1.01]'
-                    }`}
-                  >
-                    {/* Background Image */}
-                    <img 
-                      src={img} 
-                      alt={c.label} 
-                      className={`absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110 ${
-                        isActive ? 'scale-[1.05]' : ''
-                      }`}
-                    />
-                    
-                    {/* Glassmorphism / Gradient Overlay */}
-                    <div className={`absolute inset-0 transition-colors duration-300 ${
-                      isActive 
-                        ? 'bg-neutral-950/50 backdrop-blur-[1px]' 
-                        : 'bg-neutral-950/35 backdrop-blur-none group-hover:bg-neutral-950/45 group-hover:backdrop-blur-[0.5px]'
-                    }`} />
-
-                    {/* Bottom Border Accent when Active */}
-                    {isActive && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-neutral-950" />
-                    )}
-
-                    {/* Content text */}
-                    <div className="absolute inset-0 p-4 flex flex-col justify-end text-left z-10">
-                      <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase font-black text-white leading-tight">
-                        {shortLabel}
-                      </span>
-                      <span className="text-[7.5px] font-mono tracking-widest text-white/75 uppercase font-bold mt-0.5">
-                        {count} item{count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+          {/* Explore Categories Banner */}
+          <div
+            onClick={() => {
+              navigate('/?scroll=categories', { replace: true })
+            }}
+            className="group relative h-44 md:h-52 w-full rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-lg transition-all duration-300 border border-[var(--color-border)] bg-neutral-950"
+          >
+            {/* Background Image */}
+            <img
+              src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80"
+              alt="Explore Categories Banner"
+              className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 brightness-75"
+            />
+            {/* Heavy Dark Gradient Overlay for Maximum Text Contrast */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/85 group-hover:from-black/80 group-hover:via-black/55 group-hover:to-black/80 transition-colors duration-300" />
+            
+            {/* Content Overlay */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
+              <h2 className="text-white font-mono font-black text-sm md:text-xl tracking-[0.3em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-amber-400 transition-colors duration-300">
+                🔍 EXPLORE ALL CATEGORIES
+              </h2>
+              <p className="text-[11px] md:text-sm font-bold text-neutral-100 uppercase tracking-widest leading-relaxed max-w-lg drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+                Browse our curated drops of Printed Tees, Oversized Fits, Shirts, Hoodies and more
+              </p>
+              <span className="text-[10px] md:text-xs font-mono bg-white text-black font-black uppercase tracking-widest mt-3 px-6 py-2.5 rounded-lg border border-white hover:bg-amber-400 hover:text-black hover:border-amber-400 transition-all duration-300 shadow-md">
+                EXPLORE NOW &rarr;
+              </span>
             </div>
+          </div>
+
+          {/* Mobile Quick Filters (Horizontal Scroll) */}
+          <div className="flex lg:hidden overflow-x-auto gap-3 pb-2 pt-1 scrollbar-none snap-x items-center w-full">
+            {[
+              { value: 'all', label: 'All' },
+              { value: 'BEST SELLER', label: 'Top Rated' },
+              { value: 'PLUS SIZE', label: 'Plus Size' },
+              { value: 'NEW DROP', label: 'New' }
+            ].map((t) => (
+              <button
+                key={t.value}
+                onClick={() => setSelectedTag(t.value)}
+                className={`snap-start shrink-0 text-sm font-sans px-5 py-2 border transition-colors rounded-lg shadow-xs ${
+                  selectedTag === t.value
+                    ? 'bg-neutral-900 text-white border-neutral-900 font-bold'
+                    : 'bg-white text-neutral-600 border-neutral-300 font-medium'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+            <button
+               onClick={() => setFilterDrawerOpen(true)}
+               className="snap-start shrink-0 text-sm font-sans px-5 py-2 border rounded-lg bg-white text-neutral-600 border-neutral-300 flex items-center gap-1.5 font-medium shadow-xs"
+            >
+               Color <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+          </div>
+
+          {/* Filtering Controller Unit (Desktop) */}
+          <div className="hidden lg:flex bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl flex-col gap-6 shadow-xs">
+
 
             {/* Tags Select Pills */}
             <div className="flex flex-wrap gap-2">
@@ -385,10 +378,10 @@ function Shop() {
                 <button
                   key={t.value}
                   onClick={() => setSelectedTag(t.value)}
-                  className={`text-[9px] font-mono tracking-wider uppercase px-3 py-1.5 border transition-all duration-200 cursor-pointer rounded-none ${
+                  className={`text-[9px] font-mono tracking-wider uppercase px-3.5 py-1.5 border transition-all duration-200 cursor-pointer rounded-lg ${
                     selectedTag === t.value
-                      ? 'bg-neutral-950 text-white border-neutral-950'
-                      : 'bg-white text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                      ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
+                      : 'bg-[var(--color-surface)]/40 text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
                   }`}
                 >
                   {t.label}
@@ -406,12 +399,12 @@ function Shop() {
                     placeholder="SEARCH THE ARCHIVE..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent border-b border-neutral-300 focus:border-neutral-950 py-2.5 text-xs text-neutral-950 placeholder-neutral-400 outline-hidden tracking-widest font-mono uppercase transition-colors"
+                    className="w-full bg-transparent border-b border-[var(--color-border)] focus:border-[var(--color-accent)] py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)]/50 outline-hidden tracking-widest font-mono uppercase transition-colors"
                   />
                 </div>
                 <button
                   onClick={() => setFilterDrawerOpen(true)}
-                  className="bg-neutral-950 hover:bg-neutral-800 text-white font-mono text-[10px] tracking-widest uppercase px-4 py-2.5 flex items-center gap-1.5 transition-all select-none cursor-pointer"
+                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono text-[10px] tracking-widest uppercase px-4.5 py-2.5 flex items-center gap-1.5 transition-all select-none cursor-pointer rounded-xl shadow-xs"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -424,14 +417,14 @@ function Shop() {
               <div className="flex flex-wrap items-center gap-6">
                 {/* Grid Column Selector (Desktop Only) */}
                 <div className="hidden lg:flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">VIEW:</span>
-                  <div className="flex border border-neutral-950/15 bg-white">
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-widest">VIEW:</span>
+                  <div className="flex border border-[var(--color-border)] bg-[var(--color-surface)]/40 backdrop-blur-xs rounded-lg overflow-hidden">
                     {[2, 3, 4].map((n) => (
                       <button
                         key={n}
                         onClick={() => setCols(n)}
-                        className={`text-[9px] font-mono font-bold px-3 py-1.5 border-r last:border-r-0 border-neutral-950/15 hover:bg-neutral-50 cursor-pointer transition-colors ${
-                          cols === n ? 'bg-neutral-950 text-white hover:bg-neutral-900 border-none' : 'text-neutral-700 bg-white'
+                        className={`text-[9px] font-mono font-bold px-3 py-1.5 border-r last:border-r-0 border-[var(--color-border)] hover:bg-[var(--color-subtle)] cursor-pointer transition-colors ${
+                          cols === n ? 'bg-[var(--color-accent)] text-white border-none' : 'text-[var(--color-muted)] bg-transparent'
                         }`}
                       >
                         {n} COL
@@ -442,11 +435,11 @@ function Shop() {
 
                 {/* Sort Dropdown */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">SORT BY:</span>
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-widest">SORT BY:</span>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="bg-white border border-neutral-950/15 text-[10px] font-mono font-bold tracking-wider uppercase px-3 py-2 outline-hidden cursor-pointer text-neutral-800 rounded-none hover:border-neutral-950"
+                    className="bg-[var(--color-surface)]/40 backdrop-blur-xs border border-[var(--color-border)] text-[10px] font-mono font-bold tracking-wider uppercase px-3 py-2 outline-hidden cursor-pointer text-[var(--color-text)] rounded-lg hover:border-[var(--color-accent)] transition-all"
                   >
                     <option value="newest">NEWEST RELEASES</option>
                     <option value="popularity">POPULARITY</option>
@@ -460,11 +453,11 @@ function Shop() {
 
           {/* Active Filter Badges */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 bg-[#fafafb] p-4 border border-neutral-950/5">
-              <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest mr-1.5">ACTIVE:</span>
+            <div className="flex flex-wrap items-center gap-2 bg-[var(--color-surface)]/30 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xs">
+              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest mr-1.5">ACTIVE:</span>
               
               {selectedCategory !== 'all' && (
-                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>CAT: {selectedCategory.replace('-', ' ')}</span>
                   <button 
                     onClick={() => setSelectedCategory('all')}
@@ -476,7 +469,7 @@ function Shop() {
               )}
 
               {selectedTag !== 'all' && (
-                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>TAG: {selectedTag}</span>
                   <button 
                     onClick={() => setSelectedTag('all')}
@@ -488,7 +481,7 @@ function Shop() {
               )}
 
               {searchQuery.trim() !== '' && (
-                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>SEARCH: "{searchQuery}"</span>
                   <button 
                     onClick={() => setSearchQuery('')}
@@ -500,7 +493,7 @@ function Shop() {
               )}
 
               {(minPriceFilter > 0 || maxPriceFilter < maxPriceLimit) && (
-                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>PRICE: ₹{minPriceFilter} - ₹{maxPriceFilter}</span>
                   <button 
                     onClick={() => { setMinPriceFilter(0); setMaxPriceFilter(maxPriceLimit); }}
@@ -512,7 +505,7 @@ function Shop() {
               )}
 
               {selectedSizes.map(size => (
-                <div key={size} className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                <div key={size} className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>SIZE: {size}</span>
                   <button 
                     onClick={() => setSelectedSizes(selectedSizes.filter(s => s !== size))}
@@ -524,7 +517,7 @@ function Shop() {
               ))}
 
               {inStockOnly && (
-                <div className="flex items-center gap-1 bg-white px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-800 border border-neutral-200">
+                <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>IN STOCK</span>
                   <button 
                     onClick={() => setInStockOnly(false)}
@@ -553,7 +546,7 @@ function Shop() {
           )}
 
           {/* Catalog Count Indicator */}
-          <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-neutral-400 uppercase">
+          <div id="shop-products-grid" className="flex justify-between items-center text-[10px] font-mono tracking-widest text-[var(--color-muted)] uppercase">
             <span>SHOWING {filteredProducts.length} FITS</span>
             <span>CATALOG VOL. I</span>
           </div>
@@ -569,8 +562,8 @@ function Shop() {
 
           {/* Empty Catalog View */}
           {!loading && filteredProducts.length === 0 && (
-            <div className="w-full py-28 text-center bg-white border border-neutral-950/10">
-              <p className="text-xs font-mono font-bold tracking-widest text-neutral-400 uppercase">
+            <div className="w-full py-28 text-center bg-[var(--color-surface)] border border-neutral-950/10">
+              <p className="text-xs font-mono font-bold tracking-widest text-[var(--color-muted)] uppercase">
                 NO STREETWEAR FIT MATCHES YOUR SEARCH CRITERIA.
               </p>
               <button 
@@ -583,166 +576,150 @@ function Shop() {
           )}
 
           {/* Catalog Products Matrix Grid */}
-          {!loading && filteredProducts.length > 0 && (
-            <div className={gridClass}>
-              {filteredProducts.map((product) => {
-                const uniqueId = product.$id || product.id
-                const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View'
-                const backView = product.back_image_links?.[0] || product.back_image_link || frontView
-                const activeTag = product.tag || ""
+          {(() => {
+            const displayProducts = (sortBy !== 'price-low' && sortBy !== 'price-high')
+              ? scatterProducts(filteredProducts)
+              : filteredProducts;
 
-                let stocks = {};
-                try {
-                  stocks = JSON.parse(product?.sizes_stock || '{}');
-                } catch {
-                  stocks = {};
-                }
-                let isAllOutOfStock = false;
-                if (product && product.sizes && product.sizes.length > 0) {
-                  const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
-                  isAllOutOfStock = totalStock === 0;
-                }
-
-                let swatches = [];
-                if (product.color_hex) {
-                  if (product.color_hex.startsWith('[')) {
-                    try {
-                      const parsed = JSON.parse(product.color_hex);
-                      if (Array.isArray(parsed)) {
-                        swatches = parsed; // Array of { name, hex, front, back }
-                      }
-                    } catch (err) {
-                      console.warn("Failed to parse color_hex JSON in Shop:", err);
-                    }
-                  } else {
-                    const hexParts = product.color_hex.split(',').map(s => s.trim());
-                    const nameParts = (product.color_name || '').split(',').map(s => s.trim());
-                    swatches = hexParts.map((hex, idx) => ({
-                      hex,
-                      name: nameParts[idx] || hex
-                    })).filter(s => s.hex);
+            return !loading && displayProducts.length > 0 && (
+              <div className={gridClass}>
+                {displayProducts.map((product) => {
+                  const parentId = product.$id || product.id;
+                  const uniqueId = parentId;
+                  const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View';
+                  const backView = product.back_image_links?.[0] || product.back_image_link || frontView;
+                  const clickPath = `/product/${product.slug || parentId}`;
+                  const activeTag = product.tag || (product.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
+                  let stocks = {};
+                  try {
+                    stocks = JSON.parse(product?.sizes_stock || '{}');
+                  } catch {
+                    stocks = {};
                   }
-                }
+                  let isAllOutOfStock = false;
+                  if (product && product.sizes && product.sizes.length > 0) {
+                    const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+                    isAllOutOfStock = totalStock === 0;
+                  }
 
-                return (
-                  <div 
-                    key={uniqueId} 
-                    onClick={() => navigate(`/product/${uniqueId}`)} 
-                    className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-700 pb-4 border-b border-transparent hover:border-neutral-950/20"
-                  >
-                    {/* Image Aspect Ratio Canvas */}
-                    <div className="w-full aspect-[3/4] overflow-hidden bg-[#f6f6f6] relative transition-transform duration-700 ease-out group-hover:scale-[0.98]">
-                      
-                      {/* Floating Heart Button */}
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const exists = wishlist.some(item => item.$id === uniqueId || item.id === uniqueId);
-                          let updated;
-                          if (exists) {
-                            dispatch(removeWishlistItemState(uniqueId));
-                            const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                            updated = saved.filter(item => item.$id !== uniqueId && item.id !== uniqueId);
-                            localStorage.setItem('wishlist', JSON.stringify(updated));
-                            if (isAuthenticated && user) {
-                              try {
-                                await wishlistService.removeFromWishlist(user.$id, uniqueId);
-                              } catch (err) {
-                                console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
-                              }
-                            }
-                          } else {
-                            dispatch(addWishlistItemState(product));
-                            const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                            updated = [...saved, product];
-                            localStorage.setItem('wishlist', JSON.stringify(updated));
-                            if (isAuthenticated && user) {
-                              try {
-                                await wishlistService.addToWishlist(user.$id, uniqueId);
-                              } catch (err) {
-                                console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
-                              }
-                            }
-                          }
-                        }}
-                        className="absolute top-4 right-4 z-30 bg-white border border-neutral-950/10 p-2.5 rounded-none hover:border-neutral-950 hover:bg-white transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
-                      >
-                        {wishlist.some(item => item.$id === uniqueId || item.id === uniqueId) ? (
-                          <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
-                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                          </svg>
-                        ) : (
-                          <svg className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
-                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                          </svg>
+                 return (
+                   <div 
+                     key={uniqueId} 
+                     onClick={() => navigate(clickPath)} 
+                     className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-300 ease-out pb-4 border-b border-transparent hover:border-[var(--color-border)] rounded-xl hover:shadow-lg"
+                   >
+                     {/* Image Aspect Ratio Canvas */}
+                     <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-[var(--color-subtle)] relative transition-transform duration-700 ease-out">
+                       
+                       {/* Floating Heart Button */}
+                       <button
+                         onClick={async (e) => {
+                           e.stopPropagation();
+                           const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
+                           let updated;
+                           if (exists) {
+                             dispatch(removeWishlistItemState(parentId));
+                             const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                             updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
+                             localStorage.setItem('wishlist', JSON.stringify(updated));
+                             if (isAuthenticated && user) {
+                               try {
+                                 await wishlistService.removeFromWishlist(user.$id, parentId);
+                               } catch (err) {
+                                 console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
+                               }
+                             }
+                           } else {
+                              dispatch(addWishlistItemState(product));
+                              const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                              updated = [...saved, product];
+                             localStorage.setItem('wishlist', JSON.stringify(updated));
+                             if (isAuthenticated && user) {
+                               try {
+                                 await wishlistService.addToWishlist(user.$id, parentId);
+                               } catch (err) {
+                                 console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
+                               }
+                             }
+                           }
+                         }}
+                         className="absolute top-4 right-4 z-30 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
+                       >
+                         {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
+                           <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
+                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                           </svg>
+                         ) : (
+                           <svg className="w-3.5 h-3.5 text-[var(--color-muted)] group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                           </svg>
+                         )}
+                       </button>
+ 
+                       {/* Edit Button for Admin Mode */}
+                       {adminMode && (
+                         <button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             navigate('/admin', { state: { editProductId: parentId } });
+                           }}
+                           className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
+                         >
+                           ✏️ EDIT
+                         </button>
+                       )}
+ 
+                        {activeTag && (
+                          <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
+                            <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
+                              {activeTag}
+                            </span>
+                          </div>
                         )}
-                      </button>
-
-                      {/* Edit Button for Admin Mode */}
-                      {adminMode && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/admin', { state: { editProductId: uniqueId } });
-                          }}
-                          className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
-                        >
-                          ✏️ EDIT
-                        </button>
-                      )}
-
-                      {/* Active Tag Badge */}
-                      {activeTag && (
-                        <div className="absolute top-4 left-4 z-20 flex items-center bg-neutral-950 px-2 py-0.5 select-none">
-                          <span className="text-white font-mono text-[8px] tracking-[0.25em] uppercase font-bold">
-                            {activeTag}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Out of Stock Overlay */}
-                      {isAllOutOfStock && (
-                        <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
-                          <span className="bg-white/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
-                            SOLD OUT
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Image Flip */}
-                      <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
-                        <img
-                          src={frontView}
-                          alt={product.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0 group-hover:scale-105"
-                        />
-                        <img  
-                          src={backView}
-                          alt={`${product.name} alternate frame`}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100 group-hover:scale-105"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Metadata Content */}
-                    <div className="mt-3 px-1 flex flex-col justify-between grow">
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-[8px] font-mono text-neutral-400 tracking-wider uppercase">
-                            {product.category?.replace('-', ' ') || "HQ MERCH"}
-                          </span>
-                        </div>
-                        
-                        <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
-                          {product.name}
-                        </h3>
-                      </div>
+ 
+                       {/* Out of Stock Overlay */}
+                       {isAllOutOfStock && (
+                         <div className="absolute inset-0 bg-[var(--color-surface)]/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+                           <span className="bg-[var(--color-surface)]/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
+                             SOLD OUT
+                           </span>
+                         </div>
+                       )}
+ 
+                       {/* Image Flip */}
+                       <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
+                         <img
+                           src={frontView}
+                           alt={product.name}
+                           loading="lazy"
+                           decoding="async"
+                           className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
+                         />
+                         <img  
+                           src={backView}
+                           alt={`${product.name} alternate frame`}
+                           loading="lazy"
+                           decoding="async"
+                           className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
+                         />
+                       </div>
+                     </div>
+ 
+                     {/* Metadata Content */}
+                     <div className="mt-3 px-1 flex flex-col justify-between grow">
+                       <div>
+                         <div className="flex items-center justify-between gap-2 mb-1">
+                           <span className="text-[8px] font-mono text-[var(--color-muted)] tracking-wider uppercase">
+                             {product.category?.replace('-', ' ') || "HQ MERCH"}
+                           </span>
+                         </div>
+                         
+                         <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
+                           {product.name}
+                         </h3>
+                       </div>
                       
-                      <div className="mt-2 pt-2 border-t border-neutral-100 flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
+                      <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
                             ₹{Number(product.price).toLocaleString('en-IN')}
@@ -757,13 +734,13 @@ function Shop() {
                                   ? Math.round(priceNum / (1 - product.discount_percent / 100))
                                   : null);
                             return compareDisplay ? (
-                              <span className="text-[9px] font-mono text-neutral-400 line-through">
+                              <span className="text-[9px] font-mono text-[var(--color-muted)] line-through">
                                 ₹{compareDisplay.toLocaleString('en-IN')}
                               </span>
                             ) : null;
                           })()}
                         </div>
-                        <span className="text-[8px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
+                        <span className="text-[8px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
                           incl. taxes
                         </span>
                       </div>
@@ -772,7 +749,7 @@ function Shop() {
                 )
               })}
             </div>
-          )}
+          )})()}
 
         </div>
       </div>
@@ -783,15 +760,15 @@ function Shop() {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setFilterDrawerOpen(false)}></div>
         
         {/* Drawer Content */}
-        <div className={`absolute top-0 left-0 h-full w-full sm:w-[380px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${filterDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`absolute top-0 left-0 h-full w-full sm:w-[380px] bg-[rgba(250,247,242,0.78)] backdrop-blur-2xl border-r border-[rgba(40,32,28,0.08)] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${filterDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {/* Header */}
-          <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-neutral-900 font-mono">
+          <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[var(--color-text)] font-mono">
               ⚙️ FILTERS
             </h3>
             <button 
               onClick={() => setFilterDrawerOpen(false)}
-              className="text-neutral-400 hover:text-neutral-950 p-2 transition-colors cursor-pointer text-sm font-bold uppercase font-mono"
+              className="text-[var(--color-muted)] hover:text-[var(--color-text)] p-2 transition-colors cursor-pointer text-sm font-bold uppercase font-mono"
             >
               ✕ CLOSE
             </button>
@@ -801,16 +778,16 @@ function Shop() {
           <div className="flex-1 overflow-y-auto p-6 space-y-8">
             {/* Price Range Filter */}
             <div className="space-y-4">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">
+              <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
                 PRICE RANGE
               </label>
               
               {/* Display Range & Input Boxes */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 space-y-1">
-                  <span className="text-[9px] font-mono text-neutral-400 block uppercase">MIN PRICE</span>
-                  <div className="flex items-center border border-neutral-200 px-2 py-1 bg-[#fafafb]">
-                    <span className="text-xs font-mono font-bold text-neutral-500 mr-1">₹</span>
+                  <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">MIN PRICE</span>
+                  <div className="flex items-center border border-[var(--color-border)] px-2.5 py-1 bg-[var(--color-surface)]/40 backdrop-blur-xs rounded-lg">
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] mr-1">₹</span>
                     <input
                       type="number"
                       min="0"
@@ -820,17 +797,17 @@ function Shop() {
                         const val = Math.min(Number(e.target.value || 0), maxPriceFilter);
                         setMinPriceFilter(val);
                       }}
-                      className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-neutral-900 border-none p-0"
+                      className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-[var(--color-text)] border-none p-0"
                     />
                   </div>
                 </div>
                 
-                <div className="text-neutral-400 font-bold self-end pb-2.5 font-mono text-xs">TO</div>
+                <div className="text-[var(--color-muted)] font-bold self-end pb-2.5 font-mono text-xs">TO</div>
 
                 <div className="flex-1 space-y-1">
-                  <span className="text-[9px] font-mono text-neutral-400 block uppercase">MAX PRICE</span>
-                  <div className="flex items-center border border-neutral-200 px-2 py-1 bg-[#fafafb]">
-                    <span className="text-xs font-mono font-bold text-neutral-500 mr-1">₹</span>
+                  <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">MAX PRICE</span>
+                  <div className="flex items-center border border-[var(--color-border)] px-2.5 py-1 bg-[var(--color-surface)]/40 backdrop-blur-xs rounded-lg">
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] mr-1">₹</span>
                     <input
                       type="number"
                       min="0"
@@ -840,7 +817,7 @@ function Shop() {
                         const val = Math.max(Number(e.target.value || 0), minPriceFilter);
                         setMaxPriceFilter(val);
                       }}
-                      className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-neutral-900 border-none p-0"
+                      className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-[var(--color-text)] border-none p-0"
                     />
                   </div>
                 </div>
@@ -850,9 +827,9 @@ function Shop() {
               <div className="space-y-3 pt-1">
                 {/* Min Slider */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-mono text-neutral-400 uppercase">
+                  <div className="flex justify-between text-[9px] font-mono text-[var(--color-muted)] uppercase">
                     <span>Min Limit</span>
-                    <span className="font-bold text-neutral-800">₹{minPriceFilter}</span>
+                    <span className="font-bold text-[var(--color-text)]">₹{minPriceFilter}</span>
                   </div>
                   <input
                     type="range"
@@ -864,15 +841,15 @@ function Shop() {
                       const val = Math.min(Number(e.target.value), maxPriceFilter);
                       setMinPriceFilter(val);
                     }}
-                    className="w-full accent-neutral-900 cursor-pointer h-1.5 bg-neutral-100 appearance-none rounded-lg"
+                    className="w-full accent-[var(--color-accent)] cursor-pointer h-1.5 bg-[var(--color-subtle)] appearance-none rounded-lg"
                   />
                 </div>
 
                 {/* Max Slider */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-mono text-neutral-400 uppercase">
+                  <div className="flex justify-between text-[9px] font-mono text-[var(--color-muted)] uppercase">
                     <span>Max Limit</span>
-                    <span className="font-bold text-neutral-800">₹{maxPriceFilter}</span>
+                    <span className="font-bold text-[var(--color-text)]">₹{maxPriceFilter}</span>
                   </div>
                   <input
                     type="range"
@@ -884,7 +861,7 @@ function Shop() {
                       const val = Math.max(Number(e.target.value), minPriceFilter);
                       setMaxPriceFilter(val);
                     }}
-                    className="w-full accent-neutral-900 cursor-pointer h-1.5 bg-neutral-100 appearance-none rounded-lg"
+                    className="w-full accent-[var(--color-accent)] cursor-pointer h-1.5 bg-[var(--color-subtle)] appearance-none rounded-lg"
                   />
                 </div>
               </div>
@@ -892,7 +869,7 @@ function Shop() {
 
             {/* Size Filter */}
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">
+              <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
                 SELECT SIZES
               </label>
               <div className="flex flex-wrap gap-2 pt-1">
@@ -908,10 +885,10 @@ function Shop() {
                           setSelectedSizes([...selectedSizes, size]);
                         }
                       }}
-                      className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer ${
+                      className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer rounded-lg ${
                         isSelected
-                          ? 'bg-neutral-950 text-white border-neutral-950'
-                          : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
+                          : 'bg-[var(--color-surface)]/40 text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
                       }`}
                     >
                       {size}
@@ -923,7 +900,7 @@ function Shop() {
 
             {/* In Stock Availability Filter */}
             <div className="space-y-3 pt-2">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block font-mono">
+              <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
                 AVAILABILITY
               </label>
               <label className="flex items-center gap-3 cursor-pointer select-none py-1">
@@ -931,9 +908,9 @@ function Shop() {
                   type="checkbox"
                   checked={inStockOnly}
                   onChange={(e) => setInStockOnly(e.target.checked)}
-                  className="w-4 h-4 rounded-none accent-neutral-950 cursor-pointer border-neutral-300"
+                  className="w-4 h-4 rounded-md accent-[var(--color-accent)] cursor-pointer border-[var(--color-border)] bg-[var(--color-surface)]/40"
                 />
-                <span className="text-xs font-mono font-bold tracking-wider text-neutral-800 uppercase">
+                <span className="text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase">
                   SHOW IN-STOCK ONLY
                 </span>
               </label>
@@ -941,10 +918,10 @@ function Shop() {
           </div>
 
           {/* Drawer Footer (Sticky Actions) */}
-          <div className="p-6 border-t border-neutral-100 bg-neutral-50/50 space-y-3">
+          <div className="p-6 border-t border-[var(--color-border)] bg-[var(--color-surface)]/40 backdrop-blur-md space-y-3">
             <button
               onClick={() => setFilterDrawerOpen(false)}
-              className="w-full py-3.5 bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-mono font-bold uppercase tracking-[0.15em] rounded-none text-center transition-all cursor-pointer"
+              className="w-full py-3.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-mono font-bold uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-xs"
             >
               Apply Filters
             </button>
@@ -955,13 +932,81 @@ function Shop() {
                 setSelectedSizes([]);
                 setInStockOnly(false);
               }}
-              className="w-full py-3 bg-white border border-neutral-950 hover:bg-neutral-50 text-[10px] font-mono font-bold uppercase tracking-[0.15em] text-neutral-950 rounded-none text-center transition-all cursor-pointer"
+              className="w-full py-3 bg-[var(--color-surface)]/40 border border-[var(--color-border)] hover:bg-[var(--color-surface)]/60 text-[10px] font-mono font-bold uppercase tracking-[0.15em] text-[var(--color-text)] rounded-xl text-center transition-all cursor-pointer"
             >
               Reset Filters
             </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Sticky Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-200 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-safe">
+        <div className="flex h-14 relative">
+          <button 
+            onClick={() => setMobileSortOpen(true)}
+            className="flex-1 flex items-center justify-center gap-2 active:bg-neutral-50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                <svg className="w-5 h-5 text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+              </div>
+              <div className="flex flex-col items-start leading-none mt-0.5">
+                <span className="font-bold text-[13px] text-neutral-900">Sort</span>
+                <span className="text-[9px] text-neutral-500">{sortBy === 'newest' ? 'Newest' : sortBy === 'popularity' ? 'Popularity' : sortBy === 'price-low' ? 'Price: Low' : 'Price: High'}</span>
+              </div>
+            </div>
+          </button>
+          
+          <div className="w-[1px] h-8 bg-neutral-200 absolute left-1/2 top-1/2 -translate-y-1/2" />
+
+          <button 
+            onClick={() => setFilterDrawerOpen(true)}
+            className="flex-1 flex items-center justify-center gap-2 active:bg-neutral-50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-neutral-300"></span>
+                <svg className="w-5 h-5 text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+              </div>
+              <div className="flex flex-col items-start leading-none mt-0.5">
+                <span className="font-bold text-[13px] text-neutral-900">Filter</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Sort Bottom Sheet Modal */}
+      {mobileSortOpen && (
+        <div className="fixed inset-0 z-50 flex items-end lg:hidden">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileSortOpen(false)} />
+          <div className="w-full bg-white rounded-t-2xl p-6 relative animate-slide-up">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-base font-bold text-neutral-900 uppercase tracking-widest">Sort By</h3>
+              <button onClick={() => setMobileSortOpen(false)} className="text-neutral-500 hover:text-neutral-900 cursor-pointer">✕</button>
+            </div>
+            <div className="flex flex-col gap-4">
+              {[
+                { value: 'newest', label: 'Newest Releases' },
+                { value: 'popularity', label: 'Popularity' },
+                { value: 'price-low', label: 'Price: Low to High' },
+                { value: 'price-high', label: 'Price: High to Low' }
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setSortBy(opt.value); setMobileSortOpen(false); }}
+                  className={`flex justify-between items-center py-2 text-sm uppercase tracking-widest font-mono cursor-pointer ${sortBy === opt.value ? 'text-blue-600 font-bold' : 'text-neutral-600'}`}
+                >
+                  {opt.label}
+                  {sortBy === opt.value && <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </>

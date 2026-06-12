@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -12,6 +12,7 @@ import cartService from '../../appwrite/cart';
 import storageService from '../../appwrite/storage';
 import slidesService from '../../appwrite/slides';
 import { FiFileText } from 'react-icons/fi';
+
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
@@ -86,6 +87,16 @@ function AdminPanel() {
   const [newCouponDiscount, setNewCouponDiscount] = useState(10);
   const [newCouponMinOrderValue, setNewCouponMinOrderValue] = useState('');
   const [newCouponValidUntil, setNewCouponValidUntil] = useState('');
+  const [editingCouponId, setEditingCouponId] = useState(null);
+  const [isEditingCoupon, setIsEditingCoupon] = useState(false);
+
+  // Newsletter & Broadcaster State
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState([]);
+  const [campaignSubject, setCampaignSubject] = useState('');
+  const [campaignBody, setCampaignBody] = useState('');
+  const [campaignHistory, setCampaignHistory] = useState([]);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastingProgress, setBroadcastingProgress] = useState(0);
 
   // Store Database Telemetry States
   const [restockNotifications, setRestockNotifications] = useState([]);
@@ -93,12 +104,7 @@ function AdminPanel() {
   const [activeCarts, setActiveCarts] = useState([]);
   const [telemetryLoading, setTelemetryLoading] = useState(false);
 
-  // Multi-color dynamic variants state
-  const [colorVariants, setColorVariants] = useState([]);
-  const [vName, setVName] = useState('');
-  const [vHex, setVHex] = useState('');
-  const [vFront, setVFront] = useState('');
-  const [vBack, setVBack] = useState('');
+
 
   const [uploadingFields, setUploadingFields] = useState({});
 
@@ -123,9 +129,13 @@ function AdminPanel() {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('category_images')) || {};
-      setCategoryImages(saved);
+      setTimeout(() => {
+        setCategoryImages(saved);
+      }, 0);
       const deleted = JSON.parse(localStorage.getItem('deleted_categories')) || [];
-      setDeletedCategories(deleted);
+      setTimeout(() => {
+        setDeletedCategories(deleted);
+      }, 0);
     } catch (e) {
       console.error("Failed to parse category configuration metadata:", e);
     }
@@ -379,7 +389,6 @@ function AdminPanel() {
 
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
-      // Upload the original (uncompressed) product image
       const response = await storageService.uploadFile(file);
       if (response?.$id) {
         const fileUrl = storageService.getFileView(response.$id);
@@ -396,33 +405,7 @@ function AdminPanel() {
     }
   };
 
-  const addColorVariant = () => {
-    if (!vName.trim() || !vHex.trim() || !vFront.trim()) {
-      showToast("Color Name, Hex Code, and Front Image Link are required for variant.", "error");
-      return;
-    }
-    const hexVal = vHex.trim();
-    if (!hexVal.startsWith('#') || hexVal.length < 4) {
-      showToast("Hex code must start with # (e.g. #000000).", "error");
-      return;
-    }
-    const newVariant = {
-      name: vName.trim().toUpperCase(),
-      hex: hexVal,
-      front: vFront.trim(),
-      back: vBack.trim()
-    };
-    setColorVariants(prev => [...prev, newVariant]);
-    setVName('');
-    setVHex('');
-    setVFront('');
-    setVBack('');
-    showToast("Variant added locally.", "success");
-  };
 
-  const removeColorVariant = (idx) => {
-    setColorVariants(prev => prev.filter((_, i) => i !== idx));
-  };
 
   const loadStoreTelemetry = async () => {
     try {
@@ -487,12 +470,34 @@ function AdminPanel() {
         if (couponsList) setCampaignCoupons(couponsList);
       })
       .catch(err => console.error("Failed to load coupons:", err));
+
+    campaignService.getNewsletterSubscribers()
+      .then(subs => {
+        if (subs) setNewsletterSubscribers(subs);
+      })
+      .catch(err => console.error("Failed to load subscribers:", err));
+
+    campaignService.getCampaignHistory()
+      .then(hist => {
+        if (hist) setCampaignHistory(hist);
+      })
+      .catch(err => console.error("Failed to load campaign history:", err));
   }, [isAdmin]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  if (!isAdmin) return <Navigate to="/" replace />;
-
   const onSubmit = async (data) => {
+    if (data.is_featured) {
+      const featuredCount = products.filter(p => 
+        (p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1') &&
+        (p.$id !== editingId && p.id !== editingId)
+      ).length;
+
+      if (featuredCount >= 4) {
+        showToast("⚠️ Limit Exceeded: Maximum of 4 featured products are allowed on the homepage. Please un-feature another product first.", "error");
+        return;
+      }
+    }
+
     setActionLoading(true);
 
     const searchKeywords = data.search_keywords
@@ -506,20 +511,17 @@ function AdminPanel() {
     const stockMap = {};
     const selectedSizes = [];
     SIZE_OPTIONS.forEach(size => {
-      const stockVal = Number(data[`stock_${size}`] || 0);
-      stockMap[size] = stockVal;
-      if (stockVal > 0) {
+      const stockInput = data[`stock_${size}`];
+      if (stockInput !== undefined && stockInput !== '') {
+        const stockVal = Number(stockInput || 0);
+        stockMap[size] = stockVal;
         selectedSizes.push(size);
       }
     });
 
-    // Check if colorVariants exist
-    let finalColorName = data.color_name?.trim() || "";
-    let finalColorHex = data.color_hex?.trim() || "";
-    if (colorVariants.length > 0) {
-      finalColorHex = JSON.stringify(colorVariants);
-      finalColorName = colorVariants.map(v => v.name).join(', ');
-    }
+    // Assign simple colorName and colorHex fields
+    const finalColorName = data.color_name?.trim() || "";
+    const finalColorHex = data.color_hex?.trim() || "";
 
     // Helper to format/slugify custom category
     const slugifyCategory = (cat) => {
@@ -551,6 +553,7 @@ function AdminPanel() {
       fabric_gsm: data.fabric_gsm?.trim() || "",
       compare_at_price: data.compare_at_price ? Number(data.compare_at_price) : 0,
       is_featured: !!data.is_featured,
+      is_vip_only: !!data.is_vip_only,
       slug: data.slug?.trim() || data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || ""
     };
 
@@ -570,6 +573,7 @@ function AdminPanel() {
           delete stripped.sizes_stock;
           delete stripped.compare_at_price;
           delete stripped.is_featured;
+          delete stripped.is_vip_only;
           delete stripped.slug;
           delete stripped.return_policy;
           return await productsService.updateProduct(id, stripped);
@@ -594,6 +598,7 @@ function AdminPanel() {
           delete stripped.sizes_stock;
           delete stripped.compare_at_price;
           delete stripped.is_featured;
+          delete stripped.is_vip_only;
           delete stripped.slug;
           delete stripped.return_policy;
           return await productsService.createProduct(stripped);
@@ -621,9 +626,9 @@ function AdminPanel() {
       });
       setValue('compare_at_price', '');
       setValue('is_featured', false);
+      setValue('is_vip_only', false);
       setValue('slug', '');
       setValue('return_policy', '7 Day Return');
-      setColorVariants([]);
       setEditingId(null);
       setIsCustomCategory(false);
       setProductsSubTab('list');
@@ -632,7 +637,7 @@ function AdminPanel() {
     }
   };
 
-  const handleEdit = (id) => {
+  const handleEdit = useCallback((id) => {
     const product = products.find(p => p.id === id || p.$id === id);
     if (product) {
       setIsCustomCategory(false);
@@ -664,8 +669,13 @@ function AdminPanel() {
       }
 
       SIZE_OPTIONS.forEach(size => {
-        const hasSizeChecked = product.sizes?.includes(size);
-        setValue(`stock_${size}`, parsedStock[size] !== undefined ? parsedStock[size] : (hasSizeChecked ? 10 : 0));
+        const isOffered = product.sizes?.includes(size);
+        setValue(
+          `stock_${size}`,
+          parsedStock[size] !== undefined 
+            ? parsedStock[size] 
+            : (isOffered ? 10 : '')
+        );
       });
 
       const backImageLinks = Array.isArray(product.back_image_links)
@@ -679,38 +689,20 @@ function AdminPanel() {
       setValue('discount_percent', product.discount_percent || 0);
       setValue('color_group_id', product.color_group_id || '');
 
-      // Parse dynamic JSON variants if present
-      let parsedVariants = [];
-      let isJsonVariants = false;
-      if (product.color_hex && product.color_hex.startsWith('[')) {
-        try {
-          parsedVariants = JSON.parse(product.color_hex);
-          isJsonVariants = true;
-        } catch (e) {
-          console.warn("Failed to parse color_hex as JSON variants:", e);
-        }
-      }
-
-      if (isJsonVariants) {
-        setColorVariants(parsedVariants);
-        setValue('color_name', '');
-        setValue('color_hex', '');
-      } else {
-        setColorVariants([]);
-        setValue('color_name', product.color_name || '');
-        setValue('color_hex', product.color_hex || '');
-      }
+      setValue('color_name', product.color_name || '');
+      setValue('color_hex', product.color_hex || '');
 
       setValue('fit_type', product.fit_type || '');
       setValue('fabric_gsm', product.fabric_gsm || '');
       setValue('compare_at_price', product.compare_at_price || '');
       setValue('is_featured', product.is_featured === true || product.is_featured === 'true' || product.is_featured === 1 || product.is_featured === '1');
+      setValue('is_vip_only', product.is_vip_only === true || product.is_vip_only === 'true' || product.is_vip_only === 1 || product.is_vip_only === '1');
       setValue('slug', product.slug || '');
       setEditingId(id);
       setProductsSubTab('form');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
+  }, [products, setValue]);
 
   useEffect(() => {
     if (isAdmin && products.length > 0) {
@@ -721,15 +713,19 @@ function AdminPanel() {
       if (targetEditId) {
         const found = products.find(p => p.id === targetEditId || p.$id === targetEditId);
         if (found) {
-          setActiveTab('products');
-          handleEdit(targetEditId);
+          setTimeout(() => {
+            setActiveTab('products');
+            handleEdit(targetEditId);
+          }, 0);
           
           // Clean up location state and URL query parameter to prevent loop/stale edit state
           window.history.replaceState({}, document.title);
         }
       }
     }
-  }, [location, products, isAdmin]);
+  }, [location, products, isAdmin, handleEdit]);
+
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   const handleCancelEdit = () => {
     reset();
@@ -746,16 +742,12 @@ function AdminPanel() {
     setValue('fabric_gsm', '');
     setValue('compare_at_price', '');
     setValue('is_featured', false);
+    setValue('is_vip_only', false);
     setValue('slug', '');
     setValue('color_hex', '');
     setValue('fit_type', '');
     setValue('fabric_gsm', '');
     setValue('return_policy', '7 Day Return');
-    setColorVariants([]);
-    setVName('');
-    setVHex('');
-    setVFront('');
-    setVBack('');
     setEditingId(null);
     setIsCustomCategory(false);
     setProductsSubTab('list');
@@ -960,7 +952,7 @@ function AdminPanel() {
         }
       }
 
-      let parsedItems = [];
+      let parsedItems;
       try {
         parsedItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
       } catch {
@@ -1445,6 +1437,57 @@ function AdminPanel() {
     }
   };
 
+  const handleSendCampaign = async () => {
+    if (!campaignSubject.trim()) {
+      showToast("Please enter a campaign subject.", "error");
+      return;
+    }
+    if (!campaignBody.trim()) {
+      showToast("Please write a campaign message.", "error");
+      return;
+    }
+
+    const subs = await campaignService.getNewsletterSubscribers();
+    const total = subs.length;
+    if (total === 0) {
+      showToast("No newsletter subscribers available to receive this campaign.", "error");
+      return;
+    }
+
+    setIsBroadcasting(true);
+    setBroadcastingProgress(0);
+
+    let sentCount = 0;
+    const interval = setInterval(async () => {
+      sentCount += Math.ceil(total / 5);
+      if (sentCount >= total) {
+        sentCount = total;
+        clearInterval(interval);
+        
+        try {
+          await campaignService.sendCampaign(
+            campaignSubject.trim(), 
+            campaignBody.trim(), 
+            total
+          );
+          
+          const updatedHistory = await campaignService.getCampaignHistory();
+          setCampaignHistory(updatedHistory);
+          
+          showToast(`🚀 Campaign broadcasted successfully to all ${total} subscribers!`, "success");
+          setCampaignSubject('');
+          setCampaignBody('');
+        } catch (err) {
+          console.error("Failed to save campaign:", err);
+          showToast("Failed to complete campaign broadcast.", "error");
+        } finally {
+          setIsBroadcasting(false);
+        }
+      }
+      setBroadcastingProgress(sentCount);
+    }, 300);
+  };
+
   const handleAddCoupon = async () => {
     if (!newCouponCode.trim()) return;
     const cleanCode = newCouponCode.trim().toUpperCase();
@@ -1467,6 +1510,48 @@ function AdminPanel() {
       setNewCouponValidUntil('');
     } catch (err) {
       console.error("Failed to add coupon:", err);
+    }
+  };
+
+  const handleStartEditCoupon = (coupon) => {
+    setNewCouponCode(coupon.code);
+    setNewCouponDiscount(Number(coupon.discount));
+    setNewCouponMinOrderValue(coupon.min_order_value !== undefined ? String(coupon.min_order_value) : '');
+    setNewCouponValidUntil(coupon.valid_until || '');
+    setEditingCouponId(coupon.$id || coupon.id);
+    setIsEditingCoupon(true);
+  };
+
+  const handleCancelEditCoupon = () => {
+    setNewCouponCode('');
+    setNewCouponDiscount(10);
+    setNewCouponMinOrderValue('');
+    setNewCouponValidUntil('');
+    setEditingCouponId(null);
+    setIsEditingCoupon(false);
+  };
+
+  const handleUpdateCoupon = async () => {
+    if (!newCouponCode.trim() || !editingCouponId) return;
+    const cleanCode = newCouponCode.trim().toUpperCase();
+
+    if (campaignCoupons.some(c => c.code === cleanCode && (c.$id || c.id) !== editingCouponId)) {
+      showToast("Another coupon with this code already exists.", "error");
+      return;
+    }
+
+    try {
+      await campaignService.updateCoupon(editingCouponId, cleanCode, Number(newCouponDiscount), {
+        min_order_value: newCouponMinOrderValue ? Number(newCouponMinOrderValue) : 0,
+        valid_until: newCouponValidUntil || ''
+      });
+      const response = await campaignService.getCoupons();
+      setCampaignCoupons(response || []);
+      showToast(`🎟️ Coupon ${cleanCode} updated successfully!`, 'success');
+      handleCancelEditCoupon();
+    } catch (err) {
+      console.error("Failed to update coupon:", err);
+      showToast("Failed to update coupon.", "error");
     }
   };
 
@@ -1525,63 +1610,63 @@ function AdminPanel() {
   });
 
   return (
-    <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 p-6 md:p-12 relative selection:bg-neutral-950 selection:text-white">
+    <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] p-6 md:p-12 relative selection:bg-[var(--color-accent)] selection:text-white">
       <div className="relative z-20 max-w-4xl mx-auto space-y-8">
 
         {/* Header Display Node */}
-        <div className="bg-white p-8 rounded-none border border-neutral-950">
-          <div className="mb-6 pb-6 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-[var(--color-surface)] p-8 rounded-none border border-[var(--color-accent)]">
+          <div className="mb-6 pb-6 border-b border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h4 className="text-xs tracking-[0.4em] text-neutral-400 font-bold uppercase mb-1">HQ Operations</h4>
-              <h1 className="text-3xl font-black tracking-widest uppercase text-neutral-900">
+              <h4 className="text-xs tracking-[0.4em] text-[var(--color-muted)] font-bold uppercase mb-1">HQ Operations</h4>
+              <h1 className="text-3xl font-black tracking-widest uppercase text-[var(--color-text)]">
                 Operations Console
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <Link to="/" className="bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-black tracking-widest px-4 py-2.5 rounded-none uppercase h-fit transition-colors">
+              <Link to="/" className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-4 py-2.5 rounded-none uppercase h-fit transition-colors">
                 HOME
               </Link>
-              <div className="border border-neutral-950 text-neutral-950 text-[10px] font-mono font-black tracking-widest px-4 py-2.5 rounded-none uppercase h-fit">
+              <div className="border border-[var(--color-accent)] text-[var(--color-text)] text-[10px] font-mono font-black tracking-widest px-4 py-2.5 rounded-none uppercase h-fit">
                 Admin Mode Active
               </div>
             </div>
           </div>
 
           {/* Tab Navigation Menu */}
-          <div className="flex gap-6 border-b border-neutral-200 pb-3 mb-8 flex-wrap">
+          <div className="flex gap-6 border-b border-[var(--color-border)] pb-3 mb-8 flex-wrap">
             <button 
               onClick={() => { setActiveTab('products'); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'products' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'products' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Drops Manager
             </button>
             <button 
               onClick={() => { setActiveTab('orders'); loadCustomerOrders(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'orders' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'orders' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Fulfillment ({orders.length})
             </button>
             <button 
               onClick={() => { setActiveTab('campaigns'); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'campaigns' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'campaigns' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Campaign Panel
             </button>
             <button 
               onClick={() => { setActiveTab('slider'); loadSlides(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'slider' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'slider' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Hero Slider
             </button>
             <button 
               onClick={() => { setActiveTab('telemetry'); loadStoreTelemetry(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'telemetry' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'telemetry' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Activity Logs
             </button>
             <button 
               onClick={() => { setActiveTab('categories'); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'categories' ? 'text-neutral-950 border-b-2 border-neutral-950' : 'text-neutral-400 hover:text-neutral-900'}`}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'categories' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Category Manager
             </button>
@@ -1593,14 +1678,14 @@ function AdminPanel() {
           {activeTab === 'products' && (
             <div className="space-y-6">
               {/* Products Sub-Tab Menu */}
-              <div className="flex gap-6 border-b border-neutral-200 pb-3 mb-2 flex-wrap">
+              <div className="flex gap-6 border-b border-[var(--color-border)] pb-3 mb-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setProductsSubTab('list')}
                   className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1.5 transition-all border-b-2 cursor-pointer ${
                     productsSubTab === 'list' 
-                      ? 'text-neutral-950 border-neutral-950' 
-                      : 'text-neutral-400 border-transparent hover:text-neutral-950'
+                      ? 'text-[var(--color-text)] border-[var(--color-accent)]' 
+                      : 'text-[var(--color-muted)] border-transparent hover:text-[var(--color-text)]'
                   }`}
                 >
                   Deployed Drops Pool ({products.length})
@@ -1615,8 +1700,8 @@ function AdminPanel() {
                   }}
                   className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1.5 transition-all border-b-2 cursor-pointer ${
                     productsSubTab === 'form' 
-                      ? 'text-neutral-950 border-neutral-950' 
-                      : 'text-neutral-400 border-transparent hover:text-neutral-950'
+                      ? 'text-[var(--color-text)] border-[var(--color-accent)]' 
+                      : 'text-[var(--color-muted)] border-transparent hover:text-[var(--color-text)]'
                   }`}
                 >
                   {editingId ? '⚡ Edit Drop Details' : '➕ Launch New Drop'}
@@ -1628,12 +1713,12 @@ function AdminPanel() {
               
               {/* Product Name */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Product Name</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Product Name</label>
                 <input
                   type="text"
                   disabled={actionLoading}
                   placeholder="E.G., GOTHIC OVERSIZED HOODIE"
-                  className={`w-full bg-[#fbfbfb] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors uppercase font-medium disabled:opacity-50`}
+                  className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors uppercase font-medium disabled:opacity-50`}
                   {...register('name', { required: 'Product name is required' })}
                 />
                 {errors.name && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -1641,12 +1726,12 @@ function AdminPanel() {
 
               {/* Price */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Price (INR)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Price (INR)</label>
                 <input
                   type="number"
                   placeholder="1499"
                   disabled={actionLoading}
-                  className={`w-full bg-[#fbfbfb] border ${errors.price ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium disabled:opacity-50`}
+                  className={`w-full bg-[var(--color-subtle)] border ${errors.price ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50`}
                   {...register('price', { 
                     required: 'Price is required',
                     min: { value: 1, message: 'Price must be greater than 0' }
@@ -1657,24 +1742,24 @@ function AdminPanel() {
 
               {/* Compare-at Price */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Compare-At Price (INR)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Compare-At Price (INR)</label>
                 <input
                   type="number"
                   placeholder="1999"
                   disabled={actionLoading}
-                  className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium disabled:opacity-50"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50"
                   {...register('compare_at_price')}
                 />
               </div>
 
               {/* Category */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Category</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Category</label>
                 {!isCustomCategory ? (
                   <div className="relative">
                     <select
                       disabled={actionLoading}
-                      className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 pr-10 text-sm text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
+                      className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 pr-10 text-sm text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
                       {...register('category', { 
                         required: 'Category is required',
                         onChange: (e) => {
@@ -1691,7 +1776,7 @@ function AdminPanel() {
                       ))}
                       <option value="custom">➕ ADD NEW CUSTOM CATEGORY</option>
                     </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-neutral-500">
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--color-muted)]">
                       <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                         <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
                       </svg>
@@ -1703,7 +1788,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., CARGO PANTS"
-                      className="grow bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors uppercase font-medium disabled:opacity-50"
+                      className="grow bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors uppercase font-medium disabled:opacity-50"
                       {...register('category', { required: 'Category is required' })}
                     />
                     <button
@@ -1712,7 +1797,7 @@ function AdminPanel() {
                         setIsCustomCategory(false);
                         setValue('category', 'printed-tshirt'); // Reset to default
                       }}
-                      className="bg-neutral-200 hover:bg-[#e2e2e2] text-neutral-800 px-4 py-3.5 rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer"
+                      className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] px-4 py-3.5 rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -1723,40 +1808,40 @@ function AdminPanel() {
 
               {/* Custom URL Slug */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Custom URL Slug</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Custom URL Slug</label>
                 <input
                   type="text"
                   placeholder="gothic-oversized-hoodie"
                   disabled={actionLoading}
-                  className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium disabled:opacity-50 lowercase"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50 lowercase"
                   {...register('slug')}
                 />
               </div>
 
               {/* Search Keywords */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Search Keywords (Comma Separated)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Search Keywords (Comma Separated)</label>
                 <input
                   type="text"
                   disabled={actionLoading}
                   placeholder="E.G., OVERSIZED, HEAVYWEIGHT, BLACK, GRAPHIC, COTTON"
-                  className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors uppercase font-medium disabled:opacity-50"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors uppercase font-medium disabled:opacity-50"
                   {...register('search_keywords')}
                 />
               </div>
 
               {/* Front Image Link */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Front Image Link</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Front Image Link</label>
                 <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     disabled={actionLoading}
                     placeholder="PASTE FRONT IMAGE LINK"
-                    className={`flex-1 bg-[#fbfbfb] border ${errors.front_image_link ? 'border-rose-300 focus:border-rose-500' : 'border-neutral-200'} rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium disabled:opacity-50`}
+                    className={`flex-1 bg-[var(--color-subtle)] border ${errors.front_image_link ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50`}
                     {...register('front_image_link', { required: 'Front image link is required' })}
                   />
-                  <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none disabled:opacity-50">
+                  <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-accent)] text-center select-none disabled:opacity-50">
                     {uploadingFields['front_image_link'] ? 'Uploading...' : 'Upload'}
                     <input
                       type="file"
@@ -1772,7 +1857,7 @@ function AdminPanel() {
 
               {/* Gallery Images */}
               <div className="flex flex-col gap-3 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Back Image Links (Max 4)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Back Image Links (Max 4)</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {BACK_IMAGE_FIELDS.map((fieldName, index) => (
                     <div key={fieldName} className="flex gap-2 items-center">
@@ -1780,10 +1865,10 @@ function AdminPanel() {
                         type="text"
                         disabled={actionLoading}
                         placeholder={`BACK IMAGE LINK ${index + 1}`}
-                        className="flex-1 bg-[#fbfbfb] border border-neutral-200 focus:border-neutral-950 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
+                        className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
                         {...register(fieldName, index === 0 ? { required: 'At least one back view link is required.' } : undefined)}
                       />
-                      <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none disabled:opacity-50">
+                      <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-accent)] text-center select-none disabled:opacity-50">
                         {uploadingFields[fieldName] ? 'Uploading...' : 'Upload'}
                         <input
                           type="file"
@@ -1801,17 +1886,17 @@ function AdminPanel() {
 
               {/* Size-wise Stock Management (Option 2) */}
               <div className="flex flex-col gap-3 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Size-wise Stock Inventory Configuration</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 rounded-xl border border-neutral-200 bg-neutral-50/50 p-4">
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Size-wise Stock Inventory Configuration</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-subtle)]/50 p-4">
                   {SIZE_OPTIONS.map((size) => (
-                    <div key={size} className="flex flex-col gap-1.5 p-2 bg-white rounded-lg border border-neutral-200">
-                      <span className="text-[10px] font-black text-neutral-800 tracking-wider text-center">{size} STOCK</span>
+                    <div key={size} className="flex flex-col gap-1.5 p-2 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)]">
+                      <span className="text-[10px] font-black text-[var(--color-text)] tracking-wider text-center">{size} STOCK</span>
                       <input
                         type="number"
                         placeholder="0"
                         min="0"
                         disabled={actionLoading}
-                        className="w-full text-center text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-full text-center text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         {...register(`stock_${size}`)}
                       />
                     </div>
@@ -1821,14 +1906,14 @@ function AdminPanel() {
 
               {/* Product Metadata & Custom Variations */}
               <div className="flex flex-col gap-3 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Product Metadata & Custom Variations</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 rounded-xl border border-neutral-200 bg-neutral-50/50 p-4">
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Product Metadata & Custom Variations</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-subtle)]/50 p-4">
                   {/* Status Badge Tag */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Status Badge Tag</label>
+                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Status Badge Tag</label>
                     <select
                       disabled={actionLoading}
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-950 bg-transparent py-1 uppercase appearance-none cursor-pointer text-neutral-800"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase appearance-none cursor-pointer text-[var(--color-text)]"
                       {...register('single_tag')}
                     >
                       <option value="">NONE / NO BADGE</option>
@@ -1839,207 +1924,122 @@ function AdminPanel() {
                   </div>
 
                   {/* Discount Percent */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Discount Percent (%)</label>
+                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Discount Percent (%)</label>
                     <input
                       type="number"
                       disabled={actionLoading}
                       placeholder="0"
                       min="0"
                       max="100"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1"
                       {...register('discount_percent')}
                     />
                   </div>
 
-                  {/* Color Group ID */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Color Group ID</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., CG-TEE-01"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
-                      {...register('color_group_id')}
-                    />
-                  </div>
+                      {/* Color Group ID */}
+                      <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Group ID</label>
+                        <input
+                          type="text"
+                          disabled={actionLoading}
+                          placeholder="E.G., CG-TEE-01"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                          {...register('color_group_id')}
+                        />
+                      </div>
 
-                  {/* Color Name */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Color Name</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., JET BLACK"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
-                      {...register('color_name')}
-                    />
-                  </div>
+                      {/* Color Name */}
+                      <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Name</label>
+                        <input
+                          type="text"
+                          disabled={actionLoading}
+                          placeholder="E.G., JET BLACK"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                          {...register('color_name')}
+                        />
+                      </div>
 
-                  {/* Color Hex */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Color Hex Code</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., #000000"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
-                      {...register('color_hex')}
-                    />
-                  </div>
+                      {/* Color Hex */}
+                      <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Hex Code</label>
+                        <input
+                          type="text"
+                          disabled={actionLoading}
+                          placeholder="E.G., #000000"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                          {...register('color_hex')}
+                        />
+                      </div>
 
                   {/* Fit Type */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Fit Type</label>
+                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Fit Type</label>
                     <input
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., OVERSIZED BOX FIT"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
                       {...register('fit_type')}
                     />
                   </div>
 
                   {/* Fabric GSM */}
-                  <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-neutral-200 sm:col-span-2 md:col-span-3">
-                    <label className="text-[9px] font-black text-neutral-500 uppercase">Fabric GSM</label>
+                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
+                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Fabric GSM</label>
                     <input
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., 240 GSM 100% COMBED COTTON"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-neutral-200 focus:border-neutral-900 bg-transparent py-1 uppercase"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
                       {...register('fabric_gsm')}
                     />
                   </div>
 
                   {/* Featured Product Flag */}
-                  <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-neutral-200 sm:col-span-2 md:col-span-3">
+                  <div className="flex items-center gap-3 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
                     <input
                       type="checkbox"
                       id="is_featured"
                       disabled={actionLoading}
-                      className="w-4 h-4 text-neutral-950 border-neutral-200 focus:ring-0 focus:ring-offset-0 rounded-none accent-neutral-950 cursor-pointer"
+                      className="w-4 h-4 text-[var(--color-text)] border-[var(--color-border)] focus:ring-0 focus:ring-offset-0 rounded-none accent-[var(--color-accent)] cursor-pointer"
                       {...register('is_featured')}
                     />
-                    <label htmlFor="is_featured" className="text-[10px] font-black text-neutral-750 uppercase tracking-widest cursor-pointer select-none">
+                    <label htmlFor="is_featured" className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer select-none">
                       ★ Mark as Featured (Display in Heavyweight Drops on Homepage)
                     </label>
                   </div>
 
-                  {/* Dynamic Color Variants Creator */}
-                  <div className="sm:col-span-2 md:col-span-3 border-t border-neutral-200/60 pt-4 mt-2 space-y-3">
-                    <label className="text-[10px] font-black tracking-widest text-neutral-800 uppercase block">
-                      Multi-Color Variants (Option B: Single Page Switcher)
-                    </label>
-                    <p className="text-[9px] text-neutral-400 uppercase tracking-wider">
-                      Add color swatches and specific photos for this product. If you add variants here, they will override the simple Color Name/Hex fields above.
-                    </p>
 
-                    {/* Variant Entry Form */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-neutral-50 p-3 border border-neutral-200">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[8px] font-bold text-neutral-500 uppercase">Color Name</span>
-                        <input
-                          type="text"
-                          placeholder="E.G. BLACK"
-                          value={vName}
-                          onChange={(e) => setVName(e.target.value)}
-                          className="bg-white border border-neutral-300 px-3 py-2 text-xs tracking-wider uppercase outline-hidden"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[8px] font-bold text-neutral-500 uppercase">Hex Code</span>
-                        <input
-                          type="text"
-                          placeholder="E.G. #000000"
-                          value={vHex}
-                          onChange={(e) => setVHex(e.target.value)}
-                          className="bg-white border border-neutral-300 px-3 py-2 text-xs tracking-wider uppercase outline-hidden font-mono"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[8px] font-bold text-neutral-500 uppercase">Front Image Link</span>
-                        <input
-                          type="text"
-                          placeholder="URL TO FRONT IMAGE"
-                          value={vFront}
-                          onChange={(e) => setVFront(e.target.value)}
-                          className="bg-white border border-neutral-300 px-3 py-2 text-xs tracking-wider outline-hidden"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1 justify-end">
-                        <span className="text-[8px] font-bold text-neutral-500 uppercase">Back Image Link (Optional)</span>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="URL TO BACK IMAGE"
-                            value={vBack}
-                            onChange={(e) => setVBack(e.target.value)}
-                            className="bg-white border border-neutral-300 px-3 py-2 text-xs tracking-wider outline-hidden flex-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={addColorVariant}
-                            className="bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-bold tracking-widest px-3 py-2 uppercase shrink-0 transition-colors cursor-pointer"
-                          >
-                            ADD
-                          </button>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Added Variants List */}
-                    {colorVariants.length > 0 && (
-                      <div className="space-y-2 mt-3">
-                        <span className="text-[8px] font-black text-neutral-600 uppercase tracking-widest block">Added Variants ({colorVariants.length})</span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {colorVariants.map((variant, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-2.5 bg-neutral-50/50 border border-neutral-200">
-                              <div className="flex items-center gap-2">
-                                <span className="w-4 h-4 rounded-full border border-neutral-300 shrink-0" style={{ backgroundColor: variant.hex }} />
-                                <div className="text-[10px] font-bold text-neutral-800 tracking-wider">
-                                  {variant.name} ({variant.hex})
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeColorVariant(idx)}
-                                className="text-[9px] font-bold text-rose-600 hover:text-rose-800 uppercase tracking-widest cursor-pointer"
-                              >
-                                REMOVE
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
 
               {/* Description Spec */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Description (Optional)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Description (Optional)</label>
                 <textarea
                   rows="3"
                   disabled={actionLoading}
                   placeholder="E.G., 280 GSM 100% FRENCH TERRY COTTON. BOOTCUT BOXED DROP LAYOUT SPEC..."
-                  className="w-full bg-[#fbfbfb] border border-neutral-200 rounded-xl px-4 py-3.5 text-sm text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors font-medium resize-none disabled:opacity-50 uppercase"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium resize-none disabled:opacity-50 uppercase"
                   {...register('description')}
                 />
               </div>
 
               {/* Return Policy Select Input */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Return Policy *</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Return Policy *</label>
                 <select
                   disabled={actionLoading}
-                  className="w-full bg-[#fbfbfb] border border-neutral-250 hover:border-neutral-450 focus:border-neutral-950 rounded-xl px-4 py-3.5 text-sm text-neutral-900 outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50 uppercase cursor-pointer"
+                  className="w-full bg-[var(--color-subtle)] border border-neutral-250 hover:border-neutral-450 focus:border-[var(--color-accent)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50 uppercase cursor-pointer"
                   {...register('return_policy')}
                 >
-                  <option value="7 Day Return">7 Day Return</option>
-                  <option value="No Return">No Return</option>
-                  <option value="Exchange Only">Exchange Only</option>
+                  <option value="7 Day Return">7 Day Return & Exchange</option>
+                  <option value="Return Only">Return Only (No Exchange)</option>
+                  <option value="Exchange Only">Exchange Only (No Refund)</option>
+                  <option value="No Return">No Return or Exchange (Final Sale)</option>
                 </select>
               </div>
 
@@ -2048,7 +2048,7 @@ function AdminPanel() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex-1 bg-neutral-950 hover:bg-neutral-800 text-white font-black text-xs tracking-widest uppercase py-4 rounded-none border border-neutral-950 transition-all active:scale-[0.99] disabled:opacity-40 cursor-pointer"
+                  className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-xs tracking-widest uppercase py-4 rounded-none border border-[var(--color-accent)] transition-all active:scale-[0.99] disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading ? 'PROCESSING REQUEST...' : editingId ? 'UPDATE DROP SPECIFICATION' : 'DEPLOY DROP TO PUBLIC'}
                 </button>
@@ -2056,7 +2056,7 @@ function AdminPanel() {
                   type="button"
                   disabled={actionLoading}
                   onClick={handleCancelEdit}
-                  className="px-6 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-black text-xs tracking-widest uppercase py-4 rounded-none border border-neutral-350 transition-all active:scale-[0.99] cursor-pointer"
+                  className="px-6 bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-black text-xs tracking-widest uppercase py-4 rounded-none border border-[var(--color-border)] transition-all active:scale-[0.99] cursor-pointer"
                 >
                   {editingId ? 'CANCEL' : 'RETURN TO POOL'}
                 </button>
@@ -2109,25 +2109,25 @@ function AdminPanel() {
                   return (
                     <div className="space-y-6">
                       {/* Search & Filter Controls */}
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-neutral-50/50 p-4 border border-neutral-950 rounded-none">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-[var(--color-subtle)]/50 p-4 border border-[var(--color-accent)] rounded-none">
                         {/* Search Input */}
                         <div className="flex flex-col gap-1.5 sm:col-span-1">
-                          <span className="text-[8px] font-mono text-neutral-400 font-bold uppercase tracking-widest">Search Drops</span>
+                          <span className="text-[8px] font-mono text-[var(--color-muted)] font-bold uppercase tracking-widest">Search Drops</span>
                           <input
                             type="text"
                             value={productSearchQuery}
                             onChange={(e) => setProductSearchQuery(e.target.value)}
                             placeholder="Search name, slug, tag..."
-                            className="w-full bg-white border border-neutral-950 text-xs font-mono font-bold px-3 py-2 outline-hidden placeholder-neutral-450 uppercase tracking-wider rounded-none focus:border-neutral-950 focus:bg-white"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold px-3 py-2 outline-hidden placeholder-neutral-450 uppercase tracking-wider rounded-none focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)]"
                           />
                         </div>
                         {/* Category Selector */}
                         <div className="flex flex-col gap-1.5">
-                          <span className="text-[8px] font-mono text-neutral-400 font-bold uppercase tracking-widest">Filter Category</span>
+                          <span className="text-[8px] font-mono text-[var(--color-muted)] font-bold uppercase tracking-widest">Filter Category</span>
                           <select
                             value={productCategoryFilter}
                             onChange={(e) => setProductCategoryFilter(e.target.value)}
-                            className="w-full bg-white border border-neutral-950 text-xs font-mono font-bold text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 uppercase cursor-pointer rounded-none px-2 py-2"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] uppercase cursor-pointer rounded-none px-2 py-2"
                           >
                             <option value="ALL">ALL CATEGORIES</option>
                             {allCategories.map(cat => (
@@ -2137,11 +2137,11 @@ function AdminPanel() {
                         </div>
                         {/* Tag Selector */}
                         <div className="flex flex-col gap-1.5">
-                          <span className="text-[8px] font-mono text-neutral-400 font-bold uppercase tracking-widest">Filter Badge</span>
+                          <span className="text-[8px] font-mono text-[var(--color-muted)] font-bold uppercase tracking-widest">Filter Badge</span>
                           <select
                             value={productTagFilter}
                             onChange={(e) => setProductTagFilter(e.target.value)}
-                            className="w-full bg-white border border-neutral-950 text-xs font-mono font-bold text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 uppercase cursor-pointer rounded-none px-2 py-2"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] uppercase cursor-pointer rounded-none px-2 py-2"
                           >
                             <option value="ALL">ALL BADGES</option>
                             <option value="NEW DROP">NEW DROP</option>
@@ -2152,11 +2152,11 @@ function AdminPanel() {
                         </div>
                         {/* Stock Selector */}
                         <div className="flex flex-col gap-1.5">
-                          <span className="text-[8px] font-mono text-neutral-400 font-bold uppercase tracking-widest">Filter Stock</span>
+                          <span className="text-[8px] font-mono text-[var(--color-muted)] font-bold uppercase tracking-widest">Filter Stock</span>
                           <select
                             value={productStockFilter}
                             onChange={(e) => setProductStockFilter(e.target.value)}
-                            className="w-full bg-white border border-neutral-950 text-xs font-mono font-bold text-neutral-800 outline-hidden tracking-wider focus:border-neutral-950 uppercase cursor-pointer rounded-none px-2 py-2"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] uppercase cursor-pointer rounded-none px-2 py-2"
                           >
                             <option value="ALL">ALL STOCK STATUS</option>
                             <option value="IN_STOCK">IN STOCK ONLY</option>
@@ -2166,8 +2166,8 @@ function AdminPanel() {
                       </div>
 
                       {filteredProducts.length === 0 ? (
-                        <div className="py-12 text-center border border-dashed border-neutral-950 rounded-none bg-neutral-50/50">
-                          <p className="text-xs font-mono font-black tracking-widest text-neutral-500 uppercase">
+                        <div className="py-12 text-center border border-dashed border-[var(--color-accent)] rounded-none bg-[var(--color-subtle)]/50">
+                          <p className="text-xs font-mono font-black tracking-widest text-[var(--color-muted)] uppercase">
                             No active product drops match the search criteria or filters.
                           </p>
                         </div>
@@ -2197,18 +2197,18 @@ function AdminPanel() {
                             const backImagesArrayCount = Array.isArray(p.back_image_links) ? p.back_image_links.length : p.back_image_link ? 1 : 0;
 
                             return (
-                              <div key={targetId} className="flex items-center gap-4 p-3 border border-neutral-950 bg-neutral-50/50 group hover:bg-neutral-100/30 transition-colors duration-200 rounded-none">
-                                <img src={coverThumbnailUrl} alt={p.name} className="w-12 h-12 object-cover border border-neutral-950 shrink-0 rounded-none" />
+                              <div key={targetId} className="flex items-center gap-4 p-3 border border-[var(--color-accent)] bg-[var(--color-subtle)]/50 group hover:bg-[var(--color-subtle)]/30 transition-colors duration-200 rounded-none">
+                                <img src={coverThumbnailUrl} alt={p.name} className="w-12 h-12 object-cover border border-[var(--color-accent)] shrink-0 rounded-none" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-black uppercase tracking-wide text-neutral-900 truncate">{p.name}</p>
-                                  <p className="text-xs text-neutral-500 mt-0.5 uppercase tracking-tight">
-                                    ₹{p.price} · <span className="text-[var(--theme-primary)] font-bold">{parsedTagsString}</span> · Stocks: {parsedSizesString} · Backframes: {backImagesArrayCount}
+                                  <p className="text-xs font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
+                                  <p className="text-xs text-[var(--color-muted)] mt-0.5 uppercase tracking-tight">
+                                    ₹{p.price} · <span className="text-[var(--color-accent)] font-bold">{parsedTagsString}</span> · Stocks: {parsedSizesString} · Backframes: {backImagesArrayCount}
                                   </p>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleEdit(targetId)}
-                                  className="text-[9px] bg-white border border-neutral-950 hover:bg-neutral-950 hover:text-white px-3 py-1.5 font-mono font-black text-neutral-950 uppercase tracking-widest cursor-pointer shrink-0 transition-colors duration-150 rounded-none"
+                                  className="text-[9px] bg-[var(--color-surface)] border border-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white px-3 py-1.5 font-mono font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer shrink-0 transition-colors duration-150 rounded-none"
                                 >
                                   Edit
                                 </button>
@@ -2236,16 +2236,16 @@ function AdminPanel() {
               ========================================== */}
           {activeTab === 'orders' && (
             <div className="space-y-6">
-              <div className="pb-4 border-b border-neutral-100 flex items-center justify-between">
-                <h2 className="text-xs font-black tracking-[0.4em] text-[var(--theme-primary)] uppercase">Incoming Customer Orders</h2>
-                <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{orders.length} TOTAL ORDERS</span>
+              <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
+                <h2 className="text-xs font-black tracking-[0.4em] text-[var(--color-accent)] uppercase">Incoming Customer Orders</h2>
+                <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{orders.length} TOTAL ORDERS</span>
               </div>
 
               {/* Telemetry Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
-                  <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">TOTAL SALES REVENUE</span>
-                  <span className="text-lg font-black text-neutral-900">
+                <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-4 rounded-xl flex flex-col gap-1">
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">TOTAL SALES REVENUE</span>
+                  <span className="text-lg font-black text-[var(--color-text)]">
                     ₹{orders
                       .filter(o => o.status !== 'CANCELLED')
                       .reduce((acc, o) => acc + Number(o.total || 0), 0)
@@ -2254,26 +2254,26 @@ function AdminPanel() {
                   </span>
                   <span className="text-[8px] font-bold text-emerald-600 uppercase tracking-wider">Total from active orders</span>
                 </div>
-                <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
-                  <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">PENDING ORDERS</span>
+                <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-4 rounded-xl flex flex-col gap-1">
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">PENDING ORDERS</span>
                   <span className="text-lg font-black text-amber-600">
                     {orders.filter(o => (o.status || 'PENDING') === 'PENDING').length} ORDERS
                   </span>
-                  <span className="text-[8px] font-bold text-neutral-450 uppercase tracking-wider">Awaiting shipping</span>
+                  <span className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-wider">Awaiting shipping</span>
                 </div>
-                <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
-                  <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">RETURN/EXCHANGE REQS</span>
-                  <span className="text-lg font-black text-indigo-600">
+                <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-4 rounded-xl flex flex-col gap-1">
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">RETURN/EXCHANGE REQS</span>
+                  <span className="text-lg font-black text-[var(--color-accent)]">
                     {orders.filter(o => o.status === 'RETURN_REQUESTED' || o.status === 'EXCHANGE_REQUESTED').length} REQS
                   </span>
-                  <span className="text-[8px] font-bold text-neutral-450 uppercase tracking-wider">Requires resolution</span>
+                  <span className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-wider">Requires resolution</span>
                 </div>
-                <div className="bg-neutral-50 border border-neutral-200 p-4 rounded-xl flex flex-col gap-1">
-                  <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest font-bold">CANCELLED ORDERS</span>
+                <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-4 rounded-xl flex flex-col gap-1">
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">CANCELLED ORDERS</span>
                   <span className="text-lg font-black text-rose-600">
                     {orders.filter(o => o.status === 'CANCELLED').length} ORDERS
                   </span>
-                  <span className="text-[8px] font-bold text-neutral-450 uppercase tracking-wider">Cancelled order count</span>
+                  <span className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-wider">Cancelled order count</span>
                 </div>
               </div>
 
@@ -2307,15 +2307,15 @@ function AdminPanel() {
                 const areaPoints = `50,120 ${polylinePoints} 460,120`;
 
                 return (
-                  <div className="bg-white border border-neutral-200 p-6 rounded-xl space-y-4 shadow-xs">
+                  <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6 rounded-xl space-y-4 shadow-xs">
                     <div className="flex justify-between items-center pb-2 border-b border-neutral-150">
                       <div className="space-y-0.5">
-                        <h3 className="text-xs font-black tracking-[0.2em] text-neutral-900 uppercase">📈 Sales Revenue Trend</h3>
-                        <p className="text-[9px] font-mono font-bold text-neutral-400 uppercase">Daily revenue trajectory from active customer orders (last 7 days)</p>
+                        <h3 className="text-xs font-black tracking-[0.2em] text-[var(--color-text)] uppercase">📈 Sales Revenue Trend</h3>
+                        <p className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Daily revenue trajectory from active customer orders (last 7 days)</p>
                       </div>
                       <div className="text-right">
-                        <span className="text-[8px] font-mono text-neutral-400 block uppercase">PEAK DAILY VALUE</span>
-                        <span className="text-xs font-mono font-black text-neutral-900">₹{Math.max(...chartData.map(d => d.revenue)).toLocaleString('en-IN')}</span>
+                        <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase">PEAK DAILY VALUE</span>
+                        <span className="text-xs font-mono font-black text-[var(--color-text)]">₹{Math.max(...chartData.map(d => d.revenue)).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
 
@@ -2396,28 +2396,28 @@ function AdminPanel() {
               })()}
 
               {/* Search and Export Utilities Row */}
-              <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-white border border-neutral-200 p-4 rounded-xl">
+              <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-xl">
                 <div className="flex-1 relative">
                   <input
                     type="text"
                     value={orderSearchQuery}
                     onChange={(e) => setOrderSearchQuery(e.target.value)}
                     placeholder="Search name, email, or order ID..."
-                    className="w-full bg-[#fafafb] border border-neutral-200 focus:border-neutral-950 text-xs font-semibold px-4 py-2.5 outline-hidden placeholder-neutral-400 uppercase tracking-wider rounded-lg font-sans"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-accent)] text-xs font-semibold px-4 py-2.5 outline-hidden placeholder-[var(--color-muted)] uppercase tracking-wider rounded-lg font-sans"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={handlePrintShippingLabels}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center flex items-center gap-1.5 shadow-xs"
+                    className="bg-[var(--color-accent)] hover:bg-indigo-700 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center flex items-center gap-1.5 shadow-xs"
                   >
                     <FiFileText className="text-xs" /> Print Shipping Slips
                   </button>
                   <button
                     type="button"
                     onClick={handleExportOrdersToCSV}
-                    className="bg-neutral-950 hover:bg-neutral-855 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center"
+                    className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center"
                   >
                     Export Orders list to CSV
                   </button>
@@ -2425,8 +2425,8 @@ function AdminPanel() {
               </div>
 
               {/* Order Status Filters */}
-              <div className="flex flex-wrap gap-2 border-b border-neutral-200/60 pb-4">
-                {['ALL', 'PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'EXCHANGE_REQUESTED', 'RETURNED', 'EXCHANGED'].map((filterVal) => {
+              <div className="flex flex-wrap gap-2 border-b border-[var(--color-border)]/60 pb-4">
+                {['ALL', 'PENDING', 'CANCELLATION_REQUESTED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'EXCHANGE_REQUESTED', 'RETURNED', 'EXCHANGED'].map((filterVal) => {
                   const count = filterVal === 'ALL' 
                     ? orders.length 
                     : orders.filter(o => (o.status || 'PENDING') === filterVal).length;
@@ -2436,8 +2436,8 @@ function AdminPanel() {
                       onClick={() => setOrderFilter(filterVal)}
                       className={`px-3.5 py-2 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg border cursor-pointer ${
                         orderFilter === filterVal
-                          ? 'bg-neutral-950 text-white border-neutral-950 shadow-xs'
-                          : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-450'
+                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
+                          : 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-neutral-450'
                       }`}
                     >
                       {filterVal} ({count})
@@ -2451,8 +2451,8 @@ function AdminPanel() {
 
                 if (filteredOrders.length === 0) {
                   return (
-                    <div className="py-20 text-center border border-dashed border-neutral-350 rounded-2xl bg-neutral-50/50">
-                      <p className="text-xs font-black tracking-widest text-neutral-500 uppercase">
+                    <div className="py-20 text-center border border-dashed border-[var(--color-border)] rounded-2xl bg-[var(--color-subtle)]/50">
+                      <p className="text-xs font-black tracking-widest text-[var(--color-muted)] uppercase">
                         No orders match the filters or search query &ldquo;{orderSearchQuery || orderFilter}&rdquo;.
                       </p>
                     </div>
@@ -2510,11 +2510,11 @@ function AdminPanel() {
                       }
 
                       return (
-                        <div key={uniqueOrderId || idx} className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200 flex flex-col gap-4">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-neutral-200/60 pb-3 gap-2">
+                        <div key={uniqueOrderId || idx} className="bg-[var(--color-subtle)] p-6 rounded-2xl border border-[var(--color-border)] flex flex-col gap-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--color-border)]/60 pb-3 gap-2">
                             <div className="space-y-1">
-                              <span className="text-[9px] font-mono text-neutral-500 block uppercase">ORDER: {orderNumber}</span>
-                              <span className="text-xs font-black text-neutral-900 uppercase tracking-wide">{order.customerName}</span>
+                              <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">ORDER: {orderNumber}</span>
+                              <span className="text-xs font-black text-[var(--color-text)] uppercase tracking-wide">{order.customerName}</span>
                             </div>
                             
                             <div className="flex items-center gap-2">
@@ -2525,25 +2525,34 @@ function AdminPanel() {
                                 : order.status === 'SHIPPED' 
                                 ? 'bg-amber-50 text-amber-600 border border-amber-250' 
                                 : order.status === 'CANCELLED'
-                                ? 'bg-neutral-100 text-neutral-500 border border-neutral-300'
+                                ? 'bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)]'
+                                : order.status === 'CANCELLATION_REQUESTED'
+                                ? 'bg-rose-100 text-rose-750 border border-rose-350 animate-pulse font-bold'
                                 : order.status === 'RETURN_REQUESTED' || order.status === 'EXCHANGE_REQUESTED'
                                 ? 'bg-amber-100 text-amber-700 border border-amber-300 animate-pulse font-bold'
                                 : order.status === 'RETURNED' || order.status === 'RETURN_APPROVED'
                                 ? 'bg-rose-50 text-rose-600 border border-rose-250 font-bold'
                                 : order.status === 'EXCHANGED' || order.status === 'EXCHANGE_APPROVED'
-                                ? 'bg-indigo-50 text-indigo-600 border border-indigo-250 font-bold'
+                                ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border border-indigo-250 font-bold'
                                 : 'bg-rose-50 text-rose-600 border border-rose-250 animate-pulse'
                               }`}>
                                 {order.status || 'PENDING'}
                               </span>
                               
-                              <span className="text-xs font-mono font-black text-neutral-900">₹{order.total?.toLocaleString('en-IN')}</span>
+                              <span className="text-xs font-mono font-black text-[var(--color-text)]">₹{order.total?.toLocaleString('en-IN')}</span>
                             </div>
                           </div>
 
                           {order.status === 'CANCELLED' && cancelReason && (
                             <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg text-rose-700 text-[10px] font-medium uppercase tracking-wide">
                               <span className="font-bold block text-[8px] text-rose-500">CANCELLATION REASON</span>
+                              &ldquo;{cancelReason}&rdquo;
+                            </div>
+                          )}
+
+                          {order.status === 'CANCELLATION_REQUESTED' && cancelReason && (
+                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg text-amber-700 text-[10px] font-medium uppercase tracking-wide">
+                              <span className="font-bold block text-[8px] text-amber-500">REQUESTED CANCELLATION REASON</span>
                               &ldquo;{cancelReason}&rdquo;
                             </div>
                           )}
@@ -2556,7 +2565,7 @@ function AdminPanel() {
                                 {parsedAddr.metadata.return_requests.map((request, reqIdx) => (
                                   <div key={reqIdx} className="text-xs border-b border-amber-200/40 pb-2 last:border-b-0 last:pb-0 space-y-1 font-medium uppercase tracking-wide">
                                     <div className="flex justify-between items-center">
-                                      <span className="font-black text-neutral-900">
+                                      <span className="font-black text-[var(--color-text)]">
                                         {request.type === 'RETURN' ? '↩️ Return' : '🔄 Exchange'} for {request.productName}
                                       </span>
                                       <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase ${
@@ -2569,18 +2578,18 @@ function AdminPanel() {
                                         {request.status}
                                       </span>
                                     </div>
-                                    <p className="text-neutral-500 text-[10px] font-mono">
+                                    <p className="text-[var(--color-muted)] text-[10px] font-mono">
                                       Original Size: {request.originalSize} 
                                       {request.type === 'EXCHANGE' && ` · Desired Size: ${request.exchangeTargetSize}`}
                                     </p>
-                                    <p className="text-neutral-700 text-[10px] normal-case italic font-medium">
+                                    <p className="text-[var(--color-text)] text-[10px] normal-case italic font-medium">
                                       Reason: "{request.reason}"
                                     </p>
                                     
                                     {/* Uploaded Condition Verification Photos */}
                                     {Array.isArray(request.images) && request.images.length > 0 && (
                                       <div className="pt-1.5 pb-1">
-                                        <span className="text-[9px] text-neutral-500 font-mono block mb-1">📷 Verification Images:</span>
+                                        <span className="text-[9px] text-[var(--color-muted)] font-mono block mb-1">📷 Verification Images:</span>
                                         <div className="flex flex-wrap gap-1.5">
                                           {request.images.map((imgUrl, imgIdx) => (
                                             <a href={imgUrl} target="_blank" rel="noopener noreferrer" key={imgIdx} className="block hover:opacity-90 transition-opacity">
@@ -2638,38 +2647,38 @@ function AdminPanel() {
                           )}
 
                           {/* Customer & shipping info */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium uppercase tracking-wide text-neutral-600">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
                             <div>
-                              <span className="text-[8px] font-bold text-neutral-400 block tracking-widest">SHIPPING DESTINATION</span>
-                              <span className="text-neutral-900 font-bold block mt-0.5 text-[11px] leading-relaxed">{displayAddress}</span>
+                              <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest">SHIPPING DESTINATION</span>
+                              <span className="text-[var(--color-text)] font-bold block mt-0.5 text-[11px] leading-relaxed">{displayAddress}</span>
                             </div>
                             <div>
-                              <span className="text-[8px] font-bold text-neutral-400 block tracking-widest">CONTACT SPEC DETAILS</span>
-                              <span className="text-neutral-900 font-bold block mt-0.5">{order.phone} · {order.email}</span>
+                              <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest">CONTACT SPEC DETAILS</span>
+                              <span className="text-[var(--color-text)] font-bold block mt-0.5">{order.phone} · {order.email}</span>
                             </div>
                           </div>
 
                           {/* Purchased Garments */}
-                          <div className="bg-white/80 p-4 rounded-xl border border-neutral-200/50 space-y-2">
-                            <span className="text-[8px] font-bold text-neutral-400 block tracking-widest">GARMENTS SPECIFICATION LIST</span>
+                          <div className="bg-[var(--color-surface)]/80 p-4 rounded-xl border border-[var(--color-border)]/50 space-y-2">
+                            <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest">GARMENTS SPECIFICATION LIST</span>
                             <div className="divide-y divide-neutral-100">
                               {parsedItems.map((item, itemIdx) => (
                                 <div key={itemIdx} className="flex justify-between items-center py-2 text-xs">
-                                  <span className="font-black text-neutral-800 uppercase tracking-wide truncate max-w-sm">{item.name}</span>
-                                  <span className="font-mono text-neutral-500">Size: {item.size || 'M'} · Qty: {item.quantity} · ₹{item.price}</span>
+                                  <span className="font-black text-[var(--color-text)] uppercase tracking-wide truncate max-w-sm">{item.name}</span>
+                                  <span className="font-mono text-[var(--color-muted)]">Size: {item.size || 'M'} · Qty: {item.quantity} · ₹{item.price}</span>
                                 </div>
                               ))}
                             </div>
                           </div>
 
                           {/* Actions to shift status */}
-                          <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-neutral-200/40">
+                          <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-[var(--color-border)]/40">
                             {/* Reset to Pending button */}
                             {(order.status !== 'PENDING' && order.status !== 'CANCELLED') && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'PENDING')}
-                                className="bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-[var(--color-subtle)] hover:bg-neutral-300 text-[var(--color-text)] font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Reset to Pending
                               </button>
@@ -2691,7 +2700,7 @@ function AdminPanel() {
                                 <button
                                   disabled={actionLoading}
                                   onClick={() => handleOrderStatusShift(order, 'PROCESSING')}
-                                  className="bg-neutral-900 hover:bg-neutral-800 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-900 cursor-pointer transition-colors disabled:opacity-50"
+                                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-accent)] cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                   Start Processing
                                 </button>
@@ -2703,7 +2712,7 @@ function AdminPanel() {
                                     setAdminTrackingUrl('');
                                     setIsShippedModalOpen(true);
                                   }}
-                                  className="bg-neutral-950 hover:bg-neutral-855 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
+                                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-accent)] cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                   Mark as Shipped
                                 </button>
@@ -2720,7 +2729,7 @@ function AdminPanel() {
                                   setAdminTrackingUrl('');
                                   setIsShippedModalOpen(true);
                                 }}
-                                className="bg-neutral-950 hover:bg-neutral-855 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-950 cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-accent)] cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Mark as Shipped
                               </button>
@@ -2732,7 +2741,7 @@ function AdminPanel() {
                                 <button
                                   disabled={actionLoading}
                                   onClick={() => handleOrderStatusShift(order, 'IN_TRANSIT')}
-                                  className="bg-indigo-600 hover:bg-indigo-755 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-indigo-600 cursor-pointer transition-colors disabled:opacity-50"
+                                  className="bg-[var(--color-accent)] hover:bg-indigo-755 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-indigo-600 cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                   Mark as In Transit
                                 </button>
@@ -2757,7 +2766,26 @@ function AdminPanel() {
                               </button>
                             )}
 
-                            {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                            {order.status === 'CANCELLATION_REQUESTED' && (
+                              <>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleOrderStatusShift(order, 'CANCELLED')}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-emerald-600 cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                  Approve Cancellation
+                                </button>
+                                <button
+                                  disabled={actionLoading}
+                                  onClick={() => handleOrderStatusShift(order, 'PENDING')}
+                                  className="bg-neutral-500 hover:bg-neutral-600 text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-neutral-500 cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                  Reject Request & Process
+                                </button>
+                              </>
+                            )}
+
+                            {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && order.status !== 'CANCELLATION_REQUESTED' && (
                               <button
                                 disabled={actionLoading}
                                 onClick={() => {
@@ -2788,10 +2816,10 @@ function AdminPanel() {
             <div className="space-y-8">
               
               {/* Marquee Announcer Manager */}
-              <div className="bg-white p-6 rounded-none border border-neutral-950 space-y-4">
+              <div className="bg-[var(--color-surface)] p-6 rounded-none border border-[var(--color-accent)] space-y-4">
                 <div>
-                  <h3 className="text-xs font-mono font-black tracking-widest text-neutral-950 uppercase">DYNAMIC BANNER ANNOUNCEMENT</h3>
-                  <p className="text-[10px] text-neutral-450 uppercase tracking-wider mt-0.5">Edit the live marquee banner announcement text displayed globally on the homepage.</p>
+                  <h3 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase">DYNAMIC BANNER ANNOUNCEMENT</h3>
+                  <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5">Edit the live marquee banner announcement text displayed globally on the homepage.</p>
                 </div>
 
                 <div className="flex gap-3">
@@ -2800,11 +2828,11 @@ function AdminPanel() {
                     value={campaignPromoText}
                     onChange={(e) => setCampaignPromoText(e.target.value)}
                     placeholder="ENTER MARQUEE ANNOUNCEMENT TEXT..."
-                    className="flex-1 bg-white border border-neutral-300 focus:border-neutral-950 rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider outline-hidden"
+                    className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider outline-hidden"
                   />
                   <button
                     onClick={saveCampaignPromoText}
-                    className="bg-neutral-950 hover:bg-neutral-900 text-white font-mono font-black text-xs tracking-widest uppercase px-6 rounded-none cursor-pointer transition-all duration-300"
+                    className="bg-[var(--color-accent)] hover:bg-[var(--color-accent)] text-white font-mono font-black text-xs tracking-widest uppercase px-6 rounded-none cursor-pointer transition-all duration-300"
                   >
                     SAVE
                   </button>
@@ -2812,14 +2840,14 @@ function AdminPanel() {
               </div>
 
               {/* Coupons Generator */}
-              <div className="bg-white p-6 rounded-none border border-neutral-950 space-y-4">
+              <div className="bg-[var(--color-surface)] p-6 rounded-none border border-[var(--color-accent)] space-y-4">
                 <div>
-                  <h3 className="text-xs font-mono font-black tracking-widest text-neutral-950 uppercase">PROMO COUPON MANAGER</h3>
-                  <p className="text-[10px] text-neutral-450 uppercase tracking-wider mt-0.5">Activate or revoke coupon discount codes to enable live checkouts promotions.</p>
+                  <h3 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase">PROMO COUPON MANAGER</h3>
+                  <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5">Activate or revoke coupon discount codes to enable live checkouts promotions.</p>
                 </div>
 
                 {/* Coupon Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-white p-4 rounded-none border border-neutral-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-[var(--color-surface)] p-4 rounded-none border border-[var(--color-border)]">
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[8px] font-black text-neutral-550 block tracking-widest uppercase">COUPON CODE</span>
                     <input
@@ -2827,7 +2855,7 @@ function AdminPanel() {
                       value={newCouponCode}
                       onChange={(e) => setNewCouponCode(e.target.value)}
                       placeholder="E.G., STREET50"
-                      className="bg-neutral-50 border border-neutral-300 focus:border-neutral-950 rounded-none px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -2835,7 +2863,7 @@ function AdminPanel() {
                     <select
                       value={newCouponDiscount}
                       onChange={(e) => setNewCouponDiscount(Number(e.target.value))}
-                      className="bg-neutral-50 border border-neutral-300 rounded-none px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden cursor-pointer"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-none px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden cursor-pointer"
                     >
                       <option value="10">10% OFF</option>
                       <option value="20">20% OFF</option>
@@ -2851,7 +2879,7 @@ function AdminPanel() {
                       value={newCouponMinOrderValue}
                       onChange={(e) => setNewCouponMinOrderValue(e.target.value)}
                       placeholder="e.g. 1999"
-                      className="bg-neutral-50 border border-neutral-300 focus:border-neutral-950 rounded-none px-3 py-2 text-xs font-mono font-black w-full outline-hidden"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs font-mono font-black w-full outline-hidden"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -2860,40 +2888,210 @@ function AdminPanel() {
                       type="date"
                       value={newCouponValidUntil}
                       onChange={(e) => setNewCouponValidUntil(e.target.value)}
-                      className="bg-neutral-50 border border-neutral-300 focus:border-neutral-950 rounded-none px-3 py-1.5 text-xs font-mono font-black w-full outline-hidden"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-1.5 text-xs font-mono font-black w-full outline-hidden"
                     />
                   </div>
-                  <button
-                    onClick={handleAddCoupon}
-                    className="bg-neutral-950 hover:bg-neutral-900 text-white font-mono font-black text-xs tracking-widest uppercase py-2.5 rounded-none cursor-pointer transition-colors w-full md:col-span-2 lg:col-span-1"
-                  >
-                    ACTIVATE
-                  </button>
+                  <div className="flex flex-col gap-2 w-full md:col-span-2 lg:col-span-1">
+                    <button
+                      type="button"
+                      onClick={isEditingCoupon ? handleUpdateCoupon : handleAddCoupon}
+                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-widest uppercase py-2.5 rounded-none cursor-pointer transition-colors w-full"
+                    >
+                      {isEditingCoupon ? 'UPDATE' : 'ACTIVATE'}
+                    </button>
+                    {isEditingCoupon && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEditCoupon}
+                        className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-mono font-black text-xs tracking-widest uppercase py-1.5 rounded-none cursor-pointer transition-colors w-full text-center"
+                      >
+                        CANCEL
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Active Coupons List */}
                 <div className="space-y-2 mt-4">
-                  <span className="text-[8px] font-bold text-neutral-400 block tracking-widest uppercase">ACTIVE EXCLUSIVE COUPONS ({campaignCoupons.length})</span>
+                  <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest uppercase">ACTIVE EXCLUSIVE COUPONS ({campaignCoupons.length})</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {campaignCoupons.map((coupon, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-xl border border-neutral-200">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-mono font-black bg-neutral-900 text-white px-2.5 py-1 rounded border border-neutral-900 tracking-wider">{coupon.code}</span>
-                          <span className="text-[10px] font-black text-emerald-600 tracking-wider uppercase">{coupon.discount}% SAVINGS</span>
+                    {campaignCoupons.map((coupon, idx) => {
+                      const minVal = coupon.min_order_value ? Number(coupon.min_order_value) : 0;
+                      const validDate = coupon.valid_until || '';
+                      const isExpired = coupon.isExpired;
+                      return (
+                        <div key={idx} className={`flex flex-col justify-between bg-[var(--color-surface)] p-4 rounded-xl border space-y-3 shadow-2xs hover:shadow-xs transition-shadow ${isExpired ? 'opacity-65 border-rose-200' : 'border-[var(--color-border)]'}`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono font-black bg-[var(--color-accent)] text-white px-2.5 py-1 rounded border border-[var(--color-accent)] tracking-wider">
+                                {coupon.code}
+                              </span>
+                              <span className="text-[10px] font-black text-emerald-655 tracking-wider uppercase">
+                                {coupon.discount}% SAVINGS
+                              </span>
+                              {isExpired && (
+                                <span className="text-[8px] bg-rose-600 text-white font-mono uppercase px-1.5 py-0.5 font-bold rounded select-none">
+                                  EXPIRED
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditCoupon(coupon)}
+                                className="text-[9px] font-black text-blue-600 hover:text-blue-700 uppercase cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCoupon(coupon.code)}
+                                className="text-[9px] font-black text-rose-655 hover:text-rose-700 uppercase cursor-pointer"
+                              >
+                                Deactivate
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[9px] font-mono border-t border-[var(--color-border)] pt-2 text-[var(--color-muted)]">
+                            <div>
+                              <span className="font-bold block uppercase text-[var(--color-text)]">MINIMUM ORDER</span>
+                              <span>{minVal > 0 ? `₹${minVal.toLocaleString('en-IN')}` : 'NO MINIMUM'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold block uppercase text-[var(--color-text)]">VALID UNTIL</span>
+                              <span>{validDate ? new Date(validDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'NEVER EXPIRES'}</span>
+                            </div>
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Newsletter & Campaign Broadcaster Section */}
+              <div className="bg-[var(--color-surface)] p-6 rounded-none border border-[var(--color-accent)] space-y-6">
+                <div>
+                  <h3 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase">NEWSLETTER & EMAIL CAMPAIGN BROADCASTER</h3>
+                  <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5">Send a one-click newsletter broadcast email or notification to all subscribed users.</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Compose Form */}
+                  <div className="lg:col-span-2 space-y-4 bg-[var(--color-surface)] p-5 rounded-none border border-[var(--color-border)]">
+                    <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase border-b border-[var(--color-border)] pb-2">COMPOSE BROADCAST CAMPAIGN</h4>
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[8px] font-black text-[var(--color-muted)] block tracking-widest uppercase">CAMPAIGN SUBJECT</span>
+                      <input
+                        type="text"
+                        value={campaignSubject}
+                        onChange={(e) => setCampaignSubject(e.target.value)}
+                        placeholder="ENTER CAMPAIGN SUBJECT..."
+                        disabled={isBroadcasting}
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3.5 py-3 text-xs font-bold uppercase tracking-wider w-full outline-hidden disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[8px] font-black text-[var(--color-muted)] block tracking-widest uppercase">CAMPAIGN BODY CONTENT</span>
+                      <textarea
+                        rows="5"
+                        value={campaignBody}
+                        onChange={(e) => setCampaignBody(e.target.value)}
+                        placeholder="WRITE YOUR BROADCAST EMAIL OR NOTIFICATION MESSAGE HERE..."
+                        disabled={isBroadcasting}
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3.5 py-3 text-xs font-medium w-full outline-hidden disabled:opacity-50 font-sans"
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      {isBroadcasting ? (
+                        <div className="space-y-2">
+                          <div className="w-full bg-neutral-900 h-2 overflow-hidden relative">
+                            <div 
+                              className="bg-[var(--color-accent)] h-full transition-all duration-300"
+                              style={{ width: `${(broadcastingProgress / Math.max(1, newsletterSubscribers.length)) * 100}%` }}
+                            />
+                          </div>
+                          <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider text-center">
+                            Broadcasting: {broadcastingProgress} / {newsletterSubscribers.length} emails dispatched...
+                          </p>
+                        </div>
+                      ) : (
                         <button
-                          onClick={() => handleDeleteCoupon(coupon.code)}
-                          className="text-[9px] font-black text-rose-600 hover:text-rose-700 uppercase cursor-pointer"
+                          onClick={handleSendCampaign}
+                          className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-widest uppercase py-3.5 px-6 rounded-none cursor-pointer transition-colors"
                         >
-                          Deactivate
+                          🚀 Send Broadcast Campaign Once
                         </button>
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Subscribers List */}
+                  <div className="space-y-4 bg-[var(--color-surface)] p-5 rounded-none border border-[var(--color-border)] flex flex-col max-h-[360px] overflow-hidden">
+                    <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase border-b border-[var(--color-border)] pb-2 flex justify-between items-center">
+                      <span>SUBSCRIBERS</span>
+                      <span className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] px-2 py-0.5 rounded text-[8px] font-bold">
+                        {newsletterSubscribers.length} TOTAL
+                      </span>
+                    </h4>
+                    
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1.5 custom-scrollbar">
+                      {newsletterSubscribers.length === 0 ? (
+                        <p className="text-[9px] text-[var(--color-muted)] font-mono uppercase text-center py-8">No active subscribers</p>
+                      ) : (
+                        newsletterSubscribers.map((sub, idx) => (
+                          <div key={sub.$id || idx} className="flex items-center gap-2 p-2 bg-[var(--color-subtle)] border border-[var(--color-border)] justify-between">
+                            <span className="text-[10px] font-mono text-[var(--color-text)] font-semibold truncate">{sub.email}</span>
+                            <span className="text-[8px] font-mono text-emerald-600 font-bold bg-emerald-50 px-1 py-0.5 uppercase">Active</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
+                {/* Campaign Sent History */}
+                <div className="space-y-3 pt-4 border-t border-[var(--color-border)]">
+                  <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">BROADCAST CAMPAIGNS SENT HISTORY ({campaignHistory.length})</h4>
+                  {campaignHistory.length === 0 ? (
+                    <p className="text-[9px] text-[var(--color-muted)] font-mono uppercase py-4">No broadcast history recorded</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-[10px] text-left font-mono">
+                        <thead>
+                          <tr className="border-b border-[var(--color-border)] text-[var(--color-muted)] uppercase tracking-wider">
+                            <th className="py-2.5 px-3">Subject</th>
+                            <th className="py-2.5 px-3">Body Preview</th>
+                            <th className="py-2.5 px-3">Recipients</th>
+                            <th className="py-2.5 px-3">Date Sent</th>
+                            <th className="py-2.5 px-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--color-border)]/50">
+                          {campaignHistory.map((camp) => (
+                            <tr key={camp.id} className="hover:bg-[var(--color-subtle)]/40 transition-colors">
+                              <td className="py-3 px-3 font-bold text-[var(--color-text)] uppercase max-w-[150px] truncate">{camp.subject}</td>
+                              <td className="py-3 px-3 text-[var(--color-muted)] max-w-[250px] truncate">{camp.body}</td>
+                              <td className="py-3 px-3 text-neutral-800">{camp.recipientsCount} Subscribers</td>
+                              <td className="py-3 px-3 text-[var(--color-muted)]">
+                                {new Date(camp.sentAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="text-emerald-600 font-black uppercase text-[8px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 select-none">
+                                  DELIVERED ✓
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
-
             </div>
           )}
 
@@ -2905,23 +3103,23 @@ function AdminPanel() {
               
               {/* Restock Alerts Section */}
               <div className="space-y-4">
-                <div className="pb-4 border-b border-neutral-200 flex items-center justify-between">
-                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Restock Requests</h2>
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{restockNotifications.length} REQUESTS</span>
+                <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
+                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Restock Requests</h2>
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{restockNotifications.length} REQUESTS</span>
                 </div>
                 
                 {telemetryLoading ? (
-                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Loading data...</div>
+                  <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading data...</div>
                 ) : restockNotifications.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-neutral-300 rounded-none bg-neutral-50/50">
-                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No size restock requests logged.</p>
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-subtle)]/50">
+                    <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No size restock requests logged.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-neutral-950 rounded-none bg-white">
+                  <div className="overflow-hidden border border-[var(--color-accent)] rounded-none bg-[var(--color-surface)]">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
+                          <tr className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                             <th className="p-4">Email Address</th>
                             <th className="p-4">Product</th>
                             <th className="p-4">Size</th>
@@ -2930,30 +3128,31 @@ function AdminPanel() {
                             <th className="p-4 text-right">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
-                          {restockNotifications.map((n, idx) => (
-                            <tr key={n.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
-                              <td className="p-4 font-bold text-neutral-900 select-all lowercase">{n.email}</td>
-                              <td className="p-4">
-                                <Link 
-                                  to={`/product/${n.productId}`} 
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-3 font-bold text-neutral-900 hover:text-[var(--theme-primary)] hover:underline transition-colors cursor-pointer"
-                                >
-                                  {(() => {
-                                    const foundProd = products.find(p => p.$id === n.productId || p.id === n.productId);
-                                    const img = foundProd?.front_image_link || foundProd?.image_url || foundProd?.image;
+                        <tbody className="font-semibold text-[var(--color-muted)] uppercase tracking-wide">
+                          {restockNotifications.map((n, idx) => {
+                            const foundProd = products.find(p => p.$id === n.productId || p.id === n.productId);
+                            return (
+                              <tr key={n.$id || idx} className="border-b border-[var(--color-border)] hover:bg-[var(--color-subtle)]/50 transition-colors">
+                                <td className="p-4 font-bold text-[var(--color-text)] select-all lowercase">{n.email}</td>
+                                <td className="p-4">
+                                  <Link 
+                                    to={`/product/${foundProd?.slug || n.productId}`} 
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 font-bold text-[var(--color-text)] hover:text-[var(--color-accent)] hover:underline transition-colors cursor-pointer"
+                                  >
+                                    {(() => {
+                                      const img = foundProd?.front_image_link || foundProd?.image_url || foundProd?.image;
                                     return (
                                       <>
                                         {img ? (
                                           <img 
                                             src={img} 
                                             alt={foundProd?.name || 'Product'} 
-                                            className="w-10 h-12 object-cover border border-neutral-200 shrink-0 bg-neutral-50"
+                                            className="w-10 h-12 object-cover border border-[var(--color-border)] shrink-0 bg-[var(--color-subtle)]"
                                           />
                                         ) : (
-                                          <div className="w-10 h-12 bg-neutral-100 border border-neutral-200 shrink-0 flex items-center justify-center text-[8px] font-bold text-neutral-400">
+                                          <div className="w-10 h-12 bg-[var(--color-subtle)] border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)]">
                                             NO IMG
                                           </div>
                                         )}
@@ -2961,15 +3160,15 @@ function AdminPanel() {
                                           <span className="text-xs uppercase truncate max-w-[180px] block">
                                             {foundProd ? foundProd.name : "Unknown Product"}
                                           </span>
-                                          <span className="font-mono text-[9px] text-neutral-400 mt-0.5 block">{n.productId}</span>
+                                          <span className="font-mono text-[9px] text-[var(--color-muted)] mt-0.5 block">{n.productId}</span>
                                         </div>
                                       </>
                                     );
                                   })()}
                                 </Link>
                               </td>
-                              <td className="p-4 font-black text-indigo-600">{n.size}</td>
-                              <td className="p-4 text-[10px] font-mono text-neutral-500">{n.requestedAt ? new Date(n.requestedAt).toLocaleString('en-IN') : 'N/A'}</td>
+                              <td className="p-4 font-black text-[var(--color-accent)]">{n.size}</td>
+                              <td className="p-4 text-[10px] font-mono text-[var(--color-muted)]">{n.requestedAt ? new Date(n.requestedAt).toLocaleString('en-IN') : 'N/A'}</td>
                               <td className="p-4">
                                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${n.notified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}>
                                   {n.notified ? 'NOTIFIED' : 'PENDING'}
@@ -2994,7 +3193,8 @@ function AdminPanel() {
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                          );
+                        })}
                         </tbody>
                       </table>
                     </div>
@@ -3004,36 +3204,36 @@ function AdminPanel() {
 
               {/* Coupon Usage Logs Section */}
               <div className="space-y-4">
-                <div className="pb-4 border-b border-neutral-200 flex items-center justify-between">
-                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Promo Coupon Usage</h2>
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{couponUsages.length} TOTAL USES</span>
+                <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
+                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Promo Coupon Usage</h2>
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{couponUsages.length} TOTAL USES</span>
                 </div>
                 
                 {telemetryLoading ? (
-                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Loading data...</div>
+                  <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading data...</div>
                 ) : couponUsages.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-neutral-300 rounded-none bg-neutral-50/50">
-                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No active coupon usage history has been recorded.</p>
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-subtle)]/50">
+                    <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No active coupon usage history has been recorded.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-neutral-950 rounded-none bg-white">
+                  <div className="overflow-hidden border border-[var(--color-accent)] rounded-none bg-[var(--color-surface)]">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
+                          <tr className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                             <th className="p-4">Customer ID</th>
                             <th className="p-4">Coupon Applied</th>
                             <th className="p-4">Usage Count</th>
                             <th className="p-4">Last Used Time</th>
                           </tr>
                         </thead>
-                        <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
+                        <tbody className="font-semibold text-[var(--color-muted)] uppercase tracking-wide">
                           {couponUsages.map((c, idx) => (
-                            <tr key={c.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
+                            <tr key={c.$id || idx} className="border-b border-[var(--color-border)] hover:bg-[var(--color-subtle)]/50 transition-colors">
                               <td className="p-4 font-mono select-all text-[10px]">{c.userId}</td>
                               <td className="p-4 font-black text-emerald-600 tracking-widest">{c.couponCode}</td>
-                              <td className="p-4 font-mono font-black text-neutral-900">{c.usedCount}</td>
-                              <td className="p-4 text-[10px] font-mono text-neutral-500">{c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleString('en-IN') : 'N/A'}</td>
+                              <td className="p-4 font-mono font-black text-[var(--color-text)]">{c.usedCount}</td>
+                              <td className="p-4 text-[10px] font-mono text-[var(--color-muted)]">{c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleString('en-IN') : 'N/A'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -3045,23 +3245,23 @@ function AdminPanel() {
 
               {/* Cart Telemetry / Status Section */}
               <div className="space-y-4">
-                <div className="pb-4 border-b border-neutral-200 flex items-center justify-between">
-                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Customer Cart Activity</h2>
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{activeCarts.length} TOTAL CARTS</span>
+                <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
+                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Customer Cart Activity</h2>
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{activeCarts.length} TOTAL CARTS</span>
                 </div>
                 
                 {telemetryLoading ? (
-                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Loading data...</div>
+                  <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading data...</div>
                 ) : activeCarts.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-neutral-300 rounded-none bg-neutral-50/50">
-                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No active cart activity recorded.</p>
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-subtle)]/50">
+                    <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No active cart activity recorded.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-neutral-950 rounded-none bg-white">
+                  <div className="overflow-hidden border border-[var(--color-accent)] rounded-none bg-[var(--color-surface)]">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="bg-neutral-50 border-b border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-450">
+                          <tr className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                             <th className="p-4">Customer ID</th>
                             <th className="p-4">Product Detail</th>
                             <th className="p-4">Size</th>
@@ -3069,20 +3269,20 @@ function AdminPanel() {
                             <th className="p-4">Status</th>
                           </tr>
                         </thead>
-                        <tbody className="font-semibold text-neutral-600 uppercase tracking-wide">
+                        <tbody className="font-semibold text-[var(--color-muted)] uppercase tracking-wide">
                           {activeCarts.map((c, idx) => (
-                            <tr key={c.$id || idx} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors">
+                            <tr key={c.$id || idx} className="border-b border-[var(--color-border)] hover:bg-[var(--color-subtle)]/50 transition-colors">
                               <td className="p-4 font-mono select-all text-[10px]">{c.userId}</td>
-                              <td className="p-4 font-bold text-neutral-900 truncate max-w-[180px]">{c.name}</td>
-                              <td className="p-4 font-mono text-neutral-800">{c.size}</td>
-                              <td className="p-4 text-neutral-500">₹{c.price} x {c.quantity}</td>
+                              <td className="p-4 font-bold text-[var(--color-text)] truncate max-w-[180px]">{c.name}</td>
+                              <td className="p-4 font-mono text-[var(--color-text)]">{c.size}</td>
+                              <td className="p-4 text-[var(--color-muted)]">₹{c.price} x {c.quantity}</td>
                               <td className="p-4">
                                 <span className={`text-[9px] font-black px-2.5 py-1 rounded-md ${
                                   c.cart_status === 'converted' 
                                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
                                   : c.cart_status === 'abandoned' 
                                   ? 'bg-rose-50 text-rose-600 border border-rose-250' 
-                                  : 'bg-indigo-50 text-indigo-600 border border-indigo-200 animate-pulse'
+                                  : 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border border-indigo-200 animate-pulse'
                                 }`}>
                                   {c.cart_status || 'ACTIVE'}
                                 </span>
@@ -3103,28 +3303,28 @@ function AdminPanel() {
               ========================================== */}
           {activeTab === 'slider' && (
             <div className="space-y-8 animate-fade-in">
-              <div className="pb-4 border-b border-neutral-200 flex items-center justify-between">
-                <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Hero Banner Slides</h2>
-                <span className="text-[10px] font-mono text-neutral-400 uppercase font-black">{slides.length} SLIDES ACTIVE</span>
+              <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
+                <h2 className="text-xs font-mono font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Hero Banner Slides</h2>
+                <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{slides.length} SLIDES ACTIVE</span>
               </div>
 
               {/* Add New Slide Form */}
-              <div className="bg-[#fcfcfd] border border-neutral-200 p-6 rounded-none space-y-6">
-                <h3 className="text-[10px] font-mono font-black tracking-widest text-neutral-900 uppercase">➕ Add New Banner Slide</h3>
+              <div className="bg-[#fcfcfd] border border-[var(--color-border)] p-6 rounded-none space-y-6">
+                <h3 className="text-[10px] font-mono font-black tracking-widest text-[var(--color-text)] uppercase">➕ Add New Banner Slide</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Desktop Image Upload */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Desktop Banner Image (1440x800 recommended)</label>
+                    <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Desktop Banner Image (1440x800 recommended)</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         placeholder="Paste image URL or upload file..."
                         value={slideImage}
                         onChange={(e) => setSlideImage(e.target.value)}
-                        className="grow bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                        className="grow bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
                       />
-                      <label className="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
+                      <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
                         {slideUploading ? "Uploading..." : "Upload"}
                         <input
                           type="file"
@@ -3136,7 +3336,7 @@ function AdminPanel() {
                       </label>
                     </div>
                     {slideImage && (
-                      <div className="mt-2 relative w-32 aspect-[16/9] border border-neutral-200 overflow-hidden bg-neutral-100">
+                      <div className="mt-2 relative w-32 aspect-[16/9] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)]">
                         <img src={slideImage} alt="Desktop Preview" className="w-full h-full object-cover" />
                         <button type="button" onClick={() => setSlideImage("")} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 text-[8px] hover:bg-red-800 leading-none">✕</button>
                       </div>
@@ -3145,16 +3345,16 @@ function AdminPanel() {
 
                   {/* Mobile Image Upload */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Mobile Banner Image (Optional - 800x1200 recommended)</label>
+                    <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Mobile Banner Image (Optional - 800x1200 recommended)</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         placeholder="Paste mobile image URL or upload..."
                         value={slideMobileImage}
                         onChange={(e) => setSlideMobileImage(e.target.value)}
-                        className="grow bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                        className="grow bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
                       />
-                      <label className="bg-neutral-950 hover:bg-neutral-800 text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
+                      <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
                         {slideUploading ? "Uploading..." : "Upload"}
                         <input
                           type="file"
@@ -3166,7 +3366,7 @@ function AdminPanel() {
                       </label>
                     </div>
                     {slideMobileImage && (
-                      <div className="mt-2 relative w-20 aspect-[3/4] border border-neutral-200 overflow-hidden bg-neutral-100">
+                      <div className="mt-2 relative w-20 aspect-[3/4] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)]">
                         <img src={slideMobileImage} alt="Mobile Preview" className="w-full h-full object-cover" />
                         <button type="button" onClick={() => setSlideMobileImage("")} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 text-[8px] hover:bg-red-800 leading-none">✕</button>
                       </div>
@@ -3175,13 +3375,13 @@ function AdminPanel() {
 
                   {/* Click Redirect Link */}
                   <div className="flex flex-col gap-1.5 md:col-span-2">
-                    <label className="text-[10px] font-black tracking-widest text-neutral-500 uppercase">Destination Redirect Link (e.g., /shop or /category/printed-tshirt)</label>
+                    <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Destination Redirect Link (e.g., /shop or /category/printed-tshirt)</label>
                     <input
                       type="text"
                       placeholder="E.G., /shop"
                       value={slideLink}
                       onChange={(e) => setSlideLink(e.target.value)}
-                      className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-3 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
                     />
                   </div>
                 </div>
@@ -3190,7 +3390,7 @@ function AdminPanel() {
                   type="button"
                   onClick={handleAddSlide}
                   disabled={actionLoading || slideUploading || !slideImage.trim()}
-                  className="bg-neutral-950 hover:bg-neutral-800 text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-none uppercase transition-colors disabled:opacity-50 cursor-pointer"
+                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-none uppercase transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   🚀 DEPLOY BANNER SLIDE
                 </button>
@@ -3198,39 +3398,39 @@ function AdminPanel() {
 
               {/* Active Slides Display Grid */}
               <div className="space-y-4">
-                <h3 className="text-[10px] font-mono font-black tracking-widest text-neutral-900 uppercase">Active Banners</h3>
+                <h3 className="text-[10px] font-mono font-black tracking-widest text-[var(--color-text)] uppercase">Active Banners</h3>
                 
                 {slidesLoading ? (
-                  <div className="py-12 text-center text-xs font-bold text-neutral-400 animate-pulse uppercase tracking-widest">Loading Slides...</div>
+                  <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading Slides...</div>
                 ) : slides.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-neutral-300 bg-neutral-50/50">
-                    <p className="text-xs font-black tracking-wide text-neutral-500 uppercase">No active homepage slides. Falling back to default banners.</p>
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] bg-[var(--color-subtle)]/50">
+                    <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No active homepage slides. Falling back to default banners.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {slides.map((slide) => (
-                      <div key={slide.$id} className="border border-neutral-950/10 bg-white p-4 flex flex-col justify-between space-y-4">
+                      <div key={slide.$id} className="border border-[var(--color-accent)]/10 bg-[var(--color-surface)] p-4 flex flex-col justify-between space-y-4">
                         <div className="space-y-2">
                           <div className="flex gap-4">
-                            <div className="w-1/2 aspect-[16/9] border border-neutral-200 overflow-hidden bg-neutral-100 relative">
+                            <div className="w-1/2 aspect-[16/9] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
                               <img src={slide.image} alt="Desktop slide view" className="w-full h-full object-cover" />
                               <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">DESKTOP</span>
                             </div>
                             {slide.mobileImage ? (
-                              <div className="w-1/4 aspect-[3/4] border border-neutral-200 overflow-hidden bg-neutral-100 relative">
+                              <div className="w-1/4 aspect-[3/4] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
                                 <img src={slide.mobileImage} alt="Mobile slide view" className="w-full h-full object-cover" />
                                 <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">MOBILE</span>
                               </div>
                             ) : (
-                              <div className="w-1/4 aspect-[3/4] border border-dashed border-neutral-300 flex items-center justify-center text-neutral-400 text-[8px] uppercase">
+                              <div className="w-1/4 aspect-[3/4] border border-dashed border-[var(--color-border)] flex items-center justify-center text-[var(--color-muted)] text-[8px] uppercase">
                                 No Mobile View
                               </div>
                             )}
                           </div>
 
                           <div className="text-[10px] font-mono space-y-1">
-                            <div className="truncate"><span className="text-neutral-400">LINK:</span> <span className="font-bold">{slide.link || "None"}</span></div>
-                            <div><span className="text-neutral-400">CREATED:</span> <span>{new Date(slide.$createdAt).toLocaleString()}</span></div>
+                            <div className="truncate"><span className="text-[var(--color-muted)]">LINK:</span> <span className="font-bold">{slide.link || "None"}</span></div>
+                            <div><span className="text-[var(--color-muted)]">CREATED:</span> <span>{new Date(slide.$createdAt).toLocaleString()}</span></div>
                           </div>
                         </div>
 
@@ -3250,11 +3450,11 @@ function AdminPanel() {
           )}
 
           {activeTab === 'categories' && (
-            <div className="space-y-8 animate-fade-in text-neutral-900">
-              <div className="pb-4 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-8 animate-fade-in text-[var(--color-text)]">
+              <div className="pb-4 border-b border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-neutral-950 uppercase">Category Manager</h2>
-                  <p className="text-[10px] text-neutral-400 font-mono mt-1 uppercase">Configure custom category cover image overrides and rename categories across products.</p>
+                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Category Manager</h2>
+                  <p className="text-[10px] text-[var(--color-muted)] font-mono mt-1 uppercase">Configure custom category cover image overrides and rename categories across products.</p>
                 </div>
                 {deletedCategories.length > 0 && (
                   <button
@@ -3264,23 +3464,23 @@ function AdminPanel() {
                       localStorage.removeItem('deleted_categories');
                       showToast("✓ All deleted categories restored!", "success");
                     }}
-                    className="border border-neutral-950 hover:bg-neutral-950 hover:text-white text-neutral-950 text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-all cursor-pointer select-none shrink-0"
+                    className="border border-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-all cursor-pointer select-none shrink-0"
                   >
                     🔄 Restore Defaults ({deletedCategories.length})
                   </button>
                 )}
               </div>
 
-              <div className="bg-white border border-neutral-950 p-6 rounded-none space-y-6">
+              <div className="bg-[var(--color-surface)] border border-[var(--color-accent)] p-6 rounded-none space-y-6">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-neutral-900">
-                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase w-16">Preview</th>
-                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase">Category Information</th>
-                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase w-28 text-center">Live Drops</th>
-                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase">Cover Image Override</th>
-                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-neutral-400 uppercase text-right w-40">Actions</th>
+                      <tr className="border-b border-[var(--color-accent)]">
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase w-16">Preview</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase">Category Information</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase w-28 text-center">Live Drops</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase">Cover Image Override</th>
+                        <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase text-right w-40">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
@@ -3313,7 +3513,7 @@ function AdminPanel() {
                             <tr key={cat.value} className="align-middle">
                               {/* Preview Column */}
                               <td className="py-4 pr-4">
-                                <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-950/10">
+                                <div className="w-12 h-12 rounded-full overflow-hidden border border-[var(--color-accent)]/10">
                                   <img 
                                     src={currentImageUrl} 
                                     alt={cat.label} 
@@ -3333,20 +3533,20 @@ function AdminPanel() {
                                       type="text"
                                       value={editCategoryName}
                                       onChange={(e) => setEditCategoryName(e.target.value)}
-                                      className="bg-white border border-neutral-950 rounded-none px-3 py-1.5 text-xs text-neutral-900 font-bold outline-hidden uppercase tracking-wider"
+                                      className="bg-[var(--color-surface)] border border-[var(--color-accent)] rounded-none px-3 py-1.5 text-xs text-[var(--color-text)] font-bold outline-hidden uppercase tracking-wider"
                                       placeholder="New Category Name..."
                                       autoFocus
                                     />
-                                    <span className="text-[8px] font-mono text-neutral-400 uppercase tracking-widest leading-relaxed">
+                                    <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-widest leading-relaxed">
                                       WARNING: This will update category tags on all matching live drops.
                                     </span>
                                   </div>
                                 ) : (
                                   <div className="space-y-1">
-                                    <h4 className="text-xs font-bold text-neutral-950 uppercase tracking-wider">{cat.label}</h4>
+                                    <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">{cat.label}</h4>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-[9px] font-mono text-neutral-400 uppercase">SLUG:</span>
-                                      <code className="text-[9px] font-mono bg-neutral-100 text-neutral-600 px-1 py-0.5 rounded-sm">{cat.value}</code>
+                                      <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase">SLUG:</span>
+                                      <code className="text-[9px] font-mono bg-[var(--color-subtle)] text-[var(--color-muted)] px-1 py-0.5 rounded-sm">{cat.value}</code>
                                     </div>
                                   </div>
                                 )}
@@ -3354,7 +3554,7 @@ function AdminPanel() {
 
                               {/* Live Drops Column */}
                               <td className="py-4 pr-4 text-center">
-                                <span className="inline-block px-2.5 py-1 text-[9px] font-mono font-bold tracking-widest rounded-none bg-neutral-100 text-neutral-800 uppercase">
+                                <span className="inline-block px-2.5 py-1 text-[9px] font-mono font-bold tracking-widest rounded-none bg-[var(--color-subtle)] text-[var(--color-text)] uppercase">
                                   {productCount} Drop{productCount !== 1 ? 's' : ''}
                                 </span>
                               </td>
@@ -3371,12 +3571,12 @@ function AdminPanel() {
                                         const urlVal = e.target.value;
                                         setNewCategoryImageUrls(prev => ({ ...prev, [cat.value]: urlVal }));
                                       }}
-                                      className="grow bg-white border border-neutral-200 rounded-none px-3 py-1.5 text-xs text-neutral-900 placeholder-neutral-400 outline-hidden tracking-wider focus:border-neutral-950 transition-colors"
+                                      className="grow bg-[var(--color-surface)] border border-[var(--color-border)] rounded-none px-3 py-1.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
                                     />
                                     <button
                                       type="button"
                                       onClick={() => handleSaveCategoryImage(cat.value, inputUrl)}
-                                      className="bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors shrink-0 cursor-pointer"
+                                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors shrink-0 cursor-pointer"
                                     >
                                       Save Cover
                                     </button>
@@ -3384,7 +3584,7 @@ function AdminPanel() {
                                   
                                   {/* Upload local image field */}
                                   <div className="flex items-center gap-2">
-                                    <label className="text-[9px] font-mono font-black text-neutral-500 uppercase tracking-widest hover:text-neutral-900 transition-colors cursor-pointer border border-dashed border-neutral-300 px-3 py-1 hover:border-neutral-600">
+                                    <label className="text-[9px] font-mono font-black text-[var(--color-muted)] uppercase tracking-widest hover:text-[var(--color-text)] transition-colors cursor-pointer border border-dashed border-[var(--color-border)] px-3 py-1 hover:border-neutral-600">
                                       {isUploading ? "Uploading to Cloud..." : "📁 Upload Cover Image file"}
                                       <input
                                         type="file"
@@ -3428,7 +3628,7 @@ function AdminPanel() {
                                     <button
                                       type="button"
                                       onClick={() => setEditingCategory(null)}
-                                      className="border border-neutral-300 hover:bg-neutral-50 text-neutral-600 text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors cursor-pointer"
+                                      className="border border-[var(--color-border)] hover:bg-[var(--color-subtle)] text-[var(--color-muted)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors cursor-pointer"
                                     >
                                       Cancel
                                     </button>
@@ -3441,7 +3641,7 @@ function AdminPanel() {
                                         setEditingCategory(cat.value);
                                         setEditCategoryName(cat.label);
                                       }}
-                                      className="border border-neutral-950 hover:bg-neutral-50 text-neutral-950 text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-none uppercase transition-colors cursor-pointer"
+                                      className="border border-[var(--color-accent)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-none uppercase transition-colors cursor-pointer"
                                     >
                                       ✏️ Rename
                                     </button>
@@ -3477,18 +3677,18 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => setIsAdminCancelModalOpen(false)}
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Cancel Order Manifest
               </h2>
-              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
                 Please select a reason for cancelling order {cancelTargetOrder.order_number || cancelTargetOrder.$id?.substring(0, 12).toUpperCase()}. This will release inventory stock back to the active registry.
               </p>
             </div>
@@ -3506,8 +3706,8 @@ function AdminPanel() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
                     adminCancelReason === opt
-                    ? 'border-neutral-950 bg-neutral-50/50'
-                    : 'border-neutral-200 hover:border-neutral-400'
+                    ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
                   <input 
@@ -3515,9 +3715,9 @@ function AdminPanel() {
                     name="admin_cancel_option"
                     checked={adminCancelReason === opt}
                     onChange={() => setAdminCancelReason(opt)}
-                    className="mt-0.5 accent-neutral-950"
+                    className="mt-0.5 accent-[var(--color-accent)]"
                   />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-800 leading-normal select-none">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text)] leading-normal select-none">
                     {opt}
                   </span>
                 </label>
@@ -3526,7 +3726,7 @@ function AdminPanel() {
 
             {/* Custom Explanation Textarea */}
             <div className="space-y-2">
-              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 ADDITIONAL SPEC DETAIL / CUSTOM REASON
               </label>
               <textarea
@@ -3534,23 +3734,23 @@ function AdminPanel() {
                 onChange={(e) => setAdminCancelCustomText(e.target.value)}
                 placeholder="ENTER CUSTOM REASON DETAILS..."
                 rows={3}
-                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setIsAdminCancelModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Keep Order
               </button>
               <button
                 type="button"
                 onClick={submitAdminCancelOrder}
-                className="w-full py-3 bg-neutral-950 hover:bg-neutral-850 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
               >
                 Cancel Order
               </button>
@@ -3564,28 +3764,28 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => setIsSweepProductModalOpen(false)}
           />
           
           {/* Modal Container */}
-           <div className="relative z-60 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+           <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">DELETE PRODUCT</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">DELETE PRODUCT</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Delete Product?
               </h2>
-              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
                 Are you sure you want to permanently delete this product from the shop? This action cannot be undone.
               </p>
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setIsSweepProductModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel
               </button>
@@ -3606,28 +3806,28 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => setIsDeleteOrderModalOpen(false)}
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+          <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">DELETE CANCELLED ORDER</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">DELETE CANCELLED ORDER</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Delete Order?
               </h2>
-              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
                 Are you sure you want to permanently delete order #{deleteTargetOrder.order_number || deleteTargetOrder.$id?.substring(0,6).toUpperCase()} from the store databases? This action is irreversible.
               </p>
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setIsDeleteOrderModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel
               </button>
@@ -3646,25 +3846,25 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => setIsShippedModalOpen(false)}
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Mark Order as Shipped
               </h2>
-              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
                 Add tracking information for order {shippedTargetOrder.order_number || shippedTargetOrder.$id?.substring(0, 12).toUpperCase()}.
               </p>
             </div>
             
             {/* Tracking Number Input */}
             <div className="space-y-2">
-              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 CARRIER TRACKING NUMBER *
               </label>
               <input
@@ -3672,13 +3872,13 @@ function AdminPanel() {
                 value={adminTrackingNumber}
                 onChange={(e) => setAdminTrackingNumber(e.target.value)}
                 placeholder="E.G., Delhivery: 123456789"
-                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 uppercase tracking-wider"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] uppercase tracking-wider"
               />
             </div>
 
             {/* Tracking URL Input */}
             <div className="space-y-2">
-              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 CUSTOM TRACKING URL (OPTIONAL)
               </label>
               <input
@@ -3686,23 +3886,23 @@ function AdminPanel() {
                 value={adminTrackingUrl}
                 onChange={(e) => setAdminTrackingUrl(e.target.value)}
                 placeholder="LEAVE BLANK TO DEFAULT TO DELHIVERY TRACKER..."
-                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 tracking-wider"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] tracking-wider"
               />
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setIsShippedModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={submitAdminShippedOrder}
-                className="w-full py-3 bg-neutral-950 hover:bg-neutral-850 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
               >
                 Dispatch shipment
               </button>
@@ -3716,7 +3916,7 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => {
               setIsDeleteCategoryModalOpen(false);
               setDeleteTargetCategory(null);
@@ -3724,14 +3924,14 @@ function AdminPanel() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-sm bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+          <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">DELETE CATEGORY</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">DELETE CATEGORY</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Delete "{deleteTargetCategory.label}"?
               </h2>
-              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-2.5 leading-relaxed">
-                This will clear the category field on all <strong className="text-neutral-950 font-bold">{products.filter(p => p.category === deleteTargetCategory.value).length}</strong> product drops belonging to it.
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-2.5 leading-relaxed">
+                This will clear the category field on all <strong className="text-[var(--color-text)] font-bold">{products.filter(p => p.category === deleteTargetCategory.value).length}</strong> product drops belonging to it.
               </p>
               <p className="text-[9.5px] text-red-600 font-mono uppercase tracking-wider mt-2 leading-relaxed">
                 ⚠️ WARNING: The products will remain in the catalog but will be marked as "Uncategorized". Any cover override will also be permanently deleted.
@@ -3739,14 +3939,14 @@ function AdminPanel() {
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => {
                   setIsDeleteCategoryModalOpen(false);
                   setDeleteTargetCategory(null);
                 }}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel
               </button>
@@ -3767,7 +3967,7 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => {
               setIsRejectModalOpen(false);
               setRejectTargetOrder(null);
@@ -3776,13 +3976,13 @@ function AdminPanel() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up max-h-[90vh] overflow-y-auto">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Reject Return/Exchange Request
               </h2>
-              <p className="text-[9px] text-neutral-450 uppercase tracking-wider mt-0.5 leading-relaxed">
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
                 Please select or enter the reason for rejecting this return/exchange request. This reason will be displayed to the customer.
               </p>
             </div>
@@ -3800,8 +4000,8 @@ function AdminPanel() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
                     adminRejectReason === opt
-                    ? 'border-neutral-950 bg-neutral-50/50'
-                    : 'border-neutral-200 hover:border-neutral-400'
+                    ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
                   <input 
@@ -3809,9 +4009,9 @@ function AdminPanel() {
                     name="admin_reject_option"
                     checked={adminRejectReason === opt}
                     onChange={() => setAdminRejectReason(opt)}
-                    className="mt-0.5 accent-neutral-950"
+                    className="mt-0.5 accent-[var(--color-accent)]"
                   />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-800 leading-normal select-none">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text)] leading-normal select-none">
                     {opt}
                   </span>
                 </label>
@@ -3820,7 +4020,7 @@ function AdminPanel() {
 
             {/* Custom Explanation Textarea */}
             <div className="space-y-2">
-              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 ADDITIONAL SPEC DETAIL / CUSTOM REASON
               </label>
               <textarea
@@ -3828,12 +4028,12 @@ function AdminPanel() {
                 onChange={(e) => setAdminRejectCustomText(e.target.value)}
                 placeholder="ENTER CUSTOM REJECTION DETAIL..."
                 rows={3}
-                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => {
@@ -3841,14 +4041,14 @@ function AdminPanel() {
                   setRejectTargetOrder(null);
                   setRejectTargetItemIndex(null);
                 }}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel Action
               </button>
               <button
                 type="button"
                 onClick={submitAdminRejectRequest}
-                className="w-full py-3 bg-neutral-950 hover:bg-neutral-855 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
               >
                 Reject Request
               </button>
@@ -3862,7 +4062,7 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-neutral-950/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
             onClick={() => {
               setIsApproveModalOpen(false);
               setApproveTargetOrder(null);
@@ -3871,10 +4071,10 @@ function AdminPanel() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up max-h-[90vh] overflow-y-auto">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
                 Approve {approveTargetRequest.type === 'RETURN' ? 'Return' : 'Exchange'} Request
               </h2>
               <p className="text-[9px] text-neutral-455 uppercase tracking-wider mt-0.5 leading-relaxed">
@@ -3894,8 +4094,8 @@ function AdminPanel() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
                     adminApproveInstructions === opt
-                    ? 'border-neutral-950 bg-neutral-50/50'
-                    : 'border-neutral-200 hover:border-neutral-400'
+                    ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
                   <input 
@@ -3903,9 +4103,9 @@ function AdminPanel() {
                     name="admin_approve_option"
                     checked={adminApproveInstructions === opt}
                     onChange={() => setAdminApproveInstructions(opt)}
-                    className="mt-0.5 accent-neutral-950"
+                    className="mt-0.5 accent-[var(--color-accent)]"
                   />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-800 leading-normal select-none">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text)] leading-normal select-none">
                     {opt}
                   </span>
                 </label>
@@ -3914,7 +4114,7 @@ function AdminPanel() {
 
             {/* Custom Explanation Textarea */}
             <div className="space-y-2">
-              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 ADDITIONAL INSTRUCTIONS / CUSTOM LOGISTICS DETAIL
               </label>
               <textarea
@@ -3922,12 +4122,12 @@ function AdminPanel() {
                 onChange={(e) => setAdminApproveCustomText(e.target.value)}
                 placeholder="ENTER RETURN SHIPPING INSTRUCTIONS OR REVERSE TRACKING URL..."
                 rows={3}
-                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => {
@@ -3935,7 +4135,7 @@ function AdminPanel() {
                   setApproveTargetOrder(null);
                   setApproveTargetRequest(null);
                 }}
-                className="w-full py-3 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel Action
               </button>

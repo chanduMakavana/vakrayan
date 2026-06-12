@@ -107,10 +107,12 @@ export class CartService {
         }
     }
 
-    async clearUserCart(user_id) {
+    async clearUserCart(user_id, itemIds = null) {
         try {
             const items = await this.getCartItems(user_id);
-            const deletePromises = items.map((item) => this.removeFromCart(item.$id));
+            const deletePromises = items
+                .filter(item => !itemIds || itemIds.includes(item.$id))
+                .map((item) => this.removeFromCart(item.$id));
             await Promise.all(deletePromises);
             return true;
         } catch (error) {
@@ -120,10 +122,11 @@ export class CartService {
     }
 
     // Soft-update cart items status to converted on checkout (used for abandonment analytics)
-    async convertCartItems(user_id) {
+    async convertCartItems(user_id, itemIds = null) {
         try {
             const items = await this.getCartItems(user_id);
             for (const item of items) {
+                if (itemIds && !itemIds.includes(item.$id)) continue;
                 try {
                     await this.updateCartItem(item.$id, { cart_status: 'converted' });
                 } catch (e) {

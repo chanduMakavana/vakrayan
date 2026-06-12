@@ -100,6 +100,7 @@ const schema = [
             { key: 'fabric_gsm', type: 'string', size: 100, required: false, default: '' },
             { key: 'compare_at_price', type: 'integer', required: false, default: 0 },
             { key: 'is_featured', type: 'boolean', required: false, default: false },
+            { key: 'is_vip_only', type: 'boolean', required: false, default: false },
             { key: 'total_sold', type: 'integer', required: false, default: 0 },
             { key: 'slug', type: 'string', size: 255, required: false, default: '' }
         ]

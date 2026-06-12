@@ -87,7 +87,7 @@ export const ToastProvider = ({ children }) => {
               
               <button
                 onClick={() => removeToast(toast.id)}
-                className="text-neutral-400 hover:text-neutral-200 p-0.5 rounded-md hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                className="text-[var(--color-muted)] hover:text-neutral-200 p-0.5 rounded-md hover:bg-[var(--color-surface)]/5 transition-colors cursor-pointer shrink-0"
                 aria-label="Close notification"
               >
                 <CloseIcon />

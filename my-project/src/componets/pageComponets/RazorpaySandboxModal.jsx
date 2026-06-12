@@ -231,14 +231,14 @@ const RazorpaySandboxModal = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/80 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-neutral-200/50 flex flex-col animate-scale-up">
+      <div className="bg-[var(--color-surface)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-[var(--color-border)]/50 flex flex-col animate-scale-up">
         
         {/* Razorpay Brand Header */}
         <div className="bg-[#121c2c] px-6 py-4 text-white flex items-center justify-between border-b border-[#1b2a40]">
           <div className="flex items-center gap-2.5">
             <div className="w-6 h-6 rounded bg-indigo-500 flex items-center justify-center text-xs font-black text-white font-mono">R</div>
             <div className="flex flex-col">
-              <span className="text-[8px] font-black tracking-[0.25em] text-neutral-400 uppercase leading-none">{t.secured}</span>
+              <span className="text-[8px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase leading-none">{t.secured}</span>
               <span className="text-xs font-black tracking-wider uppercase mt-1">{t.title}</span>
             </div>
           </div>
@@ -256,7 +256,7 @@ const RazorpaySandboxModal = ({
             <button 
               type="button"
               onClick={onClose}
-              className="text-neutral-400 hover:text-white text-[10px] font-bold font-mono tracking-widest cursor-pointer px-2 py-0.5 rounded transition-colors"
+              className="text-[var(--color-muted)] hover:text-white text-[10px] font-bold font-mono tracking-widest cursor-pointer px-2 py-0.5 rounded transition-colors"
             >
               {t.cancel}
             </button>
@@ -264,23 +264,23 @@ const RazorpaySandboxModal = ({
         </div>
 
         {/* Merchant Details Block */}
-        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+        <div className="px-6 py-4 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-surface)]/50">
           <div>
-            <span className="text-[8px] font-mono text-neutral-400 block uppercase font-black">{t.merchant}</span>
-            <span className="text-xs font-black text-neutral-800 uppercase tracking-wide">Aashis Streetwear HQ</span>
+            <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase font-black">{t.merchant}</span>
+            <span className="text-xs font-black text-[var(--color-text)] uppercase tracking-wide">Aashis Streetwear HQ</span>
           </div>
           <div className="text-right">
-            <span className="text-[8px] font-mono text-neutral-400 block uppercase font-black">{t.amount}</span>
+            <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase font-black">{t.amount}</span>
             <span className="text-base font-mono font-black text-[#121c2c]">₹{finalAmount.toLocaleString('en-IN')}</span>
           </div>
         </div>
 
         {/* Main Interactive Split-pane */}
-        <div className="flex flex-1 min-h-[350px] bg-white">
+        <div className="flex flex-1 min-h-[350px] bg-[var(--color-surface)]">
           
           {/* Left Sidebar Tab Selection */}
-          <div className="w-1/3 border-r border-neutral-200/60 bg-neutral-50/40 p-3 flex flex-col gap-1.5 shrink-0">
-            <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest font-black mb-1 px-2">{t.payVia}</span>
+          <div className="w-1/3 border-r border-[var(--color-border)] bg-[var(--color-surface)]/40 p-3 flex flex-col gap-1.5 shrink-0">
+            <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest font-black mb-1 px-2">{t.payVia}</span>
             
             {/* 1. Card Tab */}
             <button
@@ -288,8 +288,8 @@ const RazorpaySandboxModal = ({
               onClick={() => setSimulatedMethod('card')}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
                 simulatedMethod === 'card' 
-                ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
+                ? 'bg-[var(--color-surface)] text-indigo-600 border border-[var(--color-border)] shadow-xs' 
+                : 'text-[var(--color-muted)] hover:bg-neutral-100/50 hover:text-[var(--color-text)]'
               }`}
             >
               <span className="text-xs">💳</span>
@@ -302,8 +302,8 @@ const RazorpaySandboxModal = ({
               onClick={() => setSimulatedMethod('upi')}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
                 simulatedMethod === 'upi' 
-                ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
+                ? 'bg-[var(--color-surface)] text-indigo-600 border border-[var(--color-border)] shadow-xs' 
+                : 'text-[var(--color-muted)] hover:bg-neutral-100/50 hover:text-[var(--color-text)]'
               }`}
             >
               <span className="text-xs">⚡</span>
@@ -316,8 +316,8 @@ const RazorpaySandboxModal = ({
               onClick={() => setSimulatedMethod('netbanking')}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
                 simulatedMethod === 'netbanking' 
-                ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
+                ? 'bg-[var(--color-surface)] text-indigo-600 border border-[var(--color-border)] shadow-xs' 
+                : 'text-[var(--color-muted)] hover:bg-neutral-100/50 hover:text-[var(--color-text)]'
               }`}
             >
               <span className="text-xs">🏦</span>
@@ -330,8 +330,8 @@ const RazorpaySandboxModal = ({
               onClick={() => setSimulatedMethod('wallet')}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
                 simulatedMethod === 'wallet' 
-                ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
+                ? 'bg-[var(--color-surface)] text-indigo-600 border border-[var(--color-border)] shadow-xs' 
+                : 'text-[var(--color-muted)] hover:bg-neutral-100/50 hover:text-[var(--color-text)]'
               }`}
             >
               <span className="text-xs">📱</span>
@@ -344,8 +344,8 @@ const RazorpaySandboxModal = ({
               onClick={() => setSimulatedMethod('paylater')}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-left transition-all cursor-pointer ${
                 simulatedMethod === 'paylater' 
-                ? 'bg-white text-indigo-600 border border-neutral-200/60 shadow-xs' 
-                : 'text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-900'
+                ? 'bg-[var(--color-surface)] text-indigo-600 border border-[var(--color-border)] shadow-xs' 
+                : 'text-[var(--color-muted)] hover:bg-neutral-100/50 hover:text-[var(--color-text)]'
               }`}
             >
               <span className="text-xs">⏳</span>
@@ -364,8 +364,8 @@ const RazorpaySandboxModal = ({
                 <div className="space-y-3 animate-fade-in">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.cardTitle}</span>
-                      <span className="text-[9px] text-neutral-400 block mt-0.5">{t.cardSubtitle}</span>
+                      <span className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest block">{t.cardTitle}</span>
+                      <span className="text-[9px] text-[var(--color-muted)] block mt-0.5">{t.cardSubtitle}</span>
                     </div>
                     
                     <button 
@@ -385,7 +385,7 @@ const RazorpaySandboxModal = ({
                   <div className="space-y-2.5">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center justify-between">
-                        <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardNo}</label>
+                        <label className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-widest">{t.cardNo}</label>
                         <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-mono">{cardNetwork.logo}</span>
                       </div>
                       <input 
@@ -397,13 +397,13 @@ const RazorpaySandboxModal = ({
                           let formatted = val.replace(/(\d{4})(?=\d)/g, '$1 ');
                           setCardNo(formatted);
                         }}
-                        className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider w-full transition-colors"
                       />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col gap-1">
-                        <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardExpiry}</label>
+                        <label className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-widest">{t.cardExpiry}</label>
                         <input 
                           type="text" 
                           placeholder="12 / 29" 
@@ -415,11 +415,11 @@ const RazorpaySandboxModal = ({
                             }
                             setCardExpiry(val);
                           }}
-                          className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
+                          className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider w-full transition-colors"
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardCvv}</label>
+                        <label className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-widest">{t.cardCvv}</label>
                         <input 
                           type="password" 
                           placeholder="•••" 
@@ -428,23 +428,23 @@ const RazorpaySandboxModal = ({
                           onChange={(e) => {
                             setCardCvv(e.target.value.replace(/\D/g, '').substring(0, 3));
                           }}
-                          className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
+                          className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider w-full transition-colors"
                         />
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.cardHolder}</label>
+                      <label className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-widest">{t.cardHolder}</label>
                       <input 
                         type="text" 
                         placeholder="SANDBOX USER" 
                         value={cardName}
                         onChange={(e) => setCardName(e.target.value.toUpperCase())}
-                        className="bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-sans font-bold text-neutral-700 outline-hidden tracking-wider w-full transition-colors"
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-sans font-bold text-[var(--color-text)] outline-hidden tracking-wider w-full transition-colors"
                       />
                     </div>
 
-                    <label className="flex items-center gap-2 text-[9px] font-bold text-neutral-500 cursor-pointer select-none mt-1">
+                    <label className="flex items-center gap-2 text-[9px] font-bold text-[var(--color-muted)] cursor-pointer select-none mt-1">
                       <input 
                         type="checkbox" 
                         checked={saveCard}
@@ -461,23 +461,23 @@ const RazorpaySandboxModal = ({
               {simulatedMethod === 'upi' && (
                 <div className="space-y-3 animate-fade-in">
                   <div>
-                    <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.upiTitle}</span>
-                    <span className="text-[9px] text-neutral-400 block mt-0.5">{t.upiSubtitle}</span>
+                    <span className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest block">{t.upiTitle}</span>
+                    <span className="text-[9px] text-[var(--color-muted)] block mt-0.5">{t.upiSubtitle}</span>
                   </div>
                   
                   {upiQrActive ? (
-                    <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 animate-scale-in">
-                      <div className="bg-white p-3 border border-neutral-200 rounded-lg shadow-sm relative group">
+                    <div className="flex flex-col items-center justify-center p-4 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl space-y-3 animate-scale-in">
+                      <div className="bg-[var(--color-surface)] p-3 border border-[var(--color-border)] rounded-lg shadow-sm relative group">
                         <svg className="w-28 h-28 text-[#121c2c]" viewBox="0 0 100 100">
                           <path fill="currentColor" d="M0,0 h30 v30 h-30 z M10,10 h10 v10 h-10 z M70,0 h30 v30 h-30 z M80,10 h10 v10 h-10 z M0,70 h30 v30 h-30 z M10,80 h10 v10 h-10 z M40,10 h10 v10 h-10 z M55,5 h10 v10 h-10 z M45,40 h15 v15 h-15 z M5,45 h20 v10 h-20 z M80,45 h10 v20 h-10 z M40,75 h15 v15 h-15 z M75,75 h20 v20 h-20 z M85,65 h10 v10 h-10 z M65,35 h15 v10 h-15 z" />
                         </svg>
-                        <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setUpiTimer(300)}>
+                        <div className="absolute inset-0 bg-[var(--color-surface)]/95 backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setUpiTimer(300)}>
                           <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">🔄 Reset QR</span>
                         </div>
                       </div>
                       
                       <div className="text-center">
-                        <span className="text-[9px] font-black text-neutral-800 uppercase tracking-wide block">Scan & Pay using GPay / PhonePe / BHIM</span>
+                        <span className="text-[9px] font-black text-[var(--color-text)] uppercase tracking-wide block">Scan & Pay using GPay / PhonePe / BHIM</span>
                         <span className="text-[8px] font-mono text-rose-600 font-bold block mt-1">
                           ⏳ QR Code expires in {Math.floor(upiTimer / 60)}:{(upiTimer % 60).toString().padStart(2, '0')}
                         </span>
@@ -486,7 +486,7 @@ const RazorpaySandboxModal = ({
                       <button 
                         type="button" 
                         onClick={() => setUpiQrActive(false)}
-                        className="text-[8px] font-bold text-neutral-500 hover:text-neutral-700 bg-neutral-200/50 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                        className="text-[8px] font-bold text-[var(--color-muted)] hover:text-[var(--color-text)] bg-neutral-200/50 px-2 py-0.5 rounded transition-colors cursor-pointer"
                       >
                         Cancel QR Scan
                       </button>
@@ -498,13 +498,13 @@ const RazorpaySandboxModal = ({
                           setUpiQrActive(true);
                           setUpiTimer(300);
                         }}
-                        className="p-3 bg-neutral-50 hover:bg-indigo-50/20 hover:border-indigo-200 border border-neutral-200 rounded-xl flex items-center justify-between cursor-pointer transition-all active:scale-[0.99]"
+                        className="p-3 bg-[var(--color-surface)] hover:bg-indigo-50/20 hover:border-indigo-200 border border-[var(--color-border)] rounded-xl flex items-center justify-between cursor-pointer transition-all active:scale-[0.99]"
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 bg-white border border-neutral-200 rounded flex items-center justify-center text-xs shrink-0 select-none">📱</div>
+                          <div className="w-8 h-8 bg-[var(--color-surface)] border border-[var(--color-border)] rounded flex items-center justify-center text-xs shrink-0 select-none">📱</div>
                           <div>
-                            <span className="text-[10px] font-black uppercase text-neutral-800 block">{t.upiQr}</span>
-                            <span className="text-[8px] font-mono text-neutral-400 block mt-0.5">{t.upiQrSub}</span>
+                            <span className="text-[10px] font-black uppercase text-[var(--color-text)] block">{t.upiQr}</span>
+                            <span className="text-[8px] font-mono text-[var(--color-muted)] block mt-0.5">{t.upiQrSub}</span>
                           </div>
                         </div>
                         <span className="text-[8px] font-black bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-0.5 rounded uppercase">Generate QR</span>
@@ -512,12 +512,12 @@ const RazorpaySandboxModal = ({
 
                       <div className="relative flex items-center py-1">
                         <div className="w-full h-px bg-neutral-100" />
-                        <span className="absolute left-1/2 -translate-x-1/2 bg-white px-2.5 text-[8px] font-mono text-neutral-400 uppercase tracking-widest">OR PAY VIA UPI ID</span>
+                        <span className="absolute left-1/2 -translate-x-1/2 bg-[var(--color-surface)] px-2.5 text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-widest">OR PAY VIA UPI ID</span>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.upiIdLabel}</label>
+                          <label className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-widest">{t.upiIdLabel}</label>
                           {upiVerified === 'verified' && <span className="text-[8px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">✅ Verified: {customerName.toLowerCase() || 'customer'}@upi</span>}
                           {upiVerified === 'invalid' && <span className="text-[8px] font-mono font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">{t.invalidUpi}</span>}
                         </div>
@@ -530,7 +530,7 @@ const RazorpaySandboxModal = ({
                               setUpiId(e.target.value);
                               setUpiVerified('idle');
                             }}
-                            className="bg-neutral-50 border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider flex-1 transition-colors"
+                            className="bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider flex-1 transition-colors"
                           />
                           <button
                             type="button"
@@ -552,7 +552,7 @@ const RazorpaySandboxModal = ({
                               : upiVerified === 'invalid'
                               ? 'bg-rose-50 text-rose-600 border border-rose-200'
                               : upiVerified === 'verifying'
-                              ? 'bg-neutral-100 text-neutral-400 border border-neutral-200 animate-pulse'
+                              ? 'bg-neutral-100 text-[var(--color-muted)] border border-[var(--color-border)] animate-pulse'
                               : 'bg-neutral-950 hover:bg-neutral-800 text-white cursor-pointer active:scale-95'
                             }`}
                           >
@@ -583,7 +583,7 @@ const RazorpaySandboxModal = ({
                                 setUpiId(base + handle);
                                 setUpiVerified('idle');
                               }}
-                              className="text-[8px] font-mono font-bold text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 bg-neutral-50 border border-neutral-200 px-2 py-0.5 rounded transition-all cursor-pointer"
+                              className="text-[8px] font-mono font-bold text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-neutral-100 bg-[var(--color-surface)] border border-[var(--color-border)] px-2 py-0.5 rounded transition-all cursor-pointer"
                             >
                               {handle}
                             </button>
@@ -599,8 +599,8 @@ const RazorpaySandboxModal = ({
               {simulatedMethod === 'netbanking' && (
                 <div className="space-y-3 animate-fade-in">
                   <div>
-                    <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.nbTitle}</span>
-                    <span className="text-[9px] text-neutral-400 block mt-0.5">{t.nbSubtitle}</span>
+                    <span className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest block">{t.nbTitle}</span>
+                    <span className="text-[9px] text-[var(--color-muted)] block mt-0.5">{t.nbSubtitle}</span>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2">
@@ -623,11 +623,11 @@ const RazorpaySandboxModal = ({
                           className={`p-2.5 border rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all active:scale-95 ${
                             isSelected 
                             ? 'border-indigo-600 bg-indigo-50/50 shadow-xs scale-[1.02]' 
-                            : 'border-neutral-200 bg-[#fbfbfb] hover:border-neutral-300'
+                            : 'border-[var(--color-border)] bg-[var(--color-subtle)] hover:border-[var(--color-accent-hover)]'
                           }`}
                         >
                           <span className="text-base">{bank.logo}</span>
-                          <span className="text-[8px] font-black uppercase tracking-wider text-neutral-700 mt-1 truncate w-full">{bank.name}</span>
+                          <span className="text-[8px] font-black uppercase tracking-wider text-[var(--color-text)] mt-1 truncate w-full">{bank.name}</span>
                         </div>
                       );
                     })}
@@ -636,22 +636,22 @@ const RazorpaySandboxModal = ({
                   <div className="relative">
                     <div 
                       onClick={() => setNbDropdownOpen(!nbDropdownOpen)}
-                      className="w-full p-3 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl flex items-center justify-between cursor-pointer transition-colors"
+                      className="w-full p-3 bg-[var(--color-surface)] hover:bg-neutral-100/50 border border-[var(--color-border)] rounded-xl flex items-center justify-between cursor-pointer transition-colors"
                     >
-                      <span className="text-[9px] font-black uppercase tracking-wider text-neutral-600">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                         {customBankSelected ? `🏦 Selected: ${customBankSelected}` : t.searchBank}
                       </span>
-                      <span className="text-xs text-neutral-400">{nbDropdownOpen ? '▴' : '▾'}</span>
+                      <span className="text-xs text-[var(--color-muted)]">{nbDropdownOpen ? '▴' : '▾'}</span>
                     </div>
 
                     {nbDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-xl z-50 p-2 space-y-2 max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 w-full mt-1.5 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl z-50 p-2 space-y-2 max-h-48 overflow-y-auto">
                         <input 
                           type="text" 
                           placeholder="Search bank name..."
                           value={nbSearchQuery}
                           onChange={(e) => setNbSearchQuery(e.target.value)}
-                          className="w-full bg-[#fbfbfb] border border-neutral-200 focus:border-indigo-600 rounded-lg px-3 py-2 text-[9px] font-sans font-bold text-neutral-800 outline-hidden placeholder-neutral-400"
+                          className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-indigo-600 rounded-lg px-3 py-2 text-[9px] font-sans font-bold text-[var(--color-text)] outline-hidden placeholder-[var(--color-muted)]"
                         />
                         <div className="space-y-1">
                           {allIndianBanksList
@@ -665,13 +665,13 @@ const RazorpaySandboxModal = ({
                                   setNbDropdownOpen(false);
                                   setNbSearchQuery('');
                                 }}
-                                className="px-3 py-2 hover:bg-neutral-50 rounded-lg text-[9px] font-black uppercase tracking-wider text-neutral-700 cursor-pointer transition-colors"
+                                className="px-3 py-2 hover:bg-[var(--color-surface)] rounded-lg text-[9px] font-black uppercase tracking-wider text-[var(--color-text)] cursor-pointer transition-colors"
                               >
                                 🏦 {bName}
                               </div>
                             ))}
                           {allIndianBanksList.filter(bName => bName.toLowerCase().includes(nbSearchQuery.toLowerCase())).length === 0 && (
-                            <div className="px-3 py-2 text-[9px] font-mono text-neutral-400 text-center">
+                            <div className="px-3 py-2 text-[9px] font-mono text-[var(--color-muted)] text-center">
                               No matching Indian banks found
                             </div>
                           )}
@@ -686,8 +686,8 @@ const RazorpaySandboxModal = ({
               {simulatedMethod === 'wallet' && (
                 <div className="space-y-3 animate-fade-in">
                   <div>
-                    <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.walletTitle}</span>
-                    <span className="text-[9px] text-neutral-400 block mt-0.5">{t.walletSubtitle}</span>
+                    <span className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest block">{t.walletTitle}</span>
+                    <span className="text-[9px] text-[var(--color-muted)] block mt-0.5">{t.walletSubtitle}</span>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -701,10 +701,10 @@ const RazorpaySandboxModal = ({
                             setWalletLinked('idle');
                             setWalletOtp('');
                           }}
-                          className={`flex items-center gap-2 p-3 border rounded-xl text-[9px] font-black uppercase tracking-wider text-neutral-700 cursor-pointer select-none transition-all active:scale-[0.98] ${
+                          className={`flex items-center gap-2 p-3 border rounded-xl text-[9px] font-black uppercase tracking-wider text-[var(--color-text)] cursor-pointer select-none transition-all active:scale-[0.98] ${
                             isSelected 
                             ? 'border-indigo-600 bg-indigo-50/50 shadow-xs' 
-                            : 'border-neutral-200 bg-[#fbfbfb] hover:border-neutral-300'
+                            : 'border-[var(--color-border)] bg-[var(--color-subtle)] hover:border-[var(--color-accent-hover)]'
                           }`}
                         >
                           <span>📱</span>
@@ -715,16 +715,16 @@ const RazorpaySandboxModal = ({
                   </div>
 
                   {selectedWallet && (
-                    <div className="p-3 bg-neutral-50/50 border border-neutral-200 rounded-xl space-y-3 animate-slide-down">
+                    <div className="p-3 bg-[var(--color-surface)]/50 border border-[var(--color-border)] rounded-xl space-y-3 animate-slide-down">
                       {walletLinked === 'idle' && (
                         <div className="space-y-2">
-                          <label className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{t.walletPhone}</label>
+                          <label className="text-[8px] font-bold text-[var(--color-muted)] uppercase tracking-widest">{t.walletPhone}</label>
                           <input 
                             type="text" 
                             value={walletPhone}
                             onChange={(e) => setWalletPhone(e.target.value)}
                             placeholder="Enter mobile number linked to wallet"
-                            className="bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 outline-hidden tracking-wider w-full focus:border-indigo-600 transition-colors"
+                            className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider w-full focus:border-indigo-600 transition-colors"
                           />
                           <button
                             type="button"
@@ -758,7 +758,7 @@ const RazorpaySandboxModal = ({
                             value={walletOtp}
                             onChange={(e) => setWalletOtp(e.target.value.replace(/\D/g, '').substring(0, 4))}
                             placeholder="ENTER 4-DIGIT OTP"
-                            className="bg-white border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono font-bold text-neutral-700 text-center outline-hidden tracking-[0.3em] w-full focus:border-indigo-600 transition-colors"
+                            className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-xs font-mono font-bold text-[var(--color-text)] text-center outline-hidden tracking-[0.3em] w-full focus:border-indigo-600 transition-colors"
                           />
                           <button
                             type="button"
@@ -789,8 +789,8 @@ const RazorpaySandboxModal = ({
               {simulatedMethod === 'paylater' && (
                 <div className="space-y-3 animate-fade-in">
                   <div>
-                    <span className="text-[10px] font-black text-neutral-800 uppercase tracking-widest block">{t.paylaterTitle}</span>
-                    <span className="text-[9px] text-neutral-400 block mt-0.5">{t.paylaterSubtitle}</span>
+                    <span className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest block">{t.paylaterTitle}</span>
+                    <span className="text-[9px] text-[var(--color-muted)] block mt-0.5">{t.paylaterSubtitle}</span>
                   </div>
                   
                   <div className="space-y-2 max-h-52 overflow-y-auto pr-1 scrollbar-none">
@@ -808,17 +808,17 @@ const RazorpaySandboxModal = ({
                           className={`p-2.5 border rounded-xl flex items-start gap-2.5 cursor-pointer transition-all active:scale-[0.99] ${
                             isSelected 
                             ? 'border-indigo-600 bg-indigo-50/50 shadow-xs' 
-                            : 'border-neutral-200 bg-[#fbfbfb] hover:border-neutral-300'
+                            : 'border-[var(--color-border)] bg-[var(--color-subtle)] hover:border-[var(--color-accent-hover)]'
                           }`}
                         >
                           <div className={`w-3 h-3 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                            isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-neutral-300 bg-white'
+                            isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-neutral-300 bg-[var(--color-surface)]'
                           }`}>
-                            {isSelected && <div className="w-1 h-1 bg-white rounded-full" />}
+                            {isSelected && <div className="w-1 h-1 bg-[var(--color-surface)] rounded-full" />}
                           </div>
                           <div className="min-w-0">
-                            <span className="text-[9px] font-black uppercase text-neutral-800 block">{opt.name}</span>
-                            <span className="text-[8px] font-mono text-neutral-400 block leading-normal mt-0.5 truncate">{opt.desc}</span>
+                            <span className="text-[9px] font-black uppercase text-[var(--color-text)] block">{opt.name}</span>
+                            <span className="text-[8px] font-mono text-[var(--color-muted)] block leading-normal mt-0.5 truncate">{opt.desc}</span>
                           </div>
                         </div>
                       );
@@ -836,7 +836,7 @@ const RazorpaySandboxModal = ({
               onClick={handlePaymentComplete}
               className={`w-full text-white font-black text-[10px] tracking-widest uppercase py-3.5 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer mt-4 ${
                 isPayButtonDisabled 
-                ? 'bg-neutral-200 text-neutral-400 border border-neutral-300 cursor-not-allowed shadow-none' 
+                ? 'bg-neutral-200 text-[var(--color-muted)] border border-neutral-300 cursor-not-allowed shadow-none' 
                 : 'bg-[#121c2c] hover:bg-[#1b2a40]'
               }`}
             >
@@ -847,7 +847,7 @@ const RazorpaySandboxModal = ({
         </div>
 
         {/* Secured Stamp */}
-        <div className="bg-neutral-50 px-6 py-3 border-t border-neutral-100 flex items-center justify-between text-[8px] font-mono text-neutral-400 tracking-wider">
+        <div className="bg-[var(--color-surface)] px-6 py-3 border-t border-[var(--color-border)] flex items-center justify-between text-[8px] font-mono text-[var(--color-muted)] tracking-wider">
           <span>{t.secStamp}</span>
           <span>SSL 256-BIT</span>
         </div>

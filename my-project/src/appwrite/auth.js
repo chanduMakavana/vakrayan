@@ -64,6 +64,37 @@ export class AuthService {
         }
     }
 
+    // Update user preferences
+    async updatePreferences(prefs) {
+        try {
+            return await this.account.updatePrefs(prefs);
+        } catch (error) {
+            console.error("Appwrite service :: updatePreferences :: error", error.message);
+            throw error;
+        }
+    }
+
+    // Update user name
+    async updateName(name) {
+        try {
+            return await this.account.updateName(name);
+        } catch (error) {
+            console.error("Appwrite service :: updateName :: error", error.message);
+            throw error;
+        }
+    }
+
+    // Change user password
+    async updatePassword(password, oldPassword) {
+        try {
+            return await this.account.updatePassword(password, oldPassword);
+        } catch (error) {
+            console.error("Appwrite service :: updatePassword :: error", error.message);
+            throw error;
+        }
+    }
+
+
     // Create recovery link for forgotten password
     async createRecovery(email, url) {
         try {

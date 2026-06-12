@@ -3,6 +3,8 @@ import { useSelector, useDispatch } from 'react-redux'
 import wishlistService from '../../appwrite/wishlist'
 import ProductCardSkeleton from './ProductCardSkeleton'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
+import { scatterProducts } from '../../utils/colorHelper'
+
 
 function BestSellers() {
   const navigate = useNavigate()
@@ -38,23 +40,23 @@ function BestSellers() {
     });
   };
 
-  const sortedProducts = sortInStockFirst(products);
-  const featuredProducts = sortedProducts.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1');
+  const sortedProducts = scatterProducts(sortInStockFirst(products));
+  const featuredProducts = scatterProducts(sortedProducts.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1'));
   const displayedProducts = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : sortedProducts.slice(0, 4);
 
   return (
-    <section id="drops" className="bg-[#fafafb] py-16 px-4 md:px-12 border-t border-neutral-200/50 scroll-mt-20 selection:bg-neutral-900 selection:text-white">
+    <section id="drops" className="bg-[var(--color-bg)] py-16 px-4 md:px-12 border-t border-[var(--color-border)] scroll-mt-20 selection:bg-[var(--color-accent)] selection:text-white">
       {/* Section Header */}
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between max-w-7xl mx-auto">
         <div>
-          <h4 className="text-xs tracking-[0.4em] text-[var(--theme-accent)] font-bold uppercase mb-2">In Focus</h4>
-          <h2 className="text-3xl md:text-5xl font-black tracking-wider text-neutral-900 uppercase">
+          <h4 className="text-xs tracking-[0.4em] text-[var(--color-accent)] font-bold uppercase mb-2">In Focus</h4>
+          <h2 className="text-3xl md:text-5xl font-black tracking-wider text-[var(--color-text)] uppercase">
             Heavyweight Drops
           </h2>
         </div>
         <button 
           onClick={() => navigate('/shop')} 
-          className="mt-4 md:mt-0 text-xs font-bold tracking-widest text-neutral-500 hover:text-neutral-900 uppercase transition-colors duration-300 border-b border-neutral-300 pb-1 w-fit cursor-pointer"
+          className="mt-4 md:mt-0 text-xs font-bold tracking-widest text-[var(--color-muted)] hover:text-[var(--color-text)] uppercase transition-colors duration-300 border-b border-[var(--color-border)] pb-1 w-fit cursor-pointer"
         >
           View All Products &rarr;
         </button>
@@ -62,7 +64,7 @@ function BestSellers() {
 
       {/* Loading state view */}
       {loading && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-16 max-w-7xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-12 md:gap-x-10 md:gap-y-16 max-w-7xl mx-auto">
           {Array.from({ length: 4 }).map((_, index) => (
             <ProductCardSkeleton key={index} />
           ))}
@@ -71,59 +73,55 @@ function BestSellers() {
 
       {/* Empty state view */}
       {!loading && products.length === 0 && (
-        <p className="text-center text-neutral-400 text-xs tracking-widest uppercase py-20 font-bold">
+        <p className="text-center text-[var(--color-muted)] text-xs tracking-widest uppercase py-20 font-bold">
           No products yet — Admin se add karwao.
         </p>
       )}
 
       {/* Products Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-16 max-w-7xl mx-auto">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-12 md:gap-x-10 md:gap-y-16 max-w-7xl mx-auto">
         {!loading && displayedProducts.map((product) => {
-  // Resolve unique document ID
-  const uniqueId = product.$id || product.id;
-  
-  // Resolve image views and fallbacks
-  const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View';
-  const backView = product.back_image_links?.[0] || product.back_image_link || frontView;
+          const parentId = product.$id || product.id;
+          const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View';
+          const backView = product.back_image_links?.[0] || product.back_image_link || frontView;
 
-  // Tags Array Handler
-  const activeTag = product.tag || "";
+          const activeTag = product.tag || (product.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
 
-  let stocks = {};
-  try {
-    stocks = JSON.parse(product?.sizes_stock || '{}');
-  } catch {
-    stocks = {};
-  }
-  let isAllOutOfStock = false;
-  if (product && product.sizes && product.sizes.length > 0) {
-    const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
-    isAllOutOfStock = totalStock === 0;
-  }
+          let stocks = {};
+          try {
+            stocks = JSON.parse(product?.sizes_stock || '{}');
+          } catch {
+            stocks = {};
+          }
+          let isAllOutOfStock = false;
+          if (product && product.sizes && product.sizes.length > 0) {
+            const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+            isAllOutOfStock = totalStock === 0;
+          }
 
   return (
     <div 
-      key={uniqueId} 
-      onClick={() => navigate(`/product/${uniqueId}`)} 
-      className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-700 pb-4 border-b border-transparent hover:border-neutral-950/20"
+      key={parentId} 
+      onClick={() => navigate(`/product/${product.slug || parentId}`)} 
+      className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-300 ease-out pb-4 border-b border-transparent hover:shadow-lg hover:border-[var(--color-border)] rounded-xl"
     >
       {/* Image Aspect Ratio Canvas */}
-      <div className="w-full aspect-[3/4] overflow-hidden bg-[#f6f6f6] relative transition-transform duration-700 ease-out group-hover:scale-[0.98]">
+      <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-[var(--color-subtle)] relative transition-transform duration-700 ease-out">
         
         {/* Floating Heart Button */}
         <button
           onClick={async (e) => {
             e.stopPropagation();
-            const exists = wishlist.some(item => item.$id === uniqueId || item.id === uniqueId);
+            const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
             let updated;
             if (exists) {
-              dispatch(removeWishlistItemState(uniqueId));
+              dispatch(removeWishlistItemState(parentId));
               const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-              updated = saved.filter(item => item.$id !== uniqueId && item.id !== uniqueId);
+              updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
               localStorage.setItem('wishlist', JSON.stringify(updated));
               if (isAuthenticated && user) {
                 try {
-                  await wishlistService.removeFromWishlist(user.$id, uniqueId);
+                  await wishlistService.removeFromWishlist(user.$id, parentId);
                 } catch (err) {
                   console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
                 }
@@ -135,21 +133,21 @@ function BestSellers() {
               localStorage.setItem('wishlist', JSON.stringify(updated));
               if (isAuthenticated && user) {
                 try {
-                  await wishlistService.addToWishlist(user.$id, uniqueId);
+                  await wishlistService.addToWishlist(user.$id, parentId);
                 } catch (err) {
                   console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
                 }
               }
             }
           }}
-          className="absolute top-4 right-4 z-30 bg-white/90 backdrop-blur-md border border-neutral-200/60 p-2.5 rounded-full hover:border-neutral-950 hover:bg-white active:scale-90 transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
+          className="absolute top-4 right-4 z-30 bg-[var(--color-surface)]/95 backdrop-blur-md border border-[var(--color-border)] p-2.5 rounded-full hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] active:scale-90 transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
         >
-          {wishlist.some(item => item.$id === uniqueId || item.id === uniqueId) ? (
-            <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
+          {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
+            <svg className="w-3.5 h-3.5 text-[var(--color-accent)] fill-current" viewBox="0 0 24 24">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
           ) : (
-            <svg className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-[var(--color-muted)] group-hover:text-[var(--color-accent)] stroke-current fill-none stroke-2" viewBox="0 0 24 24">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
           )}
@@ -160,9 +158,9 @@ function BestSellers() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              navigate('/admin', { state: { editProductId: uniqueId } });
+              navigate('/admin', { state: { editProductId: parentId } });
             }}
-            className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
+            className="absolute bottom-4 left-4 z-30 bg-[var(--color-text)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-[var(--color-text)] transition-all shadow-md cursor-pointer"
           >
             ✏️ EDIT
           </button>
@@ -170,8 +168,8 @@ function BestSellers() {
 
         {/* Active Tag Badge */}
         {activeTag && (
-          <div className="absolute top-4 left-4 z-20 flex items-center bg-neutral-950 px-2 py-0.5 select-none">
-            <span className="text-white font-mono text-[8px] tracking-[0.25em] uppercase font-bold">
+          <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
+            <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
               {activeTag}
             </span>
           </div>
@@ -179,8 +177,8 @@ function BestSellers() {
 
         {/* Out of Stock Overlay */}
         {isAllOutOfStock && (
-          <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
-            <span className="bg-white/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
+          <div className="absolute inset-0 bg-[var(--color-bg)]/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+            <span className="bg-[var(--color-surface)]/95 text-[var(--color-text)] border border-[var(--color-border)] text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
               SOLD OUT
             </span>
           </div>
@@ -193,14 +191,14 @@ function BestSellers() {
             alt={product.name}
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0 group-hover:scale-105"
+            className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
           />
           <img  
             src={backView}
             alt={`${product.name} alternate viewframe`}
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100 group-hover:scale-105"
+            className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
           />
         </div>
       </div>
@@ -209,19 +207,19 @@ function BestSellers() {
       <div className="mt-3 px-1 flex flex-col justify-between grow">
         <div>
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-[8px] font-mono text-neutral-400 tracking-wider uppercase">
+            <span className="text-[8px] font-mono text-[var(--color-muted)] tracking-wider uppercase">
               {product.category?.replace('-', ' ') || "HQ MERCH"}
             </span>
           </div>
           
-          <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
+          <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-[var(--color-text)] uppercase truncate">
             {product.name}
           </h3>
         </div>
         
-        <div className="mt-2 pt-2 border-t border-neutral-100 flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
+        <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
+            <span className="text-sm md:text-base font-mono font-black text-[var(--color-text)]">
               ₹{Number(product.price).toLocaleString('en-IN')}
             </span>
             {(() => {
@@ -234,13 +232,13 @@ function BestSellers() {
                     ? Math.round(priceNum / (1 - product.discount_percent / 100))
                     : null);
               return compareDisplay ? (
-                <span className="text-[9px] font-mono text-neutral-400 line-through">
+                <span className="text-[9px] font-mono text-[var(--color-muted)] line-through">
                   ₹{compareDisplay.toLocaleString('en-IN')}
                 </span>
               ) : null;
             })()}
           </div>
-          <span className="text-[8px] text-neutral-450 font-sans tracking-wide uppercase font-bold">
+          <span className="text-[8px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
             incl. taxes
           </span>
         </div>

@@ -27,13 +27,12 @@ export const cartSlice = createSlice({
         removeCartItemState: (state, action) => {
             return state.filter(item => item.$id !== action.payload);
         },
-        // Safely update specific properties like quantity or subtotal
+        // Safely update specific properties like quantity, size or subtotal
         updateCartItemState: (state, action) => {
-            const { $id, quantity, subtotal } = action.payload;
+            const { $id, ...updates } = action.payload;
             const item = state.find(i => i.$id === $id);
             if (item) {
-                item.quantity = quantity;
-                item.subtotal = subtotal;
+                Object.assign(item, updates);
             }
         },
         // Clear all cart items inside Redux

@@ -3,13 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText } from 'react-icons/fi';
 import ordersService from '../../appwrite/orders';
-import productsService from '../../appwrite/products';
 import reviewsService from '../../appwrite/reviews';
-import Navbar from '../pageComponets/Navbar';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
 import storageService, { compressImage } from '../../appwrite/storage';
+import { sendWebhookNotification } from '../../utils/webhookHelper';
 
 function OrderDetail() {
   const { id } = useParams();
@@ -169,6 +168,8 @@ function OrderDetail() {
   };
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+
     if (!isAuthenticated) {
       navigate('/login');
       return;
@@ -205,9 +206,9 @@ function OrderDetail() {
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center gap-4">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4">
         <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
-        <div className="text-[10px] tracking-[0.5em] text-neutral-900 font-black uppercase">
+        <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-black uppercase">
           LOADING ORDER DETAILS...
         </div>
       </div>
@@ -366,6 +367,16 @@ function OrderDetail() {
       
       if (response) {
         showToast(`${requestItem.type === 'RETURN' ? 'Return' : 'Exchange'} request submitted successfully!`, 'success');
+        
+        // Dispatch return.requested webhook notification
+        sendWebhookNotification('return.requested', {
+          orderId: order.$id || order.id,
+          orderNumber: metadata.order_number,
+          type: requestItem.type,
+          reason: finalReason,
+          email: user?.email || order.email || ''
+        });
+
         setIsRequestModalOpen(false);
         const orderData = await ordersService.getOrderById(id);
         if (orderData) {
@@ -404,7 +415,6 @@ function OrderDetail() {
     const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
     const subtotal = Number(metadata.subtotal || order.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0));
     const discountVal = Number(order.discountAmount || order.discount_amount || metadata.discount || 0);
-    const taxAmount = Math.round(Number(metadata.tax_amount || order.tax_amount || (Number(order.total) * 0.18 / 1.18)));
 
     const discountRow = (order.couponApplied && order.couponApplied !== 'NONE' && discountVal > 0) ? `
       <div class="total-row" style="color: #059669; font-weight: bold;">
@@ -473,7 +483,7 @@ function OrderDetail() {
               <div style="text-align: right;">
                 <h3>Invoice Details</h3>
                 <p>Date: ${new Date(orderDate).toLocaleDateString('en-IN')}</p>
-                <p>Payment Mode: ${order.paymentMethod === 'COD' ? 'CASH ON DELIVERY (COD)' : 'RAZORPAY ONLINE'}</p>
+                <p>Payment Mode: ${order.paymentMethod === 'COD' ? 'CASH ON DELIVERY (COD)' : order.paymentMethod === 'WALLET' ? 'STORE WALLET' : 'RAZORPAY ONLINE'}</p>
                 ${order.paymentMethod !== 'COD' ? `<p>Transaction ID: ${metadata.razorpay_payment_id || order.razorpayPaymentId || 'N/A'}</p>` : ''}
                 <p>Order Status: ${(order.status || 'PENDING').toUpperCase()}</p>
               </div>
@@ -550,49 +560,15 @@ function OrderDetail() {
 
     try {
       setIsCancelModalOpen(false);
-      // 1. Update order status to CANCELLED in Appwrite with metadata reason
-      const updatedOrder = await ordersService.updateOrderStatus(order.$id || order.id, 'CANCELLED', { cancel_reason: finalReason });
+      // 1. Update order status to CANCELLATION_REQUESTED in Appwrite with metadata reason
+      const updatedOrder = await ordersService.updateOrderStatus(order.$id || order.id, 'CANCELLATION_REQUESTED', { cancel_reason: finalReason });
       if (updatedOrder) {
         setOrder(updatedOrder);
-        showToast("Order cancelled successfully.", "success");
-        
-        // 2. Restore Stock in the Background
-        let items = [];
-        try {
-          items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
-        } catch (err) {
-          console.warn("Could not parse items for stock restoration:", err.message);
-        }
-        
-        for (const item of items) {
-          if (item.product_id) {
-            try {
-              const liveProduct = await productsService.getProductById(item.product_id);
-              if (liveProduct) {
-                let stocks = {};
-                try {
-                  stocks = JSON.parse(liveProduct.sizes_stock || '{}');
-                } catch {
-                  stocks = {};
-                }
-                const baseSize = item.size ? String(item.size).split('/')[0].trim() : 'M';
-                const currentStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
-                stocks[baseSize] = currentStock + Number(item.quantity);
-                
-                await productsService.updateProduct(item.product_id, {
-                  sizes_stock: JSON.stringify(stocks)
-                });
-                console.log(`Stock restored for product ${item.name} (${baseSize}): +${item.quantity}`);
-              }
-            } catch (stockErr) {
-              console.warn("Could not restore stock for item:", item.name, stockErr.message);
-            }
-          }
-        }
+        showToast("Cancellation request submitted successfully. Awaiting admin approval.", "success");
       }
     } catch (err) {
-      console.error("Order cancellation failed:", err);
-      showToast("Failed to cancel order. Please try again.", "error");
+      console.error("Order cancellation request failed:", err);
+      showToast("Failed to request order cancellation. Please try again.", "error");
     }
   };
 
@@ -628,31 +604,30 @@ function OrderDetail() {
 
   return (
     <>
-      <Navbar />
 
-      <div className="w-full min-h-screen bg-[#fafafb] text-neutral-900 font-sans relative selection:bg-neutral-900 selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
-        <div className="absolute inset-0 bg-white/96 backdrop-blur-xs z-10" />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
+        <div className="absolute inset-0 bg-[var(--color-surface)]/96 backdrop-blur-xs z-10" />
 
         <div className="max-w-4xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-8">
           
           {/* Header Action */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200/40">
-            <Link to="/profile" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-neutral-400 hover:text-neutral-950 transition-colors uppercase group">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]/40">
+            <Link to="/profile" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-[var(--color-muted)] hover:text-neutral-950 transition-colors uppercase group">
               <FiArrowLeft className="text-sm group-hover:-translate-x-1 transition-transform" />
               Back to Profile
             </Link>
-            <div className="text-[9px] tracking-[0.3em] font-mono text-neutral-400 uppercase">
+            <div className="text-[9px] tracking-[0.3em] font-mono text-[var(--color-muted)] uppercase">
               ORDER INFORMATION
             </div>
           </div>
 
           {/* Core Invoice Summary Card */}
-          <div className="bg-white p-8 rounded-2xl border border-neutral-200/60 shadow-2xl space-y-6">
+          <div className="bg-[var(--color-surface)] p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-6">
             
             {/* ID & Date */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--color-border)]">
               <div className="space-y-1">
-                <span className="text-[8px] font-mono text-neutral-400 block uppercase">ORDER ID</span>
+                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase">ORDER ID</span>
                 <div className="flex flex-wrap items-center gap-3">
                   <h1 className="text-xl md:text-2xl font-black tracking-wide text-neutral-950 uppercase">
                     {metadata.order_number}
@@ -665,7 +640,7 @@ function OrderDetail() {
                       Cancel Order
                     </button>
                   )}
-                  {order.status !== 'CANCELLED' && (
+                  {order.status === 'DELIVERED' && (
                     <button
                       onClick={handlePrintInvoice}
                       className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
@@ -674,11 +649,11 @@ function OrderDetail() {
                     </button>
                   )}
                 </div>
-                <span className="text-[9px] font-mono text-neutral-400 block uppercase">Database ID: {order.$id || order.id}</span>
+                <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">Database ID: {order.$id || order.id}</span>
               </div>
               <div className="text-left md:text-right">
-                <span className="text-[8px] font-mono text-neutral-400 block uppercase">TRANSACTION TIMESTAMP</span>
-                <span className="text-xs font-mono font-bold text-neutral-600 block mt-0.5 uppercase">
+                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase">TRANSACTION TIMESTAMP</span>
+                <span className="text-xs font-mono font-bold text-[var(--color-muted)] block mt-0.5 uppercase">
                   {orderDate}
                 </span>
               </div>
@@ -692,7 +667,9 @@ function OrderDetail() {
                     <span>🚫 ORDER CANCELLED</span>
                   </h3>
                   <p className="text-[11px] text-rose-600 font-medium leading-relaxed uppercase">
-                    This order was cancelled successfully. Any online payment will be refunded to your account within 5-7 business days.
+                    {order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                      ? "This order was cancelled successfully. Your payment has been refunded to your Store Wallet."
+                      : "This order was cancelled successfully."}
                   </p>
                 </div>
                 {metadata.cancel_reason && (
@@ -704,9 +681,28 @@ function OrderDetail() {
                   </div>
                 )}
               </div>
+            ) : order.status === 'CANCELLATION_REQUESTED' ? (
+              <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 space-y-3">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-black tracking-widest text-amber-700 uppercase flex items-center gap-2">
+                    <span>⏳ CANCELLATION AWAITING APPROVAL</span>
+                  </h3>
+                  <p className="text-[11px] text-amber-600 font-medium leading-relaxed uppercase">
+                    Your request to cancel this order is pending admin approval. Once approved, any online or wallet payment will be refunded to your Store Wallet.
+                  </p>
+                </div>
+                {metadata.cancel_reason && (
+                  <div className="border-t border-amber-200/50 pt-2.5">
+                    <span className="text-[8px] font-mono text-amber-500 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
+                    <span className="text-xs font-mono font-bold text-amber-800 block mt-0.5 uppercase">
+                      &ldquo;{metadata.cancel_reason}&rdquo;
+                    </span>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="bg-neutral-50 p-8 rounded-2xl border border-neutral-200 space-y-6">
-                <h3 className="text-[10px] font-black tracking-[0.25em] text-neutral-400 uppercase">
+              <div className="bg-[var(--color-surface)] p-8 rounded-2xl border border-[var(--color-border)] space-y-6">
+                <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
                   🚚 SHIPMENT STATUS
                 </h3>
                 
@@ -714,7 +710,7 @@ function OrderDetail() {
                   {/* Vertical Line */}
                   <div className="absolute left-[35px] top-4 bottom-4 w-1 bg-neutral-200 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-[var(--theme-primary)] transition-all duration-1000 ease-out" 
+                      className="h-full bg-[var(--color-accent)] transition-all duration-1000 ease-out" 
                       style={{ height: `${(currentStepIdx / (statusSteps.length - 1)) * 100}%` }}
                     />
                   </div>
@@ -728,10 +724,10 @@ function OrderDetail() {
                         {/* Checkpoint Dot */}
                         <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
                           isCurrent 
-                          ? `bg-[var(--theme-primary)] border-[var(--theme-primary)] text-white shadow-lg scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
+                          ? `bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-lg scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
                           : isActive 
                           ? 'bg-neutral-900 border-neutral-900 text-white' 
-                          : 'bg-white border-neutral-200 text-neutral-400'
+                          : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-muted)]'
                         }`}>
                           {step.icon === 'check' ? (
                             <FiCheckCircle className="text-sm" />
@@ -744,10 +740,10 @@ function OrderDetail() {
 
                         {/* Content block */}
                         <div className="space-y-1 pt-1">
-                          <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-neutral-950 font-black' : 'text-neutral-400'}`}>
+                          <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-neutral-950 font-black' : 'text-[var(--color-muted)]'}`}>
                             {step.label}
                           </h4>
-                          <p className="text-[10px] text-neutral-500 max-w-lg leading-relaxed">
+                          <p className="text-[10px] text-[var(--color-muted)] max-w-lg leading-relaxed">
                             {step.desc}
                           </p>
                         </div>
@@ -768,7 +764,7 @@ function OrderDetail() {
                   </h3>
                 </div>
                 <div className="text-xs font-mono uppercase text-indigo-800 space-y-1">
-                  <div>Tracking Number: <strong className="font-black select-all text-neutral-900">{order.tracking_number || metadata.tracking_number}</strong></div>
+                  <div>Tracking Number: <strong className="font-black select-all text-[var(--color-text)]">{order.tracking_number || metadata.tracking_number}</strong></div>
                   <div>Carrier Channel: <span className="font-black">Delhivery/DTDC Express</span></div>
                   {(order.tracking_url || metadata.tracking_url) && (
                     <div className="pt-2">
@@ -788,11 +784,11 @@ function OrderDetail() {
 
             {/* Itemized Garments Specification List */}
             <div className="space-y-4">
-              <h3 className="text-[9px] font-black tracking-[0.25em] text-neutral-400 uppercase">
+              <h3 className="text-[9px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
                 Claimed Garments specification
               </h3>
 
-              <div className="divide-y divide-neutral-100 border border-neutral-100 rounded-2xl overflow-hidden bg-neutral-50/20 p-4 space-y-4">
+              <div className="divide-y divide-neutral-100 border border-[var(--color-border)] rounded-2xl overflow-hidden bg-[var(--color-surface)]/20 p-4 space-y-4">
                 {parsedItems.map((item, idx) => {
                   const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
                   const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
@@ -804,10 +800,10 @@ function OrderDetail() {
                           <img 
                             src={img} 
                             alt={item.name} 
-                            className="w-12 h-16 object-cover border border-neutral-200 shrink-0 bg-neutral-50"
+                            className="w-12 h-16 object-cover border border-[var(--color-border)] shrink-0 bg-[var(--color-surface)]"
                           />
                         ) : (
-                          <div className="w-12 h-16 bg-neutral-100 border border-neutral-200 shrink-0 flex items-center justify-center text-[8px] font-bold text-neutral-400">
+                          <div className="w-12 h-16 bg-neutral-100 border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)]">
                             NO IMG
                           </div>
                         )}
@@ -815,7 +811,7 @@ function OrderDetail() {
                           <h4 className="font-black text-neutral-950 uppercase tracking-wide">
                             {item.name}
                           </h4>
-                          <p className="text-[9px] font-mono text-neutral-500 uppercase">
+                          <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
                             Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
                           </p>
                            {order.status === 'DELIVERED' && (() => {
@@ -907,7 +903,7 @@ function OrderDetail() {
                                       {existingRequest.exchangeTargetSize && ` to Size ${existingRequest.exchangeTargetSize}`}
                                     </span>
                                     {existingRequest.adminComment && (
-                                      <p className="text-[9px] font-sans text-neutral-500 mt-1 font-semibold normal-case">
+                                      <p className="text-[9px] font-sans text-[var(--color-muted)] mt-1 font-semibold normal-case">
                                         Admin note: {existingRequest.adminComment}
                                       </p>
                                     )}
@@ -917,15 +913,15 @@ function OrderDetail() {
                                 {!existingRequest && !eligible && (
                                   <div className="pt-1">
                                     {itemPolicy === "No Return" ? (
-                                      <span className="text-[9px] font-mono font-semibold text-neutral-450 uppercase">🔒 Non-Returnable Item</span>
+                                      <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">🔒 Non-Returnable Item</span>
                                     ) : (
-                                      <span className="text-[9px] font-mono font-semibold text-neutral-400 uppercase">Return window expired</span>
+                                      <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">Return window expired</span>
                                     )}
                                   </div>
                                 )}
 
                                 {!existingRequest && eligible && itemPolicy !== "No Return" && (
-                                  <p className="text-[8px] font-mono text-neutral-400 uppercase">
+                                  <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">
                                     Window active (ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'})
                                   </p>
                                 )}
@@ -944,7 +940,7 @@ function OrderDetail() {
             </div>
 
             {/* Calculations & Total Invoice */}
-            <div className="space-y-3.5 text-xs font-mono font-medium uppercase text-neutral-600 pt-4 border-t border-neutral-100">
+            <div className="space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] pt-4 border-t border-[var(--color-border)]">
               <div className="flex justify-between">
                 <span>Gross catalog Value ({totalItemsCount} items)</span>
                 <span className="text-neutral-950 font-bold">
@@ -1015,16 +1011,16 @@ function OrderDetail() {
               {order.razorpayPaymentId && (
                 <div className="flex justify-between">
                   <span>TRANSACTION ID</span>
-                  <span className="text-neutral-600 font-mono text-[10px]">
+                  <span className="text-[var(--color-muted)] font-mono text-[10px]">
                     {order.razorpayPaymentId}
                   </span>
                 </div>
               )}
-              <hr className="border-neutral-100" />
+              <hr className="border-[var(--color-border)]" />
               <div className="flex justify-between items-baseline pt-2">
                 <div className="flex flex-col">
                   <span className="text-sm font-black text-neutral-950 uppercase tracking-wide">Net deposited amount</span>
-                  <span className="text-[9px] text-neutral-400 font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
+                  <span className="text-[9px] text-[var(--color-muted)] font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
                     (incl. of all taxes)
                   </span>
                 </div>
@@ -1035,15 +1031,15 @@ function OrderDetail() {
             </div>
 
             {/* Shipping Logistics Coordinates */}
-            <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide">
+            <div className="bg-[var(--color-surface)] p-6 rounded-2xl border border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide">
               <div>
-                <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">CUSTOMER DETAILS</span>
+                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CUSTOMER DETAILS</span>
                 <span className="text-neutral-950 font-bold block mt-1">{order.customerName}</span>
-                <span className="text-neutral-500 font-mono text-[10px] block mt-0.5">{order.phone}</span>
-                <span className="text-neutral-500 font-mono text-[10px] block lowercase mt-0.5">{order.email}</span>
+                <span className="text-[var(--color-muted)] font-mono text-[10px] block mt-0.5">{order.phone}</span>
+                <span className="text-[var(--color-muted)] font-mono text-[10px] block lowercase mt-0.5">{order.email}</span>
               </div>
               <div>
-                <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">SHIPPING ADDRESS</span>
+                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">SHIPPING ADDRESS</span>
                 <span className="text-neutral-950 font-bold block mt-1 leading-relaxed">
                   {addressText}
                 </span>
@@ -1051,13 +1047,14 @@ function OrderDetail() {
             </div>
 
             {/* Security Shield */}
-            <div className="flex items-center gap-3 text-[8px] font-mono text-neutral-500 border border-neutral-100 bg-neutral-50/50 p-4 rounded-xl leading-normal uppercase">
-              <FiShield className="text-base text-neutral-800 shrink-0" />
+            <div className="flex items-center gap-3 text-[8px] font-mono text-[var(--color-muted)] border border-[var(--color-border)] bg-[var(--color-surface)]/50 p-4 rounded-xl leading-normal uppercase">
+              <FiShield className="text-base text-[var(--color-text)] shrink-0" />
               <div>
-                <span className="font-bold text-neutral-800 block mb-0.5">🔒 SECURE TRANSACTION DETAILS</span>
+                <span className="font-bold text-[var(--color-text)] block mb-0.5">🔒 SECURE TRANSACTION DETAILS</span>
                 Order details verified and safely stored in our database.
               </div>
             </div>
+
 
           </div>
         </div>
@@ -1073,13 +1070,13 @@ function OrderDetail() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-50 w-full max-w-md bg-white p-8 border border-neutral-950 shadow-2xl space-y-6 text-neutral-900 animate-scale-up">
+          <div className="relative z-50 w-full max-w-md bg-[var(--color-surface)] p-5 sm:p-8 border border-neutral-950 shadow-2xl space-y-5 sm:space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto scrollbar-none">
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">CANCEL ORDER</span>
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CANCEL ORDER</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
                 Cancel Order
               </h2>
-              <p className="text-[9px] text-neutral-400 uppercase tracking-wider mt-0.5 leading-relaxed">
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
                 Please select a reason for cancelling order {metadata.order_number || order.$id}. The stock will be returned to the store.
               </p>
             </div>
@@ -1097,8 +1094,8 @@ function OrderDetail() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3.5 border cursor-pointer transition-all ${
                     cancellationReasonOption === opt
-                    ? 'border-neutral-950 bg-neutral-50/50'
-                    : 'border-neutral-200/60 hover:border-neutral-400'
+                    ? 'border-neutral-950 bg-[var(--color-surface)]/50'
+                    : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
                   <input 
@@ -1108,7 +1105,7 @@ function OrderDetail() {
                     onChange={() => setCancellationReasonOption(opt)}
                     className="mt-0.5 accent-neutral-950"
                   />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-800 leading-normal select-none">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text)] leading-normal select-none">
                     {opt}
                   </span>
                 </label>
@@ -1117,7 +1114,7 @@ function OrderDetail() {
 
             {/* Custom Explanation Textarea */}
             <div className="space-y-2">
-              <label className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 ADDITIONAL SPEC DETAIL / CUSTOM REASON
               </label>
               <textarea
@@ -1125,16 +1122,16 @@ function OrderDetail() {
                 onChange={(e) => setCustomCancellationText(e.target.value)}
                 placeholder="ENTER CUSTOM SPEC REASON DETAILS..."
                 rows={3}
-                className="w-full bg-[#fafafb] border border-neutral-200 hover:border-neutral-450 focus:border-neutral-950 text-xs font-semibold p-3 outline-hidden placeholder-neutral-400 font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setIsCancelModalOpen(false)}
-                className="w-full py-3 border border-neutral-200 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-surface)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
               >
                 Cancel
               </button>
@@ -1153,26 +1150,26 @@ function OrderDetail() {
       {/* Review Modal Overlay */}
       {reviewModalItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-6 animate-scale-up text-neutral-900">
+          <div className="bg-[var(--color-surface)] w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-6 animate-scale-up text-[var(--color-text)] max-h-[90vh] overflow-y-auto scrollbar-none">
             
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setReviewModalItem(null)}
-              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
             >
               ✕
             </button>
 
             {/* Header */}
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">PRODUCT FIT FEEDBACK</span>
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">PRODUCT FIT FEEDBACK</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
                 Review {reviewModalItem.name}
               </h2>
             </div>
 
-            <hr className="border-neutral-100" />
+            <hr className="border-[var(--color-border)]" />
 
             {modalSuccessMsg ? (
               <div className="py-8 text-center space-y-3 font-mono">
@@ -1184,10 +1181,10 @@ function OrderDetail() {
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleModalReviewSubmit} className="space-y-4 font-sans text-neutral-900">
+              <form onSubmit={handleModalReviewSubmit} className="space-y-4 font-sans text-[var(--color-text)]">
                 {/* Star Rating Selector */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Your Rating</span>
+                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Your Rating</span>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -1204,7 +1201,7 @@ function OrderDetail() {
 
                 {/* Size Fit Preference Selector */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Size Fit Preference</span>
+                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Size Fit Preference</span>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { key: 'tight', label: 'TIGHT' },
@@ -1218,7 +1215,7 @@ function OrderDetail() {
                         className={`py-2 rounded-none font-bold text-[10px] tracking-wider transition-all cursor-pointer border uppercase font-mono ${
                           modalFit === item.key
                             ? 'bg-neutral-950 text-white border-neutral-950'
-                            : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                            : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                         }`}
                       >
                         {item.label}
@@ -1231,7 +1228,7 @@ function OrderDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* Comfort */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Comfort</span>
+                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Comfort</span>
                     <div className="flex gap-1.5">
                       {[1, 2, 3, 4, 5].map((val) => (
                         <button
@@ -1241,7 +1238,7 @@ function OrderDetail() {
                           className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
                             modalComfort === val
                               ? 'bg-neutral-950 text-white border-neutral-950'
-                              : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                           }`}
                         >
                           {val}
@@ -1252,7 +1249,7 @@ function OrderDetail() {
 
                   {/* Quality */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Quality</span>
+                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Quality</span>
                     <div className="flex gap-1.5">
                       {[1, 2, 3, 4, 5].map((val) => (
                         <button
@@ -1262,7 +1259,7 @@ function OrderDetail() {
                           className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
                             modalQuality === val
                               ? 'bg-neutral-950 text-white border-neutral-950'
-                              : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                           }`}
                         >
                           {val}
@@ -1273,7 +1270,7 @@ function OrderDetail() {
 
                   {/* Breathable */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Breathable</span>
+                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Breathable</span>
                     <div className="flex gap-1.5">
                       {[1, 2, 3, 4, 5].map((val) => (
                         <button
@@ -1283,7 +1280,7 @@ function OrderDetail() {
                           className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
                             modalBreathable === val
                               ? 'bg-neutral-950 text-white border-neutral-950'
-                              : 'bg-[#fbfbfb] text-neutral-500 border-neutral-200 hover:border-neutral-950 hover:text-neutral-950'
+                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
                           }`}
                         >
                           {val}
@@ -1295,27 +1292,27 @@ function OrderDetail() {
 
                 {/* Review comment */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Your Review</span>
+                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Your Review</span>
                   <textarea
                     rows="3"
                     required
                     value={modalComment}
                     onChange={(e) => setModalComment(e.target.value)}
                     placeholder="Write your product experience here..."
-                    className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden resize-none transition-colors"
+                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors"
                   />
                 </div>
 
                 {/* Review Image URLs */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">Customer Image URLs (comma-separated, optional)</span>
+                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Customer Image URLs (comma-separated, optional)</span>
                   <div className="flex gap-2 items-center">
                     <input
                       type="text"
                       value={modalImages}
                       onChange={(e) => setModalImages(e.target.value)}
                       placeholder="https://example.com/pic1.jpg, https://example.com/pic2.jpg"
-                      className="flex-1 bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-950 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden transition-colors"
+                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden transition-colors"
                     />
                     <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
                       {uploadingImage ? 'Uploading...' : 'Upload File'}
@@ -1328,7 +1325,7 @@ function OrderDetail() {
                       />
                     </label>
                   </div>
-                  <span className="text-[8px] font-mono text-neutral-450 uppercase tracking-wide">
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wide">
                     TIP: PASTE DIRECT HTTPS LINKS OR CHOOSE A LOCAL IMAGE TO UPLOAD TEMPORARILY.
                   </span>
                 </div>
@@ -1345,7 +1342,7 @@ function OrderDetail() {
                   <button
                     type="button"
                     onClick={() => setReviewModalItem(null)}
-                    className="px-4 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer py-2.5"
+                    className="px-4 border border-neutral-250 hover:bg-[var(--color-surface)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer py-2.5"
                   >
                     Cancel
                   </button>
@@ -1360,45 +1357,45 @@ function OrderDetail() {
       {/* Return / Exchange Request Modal */}
       {isRequestModalOpen && requestItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-4 animate-scale-up text-neutral-900 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--color-surface)] w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-4 animate-scale-up text-[var(--color-text)] max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setIsRequestModalOpen(false)}
-              className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
             >
               ✕
             </button>
 
             {/* Header */}
             <div>
-              <span className="text-[8px] font-mono text-neutral-400 block uppercase tracking-widest">
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
                 {requestItem.type} REQUEST PANEL
               </span>
               <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
                 {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'} {requestItem.name}
               </h2>
-              <span className="text-xs font-mono text-neutral-500 uppercase block mt-0.5">
+              <span className="text-xs font-mono text-[var(--color-muted)] uppercase block mt-0.5">
                 Current Size: {requestItem.size} · Price: ₹{requestItem.price}
               </span>
             </div>
 
-            <hr className="border-neutral-100" />
+            <hr className="border-[var(--color-border)]" />
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 submitReturnExchangeRequest();
               }}
-              className="space-y-4 font-sans text-neutral-900"
+              className="space-y-4 font-sans text-[var(--color-text)]"
             >
               {/* Reason Selector */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Reason for {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'}</span>
+                <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Reason for {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'}</span>
                 <select
                   value={requestReason}
                   onChange={(e) => setRequestReason(e.target.value)}
-                  className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-955 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden font-medium"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden font-medium"
                 >
                   <option value="Wrong size received">Wrong size received</option>
                   <option value="Defective / Damaged product">Defective / Damaged product</option>
@@ -1411,12 +1408,12 @@ function OrderDetail() {
               {/* Target Size (For Exchange Only) */}
               {requestItem.type === 'EXCHANGE' && (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Select Desired Size</span>
+                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Select Desired Size</span>
                   <select
                     value={exchangeTargetSize}
                     onChange={(e) => setExchangeTargetSize(e.target.value)}
                     required
-                    className="w-full bg-[#fbfbfb] border border-neutral-950/20 focus:border-neutral-955 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden font-medium"
+                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden font-medium"
                   >
                     <option value="">-- Choose New Size --</option>
                     {requestItem.sizes && requestItem.sizes
@@ -1426,7 +1423,7 @@ function OrderDetail() {
                       ))
                     }
                   </select>
-                  <span className="text-[8px] font-mono text-neutral-450 uppercase">
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase">
                     Exchange is subject to catalog inventory availability during approval.
                   </span>
                 </div>
@@ -1434,32 +1431,32 @@ function OrderDetail() {
 
               {/* Detailed Notes */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-mono font-bold text-neutral-500 uppercase">Additional Comments (Optional)</span>
+                <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Additional Comments (Optional)</span>
                 <textarea
                   value={customRequestText}
                   onChange={(e) => setCustomRequestText(e.target.value)}
                   placeholder="Explain any details here..."
                   rows={3}
-                  className="w-full bg-[#fbfbfb] border border-neutral-955/20 focus:border-neutral-955 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden resize-none transition-colors"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors"
                 />
               </div>
 
               {/* Product Photos Upload Verification (Required) */}
               <div className="space-y-4">
-                <span className="text-xs font-mono font-bold text-neutral-500 uppercase block">
+                <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase block">
                   Upload Product Photos <span className="text-rose-500 font-sans font-bold">*</span> (Required)
                 </span>
                 
                 {/* Front Image Upload */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-neutral-450 uppercase">Front View Photo</span>
+                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Front View Photo</span>
                   <div className="flex gap-2 items-center">
                     <input
                       type="text"
                       value={requestFrontImage}
                       readOnly
                       placeholder={uploadingFront ? "Uploading front view..." : "No front photo selected"}
-                      className="flex-1 bg-[#fbfbfb] border border-neutral-955/20 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden truncate"
+                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden truncate"
                     />
                     <label className="shrink-0 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
                       {uploadingFront ? 'Uploading...' : 'Choose Photo'}
@@ -1477,7 +1474,7 @@ function OrderDetail() {
                       <img 
                         src={requestFrontImage} 
                         alt="Front verification proof" 
-                        className="w-full h-full object-cover border border-neutral-200" 
+                        className="w-full h-full object-cover border border-[var(--color-border)]" 
                       />
                       <button
                         type="button"
@@ -1493,14 +1490,14 @@ function OrderDetail() {
 
                 {/* Back Image Upload */}
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-neutral-450 uppercase">Back View Photo</span>
+                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Back View Photo</span>
                   <div className="flex gap-2 items-center">
                     <input
                       type="text"
                       value={requestBackImage}
                       readOnly
                       placeholder={uploadingBack ? "Uploading back view..." : "No back photo selected"}
-                      className="flex-1 bg-[#fbfbfb] border border-neutral-955/20 rounded-none px-3 py-2 text-xs text-neutral-850 outline-hidden truncate"
+                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden truncate"
                     />
                     <label className="shrink-0 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
                       {uploadingBack ? 'Uploading...' : 'Choose Photo'}
@@ -1518,7 +1515,7 @@ function OrderDetail() {
                       <img 
                         src={requestBackImage} 
                         alt="Back verification proof" 
-                        className="w-full h-full object-cover border border-neutral-200" 
+                        className="w-full h-full object-cover border border-[var(--color-border)]" 
                       />
                       <button
                         type="button"
@@ -1549,7 +1546,7 @@ function OrderDetail() {
                 <button
                   type="button"
                   onClick={() => setIsRequestModalOpen(false)}
-                  className="px-4 border border-neutral-250 hover:bg-neutral-50 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-600 rounded-none cursor-pointer py-2.5"
+                  className="px-4 border border-neutral-250 hover:bg-[var(--color-surface)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer py-2.5"
                 >
                   Cancel
                 </button>
