@@ -1512,7 +1512,26 @@ function OrderDetail() {
               <div 
                 id="invoice-print-area" 
                 className="bg-white p-8 md:p-12 border border-neutral-200 shadow-sm w-[680px] shrink-0 text-[11px] font-sans leading-normal text-black"
-                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+                style={{ 
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  color: "#000000",
+                  backgroundColor: "#ffffff",
+                  // Override Tailwind v4 oklch colors with standard hex for html2canvas compatibility
+                  "--color-neutral-50": "#f9f9f9",
+                  "--color-neutral-100": "#f5f5f5",
+                  "--color-neutral-200": "#e5e5e5",
+                  "--color-neutral-300": "#d4d4d4",
+                  "--color-neutral-400": "#a3a3a3",
+                  "--color-neutral-500": "#737373",
+                  "--color-neutral-600": "#525252",
+                  "--color-neutral-700": "#404040",
+                  "--color-neutral-800": "#262626",
+                  "--color-neutral-900": "#171717",
+                  "--color-neutral-950": "#141414",
+                  "--color-emerald-50": "#ecfdf5",
+                  "--color-emerald-600": "#059669",
+                  "--color-rose-600": "#dc2626"
+                }}
               >
                 {/* Header */}
                 <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
