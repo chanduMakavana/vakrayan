@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +10,8 @@ import { clearCartState, addCartItemState, updateCartItemState, removeCartItemSt
 import { setWishlistItems, addWishlistItemState, removeWishlistItemState, clearWishlistState } from '../../features/wishlistSlice';
 import wishlistService from '../../appwrite/wishlist';
 import { useToast } from '../../context/ToastContext';
+import { filterProductsForMode } from '../../features/productsSlice';
+import { calculateOffersDiscount } from '../../utils/discountCalculator';
 
 // Icons (inline SVGs — no extra dependency)
 const SearchIcon = () => (
@@ -90,10 +92,13 @@ const DrawerWrapper = ({ open, onClose, children }) => (
           key="drawer"
           variants={drawerVariants}
           initial="hidden" animate="visible" exit="exit"
-          className="absolute top-0 right-0 h-full w-full sm:w-[420px] bg-[rgba(250,247,242,0.78)] backdrop-blur-2xl flex flex-col"
+          className="absolute top-0 right-0 h-full w-full sm:w-[420px] flex flex-col"
           style={{ 
-            boxShadow: '-10px 0 30px -5px rgba(40, 32, 28, 0.08)',
-            borderLeft: '1px solid rgba(40, 32, 28, 0.08)'
+            background: 'var(--glass-bg-heavy)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+            boxShadow: 'var(--shadow-xl)',
+            borderLeft: '1px solid var(--glass-border-green)'
           }}
         >
           {children}
@@ -137,6 +142,7 @@ function Navbar() {
   const [removingIds,       setRemovingIds]       = useState(new Set());
   const [collectionsOpen,   setCollectionsOpen]   = useState(false);
   const [recentlyViewed,    setRecentlyViewed]    = useState([]);
+
 
   // Selection Checkboxes State (store deselected items to automatically select new items)
   const [deselectedItemIds, setDeselectedItemIds] = useState(() => {
@@ -228,30 +234,58 @@ function Navbar() {
     return () => window.removeEventListener('cart-item-added', trigger);
   }, []);
 
-  // Debounced search navigate
-  useEffect(() => {
-    if (!searchOpen || !searchVal.trim()) return;
-    const t = setTimeout(() => {
-      navigate(`/shop?search=${encodeURIComponent(searchVal.trim())}`);
-    }, 380);
-    return () => clearTimeout(t);
-  }, [searchVal, searchOpen, navigate]);
 
   // Admin check
   const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
   const isAdmin    = isAuthenticated && user && adminEmail && user.email === adminEmail;
 
-  // Search suggestions
-  const suggestions = searchVal.trim().length >= 2
-    ? products.filter(p => {
-        const q = searchVal.toLowerCase();
-        return (p.name?.toLowerCase().includes(q)) || (p.category?.toLowerCase().includes(q));
-      }).slice(0, 6)
-    : [];
+  // Search suggestions (keywords and products matching searchVal)
+  const searchSuggestions = useMemo(() => {
+    if (searchVal.trim().length < 2) return { keywords: [], products: [] };
+    const q = searchVal.toLowerCase().trim();
+
+    // 1. Filter products matching by name, category, tags, tag, or fit
+    const matchedProducts = products.filter(p => {
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const categoryMatch = p.category?.toLowerCase().includes(q);
+      const tagsMatch = Array.isArray(p.tags) && p.tags.some(t => t?.toLowerCase().includes(q));
+      const singleTagMatch = p.tag?.toLowerCase().includes(q);
+      const fitMatch = p.fit_type?.toLowerCase().includes(q);
+      return nameMatch || categoryMatch || tagsMatch || singleTagMatch || fitMatch;
+    });
+
+    // 2. Extract unique matching keywords/tags/categories
+    const keywordsSet = new Set();
+    products.forEach(p => {
+      if (p.category && p.category.toLowerCase().includes(q)) {
+        keywordsSet.add(p.category.replace(/-/g, ' '));
+      }
+      if (Array.isArray(p.tags)) {
+        p.tags.forEach(t => {
+          if (t && t.toLowerCase().includes(q)) {
+            keywordsSet.add(t);
+          }
+        });
+      }
+      if (p.tag && p.tag.toLowerCase().includes(q)) {
+        keywordsSet.add(p.tag);
+      }
+      if (p.fit_type && p.fit_type.toLowerCase().includes(q)) {
+        keywordsSet.add(p.fit_type);
+      }
+    });
+
+    return {
+      keywords: Array.from(keywordsSet).slice(0, 4),
+      products: matchedProducts.slice(0, 6)
+    };
+  }, [searchVal, products]);
 
   const navLink = ({ isActive }) =>
-    `link-underline text-[11px] font-semibold tracking-[0.12em] uppercase transition-base ${
-      isActive ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+    `relative text-[12px] font-semibold tracking-[0.06em] transition-base cursor-pointer px-1 py-0.5 ${
+      isActive 
+        ? 'text-[var(--color-accent)]' 
+        : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
     }`;
 
   /* ── Handlers ───────────────────────────────────────────── */
@@ -260,6 +294,7 @@ function Navbar() {
     }
     finally {
       dispatch(logoutAction());
+      dispatch(filterProductsForMode(false));
       dispatch(clearCartState());
       localStorage.removeItem('wishlist');
       dispatch(clearWishlistState());
@@ -267,6 +302,12 @@ function Navbar() {
       setIsOpen(false);
       navigate('/login');
     }
+  };
+
+  const handleToggleAdminMode = () => {
+    const nextAdminMode = !adminMode;
+    dispatch(toggleAdminMode());
+    dispatch(filterProductsForMode(nextAdminMode));
   };
 
   const handleToggleWishlist = async (product) => {
@@ -486,14 +527,31 @@ function Navbar() {
     }
   };
 
+  const allProducts = useSelector(state => state.products.allItems);
+  const offers = useSelector(state => state.products.offers);
+
   const selectedCartItems = cartItems.filter(item => selectedItemIds.includes(item.$id));
-  const cartTotal = selectedCartItems.reduce((acc, i) => acc + Number(i.subtotal || 0), 0);
+  const cartTotalBeforeDiscount = selectedCartItems.reduce((acc, i) => acc + Number((i.price || 0) * (i.quantity || 0)), 0);
+
+  const { totalDiscount: bundleDiscount, appliedOffers } = useMemo(() => {
+    return calculateOffersDiscount(selectedCartItems, allProducts, offers);
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  }, [selectedCartItems, allProducts, offers]);
+
+  const cartTotal = cartTotalBeforeDiscount - bundleDiscount;
 
   return (
     <>
       {/* ── Main Navbar ─────────────────────────────────────── */}
       <nav
-        className="sticky top-0 z-50 transition-all duration-300 bg-[var(--color-surface)]/70 backdrop-blur-md border-b border-white/20 shadow-2xs"
+        className="sticky top-0 z-50"
+        style={{
+          background: 'rgba(244,250,247,0.88)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          borderBottom: '1px solid rgba(5,150,105,0.12)',
+          boxShadow: '0 4px 24px rgba(5,150,105,0.06), 0 1px 4px rgba(0,0,0,0.04)'
+        }}
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6 md:px-10 lg:px-12 py-0">
           <div className="flex items-center justify-between h-20">
@@ -501,12 +559,13 @@ function Navbar() {
             {/* Brand */}
             <Link
               to="/"
-              className="flex-shrink-0"
-              style={{ fontFamily: 'Outfit, sans-serif' }}
+              className="flex-shrink-0 group flex items-center"
             >
-              <span className="text-[12px] sm:text-[15px] font-black tracking-[0.18em] sm:tracking-[0.3em] uppercase text-[var(--color-text)] transition-all duration-300">
-                STREET<span style={{ color: 'var(--color-accent)' }}>—</span>WEAR
-              </span>
+              <img
+                src="/vakrayan-logo.png"
+                alt="Vakrayan Logo"
+                className="h-10 w-10 sm:h-12 sm:w-12 object-contain transition-all duration-300 group-hover:scale-110 drop-shadow-md"
+              />
             </Link>
 
             {/* Desktop nav links */}
@@ -535,28 +594,31 @@ function Navbar() {
                 <AnimatePresence>
                   {collectionsOpen && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute left-0 mt-2 w-48 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-lg p-2 rounded-xl z-50 flex flex-col gap-1"
+                      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.97 }}
+                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute left-0 mt-3 w-52 p-2 rounded-2xl z-50 flex flex-col gap-0.5"
+                      style={{
+                        background: 'var(--glass-bg-heavy)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        border: '1px solid var(--glass-border-green)',
+                        boxShadow: 'var(--shadow-lg)'
+                      }}
                     >
-                      <Link to="/category/oversized-tshirt" className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase hover:bg-[var(--color-bg)] rounded-lg text-left text-[var(--color-text)]">Oversized</Link>
-                      <Link to="/category/printed-tshirt" className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase hover:bg-[var(--color-bg)] rounded-lg text-left text-[var(--color-text)]">Printed</Link>
-                      <Link to="/category/shirts" className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase hover:bg-[var(--color-bg)] rounded-lg text-left text-[var(--color-text)]">Shirts</Link>
-                      <Link to="/category/hoodies" className="px-3 py-2 text-[10px] font-bold tracking-widest uppercase hover:bg-[var(--color-bg)] rounded-lg text-left text-[var(--color-text)]">Hoodies</Link>
+                      <Link to="/category/oversized-tshirt" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Oversized T-Shirts</Link>
+                      <Link to="/category/printed-tshirt" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Printed T-Shirts</Link>
+                      <Link to="/category/shirts" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Shirts</Link>
+                      <Link to="/category/hoodies" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Hoodies</Link>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </li>
               <li>
-                <a href="#brand-story" className="link-underline text-[11px] font-semibold tracking-[0.12em] uppercase transition-base text-[var(--color-muted)] hover:text-[var(--color-text)]">
-                  About
-                </a>
-              </li>
-              <li>
-                <a href="#footer" className="link-underline text-[11px] font-semibold tracking-[0.12em] uppercase transition-base text-[var(--color-muted)] hover:text-[var(--color-text)]">
-                  Contact
-                </a>
+                <NavLink to="/profile?tab=orders" className={navLink}>
+                  Track Order
+                </NavLink>
               </li>
             </ul>
 
@@ -570,7 +632,7 @@ function Navbar() {
                     Admin
                   </span>
                   <button
-                    onClick={() => dispatch(toggleAdminMode())}
+                    onClick={handleToggleAdminMode}
                     className={`relative inline-flex h-4 w-7 rounded-full border-0 cursor-pointer transition-colors duration-200 ${
                       adminMode ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'
                     }`}
@@ -583,7 +645,8 @@ function Navbar() {
               {/* Search */}
               <button
                 onClick={() => { setSearchOpen(v => !v); setSearchVal(''); }}
-                className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-base cursor-pointer"
+                style={{ background: 'rgba(5,150,105,0.06)' }}
               >
                 <SearchIcon />
               </button>
@@ -591,7 +654,11 @@ function Navbar() {
               {/* Wishlist */}
               <button
                 onClick={() => { if (!isAuthenticated) { navigate('/login'); return; } setWishlistDrawerOpen(true); }}
-                className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer"
+                className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-base cursor-pointer"
+                style={{ 
+                  color: wishlist.length > 0 ? 'var(--color-accent)' : 'var(--color-muted)',
+                  background: wishlist.length > 0 ? 'rgba(5,150,105,0.10)' : 'rgba(5,150,105,0.06)'
+                }}
               >
                 <motion.span animate={animateWishlist ? { scale: [1, 1.3, 1] } : {}} transition={{ type: 'spring', stiffness: 400, damping: 12 }}>
                   <HeartIcon filled={wishlist.length > 0} />
@@ -601,8 +668,8 @@ function Navbar() {
                     <motion.span
                       initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                      className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
-                      style={{ background: 'var(--color-accent)' }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
+                      style={{ background: 'var(--color-accent)', boxShadow: '0 2px 6px rgba(5,150,105,0.4)' }}
                     >
                       {wishlist.length}
                     </motion.span>
@@ -613,7 +680,11 @@ function Navbar() {
               {/* Cart */}
               <button
                 onClick={() => setCartDrawerOpen(true)}
-                className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer"
+                className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-base cursor-pointer"
+                style={{ 
+                  color: cartCount > 0 ? 'var(--color-accent)' : 'var(--color-muted)',
+                  background: cartCount > 0 ? 'rgba(5,150,105,0.10)' : 'rgba(5,150,105,0.06)'
+                }}
               >
                 <motion.span animate={animateCart ? { scale: [1, 1.3, 1] } : {}} transition={{ type: 'spring', stiffness: 400, damping: 12 }}>
                   <BagIcon />
@@ -623,8 +694,8 @@ function Navbar() {
                     <motion.span
                       initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                      className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
-                      style={{ background: 'var(--color-accent)' }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
+                      style={{ background: 'var(--color-accent)', boxShadow: '0 2px 6px rgba(5,150,105,0.4)' }}
                     >
                       {cartCount}
                     </motion.span>
@@ -655,8 +726,14 @@ function Navbar() {
                     <motion.div
                       variants={dropdownVariants}
                       initial="hidden" animate="visible" exit="exit"
-                      className="absolute right-0 mt-2 w-60 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] overflow-hidden z-50"
-                      style={{ boxShadow: 'var(--shadow-lg)' }}
+                      className="absolute right-0 mt-3 w-64 rounded-2xl overflow-hidden z-50"
+                      style={{ 
+                        background: 'var(--glass-bg-heavy)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        border: '1px solid var(--glass-border-green)',
+                        boxShadow: 'var(--shadow-lg)'
+                      }}
                     >
                       {isAuthenticated && user ? (
                         <>
@@ -732,8 +809,13 @@ function Navbar() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1, transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] } }}
               exit={{ height: 0, opacity: 0, transition: { duration: 0.2 } }}
-              className="border-t border-[var(--color-border)] overflow-visible"
-              style={{ background: 'rgba(250,247,242,0.98)' }}
+              className="border-t overflow-visible"
+              style={{ 
+                background: 'rgba(244,250,247,0.97)',
+                borderColor: 'rgba(5,150,105,0.10)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)'
+              }}
             >
               <div className="content-shell py-3 relative">
                 <form
@@ -766,33 +848,72 @@ function Navbar() {
 
                 {/* Suggestions */}
                 <AnimatePresence>
-                  {suggestions.length > 0 && (
+                  {(searchSuggestions.keywords.length > 0 || searchSuggestions.products.length > 0) && (
                     <motion.div
                       variants={dropdownVariants}
                       initial="hidden" animate="visible" exit="exit"
-                      className="absolute top-full left-4 right-4 sm:left-6 sm:right-6 md:left-10 md:right-10 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] overflow-hidden z-50 mt-1"
+                      className="absolute top-full left-4 right-4 sm:left-6 sm:right-6 md:left-10 md:right-10 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] overflow-hidden z-50 mt-1 p-4 space-y-4"
                       style={{ boxShadow: 'var(--shadow-lg)' }}
                     >
-                      {suggestions.map(p => {
-                        const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/80x100';
-                        return (
-                          <button
-                            key={p.$id || p.id}
-                            type="button"
-                            onClick={() => { navigate(`/product/${p.slug || p.$id || p.id}`); setSearchOpen(false); setSearchVal(''); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-bg)] transition-base text-left border-b border-zinc-50 last:border-0"
-                          >
-                            <img src={img} alt={p.name} className="w-9 h-11 object-cover rounded-lg bg-[var(--color-subtle)] shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[12px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
-                              <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider">{p.category}</p>
-                            </div>
-                            <span className="text-[12px] font-bold text-[var(--color-text)] shrink-0">
-                              ₹{Number(p.price).toLocaleString('en-IN')}
-                            </span>
-                          </button>
-                        );
-                      })}
+                      {/* Suggested Keywords / Tags Section */}
+                      {searchSuggestions.keywords.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                            🏷️ Suggested Searches
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {searchSuggestions.keywords.map(keyword => (
+                              <button
+                                key={keyword}
+                                type="button"
+                                onClick={() => {
+                                  navigate(`/shop?search=${encodeURIComponent(keyword)}`);
+                                  setSearchOpen(false);
+                                  setSearchVal('');
+                                }}
+                                className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-sans font-bold text-[10px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors border border-[var(--color-border)]"
+                              >
+                                {keyword}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Matching Products Section */}
+                      {searchSuggestions.products.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                            👕 Matching Products
+                          </span>
+                          <div className="divide-y divide-[var(--color-border)]/50">
+                            {searchSuggestions.products.map(p => {
+                              const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/80x100';
+                              return (
+                                <button
+                                  key={p.$id || p.id}
+                                  type="button"
+                                  onClick={() => {
+                                    navigate(`/product/${p.slug || p.$id || p.id}`);
+                                    setSearchOpen(false);
+                                    setSearchVal('');
+                                  }}
+                                  className="w-full flex items-center gap-3 py-2.5 hover:bg-[var(--color-bg)] transition-base text-left border-b border-zinc-50/10 last:border-0 first:pt-0"
+                                >
+                                  <img src={img} alt={p.name} className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
+                                    <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">{p.category?.replace(/-/g, ' ')}</p>
+                                  </div>
+                                  <span className="text-[11px] font-bold text-[var(--color-text)] shrink-0">
+                                    ₹{Number(p.price).toLocaleString('en-IN')}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -807,8 +928,13 @@ function Navbar() {
             <motion.div
               variants={mobileMenuVariants}
               initial="hidden" animate="visible" exit="exit"
-              className="lg:hidden border-t border-[var(--color-border)] max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-thin"
-              style={{ background: 'rgba(250,247,242,0.98)' }}
+              className="lg:hidden border-t max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-thin"
+              style={{ 
+                background: 'rgba(244,250,247,0.97)',
+                borderColor: 'rgba(5,150,105,0.10)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)'
+              }}
             >
               <div className="content-shell py-6 space-y-1">
                 <NavLink to="/" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-3 py-3 rounded-xl text-[13px] font-semibold transition-base ${isActive ? 'bg-[var(--color-subtle)] text-[var(--color-text)]' : 'text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]'}`} end>
@@ -816,6 +942,17 @@ function Navbar() {
                 </NavLink>
                 <NavLink to="/shop" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-3 py-3 rounded-xl text-[13px] font-semibold transition-base ${isActive ? 'bg-[var(--color-subtle)] text-[var(--color-text)]' : 'text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]'}`}>
                   Shop
+                </NavLink>
+                <NavLink
+                  to="/profile?tab=orders"
+                  onClick={() => setIsOpen(false)}
+                  className={({ isActive }) => `flex items-center gap-2.5 px-3 py-3 rounded-xl text-[13px] font-semibold transition-base ${isActive ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]'}`}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  Track Order
                 </NavLink>
                 
                 <div className="px-3 py-2 space-y-2">
@@ -828,12 +965,7 @@ function Navbar() {
                   </div>
                 </div>
 
-                <a href="#brand-story" onClick={() => setIsOpen(false)} className="block px-3 py-3 rounded-xl text-[13px] font-semibold text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]">
-                  About
-                </a>
-                <a href="#footer" onClick={() => setIsOpen(false)} className="block px-3 py-3 rounded-xl text-[13px] font-semibold text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]">
-                  Contact
-                </a>
+
 
                 <div className="pt-4 mt-2 border-t border-[var(--color-border)]">
                   {isAuthenticated && user ? (
@@ -849,7 +981,7 @@ function Navbar() {
                           <div className="flex items-center justify-between px-3 py-2.5">
                             <span className="text-[12px] font-semibold text-[var(--color-text)]">Admin Mode</span>
                             <button
-                              onClick={() => dispatch(toggleAdminMode())}
+                              onClick={handleToggleAdminMode}
                               className={`relative inline-flex h-5 w-9 rounded-full border-0 cursor-pointer transition-colors duration-200 ${adminMode ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'}`}
                             >
                               <span className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-[var(--color-surface)] shadow-sm transition-transform duration-200 ${adminMode ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
@@ -934,16 +1066,63 @@ function Navbar() {
               {products.length > 0 && (
                 <div className="border-t border-[var(--color-border)] pt-6 mt-6">
                   <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Curated For You</h4>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
+                  <div
+                    className="flex gap-3 pb-3"
+                    style={{
+                      overflowX: 'auto',
+                      overflowY: 'hidden',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
+                      cursor: 'grab',
+                      userSelect: 'none',
+                      scrollBehavior: 'auto'
+                    }}
+                    onMouseDown={e => {
+                      const el = e.currentTarget;
+                      el.style.cursor = 'grabbing';
+                      let startX = e.pageX;
+                      let scrollLeft = el.scrollLeft;
+                      let lastX = e.pageX;
+                      let velocity = 0;
+                      let rafId = null;
+
+                      const onMove = ev => {
+                        const dx = ev.pageX - startX;
+                        velocity = ev.pageX - lastX;
+                        lastX = ev.pageX;
+                        el.scrollLeft = scrollLeft - dx;
+                      };
+
+                      const onUp = () => {
+                        el.style.cursor = 'grab';
+                        window.removeEventListener('mousemove', onMove);
+                        window.removeEventListener('mouseup', onUp);
+
+                        // Momentum / inertia
+                        const momentum = () => {
+                          if (Math.abs(velocity) < 0.5) return;
+                          el.scrollLeft -= velocity;
+                          velocity *= 0.88;
+                          rafId = requestAnimationFrame(momentum);
+                        };
+                        rafId = requestAnimationFrame(momentum);
+                      };
+
+                      window.addEventListener('mousemove', onMove);
+                      window.addEventListener('mouseup', onUp);
+                      if (rafId) cancelAnimationFrame(rafId);
+                    }}
+                  >
                     {products.slice(0, 4).map(p => {
                       const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                       const pId = p.$id || p.id;
                       return (
-                        <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl min-w-[140px] max-w-[140px] shrink-0 text-left snap-start">
-                          <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" />
+                        <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl snap-start" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                          <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
                           <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
                           <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
-                          <button 
+                          <button
                             onClick={async (e) => {
                               e.stopPropagation();
                               await handleMoveToCart(p);
@@ -1082,7 +1261,17 @@ function Navbar() {
               {products.length > 0 && (
                 <div className="border-t border-[var(--color-border)] pt-6 mt-6">
                   <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Complete Your Look</h4>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
+                  <div
+                    className="flex gap-3 pb-3"
+                    style={{ overflowX:'auto', overflowY:'hidden', WebkitOverflowScrolling:'touch', scrollbarWidth:'none', msOverflowStyle:'none', cursor:'grab', userSelect:'none' }}
+                    onMouseDown={e => {
+                      const el = e.currentTarget; el.style.cursor = 'grabbing';
+                      let startX = e.pageX, scrollLeft = el.scrollLeft, lastX = e.pageX, velocity = 0, rafId = null;
+                      const onMove = ev => { const dx = ev.pageX - startX; velocity = ev.pageX - lastX; lastX = ev.pageX; el.scrollLeft = scrollLeft - dx; };
+                      const onUp = () => { el.style.cursor = 'grab'; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); const go = () => { if (Math.abs(velocity) < 0.5) return; el.scrollLeft -= velocity; velocity *= 0.88; rafId = requestAnimationFrame(go); }; rafId = requestAnimationFrame(go); };
+                      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp); if (rafId) cancelAnimationFrame(rafId);
+                    }}
+                  >
                     {products
                       .filter(p => !cartItems.some(item => item.product_id === (p.$id || p.id)))
                       .slice(0, 4)
@@ -1090,19 +1279,14 @@ function Navbar() {
                         const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                         const pId = p.$id || p.id;
                         return (
-                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl min-w-[140px] max-w-[140px] shrink-0 text-left snap-start">
-                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" />
+                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
                             <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
                             <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
-                            <button 
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await handleMoveToCart(p);
-                              }}
+                            <button
+                              onClick={async (e) => { e.stopPropagation(); await handleMoveToCart(p); }}
                               className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors"
-                            >
-                              + ADD
-                            </button>
+                            >+ ADD</button>
                           </div>
                         );
                       })}
@@ -1116,9 +1300,28 @@ function Navbar() {
         {/* Footer */}
         {cartItems.length > 0 && (
           <div className="px-6 py-5 border-t border-[var(--color-border)] space-y-4" style={{ background: 'var(--color-bg)' }}>
-            <div className="flex justify-between items-center">
-              <span className="text-[12px] font-semibold text-[var(--color-muted)]">Subtotal</span>
-              <span className="text-[16px] font-bold text-[var(--color-text)]">₹{cartTotal.toLocaleString('en-IN')}</span>
+            <div className="space-y-2">
+              {bundleDiscount > 0 && (
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-[var(--color-muted)] font-semibold uppercase tracking-wider font-mono text-[9px]">Original Subtotal</span>
+                  <span className="text-[var(--color-muted)] line-through font-mono">₹{cartTotalBeforeDiscount.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {bundleDiscount > 0 && (
+                <div className="space-y-1 bg-[var(--color-subtle)] border border-[var(--color-accent)]/10 p-2.5 rounded-lg text-[9px] uppercase font-mono tracking-wider text-[var(--color-text)]">
+                  <span className="font-bold block mb-1">Bundle Savings</span>
+                  {appliedOffers.map((o) => (
+                    <div key={o.id} className="flex justify-between">
+                      <span>• {o.name} {o.timesApplied > 1 ? `(x${o.timesApplied})` : ''}</span>
+                      <span className="font-bold text-emerald-600 font-mono">-₹{o.discount.toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-[12px] font-semibold text-[var(--color-muted)]">Subtotal</span>
+                <span className="text-[16px] font-bold text-[var(--color-text)]">₹{cartTotal.toLocaleString('en-IN')}</span>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Link to="/cart" onClick={() => setCartDrawerOpen(false)} className="btn-ghost text-[11px] py-3 text-center rounded-xl">
@@ -1179,7 +1382,17 @@ function Navbar() {
               {products.length > 0 && (
                 <div className="border-t border-[var(--color-border)] pt-6 mt-6">
                   <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Recommended For You</h4>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
+                  <div
+                    className="flex gap-3 pb-3"
+                    style={{ overflowX:'auto', overflowY:'hidden', WebkitOverflowScrolling:'touch', scrollbarWidth:'none', msOverflowStyle:'none', cursor:'grab', userSelect:'none' }}
+                    onMouseDown={e => {
+                      const el = e.currentTarget; el.style.cursor = 'grabbing';
+                      let startX = e.pageX, scrollLeft = el.scrollLeft, lastX = e.pageX, velocity = 0, rafId = null;
+                      const onMove = ev => { const dx = ev.pageX - startX; velocity = ev.pageX - lastX; lastX = ev.pageX; el.scrollLeft = scrollLeft - dx; };
+                      const onUp = () => { el.style.cursor = 'grab'; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); const go = () => { if (Math.abs(velocity) < 0.5) return; el.scrollLeft -= velocity; velocity *= 0.88; rafId = requestAnimationFrame(go); }; rafId = requestAnimationFrame(go); };
+                      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp); if (rafId) cancelAnimationFrame(rafId);
+                    }}
+                  >
                     {products
                       .filter(p => !wishlist.some(item => (item.$id || item.id) === (p.$id || p.id)))
                       .slice(0, 4)
@@ -1187,19 +1400,11 @@ function Navbar() {
                         const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                         const pId = p.$id || p.id;
                         return (
-                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl min-w-[140px] max-w-[140px] shrink-0 text-left snap-start">
-                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" />
+                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
                             <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
                             <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
-                            <button 
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await handleMoveToCart(p);
-                              }}
-                              className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors"
-                            >
-                              + ADD
-                            </button>
+                            <button onClick={async (e) => { e.stopPropagation(); await handleMoveToCart(p); }} className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors">+ ADD</button>
                           </div>
                         );
                       })}
@@ -1211,24 +1416,26 @@ function Navbar() {
               {recentlyViewed.length > 0 && (
                 <div className="border-t border-[var(--color-border)] pt-6 mt-6">
                   <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Recently Viewed</h4>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
+                  <div
+                    className="flex gap-3 pb-3"
+                    style={{ overflowX:'auto', overflowY:'hidden', WebkitOverflowScrolling:'touch', scrollbarWidth:'none', msOverflowStyle:'none', cursor:'grab', userSelect:'none' }}
+                    onMouseDown={e => {
+                      const el = e.currentTarget; el.style.cursor = 'grabbing';
+                      let startX = e.pageX, scrollLeft = el.scrollLeft, lastX = e.pageX, velocity = 0, rafId = null;
+                      const onMove = ev => { const dx = ev.pageX - startX; velocity = ev.pageX - lastX; lastX = ev.pageX; el.scrollLeft = scrollLeft - dx; };
+                      const onUp = () => { el.style.cursor = 'grab'; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); const go = () => { if (Math.abs(velocity) < 0.5) return; el.scrollLeft -= velocity; velocity *= 0.88; rafId = requestAnimationFrame(go); }; rafId = requestAnimationFrame(go); };
+                      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp); if (rafId) cancelAnimationFrame(rafId);
+                    }}
+                  >
                     {recentlyViewed.map(p => {
                       const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                       const pId = p.$id || p.id;
                       return (
-                        <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl min-w-[140px] max-w-[140px] shrink-0 text-left snap-start">
-                          <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" />
+                        <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                          <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
                           <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
                           <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
-                          <button 
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await handleMoveToCart(p);
-                            }}
-                            className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors"
-                          >
-                            + ADD
-                          </button>
+                          <button onClick={async (e) => { e.stopPropagation(); await handleMoveToCart(p); }} className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors">+ ADD</button>
                         </div>
                       );
                     })}
@@ -1278,7 +1485,17 @@ function Navbar() {
               {products.length > 0 && (
                 <div className="border-t border-[var(--color-border)] pt-6 mt-6">
                   <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Recommended For You</h4>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
+                  <div
+                    className="flex gap-3 pb-3"
+                    style={{ overflowX:'auto', overflowY:'hidden', WebkitOverflowScrolling:'touch', scrollbarWidth:'none', msOverflowStyle:'none', cursor:'grab', userSelect:'none' }}
+                    onMouseDown={e => {
+                      const el = e.currentTarget; el.style.cursor = 'grabbing';
+                      let startX = e.pageX, scrollLeft = el.scrollLeft, lastX = e.pageX, velocity = 0, rafId = null;
+                      const onMove = ev => { const dx = ev.pageX - startX; velocity = ev.pageX - lastX; lastX = ev.pageX; el.scrollLeft = scrollLeft - dx; };
+                      const onUp = () => { el.style.cursor = 'grab'; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); const go = () => { if (Math.abs(velocity) < 0.5) return; el.scrollLeft -= velocity; velocity *= 0.88; rafId = requestAnimationFrame(go); }; rafId = requestAnimationFrame(go); };
+                      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp); if (rafId) cancelAnimationFrame(rafId);
+                    }}
+                  >
                     {products
                       .filter(p => !wishlist.some(item => (item.$id || item.id) === (p.$id || p.id)))
                       .slice(0, 4)
@@ -1286,19 +1503,11 @@ function Navbar() {
                         const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                         const pId = p.$id || p.id;
                         return (
-                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl min-w-[140px] max-w-[140px] shrink-0 text-left snap-start">
-                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" />
+                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
                             <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
                             <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
-                            <button 
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await handleMoveToCart(p);
-                              }}
-                              className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors"
-                            >
-                              + ADD
-                            </button>
+                            <button onClick={async (e) => { e.stopPropagation(); await handleMoveToCart(p); }} className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors">+ ADD</button>
                           </div>
                         );
                       })}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCreditCard, FiCompass, FiHelpCircle } from 'react-icons/fi';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../appwrite/auth';
 import addressService from '../../appwrite/address';
@@ -14,6 +14,7 @@ import Footer from '../pageComponets/Footer';
 import { FaStar, FaWallet } from 'react-icons/fa';
 import storageService, { compressImage } from '../../appwrite/storage';
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal';
+import walletService from '../../appwrite/wallet';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -27,7 +28,26 @@ function UserProfile() {
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeProfileTab, setActiveProfileTab] = useState('overview');
+  const location = useLocation();
+
+  const [activeProfileTab, setActiveProfileTab] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'overview';
+  });
+
+  // Helper: switch tab + clean URL
+  const switchTab = (tab) => {
+    setActiveProfileTab(tab);
+    navigate('/profile' + (tab !== 'overview' ? `?tab=${tab}` : ''), { replace: true });
+  };
+
+  // Sync tab when URL changes (e.g. navigating from Track Order)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab) setActiveProfileTab(tab);
+    else setActiveProfileTab('overview');
+  }, [location.search]);
   
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profilePhone, setProfilePhone] = useState(user?.prefs?.phone || '');
@@ -40,68 +60,25 @@ function UserProfile() {
   const [topUpAmount, setTopUpAmount] = useState('500');
   const [isRazorpayOpen, setIsRazorpayOpen] = useState(false);
 
-  const walletTransactions = useMemo(() => {
-    const credits = orders
-      .filter(o => o.status === 'CANCELLED' && o.paymentMethod === 'ONLINE')
-      .map(o => {
-        let orderNumber = o.order_number || o.$id?.substring(0, 8).toUpperCase();
-        let isTopUp = false;
-        try {
-          const parsedAddress = JSON.parse(o.address);
-          if (parsedAddress?.metadata?.order_number) {
-            orderNumber = parsedAddress.metadata.order_number;
-          }
-          const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items || [];
-          if (items.some(i => i.product_id === 'topup')) {
-            isTopUp = true;
-          }
-        } catch {
-          // Fallback if parsing fails
-        }
+  // Programmatically inject official Razorpay SDK script on mount
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => console.log("Razorpay Secured SDK initialized successfully in UserProfile.");
+    script.onerror = () => console.warn("Razorpay SDK offline in UserProfile. Reverting transaction channel to Sandbox.");
+    document.body.appendChild(script);
+    return () => {
+      try {
+        document.body.removeChild(script);
+      } catch(e) {
+        console.warn("Razorpay script cleanup ignored in UserProfile:", e.message);
+      }
+    }
+  }, []);
 
-        return {
-          id: o.$id,
-          title: isTopUp ? "Wallet Top-Up" : `Refund for Order ${orderNumber}`,
-          date: new Date(o.$updatedAt || o.$createdAt || '2026-06-10'),
-          amount: `+₹${Number(o.total || 0).toFixed(2)}`,
-          isCredit: true
-        };
-      });
-
-    const debits = orders
-      .filter(o => o.paymentMethod === 'WALLET' && o.status !== 'CANCELLED')
-      .map(o => {
-        let orderNumber = o.order_number || o.$id?.substring(0, 8).toUpperCase();
-        try {
-          const parsedAddress = JSON.parse(o.address);
-          if (parsedAddress?.metadata?.order_number) {
-            orderNumber = parsedAddress.metadata.order_number;
-          }
-        } catch {
-          // Fallback if parsing fails
-        }
-
-        return {
-          id: o.$id,
-          title: `Payment for Order ${orderNumber}`,
-          date: new Date(o.$updatedAt || o.$createdAt || '2026-06-10'),
-          amount: `-₹${Number(o.total || 0).toFixed(2)}`,
-          isCredit: false
-        };
-      });
-
-    return [...credits, ...debits].sort((a, b) => b.date - a.date);
-  }, [orders]);
-
-  const walletBalance = useMemo(() => {
-    const creditVal = orders
-      .filter(o => o.status === 'CANCELLED' && o.paymentMethod === 'ONLINE')
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const debitVal = orders
-      .filter(o => o.paymentMethod === 'WALLET' && o.status !== 'CANCELLED')
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    return Math.max(0, creditVal - debitVal);
-  }, [orders]);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletTransactions, setWalletTransactions] = useState([]);
 
   const physicalOrders = useMemo(() => {
     return orders.filter(order => {
@@ -158,46 +135,30 @@ function UserProfile() {
     setIsRazorpayOpen(false);
     setLoading(true);
     try {
-      const topUpPayload = {
+      await walletService.createWalletTransaction({
         userId: user.$id,
-        customerName: user.name || 'Store Customer',
-        email: user.email || '',
-        phone: profilePhone || user.prefs?.phone || '0000000000',
-        address: JSON.stringify({
-          customerAddress: "Wallet Top-up Channel",
-          metadata: {
-            order_number: `TOPUP-${Date.now()}`,
-            subtotal: Number(topUpAmount),
-            tax_amount: 0,
-            shipping_charge: 0,
-            coupon_code: 'NONE'
-          }
-        }),
-        items: JSON.stringify([{
-          name: "Wallet Top-Up",
-          price: Number(topUpAmount),
-          quantity: 1,
-          product_id: "topup"
-        }]),
-        total: Number(topUpAmount),
-        status: 'CANCELLED', // CANCELLED status behaves as a wallet credit!
-        paymentMethod: 'ONLINE',
-        paymentStatus: 'PAID',
-        paymentProvider: 'RAZORPAY',
-        razorpayPaymentId: paymentId
-      };
+        amount: Number(topUpAmount),
+        type: 'credit',
+        title: 'Wallet Top-Up',
+        referenceId: paymentId
+      });
 
-      const response = await ordersService.createOrder(topUpPayload);
-      if (response) {
-        showToast(`₹${Number(topUpAmount).toFixed(2)} credited to your Store Wallet successfully!`, "success");
-        // Reload user orders to refresh the balance and transactions
-        const userOrdersList = await ordersService.getUserOrders(user.$id);
-        setOrders(userOrdersList || []);
-      } else {
-        throw new Error("Failed to create top-up order record");
-      }
+      showToast(`₹${Number(topUpAmount).toFixed(2)} credited to your Store Wallet successfully!`, "success");
+      
+      // Reload wallet balance and transactions
+      const bal = await walletService.getUserWalletBalance(user.$id);
+      setWalletBalance(bal);
+      const txs = await walletService.getUserWalletTransactions(user.$id);
+      const mappedTxs = txs.map(t => ({
+        id: t.$id || t.id,
+        title: t.title,
+        date: new Date(t.$createdAt || t.date || new Date()),
+        amount: `${t.type === 'credit' ? '+' : '-'}₹${Number(t.amount || 0).toFixed(2)}`,
+        isCredit: t.type === 'credit'
+      }));
+      setWalletTransactions(mappedTxs);
     } catch (err) {
-      console.error("Top-up order creation failed:", err);
+      console.error("Top-up transaction failed:", err);
       showToast("Top-up failed to process. Please contact support.", "error");
     } finally {
       setLoading(false);
@@ -212,6 +173,48 @@ function UserProfile() {
       return;
     }
     setIsTopUpModalOpen(false);
+
+    const liveKey = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
+    if (window.Razorpay && liveKey) {
+      const options = {
+        key: liveKey,
+        amount: Math.round(amount * 100), // in paise
+        currency: "INR",
+        name: "Vakrayan",
+        description: `Wallet Top-Up`,
+        image: "https://ik.imagekit.io/yash123/brand_logo.png",
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: profilePhone || user?.prefs?.phone || ''
+        },
+        theme: {
+          color: "#A16207" // Premium gold color style gateway matching our theme
+        },
+        modal: {
+          ondismiss: () => {
+            showToast("Wallet top-up dismissed.", "info");
+          }
+        },
+        handler: async (response) => {
+          try {
+            const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+            await handleTopUpSuccess(payId);
+          } catch (err) {
+            console.error("Top-up processing issue:", err);
+            showToast("Failed to complete top-up transaction.", "error");
+          }
+        }
+      };
+      try {
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+        return;
+      } catch (err) {
+        console.warn("Real Razorpay initiation issue, falling back to sandbox simulator:", err.message);
+      }
+    }
+
     setIsRazorpayOpen(true);
   };
 
@@ -429,6 +432,21 @@ function UserProfile() {
         // Load User Orders
         const userOrdersList = await ordersService.getUserOrders(user.$id);
         setOrders(userOrdersList || []);
+
+        // Load User Wallet Balance
+        const bal = await walletService.getUserWalletBalance(user.$id);
+        setWalletBalance(bal);
+
+        // Load User Wallet Transactions
+        const txs = await walletService.getUserWalletTransactions(user.$id);
+        const mappedTxs = txs.map(t => ({
+          id: t.$id || t.id,
+          title: t.title,
+          date: new Date(t.$createdAt || t.date || new Date()),
+          amount: `${t.type === 'credit' ? '+' : '-'}₹${Number(t.amount || 0).toFixed(2)}`,
+          isCredit: t.type === 'credit'
+        }));
+        setWalletTransactions(mappedTxs);
       } catch (err) {
         console.error("Failed to load user profile dataset:", err);
       } finally {
@@ -520,7 +538,7 @@ function UserProfile() {
               
               <button
                 type="button"
-                onClick={() => { setActiveProfileTab('overview'); setEditingAddress(null); }}
+                onClick={() => { switchTab('overview'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'overview'
                     ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black'
@@ -533,7 +551,7 @@ function UserProfile() {
               
               <button
                 type="button"
-                onClick={() => { setActiveProfileTab('orders'); setEditingAddress(null); }}
+                onClick={() => { switchTab('orders'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'orders'
                     ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
@@ -543,23 +561,11 @@ function UserProfile() {
                 <FiShoppingBag className="text-sm shrink-0" />
                 My Orders
               </button>
+
               
               <button
                 type="button"
-                onClick={() => { setActiveProfileTab('payments'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
-                  activeProfileTab === 'payments'
-                    ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
-                }`}
-              >
-                <FiCreditCard className="text-sm shrink-0" />
-                My Payments
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => { setActiveProfileTab('wallet'); setEditingAddress(null); }}
+                onClick={() => { switchTab('wallet'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'wallet'
                     ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
@@ -572,7 +578,7 @@ function UserProfile() {
               
               <button
                 type="button"
-                onClick={() => { setActiveProfileTab('addresses'); setEditingAddress(null); }}
+                onClick={() => { switchTab('addresses'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'addresses'
                     ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
@@ -585,7 +591,7 @@ function UserProfile() {
               
               <button
                 type="button"
-                onClick={() => { setActiveProfileTab('profile'); setEditingAddress(null); }}
+                onClick={() => { switchTab('profile'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'profile'
                     ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
@@ -638,7 +644,7 @@ function UserProfile() {
                     </div>
                     
                     <button
-                      onClick={() => setActiveProfileTab('profile')}
+                      onClick={() => switchTab('profile')}
                       className="w-full md:w-auto bg-amber-400 hover:bg-amber-500 text-black font-mono font-black text-[10px] tracking-widest uppercase py-3 px-8 rounded-lg transition-all duration-200 cursor-pointer shadow-xs border border-amber-350 shrink-0"
                     >
                       EDIT PROFILE
@@ -649,7 +655,7 @@ function UserProfile() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* My Orders Card */}
                     <div 
-                      onClick={() => setActiveProfileTab('orders')}
+                      onClick={() => switchTab('orders')}
                       className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
                       <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -659,21 +665,11 @@ function UserProfile() {
                       <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">View, Modify And Track Orders</p>
                     </div>
 
-                    {/* My Payments Card */}
-                    <div 
-                      onClick={() => setActiveProfileTab('payments')}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
-                        <FiCreditCard className="text-lg" />
-                      </div>
-                      <h3 className="text-xs font-black text-[var(--color-text)] uppercase tracking-wider">My Payments</h3>
-                      <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">View And Modify Payment Methods</p>
-                    </div>
+
 
                     {/* My Wallet Card */}
                     <div 
-                      onClick={() => setActiveProfileTab('wallet')}
+                      onClick={() => switchTab('wallet')}
                       className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
                       <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -685,7 +681,7 @@ function UserProfile() {
 
                     {/* My Addresses Card */}
                     <div 
-                      onClick={() => setActiveProfileTab('addresses')}
+                      onClick={() => switchTab('addresses')}
                       className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
                       <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -697,7 +693,7 @@ function UserProfile() {
 
                     {/* My Profile Card */}
                     <div 
-                      onClick={() => setActiveProfileTab('profile')}
+                      onClick={() => switchTab('profile')}
                       className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
                       <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -709,7 +705,7 @@ function UserProfile() {
 
                     {/* Help & Support Card */}
                     <div 
-                      onClick={() => showToast("📞 Reach out to us at support@streetwear.in for any order assistance.", "info")}
+                      onClick={() => showToast("📞 Reach out to us at support@vakrayan.com for any order assistance.", "info")}
                       className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
                       <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -879,81 +875,6 @@ function UserProfile() {
                 </div>
               )}
 
-              {/* TAB 3: MY PAYMENTS */}
-              {activeProfileTab === 'payments' && (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="pb-4 border-b border-[var(--color-border)]">
-                    <h2 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase flex items-center gap-2">
-                      <FiCreditCard /> Saved Payment Options
-                    </h2>
-                  </div>
-
-                  <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 space-y-4">
-                    <h3 className="text-[10px] font-black text-[var(--color-text)] tracking-wider uppercase border-b border-[var(--color-border)] pb-2">LINKED CREDIT / DEBIT CARDS</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Card 1 */}
-                      <div className="p-4 bg-gradient-to-br from-neutral-900 to-neutral-950 text-white rounded-xl border border-neutral-800 space-y-4 relative overflow-hidden shadow-sm">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[8px] font-mono font-bold text-neutral-400 block tracking-widest">HDFC BANK PREMIUM</span>
-                            <span className="text-[10px] font-mono text-neutral-300">•••• •••• •••• 4890</span>
-                          </div>
-                          <span className="text-xs font-black font-sans tracking-widest italic">VISA</span>
-                        </div>
-                        <div className="flex justify-between items-end text-[9px] font-mono">
-                          <div>
-                            <span className="text-neutral-500 block uppercase text-[7px]">Card Holder</span>
-                            <span className="text-neutral-200 uppercase font-bold">{user?.name}</span>
-                          </div>
-                          <div>
-                            <span className="text-neutral-500 block uppercase text-[7px]">Expiry</span>
-                            <span className="text-neutral-200 font-bold">09/29</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card 2 */}
-                      <div className="p-4 bg-neutral-900/10 border border-[var(--color-border)] text-[var(--color-text)] rounded-xl space-y-4 relative overflow-hidden shadow-2xs hover:border-amber-400 transition-colors">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[8px] font-mono font-bold text-[var(--color-muted)] block tracking-widest">ICICI BANK CORAL</span>
-                            <span className="text-[10px] font-mono text-[var(--color-text)]">•••• •••• •••• 1294</span>
-                          </div>
-                          <span className="text-xs font-black font-sans tracking-widest italic text-[var(--color-muted)]">MASTERCARD</span>
-                        </div>
-                        <div className="flex justify-between items-end text-[9px] font-mono">
-                          <div>
-                            <span className="text-[var(--color-muted)] block uppercase text-[7px]">Card Holder</span>
-                            <span className="text-[var(--color-text)] uppercase font-bold">{user?.name}</span>
-                          </div>
-                          <div>
-                            <span className="text-[var(--color-muted)] block uppercase text-[7px]">Expiry</span>
-                            <span className="text-[var(--color-text)] font-bold">11/30</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 space-y-4 border-t border-[var(--color-border)]">
-                      <h3 className="text-[10px] font-black text-[var(--color-text)] tracking-wider uppercase border-b border-[var(--color-border)] pb-2">LINKED UPI ID</h3>
-                      <div className="flex items-center gap-2 p-3 bg-[var(--color-subtle)] border border-[var(--color-border)] justify-between rounded-lg">
-                        <span className="text-xs font-mono text-[var(--color-text)] font-bold">{user?.email?.split('@')[0]}@okaxis</span>
-                        <span className="text-[8px] font-mono text-emerald-600 font-bold bg-emerald-50 px-1 py-0.5 uppercase">Primary UPI</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <button
-                        onClick={() => showToast("Add Payment Options module loaded in integration sandbox.", "info")}
-                        className="w-full bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-mono font-black text-[10px] tracking-widest uppercase py-3 border border-[var(--color-border)] transition-colors cursor-pointer"
-                      >
-                        + Add New Payment Method
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* TAB 4: MY WALLET */}
               {activeProfileTab === 'wallet' && (
@@ -1199,8 +1120,10 @@ function UserProfile() {
                               </span>
                             )}
                             <div className="space-y-1.5">
-                              <h4 className="text-xs font-black text-[var(--color-text)] uppercase">{addr.name}</h4>
-                              <p className="text-xs text-[var(--color-text)] font-medium leading-relaxed">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
+                              <h4 className="text-xs font-black text-[var(--color-text)] uppercase">{addr.name || addr.customerName}</h4>
+                              <p className="text-xs text-[var(--color-text)] font-medium leading-relaxed">
+                                {[addr.address || addr.addressLine, addr.city, addr.state].filter(Boolean).join(', ')} - {addr.pincode}
+                              </p>
                               <p className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-semibold">Phone: {addr.phone}</p>
                             </div>
                             
@@ -1209,12 +1132,13 @@ function UserProfile() {
                                 onClick={() => {
                                   setEditingAddress(addr);
                                   setFormData({
-                                    name: addr.name || '',
+                                    name: addr.name || addr.customerName || '',
                                     phone: addr.phone || '',
-                                    address: addr.address || '',
+                                    address: addr.address || addr.addressLine || '',
                                     city: addr.city || '',
                                     state: addr.state || '',
                                     country: addr.country || 'India',
+                                    pincode: addr.pincode || '',
                                     is_default: addr.is_default || false
                                   });
                                 }}

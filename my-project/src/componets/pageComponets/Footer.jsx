@@ -11,105 +11,194 @@ function Footer() {
   const handleSubscribe = async (e) => {
     e.preventDefault();
     setError('');
-    
-    if (!email.trim()) {
-      setError('PLEASE ENTER AN EMAIL ADDRESS.');
-      return;
-    }
-    
+    if (!email.trim()) { setError('Please enter your email address.'); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setError('INVALID EMAIL ALIGNMENT. PLEASE RE-ENTER.');
-      return;
-    }
-    
+    if (!emailRegex.test(email.trim())) { setError('Invalid email — please re-enter.'); return; }
     try {
       await campaignService.subscribeNewsletter(email.trim());
       setSubscribed(true);
-      
-      // Dispatch newsletter.subscribe webhook notification
-      sendWebhookNotification('newsletter.subscribe', {
-        email: email.trim()
-      });
-      
+      sendWebhookNotification('newsletter.subscribe', { email: email.trim() });
       setEmail('');
     } catch (err) {
       console.error("Newsletter registration failed:", err);
-      setError('SUBSCRIPTION FAIL. TRY AGAIN LATER.');
+      setError(err.message || 'Subscription failed. Try again later.');
     }
   };
+
   return (
-    <footer className="bg-gradient-to-b from-[var(--color-subtle)] to-[var(--color-bg)] text-[var(--color-muted)] py-16 px-6 md:px-12 border-t border-[var(--color-border)]">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-6">
-        
-        {/* Brand Info */}
-        <div className="flex flex-col gap-4">
-          <h3 className="text-[var(--color-text)] text-xl font-black tracking-widest uppercase">
-            STREET<span className="text-[var(--color-accent)]">-</span>WEAR
-          </h3>
-          <p className="text-xs text-[var(--color-muted)] leading-relaxed max-w-xs uppercase tracking-wide font-medium">
-            Premium heavyweight drops crafted carefully to define contemporary street culture. Join the movement.
-          </p>
-        </div>
+    <footer
+      style={{
+        background: 'linear-gradient(160deg, #0D1A14 0%, #0A1510 60%, #031008 100%)',
+        borderTop: '1px solid rgba(5,150,105,0.20)'
+      }}
+    >
+      {/* Top green glow line */}
+      <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, #059669, #34D399, #059669, transparent)' }} />
 
-        {/* Quick Links */}
-        <div className="flex flex-col gap-3">
-          <h4 className="text-[var(--color-text)] text-xs font-black tracking-widest uppercase mb-1">Navigation</h4>
-          <Link to="/" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase font-medium">Home</Link>
-          <Link to="/category/printed-tshirt" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase font-medium">New Arrivals</Link>
-          <Link to="/category/shirts" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase font-medium">Men's Wear</Link>
-          <Link to="/about" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase font-medium">About Brand</Link>
-        </div>
+      <div className="max-w-7xl mx-auto px-6 md:px-12 pt-16 pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
 
-        {/* Social Handles */}
-        <div className="flex flex-col gap-3">
-          <h4 className="text-[var(--color-text)] text-xs font-black tracking-widest uppercase mb-1">Follow Us</h4>
-          <a href="#" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors tracking-wider font-mono font-bold hover:underline underline-offset-4">INSTAGRAM &nearr;</a>
-          <a href="#" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors tracking-wider font-mono font-bold hover:underline underline-offset-4">PINTEREST &nearr;</a>
-          <a href="#" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors tracking-wider font-mono font-bold hover:underline underline-offset-4">TWITTER / X &nearr;</a>
-        </div>
-
-        {/* Newsletter Subscription */}
-        <div className="flex flex-col gap-3">
-          <h4 className="text-[var(--color-text)] text-xs font-black tracking-widest uppercase mb-1">Get the Intel</h4>
-          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wide font-medium">Subscribe to receive early drops notification and secret discounts.</p>
-          
-          {!subscribed ? (
-            <form onSubmit={handleSubscribe} className="space-y-1">
-              <div className="flex mt-2 max-w-sm rounded-2xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm focus-within:shadow-md focus-within:border-[var(--color-accent)] transition-all duration-300">
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ENTER YOUR EMAIL" 
-                  className="bg-transparent text-[var(--color-text)] placeholder-[var(--color-muted)] text-[10px] tracking-wider px-4 py-3 w-full outline-hidden"
-                />
-                <button type="submit" className="bg-[var(--color-accent)] text-white font-black text-xs px-5 uppercase hover:bg-[var(--color-accent-hover)] transition-colors cursor-pointer rounded-r-2xl">
-                  Join
-                </button>
-              </div>
-              {error && (
-                <p className="text-[9px] text-[var(--color-danger)] font-mono tracking-widest uppercase pt-1 animate-pulse">
-                  {error}
-                </p>
-              )}
-            </form>
-          ) : (
-            <div className="mt-2 p-3.5 bg-emerald-950 text-emerald-400 border border-emerald-900/60 rounded-xl text-[10px] font-black uppercase tracking-widest leading-relaxed max-w-xs animate-scale-up">
-              ✓ YOU ARE NOW IN THE LOOP.<br />
-              <span className="text-emerald-500 font-mono text-[9px] font-medium tracking-wider">GET READY FOR EXCLUSIVE EARLY DROPS.</span>
+          {/* Brand */}
+          <div className="flex flex-col gap-5 md:col-span-1">
+            <div>
+              <h3
+                className="text-[32px] leading-none mb-1"
+                style={{ fontFamily: "'Chelsea Market', cursive", color: '#FFFFFF' }}
+              >
+                Vakrayan
+              </h3>
+              <div style={{ width: 40, height: 3, background: 'linear-gradient(90deg,#059669,#34D399)', borderRadius: 99 }} />
             </div>
-          )}
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, fontFamily: "'Jost', sans-serif" }}>
+              Premium heavyweight drops crafted carefully to define contemporary street culture.
+            </p>
+            {/* Social icons */}
+            <div className="flex gap-3 mt-1">
+              {['IG', 'TW', 'PT'].map(s => (
+                <a
+                  key={s}
+                  href="#"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold transition-all duration-200 cursor-pointer"
+                  style={{
+                    background: 'rgba(5,150,105,0.12)',
+                    border: '1px solid rgba(5,150,105,0.25)',
+                    color: 'rgba(255,255,255,0.60)',
+                    fontFamily: "'Jost', sans-serif"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(5,150,105,0.25)'; e.currentTarget.style.color = '#fff'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(5,150,105,0.12)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
+                >
+                  {s}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex flex-col gap-4">
+            <h4 style={{ fontFamily: "'Bungee', sans-serif", fontSize: 11, letterSpacing: '0.1em', color: '#059669' }}>
+              NAVIGATION
+            </h4>
+            {[
+              { to: '/', label: 'Home' },
+              { to: '/shop', label: 'All Products' },
+              { to: '/category/printed-tshirt', label: 'New Arrivals' },
+              { to: '/category/shirts', label: "Men's Wear" },
+            ].map(({ to, label }) => (
+              <Link
+                key={to}
+                to={to}
+                style={{ color: 'rgba(255,255,255,0.50)', fontSize: 14, fontFamily: "'Jost', sans-serif", fontWeight: 500 }}
+                className="transition-colors duration-200 hover:text-white w-fit"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Follow */}
+          <div className="flex flex-col gap-4">
+            <h4 style={{ fontFamily: "'Bungee', sans-serif", fontSize: 11, letterSpacing: '0.1em', color: '#059669' }}>
+              FOLLOW US
+            </h4>
+            {['Instagram ↗', 'Pinterest ↗', 'Twitter / X ↗'].map(s => (
+              <a
+                key={s}
+                href="#"
+                style={{ color: 'rgba(255,255,255,0.50)', fontSize: 14, fontFamily: "'Jost', sans-serif", fontWeight: 500 }}
+                className="transition-colors duration-200 hover:text-white w-fit cursor-pointer"
+              >
+                {s}
+              </a>
+            ))}
+          </div>
+
+          {/* Newsletter */}
+          <div className="flex flex-col gap-4">
+            <h4 style={{ fontFamily: "'Bungee', sans-serif", fontSize: 11, letterSpacing: '0.1em', color: '#059669' }}>
+              GET THE INTEL
+            </h4>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.6, fontFamily: "'Jost', sans-serif" }}>
+              Early drops, secret discounts & exclusive access.
+            </p>
+            {!subscribed ? (
+              <form onSubmit={handleSubscribe} className="flex flex-col gap-2 mt-1">
+                <div
+                  className="flex overflow-hidden"
+                  style={{ borderRadius: 10, border: '1px solid rgba(5,150,105,0.30)', background: 'rgba(5,150,105,0.08)' }}
+                >
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    style={{
+                      background: 'transparent',
+                      color: '#fff',
+                      fontSize: 13,
+                      padding: '11px 14px',
+                      outline: 'none',
+                      flex: 1,
+                      fontFamily: "'Jost', sans-serif"
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      background: '#059669',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      padding: '0 16px',
+                      cursor: 'pointer',
+                      fontFamily: "'Jost', sans-serif",
+                      letterSpacing: '0.05em',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#047857'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#059669'}
+                  >
+                    JOIN
+                  </button>
+                </div>
+                {error && <p style={{ color: '#F87171', fontSize: 12, fontFamily: "'Jost', sans-serif" }}>{error}</p>}
+              </form>
+            ) : (
+              <div
+                className="animate-scale-up p-4 mt-1"
+                style={{ borderRadius: 12, background: 'rgba(5,150,105,0.15)', border: '1px solid rgba(5,150,105,0.30)' }}
+              >
+                <p style={{ color: '#34D399', fontWeight: 700, fontSize: 13, fontFamily: "'Jost', sans-serif" }}>
+                  ✓ You're in the loop!
+                </p>
+                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 4, fontFamily: "'Jost', sans-serif" }}>
+                  Get ready for exclusive early drops.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
-      </div>
-
-      {/* Copyright Disclaimer */}
-      <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-[var(--color-border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] tracking-widest text-[var(--color-muted)] uppercase font-bold">
-        <span>&copy; 2026 STREETWEAR CO. ALL RIGHTS RESERVED.</span>
-        <div className="flex gap-6">
-          <a href="#" className="hover:text-[var(--color-text)] transition-colors">Privacy Policy</a>
-          <a href="#" className="hover:text-[var(--color-text)] transition-colors">Terms of Service</a>
+        {/* Bottom bar */}
+        <div
+          className="mt-14 pt-6 flex flex-col md:flex-row justify-between items-center gap-4"
+          style={{ borderTop: '1px solid rgba(5,150,105,0.15)' }}
+        >
+          <span style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}>
+            © 2026 Vakrayan Co. All rights reserved.
+          </span>
+          <div className="flex gap-6">
+            {['Privacy Policy', 'Terms of Service'].map(t => (
+              <a
+                key={t}
+                href="#"
+                style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}
+                className="hover:text-white transition-colors duration-200 cursor-pointer"
+              >
+                {t}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

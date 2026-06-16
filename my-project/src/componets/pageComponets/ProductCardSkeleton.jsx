@@ -1,13 +1,13 @@
 /**
  * ProductCardSkeleton — A premium pulsing placeholder skeleton matching
- * the streetwear product card design.
+ * the vakrayan product card design.
  */
 const ProductCardSkeleton = () => {
   return (
     <div className="flex flex-col bg-transparent animate-pulse pb-4 border-b border-transparent">
       <div className="w-full">
         {/* Aspect-ratio bounding container for image skeleton */}
-        <div className="w-full aspect-[3/4] bg-neutral-100 relative overflow-hidden rounded-xl">
+        <div className="w-full aspect-[3/4] bg-neutral-100 relative overflow-hidden rounded-none">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-neutral-200/40 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
         </div>
 

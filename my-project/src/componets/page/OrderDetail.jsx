@@ -9,6 +9,8 @@ import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
 import storageService, { compressImage } from '../../appwrite/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 function OrderDetail() {
   const { id } = useParams();
@@ -16,7 +18,7 @@ function OrderDetail() {
   const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
-  const products = useSelector(state => state.products.items || []);
+  const products = useSelector(state => state.products.allItems || []);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -68,6 +70,8 @@ function OrderDetail() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancellationReasonOption, setCancellationReasonOption] = useState("Ordered wrong size / color details");
   const [customCancellationText, setCustomCancellationText] = useState("");
+  const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Return / Exchange modal states
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -287,6 +291,19 @@ function OrderDetail() {
 
   const { addressText, metadata } = parseOrderAddressAndMetadata(order);
 
+  // Check if order was cancelled by the admin / store
+  const isAdminCancelled = 
+    metadata.cancelled_by === 'admin' || 
+    metadata.cancelled_by === 'store' ||
+    (metadata.cancel_reason && (
+      metadata.cancel_reason.toLowerCase().includes('stock') ||
+      metadata.cancel_reason.toLowerCase().includes('inventory') ||
+      metadata.cancel_reason.toLowerCase().includes('fraud') ||
+      metadata.cancel_reason.toLowerCase().includes('incorrect pricing') ||
+      metadata.cancel_reason.toLowerCase().includes('admin') ||
+      metadata.cancel_reason.toLowerCase().includes('store')
+    ));
+
   // Extract base shipping, remote route surcharge, and COD handling fee from the stored total shipping charge
   const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
   const isCod = order.paymentMethod === 'COD';
@@ -294,6 +311,8 @@ function OrderDetail() {
   const remainingShipping = Math.max(0, totalShipping - codFee);
   const remoteSurcharge = (remainingShipping === 80 || remainingShipping === 179) ? 80 : 0;
   const baseShippingCharge = Math.max(0, remainingShipping - remoteSurcharge);
+  const subtotal = Number(metadata.subtotal || order.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0));
+  const discountVal = Number(order.discountAmount || order.discount_amount || metadata.discount || 0);
 
   const isReturnExchangeEligible = () => {
     if (order.status !== 'DELIVERED') return false;
@@ -396,158 +415,40 @@ function OrderDetail() {
   };
 
   const handlePrintInvoice = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      showToast("Pop-up blocker is preventing invoice opening.", "error");
-      return;
+    setIsInvoicePreviewOpen(true);
+  };
+
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('invoice-print-area');
+    if (!element) return;
+    
+    setIsGeneratingPdf(true);
+    showToast("Generating PDF Invoice, please wait...", "info");
+    
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2.2, // Higher scale for crisp text resolution
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Calculate A4 dimensions (595.28 x 841.89 points)
+      const pdf = new jsPDF('p', 'pt', 'a4');
+      const imgWidth = 595.28;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`invoice-${metadata.order_number || order.$id || 'order'}.pdf`);
+      showToast("✓ Invoice PDF downloaded successfully!", "success");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      showToast("Failed to generate and download PDF.", "error");
+    } finally {
+      setIsGeneratingPdf(false);
     }
-
-    const itemsHtml = parsedItems.map(item => `
-      <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 12px 0; font-weight: bold; text-transform: uppercase;">${item.name}</td>
-        <td style="padding: 12px 0; font-family: monospace; text-align: center;">${(item.size || 'M').toUpperCase()}</td>
-        <td style="padding: 12px 0; font-family: monospace; text-align: center;">${item.quantity}</td>
-        <td style="padding: 12px 0; font-family: monospace; text-align: right;">₹${Number(item.price).toLocaleString('en-IN')}</td>
-        <td style="padding: 12px 0; font-family: monospace; text-align: right; font-weight: bold;">₹${Number(item.price * item.quantity).toLocaleString('en-IN')}</td>
-      </tr>
-    `).join('');
-
-    const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
-    const subtotal = Number(metadata.subtotal || order.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0));
-    const discountVal = Number(order.discountAmount || order.discount_amount || metadata.discount || 0);
-
-    const discountRow = (order.couponApplied && order.couponApplied !== 'NONE' && discountVal > 0) ? `
-      <div class="total-row" style="color: #059669; font-weight: bold;">
-        <span>COUPON SAVINGS (${order.couponApplied})</span>
-        <span style="font-family: monospace;">- ₹${discountVal.toLocaleString('en-IN')}</span>
-      </div>
-    ` : '';
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Invoice - ${metadata.order_number}</title>
-          <link rel="preconnect" href="https://fonts.googleapis.com">
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-          <style>
-            body { font-family: 'Inter', system-ui, sans-serif; color: #000; padding: 20px 0; margin: 0; line-height: 1.4; font-size: 11.5px; }
-            .header { border-bottom: 2.5px solid #000; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .logo { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; line-height: 1; }
-            .invoice-title { font-size: 15px; font-weight: 900; letter-spacing: 1px; text-align: right; text-transform: uppercase; line-height: 1.2; }
-            .details { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr; gap: 16px; margin-bottom: 30px; }
-            .details h3 { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: #555; text-transform: uppercase; margin: 0 0 6px 0; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-            .details p { font-size: 11px; font-weight: 600; margin: 0 0 3px 0; text-transform: uppercase; color: #111; word-break: break-word; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-            th { border-bottom: 2px solid #000; padding: 10px 0; text-align: left; font-size: 9px; font-weight: 900; color: #000; text-transform: uppercase; }
-            td { padding: 10px 0; font-size: 11px; }
-            .totals { font-size: 11px; font-weight: bold; border-top: 2px solid #000; padding-top: 15px; }
-            .total-row { display: flex; justify-content: space-between; margin-bottom: 6px; text-transform: uppercase; }
-            .grand-total { font-size: 16px; font-weight: 900; border-top: 1px solid #000; padding-top: 10px; margin-top: 10px; color: #000; }
-            @media print {
-              body { padding: 0; margin: 0; width: 100%; font-size: 11px; }
-              .details p { font-size: 10px; }
-              td { padding: 8px 0; font-size: 10px; }
-              .grand-total { font-size: 15px; }
-            }
-          </style>
-        </head>
-        <body>
-          <div style="max-width: 680px; margin: 0 auto; width: 100%;">
-            <div class="header">
-              <div>
-                <div class="logo">AASHIS</div>
-                <div style="font-size: 10px; color: #666; font-weight: bold; margin-top: 5px; text-transform: uppercase;">Premium Drop & Boutique</div>
-              </div>
-              <div class="invoice-title">
-                TAX INVOICE<br/>
-                <span style="font-family: monospace; font-size: 12px; font-weight: normal; color: #666;"># ${metadata.order_number}</span>
-              </div>
-            </div>
-
-            <div class="details">
-              <div>
-                <h3>Sold By</h3>
-                <p style="font-weight: 800; color: #000;">AASHIS</p>
-                <p>Surat, Gujarat, India</p>
-                <p>Pincode: 395006</p>
-                <p>GSTIN: 24AASHIS1234F1Z0</p>
-              </div>
-              <div>
-                <h3>Billed To</h3>
-                <p style="font-weight: 800; color: #000;">${metadata.customer_name || 'Customer'}</p>
-                <p style="text-transform: lowercase;">${metadata.customer_email || order.email || ''}</p>
-                <p>${addressText || ''}</p>
-                <p>Phone: ${metadata.customer_phone || ''}</p>
-              </div>
-              <div style="text-align: right;">
-                <h3>Invoice Details</h3>
-                <p>Date: ${new Date(orderDate).toLocaleDateString('en-IN')}</p>
-                <p>Payment Mode: ${order.paymentMethod === 'COD' ? 'CASH ON DELIVERY (COD)' : order.paymentMethod === 'WALLET' ? 'STORE WALLET' : 'RAZORPAY ONLINE'}</p>
-                ${order.paymentMethod !== 'COD' ? `<p>Transaction ID: ${metadata.razorpay_payment_id || order.razorpayPaymentId || 'N/A'}</p>` : ''}
-                <p>Order Status: ${(order.status || 'PENDING').toUpperCase()}</p>
-              </div>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr>
-                  <th style="text-align: left;">Item Description</th>
-                  <th style="text-align: center; width: 60px;">Size</th>
-                  <th style="text-align: center; width: 60px;">Qty</th>
-                  <th style="text-align: right; width: 120px;">Unit Price</th>
-                  <th style="text-align: right; width: 120px;">Amount</th>
-                </tr>
-              </thead>
-              <tbody style="font-size: 12px; font-weight: 600;">
-                ${itemsHtml}
-              </tbody>
-            </table>
-
-            <div style="width: 350px; margin-left: auto;" class="totals">
-              <div class="total-row">
-                <span style="color: #666;">Cart Value</span>
-                <span style="font-family: monospace;">₹${subtotal.toLocaleString('en-IN')}</span>
-              </div>
-              ${discountRow}
-
-              <div class="total-row">
-                <span style="color: #666;">Shipping & Delivery</span>
-                <span style="font-family: monospace; font-weight: bold;">${baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}</span>
-              </div>
-              ${remoteSurcharge > 0 ? `
-              <div class="total-row">
-                <span style="color: #666;">Remote Route Surcharge</span>
-                <span style="font-family: monospace; font-weight: bold;">₹${remoteSurcharge}</span>
-              </div>
-              ` : ''}
-              ${isCod ? `
-              <div class="total-row">
-                <span style="color: #666;">COD Handling Fee</span>
-                <span style="font-family: monospace; font-weight: bold;">₹${codFee}</span>
-              </div>
-              ` : ''}
-
-              <div class="total-row grand-total">
-                <span>Net Amount Paid <span style="font-size: 10px; font-weight: normal; color: #555; text-transform: none;">(incl. GST)</span></span>
-                <span style="font-family: monospace; font-size: 20px; font-weight: 900;">₹${Number(order.total).toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            <div style="margin-top: 80px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; font-size: 10px; color: #888; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">
-              Thank you for shopping with AASHIS!<br/>
-              This is a system generated tax invoice. No signature is required.
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
   const submitCancelOrder = async () => {
@@ -588,7 +489,7 @@ function OrderDetail() {
     statusSteps = [
       { key: 'DELIVERED', label: 'Fits Delivered', desc: 'Order delivered successfully.', icon: 'check' },
       { key: 'RETURN_REQUESTED', label: 'Return Requested', desc: 'Return request submitted with condition photos.', icon: 'file' },
-      { key: 'RETURNED', label: 'Return Approved & Refunded', desc: 'Admin approved the return. Refund or reverse pickup complete.', icon: 'check' }
+      { key: 'RETURNED', label: 'Return Approved & Refunded', desc: 'Admin approved the return. Refund has been credited to your Store Wallet.', icon: 'check' }
     ];
   } else if (order.status === 'EXCHANGE_REQUESTED' || order.status === 'EXCHANGED') {
     statusSteps = [
@@ -664,12 +565,18 @@ function OrderDetail() {
               <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 space-y-3">
                 <div className="space-y-1">
                   <h3 className="text-xs font-black tracking-widest text-rose-700 uppercase flex items-center gap-2">
-                    <span>🚫 ORDER CANCELLED</span>
+                    <span>{isAdminCancelled ? "🚫 ORDER CANCELLED BY STORE" : "🚫 ORDER CANCELLED"}</span>
                   </h3>
                   <p className="text-[11px] text-rose-600 font-medium leading-relaxed uppercase">
-                    {order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
-                      ? "This order was cancelled successfully. Your payment has been refunded to your Store Wallet."
-                      : "This order was cancelled successfully."}
+                    {isAdminCancelled ? (
+                      order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                        ? "This order was cancelled by the store. We apologize for the inconvenience. Your payment has been refunded to your Store Wallet."
+                        : "This order was cancelled by the store. We apologize for the inconvenience."
+                    ) : (
+                      order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                        ? "This order was cancelled successfully. Your payment has been refunded to your Store Wallet."
+                        : "This order was cancelled successfully."
+                    )}
                   </p>
                 </div>
                 {metadata.cancel_reason && (
@@ -702,11 +609,22 @@ function OrderDetail() {
               </div>
             ) : (
               <div className="bg-[var(--color-surface)] p-8 rounded-2xl border border-[var(--color-border)] space-y-6">
+                {order.status === 'RETURNED' && (
+                  <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-150 space-y-1 mb-2 animate-fade-in">
+                    <h3 className="text-[10px] font-black tracking-widest text-emerald-700 uppercase flex items-center gap-1.5">
+                      <span>↩️ RETURN APPROVED & REFUNDED</span>
+                    </h3>
+                    <p className="text-[10px] text-emerald-600 font-bold leading-relaxed uppercase">
+                      Your return has been approved and processed. A refund of ₹{(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.
+                    </p>
+                  </div>
+                )}
+                
                 <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
                   🚚 SHIPMENT STATUS
                 </h3>
                 
-                <div className="relative pl-6 space-y-8">
+                <div className="relative pl-6 space-y-8 select-none">
                   {/* Vertical Line */}
                   <div className="absolute left-[35px] top-4 bottom-4 w-1 bg-neutral-200 rounded-full overflow-hidden">
                     <div 
@@ -940,7 +858,7 @@ function OrderDetail() {
             </div>
 
             {/* Calculations & Total Invoice */}
-            <div className="space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] pt-4 border-t border-[var(--color-border)]">
+            <div className="space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] pt-4 border-t border-[var(--color-border)] select-none">
               <div className="flex justify-between">
                 <span>Gross catalog Value ({totalItemsCount} items)</span>
                 <span className="text-neutral-950 font-bold">
@@ -1552,6 +1470,154 @@ function OrderDetail() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Preview Modal */}
+      {isInvoicePreviewOpen && (
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 md:p-10 no-print animate-fade-in text-neutral-900">
+          <div className="bg-white text-neutral-950 w-full max-w-3xl rounded-none shadow-2xl relative flex flex-col max-h-[90vh]">
+            
+            {/* Modal Controls */}
+            <div className="p-4 border-b border-neutral-100 flex justify-between items-center bg-neutral-50 no-print">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-mono font-black tracking-widest text-neutral-500 uppercase">
+                  Invoice Preview
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={isGeneratingPdf}
+                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all text-[9px] font-mono font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-none cursor-pointer border border-emerald-600 disabled:opacity-50"
+                >
+                  {isGeneratingPdf ? 'Downloading...' : 'Download PDF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsInvoicePreviewOpen(false)}
+                  className="border border-neutral-300 hover:bg-neutral-100 active:scale-[0.98] transition-all text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-600 px-3 py-1.5 rounded-none cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Preview Area */}
+            <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-8 bg-neutral-100 flex justify-start sm:justify-center items-start">
+              {/* Actual Printable Invoice Card */}
+              <div 
+                id="invoice-print-area" 
+                className="bg-white p-8 md:p-12 border border-neutral-200 shadow-sm w-[680px] shrink-0 text-[11px] font-sans leading-normal text-black"
+                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+              >
+                {/* Header */}
+                <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+                  <div>
+                    <div className="text-xl md:text-2xl font-black tracking-wider uppercase leading-none">VAKRAYAN</div>
+                    <div className="text-[9px] text-neutral-500 font-bold mt-1 uppercase">Premium Drop & Boutique</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[14px] font-black tracking-wider uppercase leading-snug">TAX INVOICE</div>
+                    <div className="text-[10px] font-mono font-normal text-neutral-500 mt-0.5"># {metadata.order_number}</div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  <div>
+                    <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Sold By</div>
+                    <div className="font-extrabold text-black uppercase">VAKRAYAN</div>
+                    <div className="text-neutral-700">Surat, Gujarat, India</div>
+                    <div className="text-neutral-700">Pincode: 395006</div>
+                    <div className="text-neutral-700">GSTIN: 24VAKRAYAN1234F1Z0</div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Billed To</div>
+                    <div className="font-extrabold text-black uppercase">{metadata.customer_name || 'Customer'}</div>
+                    <div className="text-neutral-700 lowercase break-all">{metadata.customer_email || order.email || ''}</div>
+                    <div className="text-neutral-700 uppercase">{addressText || ''}</div>
+                    <div className="text-neutral-700">Phone: {metadata.customer_phone || ''}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Invoice Details</div>
+                    <div className="text-neutral-700">Date: {new Date(order.$createdAt || order.createdAt || new Date().toISOString()).toLocaleDateString('en-IN')}</div>
+                    <div className="text-neutral-700">Payment: {order.paymentMethod === 'COD' ? 'CASH ON DELIVERY (COD)' : order.paymentMethod === 'WALLET' ? 'STORE WALLET' : 'RAZORPAY ONLINE'}</div>
+                    {order.paymentMethod !== 'COD' && (
+                      <div className="text-neutral-700 break-all">Transaction: {metadata.razorpay_payment_id || order.razorpayPaymentId || 'N/A'}</div>
+                    )}
+                    <div className="text-neutral-700">Status: {(order.status || 'PENDING').toUpperCase()}</div>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <table className="w-full border-collapse mb-8 text-[11px]">
+                  <thead>
+                    <tr className="border-b-2 border-black">
+                      <th className="text-left py-2 font-black uppercase text-[8px]">Item Description</th>
+                      <th className="text-center py-2 font-black uppercase text-[8px] w-[60px]">Size</th>
+                      <th className="text-center py-2 font-black uppercase text-[8px] w-[60px]">Qty</th>
+                      <th className="text-right py-2 font-black uppercase text-[8px] w-[100px]">Unit Price</th>
+                      <th className="text-right py-2 font-black uppercase text-[8px] w-[100px]">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedItems.map((item, idx) => (
+                      <tr key={idx} className="border-b border-neutral-100">
+                        <td className="py-2.5 font-bold uppercase">{item.name}</td>
+                        <td className="py-2.5 text-center font-mono">{(item.size || 'M').toUpperCase()}</td>
+                        <td className="py-2.5 text-center font-mono">{item.quantity}</td>
+                        <td className="py-2.5 text-right font-mono">₹{Number(item.price).toLocaleString('en-IN')}</td>
+                        <td className="py-2.5 text-right font-mono font-bold">₹{Number(item.price * item.quantity).toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Totals */}
+                <div className="w-[300px] ml-auto border-t-2 border-black pt-3 text-[11px]">
+                  <div className="flex justify-between mb-1.5 uppercase font-medium">
+                    <span className="text-neutral-500">Cart Value</span>
+                    <span className="font-mono">₹{subtotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  {order.couponApplied && order.couponApplied !== 'NONE' && discountVal > 0 && (
+                    <div className="flex justify-between mb-1.5 uppercase text-emerald-600 font-bold">
+                      <span>COUPON SAVINGS ({order.couponApplied})</span>
+                      <span className="font-mono">- ₹{discountVal.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between mb-1.5 uppercase font-medium">
+                    <span className="text-neutral-500">Shipping & Delivery</span>
+                    <span className="font-mono">{baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}</span>
+                  </div>
+                  {remoteSurcharge > 0 && (
+                    <div className="flex justify-between mb-1.5 uppercase font-medium">
+                      <span className="text-neutral-500">Remote Route Surcharge</span>
+                      <span className="font-mono">₹{remoteSurcharge}</span>
+                    </div>
+                  )}
+                  {isCod && (
+                    <div className="flex justify-between mb-1.5 uppercase font-medium">
+                      <span className="text-neutral-500">COD Handling Fee</span>
+                      <span className="font-mono">₹{codFee}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-baseline border-t border-black pt-2.5 mt-2.5 uppercase font-bold">
+                    <span>Net Amount Paid <span className="text-[8px] font-normal text-neutral-500 lowercase normal-case">(incl. GST)</span></span>
+                    <span className="font-mono text-lg font-black">₹{Number(order.total || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                {/* Footer Info */}
+                <div className="mt-16 border-t border-neutral-100 pt-4 text-center text-[9px] text-neutral-400 font-bold tracking-widest uppercase leading-relaxed">
+                  Thank you for shopping with VAKRAYAN!<br/>
+                  This is a system generated tax invoice. No signature is required.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

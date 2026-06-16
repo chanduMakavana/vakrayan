@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../appwrite/products';
 import reviewsService from '../../appwrite/reviews';
@@ -108,6 +108,345 @@ function ProductDetail() {
   const [groupProducts, setGroupProducts] = useState([]);
   const [activeReviewImage, setActiveReviewImage] = useState(null);
 
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxOffset, setLightboxOffset] = useState({ x: 0, y: 0 });
+
+  const [mainPhotoZoom, setMainPhotoZoom] = useState(1);
+  const [mainPhotoOffset, setMainPhotoOffset] = useState({ x: 0, y: 0 });
+
+  const mainTouchStartRef = useRef({ x: 0, y: 0 });
+  const mainInitialDistRef = useRef(0);
+  const mainInitialZoomRef = useRef(1);
+  const mainIsPinchingRef = useRef(false);
+  const mainIsDraggingRef = useRef(false);
+  const mainPreventClickRef = useRef(false);
+
+  const mainImageRef = useRef(null);
+  const mainPhotoZoomRef = useRef(1);
+  const mainPhotoOffsetRef = useRef({ x: 0, y: 0 });
+
+  const lightboxImageRef = useRef(null);
+  const lightboxZoomRef = useRef(1);
+  const lightboxOffsetRef = useRef({ x: 0, y: 0 });
+
+  const mainContainerRef = useRef(null);
+  const lightboxContainerRef = useRef(null);
+  const lightboxModalRef = useRef(null);
+  const galleryImagesRef = useRef([]);
+
+  // Touch and wheel event handler for main photo container (blocking viewport zoom & reload)
+  useEffect(() => {
+    const container = mainContainerRef.current;
+    if (!container) return;
+
+    let ticking = false;
+
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let swipeEndX = 0;
+    let swipeEndY = 0;
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        if (mainPhotoZoomRef.current <= 1) {
+          swipeStartX = t.clientX;
+          swipeStartY = t.clientY;
+          swipeEndX = t.clientX;
+          swipeEndY = t.clientY;
+        } else {
+          mainTouchStartRef.current = {
+            x: t.clientX - mainPhotoOffsetRef.current.x,
+            y: t.clientY - mainPhotoOffsetRef.current.y
+          };
+          mainIsDraggingRef.current = true;
+        }
+      } else if (e.touches.length === 2) {
+        e.preventDefault();
+        mainIsPinchingRef.current = true;
+        mainPreventClickRef.current = true;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        mainInitialDistRef.current = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        mainInitialZoomRef.current = mainPhotoZoomRef.current;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        if (mainPhotoZoomRef.current <= 1) {
+          swipeEndX = t.clientX;
+          swipeEndY = t.clientY;
+        } else if (mainIsDraggingRef.current) {
+          e.preventDefault(); // Blocks browser scrolling and page pull-to-refresh
+          const dx = t.clientX - mainTouchStartRef.current.x;
+          const dy = t.clientY - mainTouchStartRef.current.y;
+          mainPhotoOffsetRef.current = { x: dx, y: dy };
+          mainPreventClickRef.current = true;
+          
+          if (!ticking) {
+            window.requestAnimationFrame(() => {
+              if (mainImageRef.current) {
+                mainImageRef.current.style.transform = `translate(${mainPhotoOffsetRef.current.x}px, ${mainPhotoOffsetRef.current.y}px) scale(${mainPhotoZoomRef.current})`;
+              }
+              ticking = false;
+            });
+            ticking = true;
+          }
+        }
+      } else if (e.touches.length === 2 && mainIsPinchingRef.current) {
+        e.preventDefault(); // Blocks default browser zoom
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const factor = dist / (mainInitialDistRef.current || 1);
+        const newZoom = Math.min(Math.max(mainInitialZoomRef.current * factor, 1), 5.5);
+        mainPhotoZoomRef.current = newZoom;
+        if (newZoom === 1) {
+          mainPhotoOffsetRef.current = { x: 0, y: 0 };
+        }
+        
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            if (mainImageRef.current) {
+              mainImageRef.current.style.transform = `translate(${mainPhotoOffsetRef.current.x}px, ${mainPhotoOffsetRef.current.y}px) scale(${mainPhotoZoomRef.current})`;
+            }
+            ticking = false;
+          });
+          ticking = true;
+        }
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      mainIsDraggingRef.current = false;
+      if (e.touches.length === 0) {
+        mainIsPinchingRef.current = false;
+        
+        if (mainPhotoZoomRef.current <= 1) {
+          const diffX = swipeStartX - swipeEndX;
+          const diffY = swipeStartY - swipeEndY;
+          const threshold = 40; // minimum swipe distance in pixels
+          
+          if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold) {
+            const list = galleryImagesRef.current || [];
+            if (list.length > 1) {
+              const currentIdx = list.indexOf(activeImage) !== -1 ? list.indexOf(activeImage) : 0;
+              let targetIdx = currentIdx;
+              if (diffX > 0) {
+                targetIdx = (currentIdx + 1) % list.length; // Swipe Left -> Next
+              } else {
+                targetIdx = (currentIdx - 1 + list.length) % list.length; // Swipe Right -> Prev
+              }
+              setActiveImage(list[targetIdx]);
+              
+              // Reset zoom and offsets
+              mainPhotoZoomRef.current = 1;
+              mainPhotoOffsetRef.current = { x: 0, y: 0 };
+              setMainPhotoZoom(1);
+              setMainPhotoOffset({ x: 0, y: 0 });
+              if (mainImageRef.current) {
+                mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+              }
+            }
+          }
+        } else {
+          setMainPhotoZoom(mainPhotoZoomRef.current);
+          setMainPhotoOffset(mainPhotoOffsetRef.current);
+        }
+      }
+    };
+
+    const handleWheel = (e) => {
+      // If ctrlKey is true, it is trackpad pinch zoom
+      if (e.ctrlKey) {
+        e.preventDefault();
+        mainPreventClickRef.current = true;
+        const zoomFactor = -e.deltaY * 0.015;
+        const newZoom = Math.min(Math.max(mainPhotoZoomRef.current + zoomFactor, 1), 5.5);
+        mainPhotoZoomRef.current = newZoom;
+        if (newZoom === 1) {
+          mainPhotoOffsetRef.current = { x: 0, y: 0 };
+        }
+        setMainPhotoZoom(newZoom);
+        if (newZoom === 1) {
+          setMainPhotoOffset({ x: 0, y: 0 });
+        }
+
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            if (mainImageRef.current) {
+              mainImageRef.current.style.transform = `translate(${mainPhotoOffsetRef.current.x}px, ${mainPhotoOffsetRef.current.y}px) scale(${mainPhotoZoomRef.current})`;
+            }
+            ticking = false;
+          });
+          ticking = true;
+        }
+      } else if (mainPhotoZoomRef.current > 1) {
+        // If zoomed in, mouse wheel/trackpad scroll pans the main image
+        e.preventDefault();
+        mainPreventClickRef.current = true;
+        mainPhotoOffsetRef.current = {
+          x: mainPhotoOffsetRef.current.x - e.deltaX,
+          y: mainPhotoOffsetRef.current.y - e.deltaY
+        };
+        setMainPhotoOffset({ ...mainPhotoOffsetRef.current });
+
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            if (mainImageRef.current) {
+              mainImageRef.current.style.transform = `translate(${mainPhotoOffsetRef.current.x}px, ${mainPhotoOffsetRef.current.y}px) scale(${mainPhotoZoomRef.current})`;
+            }
+            ticking = false;
+          });
+          ticking = true;
+        }
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [activeImage]);
+
+  // Touch and wheel event handler for lightbox modal (blocking viewport zoom & reload)
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const container = lightboxModalRef.current;
+    if (!container) return;
+
+    let ticking = false;
+
+    // Block ALL background scrolling & pull-to-refresh inside full-screen lightbox
+    const handleGlobalTouchMove = (e) => {
+      e.preventDefault();
+    };
+
+    const handleWheel = (e) => {
+      e.preventDefault(); // Stop webpage from scrolling or zooming
+      
+      // Every wheel event (both trackpad pinch and normal mouse wheel scroll) zooms the image
+      // Pinch zoom has ctrlKey = true (finer control), mouse wheel scroll has ctrlKey = false (larger/fixed steps)
+      const zoomFactor = e.ctrlKey ? -e.deltaY * 0.015 : (e.deltaY < 0 ? 0.25 : -0.25);
+      const newZoom = Math.min(Math.max(lightboxZoomRef.current + zoomFactor, 1), 4);
+      lightboxZoomRef.current = newZoom;
+      if (newZoom === 1) {
+        lightboxOffsetRef.current = { x: 0, y: 0 };
+      }
+      setLightboxZoom(newZoom);
+      if (newZoom === 1) {
+        setLightboxOffset({ x: 0, y: 0 });
+      }
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (lightboxImageRef.current) {
+            lightboxImageRef.current.style.transform = `translate(${lightboxOffsetRef.current.x}px, ${lightboxOffsetRef.current.y}px) scale(${lightboxZoomRef.current})`;
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        const startX = e.touches[0].clientX - lightboxOffsetRef.current.x;
+        const startY = e.touches[0].clientY - lightboxOffsetRef.current.y;
+        
+        const handleTouchMove = (moveEvent) => {
+          moveEvent.preventDefault();
+          
+          if (lightboxZoomRef.current > 1) {
+            const dx = moveEvent.touches[0].clientX - startX;
+            const dy = moveEvent.touches[0].clientY - startY;
+            lightboxOffsetRef.current = { x: dx, y: dy };
+            
+            if (!ticking) {
+              window.requestAnimationFrame(() => {
+                if (lightboxImageRef.current) {
+                  lightboxImageRef.current.style.transform = `translate(${lightboxOffsetRef.current.x}px, ${lightboxOffsetRef.current.y}px) scale(${lightboxZoomRef.current})`;
+                }
+                ticking = false;
+              });
+              ticking = true;
+            }
+          }
+        };
+        
+        const handleTouchEnd = () => {
+          window.removeEventListener('touchmove', handleTouchMove);
+          window.removeEventListener('touchend', handleTouchEnd);
+          setLightboxOffset(lightboxOffsetRef.current);
+        };
+        
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', handleTouchEnd);
+      } else if (e.touches.length === 2) {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const initialDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const initialZoom = lightboxZoomRef.current;
+        
+        const handleTouchMovePinch = (moveEvent) => {
+          moveEvent.preventDefault();
+          if (moveEvent.touches.length === 2) {
+            const mt1 = moveEvent.touches[0];
+            const mt2 = moveEvent.touches[1];
+            const currentDist = Math.hypot(mt1.clientX - mt2.clientX, mt1.clientY - mt2.clientY);
+            const factor = currentDist / (initialDist || 1);
+            const newZoom = Math.min(Math.max(initialZoom * factor, 1), 4);
+            lightboxZoomRef.current = newZoom;
+            if (newZoom === 1) {
+              lightboxOffsetRef.current = { x: 0, y: 0 };
+            }
+            
+            if (!ticking) {
+              window.requestAnimationFrame(() => {
+                if (lightboxImageRef.current) {
+                  lightboxImageRef.current.style.transform = `translate(${lightboxOffsetRef.current.x}px, ${lightboxOffsetRef.current.y}px) scale(${lightboxZoomRef.current})`;
+                }
+                ticking = false;
+              });
+              ticking = true;
+            }
+          }
+        };
+        
+        const handleTouchEndPinch = () => {
+          window.removeEventListener('touchmove', handleTouchMovePinch);
+          window.removeEventListener('touchend', handleTouchEndPinch);
+          setLightboxZoom(lightboxZoomRef.current);
+          setLightboxOffset(lightboxOffsetRef.current);
+        };
+        
+        window.addEventListener('touchmove', handleTouchMovePinch, { passive: false });
+        window.addEventListener('touchend', handleTouchEndPinch);
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleGlobalTouchMove);
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [isLightboxOpen]);
+
   const [notifyEmail, setNotifyEmail] = useState('');
   const [notifyStatus, setNotifyStatus] = useState('idle');
   const [notifyError, setNotifyError] = useState('');
@@ -146,7 +485,7 @@ function ProductDetail() {
       setNotifyEmail('');
     } catch (err) {
       console.error("Restock log failure:", err);
-      setNotifyError('Registration failed. Try again.');
+      setNotifyError(err.message || 'Registration failed. Try again.');
       setNotifyStatus('idle');
     }
   };
@@ -314,6 +653,14 @@ function ProductDetail() {
 
        const cachedProduct = products.find(p => p.slug === idOrSlug || p.$id === idOrSlug || p.id === idOrSlug);
        if (cachedProduct) {
+         const isProductLive = cachedProduct.is_live === true || cachedProduct.is_live === 'true' || cachedProduct.is_live === 1 || cachedProduct.is_live === '1';
+         if (!adminMode && !isProductLive) {
+           if (isMounted) {
+             showToast("Requested drop sequence untraceable inside active servers.", "error");
+             navigate('/');
+           }
+           return;
+         }
          if (isMounted) {
            setProduct(cachedProduct);
            setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
@@ -348,6 +695,12 @@ function ProductDetail() {
        const mainProductData = await productsService.getProductBySlugOrId(idOrSlug);
 
        if (mainProductData && isMounted) {
+         const isProductLive = mainProductData.is_live === true || mainProductData.is_live === 'true' || mainProductData.is_live === 1 || mainProductData.is_live === '1';
+         if (!adminMode && !isProductLive) {
+           showToast("Requested drop sequence untraceable inside active servers.", "error");
+           navigate('/');
+           return;
+         }
          setProduct(mainProductData);
          setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
          
@@ -368,15 +721,12 @@ function ProductDetail() {
           setSelectedColor(mainProductData.color_name || '');
           setActiveVariant(null);
 
-         const mainCategory = mainProductData.category || "";
-         const response = await productsService.getProducts();
-         const structuredData = response?.documents || response || [];
-         
-         const filteredSuggestions = structuredData.filter(
-           item => mainCategory && item.category === mainCategory && (item.$id || item.id) !== (mainProductData.$id || mainProductData.id)
-         );
-         
-         setSuggestProduct(filteredSuggestions);
+          const mainCategory = mainProductData.category || "";
+          const filteredSuggestions = products.filter(
+            item => mainCategory && item.category === mainCategory && (item.$id || item.id) !== (mainProductData.$id || mainProductData.id)
+          );
+          
+          setSuggestProduct(filteredSuggestions);
        }
      } catch (error) {
        console.error("Failed to execute data pipeline matrix updates from Appwrite:", error);
@@ -821,6 +1171,54 @@ function ProductDetail() {
         ...(Array.isArray(product.back_image_links) ? product.back_image_links : [product.back_image_link])
       ].filter(Boolean);
 
+  galleryImagesRef.current = galleryImages;
+
+  const activeImageIndex = galleryImages.indexOf(activeImage) !== -1 ? galleryImages.indexOf(activeImage) : 0;
+
+  const handleLightboxNext = () => {
+    if (galleryImages.length <= 1) return;
+    const nextIdx = (activeImageIndex + 1) % galleryImages.length;
+    setActiveImage(galleryImages[nextIdx]);
+    setLightboxZoom(1);
+    setLightboxOffset({ x: 0, y: 0 });
+    setMainPhotoZoom(1);
+    setMainPhotoOffset({ x: 0, y: 0 });
+    
+    mainPhotoZoomRef.current = 1;
+    mainPhotoOffsetRef.current = { x: 0, y: 0 };
+    lightboxZoomRef.current = 1;
+    lightboxOffsetRef.current = { x: 0, y: 0 };
+    
+    if (mainImageRef.current) {
+      mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+    }
+    if (lightboxImageRef.current) {
+      lightboxImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+    }
+  };
+
+  const handleLightboxPrev = () => {
+    if (galleryImages.length <= 1) return;
+    const prevIdx = (activeImageIndex - 1 + galleryImages.length) % galleryImages.length;
+    setActiveImage(galleryImages[prevIdx]);
+    setLightboxZoom(1);
+    setLightboxOffset({ x: 0, y: 0 });
+    setMainPhotoZoom(1);
+    setMainPhotoOffset({ x: 0, y: 0 });
+    
+    mainPhotoZoomRef.current = 1;
+    mainPhotoOffsetRef.current = { x: 0, y: 0 };
+    lightboxZoomRef.current = 1;
+    lightboxOffsetRef.current = { x: 0, y: 0 };
+    
+    if (mainImageRef.current) {
+      mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+    }
+    if (lightboxImageRef.current) {
+      lightboxImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+    }
+  };
+
   const rawDescription = product?.description || "";
   const returnPolicyMatch = rawDescription.match(/\[RETURN_POLICY\]:\s*(.+)/);
   const returnPolicy = product?.return_policy || (returnPolicyMatch ? returnPolicyMatch[1].trim() : "7 Day Return");
@@ -863,7 +1261,16 @@ function ProductDetail() {
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => setActiveImage(imgUrl)}
+                    onClick={() => {
+                      setActiveImage(imgUrl);
+                      mainPhotoZoomRef.current = 1;
+                      mainPhotoOffsetRef.current = { x: 0, y: 0 };
+                      setMainPhotoZoom(1);
+                      setMainPhotoOffset({ x: 0, y: 0 });
+                      if (mainImageRef.current) {
+                        mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+                      }
+                    }}
                     className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImage === imgUrl ? 'border-neutral-950 scale-95 shadow-sm' : 'border-[var(--color-border)] hover:border-[var(--color-accent)]'}`}
                   >
                     <img src={imgUrl} alt="Garment view" className="w-full h-full object-cover" />
@@ -875,20 +1282,90 @@ function ProductDetail() {
             <div
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
-              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group cursor-zoom-in`}
+              ref={mainContainerRef}
+              onMouseDown={(e) => {
+                if (e.button !== 0) return; // Only left click
+                if (mainPhotoZoomRef.current <= 1) return; // Only drag when zoomed
+                e.preventDefault();
+                mainIsDraggingRef.current = true;
+                const startX = e.clientX - mainPhotoOffsetRef.current.x;
+                const startY = e.clientY - mainPhotoOffsetRef.current.y;
+                
+                const handleMouseMoveDrag = (moveEvent) => {
+                  mainPreventClickRef.current = true;
+                  const dx = moveEvent.clientX - startX;
+                  const dy = moveEvent.clientY - startY;
+                  mainPhotoOffsetRef.current = { x: dx, y: dy };
+                  if (mainImageRef.current) {
+                    mainImageRef.current.style.transform = `translate(${dx}px, ${dy}px) scale(${mainPhotoZoomRef.current})`;
+                  }
+                };
+                
+                const handleMouseUpDrag = () => {
+                  mainIsDraggingRef.current = false;
+                  window.removeEventListener('mousemove', handleMouseMoveDrag);
+                  window.removeEventListener('mouseup', handleMouseUpDrag);
+                  setMainPhotoOffset(mainPhotoOffsetRef.current);
+                };
+                
+                window.addEventListener('mousemove', handleMouseMoveDrag);
+                window.addEventListener('mouseup', handleMouseUpDrag);
+              }}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                mainPreventClickRef.current = true;
+                if (mainPhotoZoomRef.current > 1) {
+                  mainPhotoZoomRef.current = 1;
+                  mainPhotoOffsetRef.current = { x: 0, y: 0 };
+                  setMainPhotoZoom(1);
+                  setMainPhotoOffset({ x: 0, y: 0 });
+                  if (mainImageRef.current) {
+                    mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+                  }
+                } else {
+                  mainPhotoZoomRef.current = 4.0;
+                  mainPhotoOffsetRef.current = { x: 0, y: 0 };
+                  setMainPhotoZoom(4.0);
+                  setMainPhotoOffset({ x: 0, y: 0 });
+                  if (mainImageRef.current) {
+                    mainImageRef.current.style.transform = 'translate(0px, 0px) scale(4.0)';
+                  }
+                }
+              }}
+              onClick={() => {
+                if (mainPreventClickRef.current) {
+                  mainPreventClickRef.current = false;
+                  return;
+                }
+                mainPhotoZoomRef.current = 1;
+                mainPhotoOffsetRef.current = { x: 0, y: 0 };
+                setMainPhotoZoom(1);
+                setMainPhotoOffset({ x: 0, y: 0 });
+                if (mainImageRef.current) {
+                  mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+                }
+                setIsLightboxOpen(true);
+                setLightboxZoom(1);
+                setLightboxOffset({ x: 0, y: 0 });
+              }}
+              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
             >
               <div className="absolute top-4 right-4 bg-[var(--color-surface)] border border-neutral-950/15 text-[var(--color-text)] font-mono text-[9px] tracking-wider px-2 py-1 rounded-none z-10 pointer-events-none uppercase">
-                Hover to Zoom
+                Hover to Zoom / Tap to Gallery
               </div>
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
+                  ref={mainImageRef}
                   src={activeImage}
                   alt={product.name}
                   fetchPriority="high"
                   decoding="sync"
                   style={{
-                    transformOrigin: zoomStyle.transformOrigin,
-                    transform: `scale(${zoomStyle.scale})`
+                    transformOrigin: mainPhotoZoom > 1 ? 'center center' : zoomStyle.transformOrigin,
+                    transform: mainPhotoZoom > 1 
+                      ? `translate(${mainPhotoOffset.x}px, ${mainPhotoOffset.y}px) scale(${mainPhotoZoom})`
+                      : `scale(${zoomStyle.scale})`
                   }}
                   className="w-full h-full object-cover object-center transition-transform duration-150 ease-out"
                 />
@@ -1009,7 +1486,7 @@ function ProductDetail() {
                 Copy Link
               </button>
               <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this streetwear fit drop: ${product.name} at ${window.location.href}`)}`}
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this vakrayan fit drop: ${product.name} at ${window.location.href}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 border border-emerald-200 bg-emerald-50 hover:border-emerald-600 hover:bg-emerald-100/50 px-2.5 py-1 transition-all cursor-pointer font-sans no-underline"
@@ -1170,7 +1647,7 @@ function ProductDetail() {
               );
             })()}
 
-            <div className="space-y-4 pt-2 border-t border-neutral-150">
+            <div className="hidden md:block space-y-4 pt-2 border-t border-neutral-150">
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex gap-3 w-full sm:w-auto sm:flex-1">
                     <div className="flex-1 transform active:scale-[0.99] transition-transform duration-150">
@@ -1233,14 +1710,30 @@ function ProductDetail() {
                     <button
                       type="button"
                       onClick={handleBuyNow}
-                      className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950"
+                      disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
+                      className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-2 sm:px-4 md:px-6 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      ⚡ Buy Now
+                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? '✕ Sold Out' : '⚡ Buy Now'}
                     </button>
                   </div>
                 </div>
 
-              {/* OUT OF STOCK RESTOCK ALERTS FORM */}
+                <div className="flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
+                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
+                    returnPolicy === "No Return" ? "bg-rose-500" :
+                    returnPolicy === "Exchange Only" ? "bg-amber-500" :
+                    returnPolicy === "Return Only" ? "bg-blue-500" : "bg-emerald-500"
+                  }`} />
+                  <p className="font-mono text-[10px] uppercase tracking-wide">
+                    {returnPolicy === "No Return" ? "No return or exchange active." :
+                     returnPolicy === "Exchange Only" ? "7-Day exchange only active." :
+                     returnPolicy === "Return Only" ? "7-Day return only active." :
+                     "7-Day returns & exchanges active."}
+                  </p>
+                </div>
+              </div>
+
+              {/* OUT OF STOCK RESTOCK ALERTS FORM - Rendered on both mobile & desktop */}
               {((selectedSize && stocks[selectedSize] === 0) || isAllOutOfStock) && (
                 <div className="p-4 bg-neutral-900 border border-neutral-850 text-white rounded-none space-y-3 mt-3 animate-fade-in">
                   <div className="flex items-center gap-2">
@@ -1286,21 +1779,6 @@ function ProductDetail() {
                   )}
                 </div>
               )}
-
-              <div className="flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
-                <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
-                  returnPolicy === "No Return" ? "bg-rose-500" :
-                  returnPolicy === "Exchange Only" ? "bg-amber-500" :
-                  returnPolicy === "Return Only" ? "bg-blue-500" : "bg-emerald-500"
-                }`} />
-                <p className="font-mono text-[10px] uppercase tracking-wide">
-                  {returnPolicy === "No Return" ? "No return or exchange active." :
-                   returnPolicy === "Exchange Only" ? "7-Day exchange only active." :
-                   returnPolicy === "Return Only" ? "7-Day return only active." :
-                   "7-Day returns & exchanges active."}
-                </p>
-              </div>
-            </div>
 
             <div className="pt-4 pb-2 border-t border-neutral-150 space-y-3">
               <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest uppercase">CHECK DELIVERY AVAILABILITY</span>
@@ -2101,7 +2579,7 @@ function ProductDetail() {
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
               <div>
                 <h3 className="text-sm font-mono font-bold uppercase tracking-[0.2em] text-neutral-950">
-                  📏 STREETWEAR SIZE GUIDE
+                  📏 VAKRAYAN SIZE GUIDE
                 </h3>
                 <p className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider mt-0.5">
                   Size chart for boxy and oversized fits
@@ -2153,7 +2631,7 @@ function ProductDetail() {
             </div>
 
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-[10px] uppercase font-bold text-[var(--color-muted)] tracking-wide leading-relaxed">
-              <span className="font-black text-[var(--color-text)] block mb-0.5">💡 STREETWEAR FIT MEMENTO</span>
+              <span className="font-black text-[var(--color-text)] block mb-0.5">💡 VAKRAYAN FIT MEMENTO</span>
               Our cuts are designed for a relaxed, slightly boxy drop-shoulder aesthetic. For a fitted standard silhouette, we recommend choosing one size smaller.
             </div>
 
@@ -2314,6 +2792,252 @@ function ProductDetail() {
               alt="High-resolution review zoom" 
               className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-lg"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Bottom Actions Bar for Mobile */}
+      {!adminMode && !loading && product && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-surface)] border-t border-neutral-200 p-3 flex gap-3 md:hidden shadow-[0_-8px_30px_rgb(0,0,0,0.08)] backdrop-blur-md pb-safe">
+          {/* Wishlist Button */}
+          <button
+            type="button"
+            onClick={async () => {
+              const productId = product.$id || product.id;
+              const exists = wishlist.some(item => item.$id === productId || item.id === productId);
+              let updated;
+              if (exists) {
+                dispatch(removeWishlistItemState(productId));
+                const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                updated = saved.filter(item => item.$id !== productId && item.id !== productId);
+                localStorage.setItem('wishlist', JSON.stringify(updated));
+                if (isAuthenticated && user) {
+                  try {
+                    await wishlistService.removeFromWishlist(user.$id, productId);
+                  } catch (e) {
+                    console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                  }
+                }
+              } else {
+                dispatch(addWishlistItemState(product));
+                const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                updated = [...saved, product];
+                localStorage.setItem('wishlist', JSON.stringify(updated));
+                if (isAuthenticated && user) {
+                  try {
+                    await wishlistService.addToWishlist(user.$id, productId);
+                  } catch (e) {
+                    console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                  }
+                }
+              }
+            }}
+            className="w-14 shrink-0 bg-[var(--color-surface)] border border-neutral-950 hover:bg-[var(--color-surface)] rounded-none transition-all flex items-center justify-center cursor-pointer"
+            title="Save to Wishlist"
+          >
+            {wishlist.some(item => item.$id === (product.$id || product.id) || item.id === (product.$id || product.id)) ? (
+              <svg className="w-5 h-5 text-rose-500 fill-current" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-[var(--color-muted)] stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Add to Cart Button */}
+          <div className="flex-1 min-w-0">
+            <AddToCartButton
+              product={product}
+              selectedSize={selectedSize}
+              selectedColor={selectedColor}
+            />
+          </div>
+
+          {/* Buy Now Button */}
+          <div className="flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
+              className="w-full h-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? '✕ Sold Out' : '⚡ Buy Now'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Product Image Lightbox Modal with Gestures & Zoom Controls */}
+      {isLightboxOpen && (
+        <div 
+          className="fixed inset-0 z-[200] flex flex-col justify-between bg-black/95 backdrop-blur-md select-none animate-fade-in outline-none"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsLightboxOpen(false);
+            if (e.key === 'ArrowRight' && galleryImages.length > 1) handleLightboxNext();
+            if (e.key === 'ArrowLeft' && galleryImages.length > 1) handleLightboxPrev();
+          }}
+          tabIndex={0}
+          ref={(el) => {
+            if (el) {
+              lightboxModalRef.current = el;
+              el.focus();
+            }
+          }}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return; // Only left click
+            if (e.target.closest('button')) return; // Ignore button clicks
+            e.preventDefault();
+            lightboxOffsetRef.current = lightboxOffset;
+            lightboxZoomRef.current = lightboxZoom;
+            const startX = e.clientX - lightboxOffsetRef.current.x;
+            const startY = e.clientY - lightboxOffsetRef.current.y;
+            
+            const handleMouseMove = (moveEvent) => {
+              if (lightboxZoomRef.current > 1) {
+                const dx = moveEvent.clientX - startX;
+                const dy = moveEvent.clientY - startY;
+                lightboxOffsetRef.current = { x: dx, y: dy };
+                if (lightboxImageRef.current) {
+                  lightboxImageRef.current.style.transform = `translate(${dx}px, ${dy}px) scale(${lightboxZoomRef.current})`;
+                }
+              }
+            };
+            
+            const handleMouseUp = () => {
+              window.removeEventListener('mousemove', handleMouseMove);
+              window.removeEventListener('mouseup', handleMouseUp);
+              setLightboxOffset(lightboxOffsetRef.current);
+            };
+            
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+          }}
+          onDoubleClick={(e) => {
+            if (e.target.closest('button')) return; // Ignore buttons
+            e.preventDefault();
+            if (lightboxZoom > 1) {
+              lightboxZoomRef.current = 1;
+              lightboxOffsetRef.current = { x: 0, y: 0 };
+              setLightboxZoom(1);
+              setLightboxOffset({ x: 0, y: 0 });
+              if (lightboxImageRef.current) {
+                lightboxImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+              }
+            } else {
+              lightboxZoomRef.current = 2.5;
+              lightboxOffsetRef.current = { x: 0, y: 0 };
+              setLightboxZoom(2.5);
+              setLightboxOffset({ x: 0, y: 0 });
+              if (lightboxImageRef.current) {
+                lightboxImageRef.current.style.transform = 'translate(0px, 0px) scale(2.5)';
+              }
+            }
+          }}
+        >
+          {/* Top Bar */}
+          <div className="w-full flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent text-white z-10">
+            <div className="font-mono text-xs tracking-wider uppercase bg-black/40 px-3 py-1.5 border border-white/10 backdrop-blur-xs">
+              {galleryImages.length > 1 ? `${activeImageIndex + 1} / ${galleryImages.length}` : '1 / 1'}
+              {lightboxZoom > 1 && ` • ${Math.round(lightboxZoom * 100)}% Zoom`}
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <span className="hidden sm:inline text-[10px] font-mono tracking-widest text-neutral-400 uppercase">
+                {lightboxZoom > 1 ? 'Drag to Pan • Double-tap to Reset' : 'Pinch or double-tap to zoom'}
+              </span>
+              <button
+                type="button"
+                className="bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-none border border-white/10 backdrop-blur-xs transition-colors cursor-pointer"
+                onClick={() => setIsLightboxOpen(false)}
+                title="Close Lightbox"
+              >
+                <FiX className="text-xl" />
+              </button>
+            </div>
+          </div>
+
+          {/* Central Image Viewer */}
+          <div className="relative flex-1 w-full flex items-center justify-center overflow-hidden">
+            {/* Left Nav */}
+            {galleryImages.length > 1 && (
+              <button
+                type="button"
+                className="absolute left-4 z-25 bg-black/40 hover:bg-black/60 text-white p-3 border border-white/10 backdrop-blur-xs transition-all hover:scale-105 active:scale-95 cursor-pointer rounded-none"
+                onClick={handleLightboxPrev}
+                title="Previous Image"
+              >
+                <FiChevronLeft className="text-2xl" />
+              </button>
+            )}
+
+            {/* Interactive Image Container */}
+            <div 
+              ref={lightboxContainerRef}
+              className={`relative max-w-full max-h-[75vh] w-auto h-auto flex items-center justify-center ${lightboxZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+            >
+              <img
+                ref={lightboxImageRef}
+                src={activeImage}
+                alt="Product Detail Expanded"
+                className="max-w-full max-h-[75vh] object-contain transition-transform duration-100 ease-out select-none pointer-events-none"
+                style={{
+                  transform: `translate(${lightboxOffset.x}px, ${lightboxOffset.y}px) scale(${lightboxZoom})`,
+                }}
+              />
+            </div>
+
+            {/* Right Nav */}
+            {galleryImages.length > 1 && (
+              <button
+                type="button"
+                className="absolute right-4 z-25 bg-black/40 hover:bg-black/60 text-white p-3 border border-white/10 backdrop-blur-xs transition-all hover:scale-105 active:scale-95 cursor-pointer rounded-none"
+                onClick={handleLightboxNext}
+                title="Next Image"
+              >
+                <FiChevronRight className="text-2xl" />
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Bar Controls */}
+          <div className="w-full flex flex-col items-center gap-4 p-4 bg-gradient-to-t from-black/80 to-transparent text-white z-10">
+
+
+            {/* Thumbnail previews */}
+            {galleryImages.length > 1 && (
+              <div className="flex gap-2 max-w-full overflow-x-auto pb-1 scrollbar-none">
+                {galleryImages.map((imgUrl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveImage(imgUrl);
+                      setLightboxZoom(1);
+                      setLightboxOffset({ x: 0, y: 0 });
+                      setMainPhotoZoom(1);
+                      setMainPhotoOffset({ x: 0, y: 0 });
+                      
+                      mainPhotoZoomRef.current = 1;
+                      mainPhotoOffsetRef.current = { x: 0, y: 0 };
+                      lightboxZoomRef.current = 1;
+                      lightboxOffsetRef.current = { x: 0, y: 0 };
+                      
+                      if (mainImageRef.current) {
+                        mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+                      }
+                      if (lightboxImageRef.current) {
+                        lightboxImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+                      }
+                    }}
+                    className={`w-10 h-12 border transition-all duration-300 shrink-0 ${activeImage === imgUrl ? 'border-white scale-95 shadow-lg' : 'border-white/25 opacity-60 hover:opacity-100'}`}
+                  >
+                    <img src={imgUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

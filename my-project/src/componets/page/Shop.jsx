@@ -20,12 +20,14 @@ function Shop() {
   const tagParam = searchParams.get('tag') // supports ?tag=NEW+DROP
 
   const products = useSelector(state => state.products.items || [])
+  const offers = useSelector(state => state.products.offers || [])
   const wishlist = useSelector(state => state.wishlist || [])
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
   const reduxFetched = useSelector(state => state.products.fetched)
   
   const [loading, setLoading] = useState(!reduxFetched)
   const [searchQuery, setSearchQuery] = useState('')
+  const [tempSearch, setTempSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(urlCategory || 'all')
   const [selectedTag, setSelectedTag] = useState(tagParam || 'all')
   const [sortBy, setSortBy] = useState('newest') // newest | price-low | price-high
@@ -106,15 +108,16 @@ function Shop() {
   }, [urlCategory])
 
   useEffect(() => {
-    if (tagParam) {
-      setTimeout(() => setSelectedTag(tagParam), 0)
-    }
+    setTimeout(() => setSelectedTag(tagParam || 'all'), 0)
   }, [tagParam])
 
   // Synchronize search input with URL search parameter
   const searchParam = searchParams.get('search') || ''
   useEffect(() => {
-    setTimeout(() => setSearchQuery(searchParam), 0)
+    setTimeout(() => {
+      setSearchQuery(searchParam);
+      setTempSearch(searchParam);
+    }, 0);
   }, [searchParam])
 
   // Debounced search query analytics logging — baseFiltered ke baad hona chahiye
@@ -124,7 +127,21 @@ function Shop() {
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
 
     // Tag Filter
-    const matchesTag = selectedTag === 'all' || (product.tag && product.tag.toUpperCase() === selectedTag.toUpperCase())
+    const activeOfferMatch = offers.find(o => 
+      (o.tag && selectedTag && o.tag.toLowerCase() === selectedTag.toLowerCase()) || 
+      (o.$id && selectedTag && o.$id.toLowerCase() === selectedTag.toLowerCase()) || 
+      (o.id && selectedTag && o.id.toLowerCase() === selectedTag.toLowerCase())
+    );
+    let matchesTag = selectedTag === 'all' || 
+      (product.tag && product.tag.toUpperCase() === selectedTag.toUpperCase()) ||
+      (Array.isArray(product.tags) && product.tags.some(t => t && t.toUpperCase() === selectedTag.toUpperCase()));
+
+    if (activeOfferMatch) {
+      const matchesId = Array.isArray(activeOfferMatch.productIds) && activeOfferMatch.productIds.includes(product.$id || product.id);
+      const matchesCategory = activeOfferMatch.category && product.category && product.category.toLowerCase() === activeOfferMatch.category.toLowerCase();
+      const matchesOfferTag = activeOfferMatch.tag && Array.isArray(product.tags) && product.tags.some(t => t && t.toLowerCase() === activeOfferMatch.tag.toLowerCase());
+      matchesTag = matchesId || matchesCategory || matchesOfferTag;
+    }
 
     // Price Filter
     const priceNum = Number(product.price || 0)
@@ -297,7 +314,7 @@ function Shop() {
           {/* Headline Title */}
           <div className="text-center md:text-left space-y-2 border-b border-[var(--color-border)] pb-6">
             <h4 className="text-xs tracking-[0.4em] text-[var(--color-accent)] font-black uppercase">
-              Streetwear Archives // HQ
+              Vakrayan Archives // HQ
             </h4>
             <h1 className="text-4xl md:text-6xl font-black tracking-tight uppercase leading-none text-[var(--color-text)]">
               Shop Collection
@@ -393,14 +410,27 @@ function Shop() {
             <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-end gap-5 pt-2">
               {/* Minimal Underline Search Input & Filter Toggle */}
               <div className="flex items-end gap-4 flex-1 max-w-xl">
-                <div className="relative flex-1">
+                <div className="relative flex-1 flex items-center">
                   <input
                     type="text"
                     placeholder="SEARCH THE ARCHIVE..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent border-b border-[var(--color-border)] focus:border-[var(--color-accent)] py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)]/50 outline-hidden tracking-widest font-mono uppercase transition-colors"
+                    value={tempSearch}
+                    onChange={(e) => setTempSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setSearchQuery(tempSearch);
+                      }
+                    }}
+                    className="w-full bg-transparent border-b border-[var(--color-border)] focus:border-[var(--color-accent)] py-2.5 pr-8 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)]/50 outline-hidden tracking-widest font-mono uppercase transition-colors"
                   />
+                  <button
+                    onClick={() => setSearchQuery(tempSearch)}
+                    className="absolute right-0 bottom-2.5 text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                  </button>
                 </div>
                 <button
                   onClick={() => setFilterDrawerOpen(true)}
@@ -564,7 +594,7 @@ function Shop() {
           {!loading && filteredProducts.length === 0 && (
             <div className="w-full py-28 text-center bg-[var(--color-surface)] border border-neutral-950/10">
               <p className="text-xs font-mono font-bold tracking-widest text-[var(--color-muted)] uppercase">
-                NO STREETWEAR FIT MATCHES YOUR SEARCH CRITERIA.
+                NO VAKRAYAN FIT MATCHES YOUR SEARCH CRITERIA.
               </p>
               <button 
                 onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setSelectedTag('all'); }} 

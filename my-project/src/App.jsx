@@ -1,5 +1,5 @@
 import './App.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -8,7 +8,8 @@ import authService from './appwrite/auth'
 import cartService from './appwrite/cart'
 import { setCartItems } from './features/addToCart'
 import productsService from './appwrite/products'
-import { setProducts } from './features/productsSlice'
+import { setProducts, setOffers } from './features/productsSlice'
+import offersService from './appwrite/offers'
 import { sendWebhookNotification } from './utils/webhookHelper'
 import { mergeLocalCartToDb } from './utils/cartMergeHelper'
 
@@ -100,9 +101,13 @@ function AppContent() {
   const dispatch = useDispatch()
   const { loading: authLoading } = useSelector((state) => state.auth)
   const productsFetched = useSelector((state) => state.products.fetched)
+  const offersFetched = useSelector((state) => state.products.offersFetched)
   const location = useLocation()
   
-  const loading = authLoading || !productsFetched;
+  const [fontsLoaded, setFontsLoaded] = useState(false)
+  const [criticalImagesLoaded, setCriticalImagesLoaded] = useState(false)
+  
+  const loading = authLoading || !productsFetched || !offersFetched || !fontsLoaded || !criticalImagesLoaded;
 
   useEffect(() => {
     authService.getCurrentUser()
@@ -167,7 +172,51 @@ function AppContent() {
         console.error('Failed to preload products in store:', prodError)
         dispatch(setProducts([])) // Ensure fetching finishes even on error
       })
+
+    offersService.getOffers()
+      .then((loadedOffers) => {
+        const normalized = Array.isArray(loadedOffers) ? loadedOffers : []
+        dispatch(setOffers(normalized))
+      })
+      .catch((offersError) => {
+        console.error('Failed to preload offers in store:', offersError)
+        dispatch(setOffers([]))
+      })
   }, [dispatch])
+
+  // Preload critical assets: fonts and hero banners
+  useEffect(() => {
+    // 1. Wait for Google Fonts to be ready
+    if (document.fonts) {
+      document.fonts.ready
+        .then(() => setFontsLoaded(true))
+        .catch(() => setFontsLoaded(true));
+    } else {
+      setFontsLoaded(true);
+    }
+
+    // 2. Preload critical images (logo & initial home banner slides)
+    const criticalImageUrls = [
+      '/vakrayan-logo.png',
+      'https://images.unsplash.com/photo-1509281373149-e957c6296406?q=80&w=1600',
+      'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=1600',
+      'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1600'
+    ];
+
+    let loadedCount = 0;
+    criticalImageUrls.forEach(url => {
+      const img = new window.Image();
+      img.src = url;
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === criticalImageUrls.length) setCriticalImagesLoaded(true);
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount === criticalImageUrls.length) setCriticalImagesLoaded(true);
+      };
+    });
+  }, [])
 
   // Premium loading splash screen
   if (loading) {
@@ -185,7 +234,7 @@ function AppContent() {
               className="text-2xl md:text-3xl font-black tracking-[0.35em] text-[var(--color-text)] uppercase"
               style={{ fontFamily: 'Outfit, sans-serif' }}
             >
-              STREET<span style={{ color: 'var(--color-accent)' }}>—</span>WEAR
+              VAKRAYAN
             </h1>
             <p
               className="text-[9px] font-bold tracking-[0.3em] uppercase"

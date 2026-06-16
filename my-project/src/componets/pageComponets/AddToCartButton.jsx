@@ -239,7 +239,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             {...buttonClickSpring}
             onClick={handleAdd}
             disabled={status === 'loading'}
-            className={`w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-6 rounded-none transition-all select-none cursor-pointer ${
+            className={`w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-2 sm:px-4 md:px-6 rounded-none transition-all select-none cursor-pointer whitespace-nowrap ${
                 status === 'success'
                 ? 'bg-emerald-500 text-white border border-emerald-500'
                 : 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] border border-[var(--color-accent)]'

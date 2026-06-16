@@ -149,6 +149,11 @@ export class OrdersService {
                 ...extraData
             };
 
+            if (status === 'DELIVERED') {
+                updatePayload.paymentStatus = 'PAID';
+                updatePayload.payment_status = 'PAID';
+            }
+
             try {
                 return await this.databases.updateDocument(
                     conf.appwriteDatabaseId,

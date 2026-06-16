@@ -107,16 +107,16 @@ function SignUp() {
     <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-[var(--color-accent)] selection:text-white animate-gradient-shift bg-[length:200%_200%]">
       <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-xs z-10" />
 
-      <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)]/80 backdrop-blur-xl p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl">
+      <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)]/80 backdrop-blur-xl p-8 rounded-none border border-[var(--color-border)] shadow-2xl">
         
         <div className="text-center mb-8">
           <h2 className="text-xs tracking-[0.5em] text-[var(--color-accent)] font-black uppercase mb-2">Join The Movement</h2>
-          <h1 className="text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">CREATE ACCOUNT</h1>
+          <h1 className="text-3xl font-serif font-black tracking-widest text-[var(--color-text)] uppercase">CREATE ACCOUNT</h1>
         </div>
 
         {/* Server error feedback */}
         {serverError && (
-          <div className="mb-6 p-3 bg-rose-50 border border-rose-250 text-rose-600 text-[11px] font-black uppercase tracking-widest rounded-xl text-center">
+          <div className="mb-6 p-3 bg-rose-50 border border-rose-250 text-rose-600 text-[11px] font-black uppercase tracking-widest rounded-none text-center">
             {serverError}
           </div>
         )}
@@ -130,7 +130,7 @@ function SignUp() {
               type="text" 
               placeholder="ENTER YOUR NAME" 
               disabled={loading}
-              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-medium disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-none px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-medium disabled:opacity-50`}
               {...register("name", { required: "Name is required" })}
             />
             {errors.name && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -143,7 +143,7 @@ function SignUp() {
               type="text" 
               placeholder="YOU@EXAMPLE.COM" 
               disabled={loading}
-              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-none px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
               {...register("email", { 
                 required: "Email is required",
                 pattern: {
@@ -162,7 +162,7 @@ function SignUp() {
               type="password" 
               placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" 
               disabled={loading}
-              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.password ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden transition-colors disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.password ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-none px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden transition-colors disabled:opacity-50`}
               {...register("password", { 
                 required: "Password is required",
                 minLength: { value: 6, message: "Password must be at least 6 characters" }
@@ -192,7 +192,7 @@ function SignUp() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] disabled:scale-100 disabled:bg-[var(--color-accent)]/40 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md mt-2 cursor-pointer transition-all duration-200"
+            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] disabled:scale-100 disabled:bg-[var(--color-accent)]/40 text-white font-black text-xs tracking-widest uppercase py-4 rounded-none shadow-md mt-2 cursor-pointer transition-all duration-200"
           >
             {loading ? 'REGISTERING...' : 'REGISTER NOW'}
           </button>
@@ -208,7 +208,7 @@ function SignUp() {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] active:scale-[0.98] disabled:scale-100 border border-[var(--color-border)] text-[var(--color-text)] font-bold text-xs tracking-widest uppercase py-4 rounded-xl shadow-md cursor-pointer transition-all duration-200"
+          className="w-full flex items-center justify-center gap-3 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] active:scale-[0.98] disabled:scale-100 border border-[var(--color-border)] text-[var(--color-text)] font-bold text-xs tracking-widest uppercase py-4 rounded-none shadow-md cursor-pointer transition-all duration-200"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 15.01 1 12 1 7.35 1 3.39 3.65 1.5 7.5l3.86 3C6.31 7.57 8.91 5.04 12 5.04z" />

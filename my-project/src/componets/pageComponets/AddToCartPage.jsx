@@ -9,6 +9,7 @@ import campaignService from '../../appwrite/campaign'
 import couponUsageService from '../../appwrite/couponUsage'
 import { setCartItems as setCartItemsAction, removeCartItemState, updateCartItemState } from '../../features/addToCart'
 import { useToast } from '../../context/ToastContext'
+import { calculateOffersDiscount } from '../../utils/discountCalculator'
 
 const loadGuestCartItems = () => {
   try {
@@ -52,8 +53,14 @@ function AddToCartPage() {
   const selectedItemIds = cartItems.filter(item => !deselectedItemIds.includes(item.$id)).map(item => item.$id);
   const selectedCartItems = cartItems.filter(item => selectedItemIds.includes(item.$id));
 
+  const allProducts = useSelector(state => state.products.allItems || []);
+  const offers = useSelector(state => state.products.offers || []);
+
+  const cartTotalBeforeDiscount = selectedCartItems.reduce((acc, item) => acc + Number((item.price || 0) * (item.quantity || 0)), 0);
+  const { totalDiscount: bundleDiscount, appliedOffers } = calculateOffersDiscount(selectedCartItems, allProducts, offers);
+
   // ➡️ 4. INVENTORY MATHEMATICS MATRIX (Accumulators)
-  const cartTotalAmount = selectedCartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
+  const cartTotalAmount = cartTotalBeforeDiscount - bundleDiscount;
   const cartTotalQuantity = selectedCartItems.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
 
   // Load carried coupon from sessionStorage on mount and validate usage, expiry and min order value
@@ -593,6 +600,25 @@ function AddToCartPage() {
             </h3>
 
             <div className="space-y-3.5 text-xs text-[var(--color-muted)]">
+              {bundleDiscount > 0 && (
+                <div className="flex justify-between">
+                  <span>Original Subtotal</span>
+                  <span className="text-[var(--color-text)] font-semibold line-through font-mono">
+                    ₹{cartTotalBeforeDiscount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+              {bundleDiscount > 0 && (
+                <div className="space-y-1.5 bg-[var(--color-subtle)] border border-[var(--color-accent)]/10 p-3 rounded-lg text-[9px] uppercase font-mono tracking-wider text-[var(--color-text)]">
+                  <span className="font-bold block mb-1">Bundle Savings</span>
+                  {appliedOffers.map((o) => (
+                    <div key={o.id} className="flex justify-between">
+                      <span>• {o.name} {o.timesApplied > 1 ? `(x${o.timesApplied})` : ''}</span>
+                      <span className="font-bold text-emerald-600 font-mono">-₹{o.discount.toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span className="text-[var(--color-text)] font-semibold">

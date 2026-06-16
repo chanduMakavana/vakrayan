@@ -102,7 +102,8 @@ const schema = [
             { key: 'is_featured', type: 'boolean', required: false, default: false },
             { key: 'is_vip_only', type: 'boolean', required: false, default: false },
             { key: 'total_sold', type: 'integer', required: false, default: 0 },
-            { key: 'slug', type: 'string', size: 255, required: false, default: '' }
+            { key: 'slug', type: 'string', size: 255, required: false, default: '' },
+            { key: 'is_live', type: 'boolean', required: false, default: false }
         ]
     },
     {
@@ -254,6 +255,39 @@ const schema = [
             { key: 'image', type: 'string', size: 500, required: true },
             { key: 'mobileImage', type: 'string', size: 500, required: false, default: '' },
             { key: 'link', type: 'string', size: 500, required: false, default: '' }
+        ]
+    },
+    {
+        id: env.VITE_APPWRITE_OFFERS_COLLECTION_ID || 'offers',
+        name: 'Offers',
+        attributes: [
+            { key: 'name', type: 'string', size: 255, required: true },
+            { key: 'qty', type: 'integer', required: true },
+            { key: 'price', type: 'integer', required: true },
+            { key: 'is_active', type: 'boolean', required: false, default: true },
+            { key: 'productIds', type: 'string', size: 255, required: false, array: true },
+            { key: 'category', type: 'string', size: 100, required: false, default: '' },
+            { key: 'tag', type: 'string', size: 100, required: false, default: '' }
+        ]
+    },
+    {
+        id: env.VITE_APPWRITE_WALLET_COLLECTION_ID || 'wallet',
+        name: 'Wallet',
+        attributes: [
+            { key: 'userId', type: 'string', size: 255, required: true },
+            { key: 'amount', type: 'float', required: true },
+            { key: 'type', type: 'string', size: 50, required: true },
+            { key: 'title', type: 'string', size: 255, required: true },
+            { key: 'referenceId', type: 'string', size: 255, required: false, default: '' }
+        ]
+    },
+    {
+        id: env.VITE_APPWRITE_CATEGORY_CONFIGS_COLLECTION_ID || 'category_configs',
+        name: 'Category Configs',
+        attributes: [
+            { key: 'category', type: 'string', size: 255, required: true },
+            { key: 'imageUrl', type: 'string', size: 500, required: false, default: '' },
+            { key: 'isDeleted', type: 'boolean', required: false, default: false }
         ]
     }
 ];

@@ -1,116 +1,189 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
+import { motion } from 'framer-motion'
+import categoryService from '../../appwrite/category'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.10 } }
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 24, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } }
+}
 
 function CategoryGrid() {
-    const [searchParams] = useSearchParams()
-    const shouldScroll = searchParams.get('scroll') === 'categories'
+  const [searchParams] = useSearchParams()
+  const shouldScroll = searchParams.get('scroll') === 'categories'
+  const [categoryConfigs, setCategoryConfigs] = useState([])
 
-    useEffect(() => {
-        if (shouldScroll) {
-            const element = document.getElementById('categories-section')
-            if (element) {
-                setTimeout(() => {
-                    element.scrollIntoView({ behavior: 'smooth' })
-                }, 100)
-            }
-        }
-    }, [shouldScroll])
-
-    const products = useSelector(state => state.products.items || [])
-
-    // Get all unique categories from products
-    const uniqueProductCategories = Array.from(
-        new Set(products.map(p => p.category).filter(Boolean))
-    )
-
-    const defaultCategories = [
-        { value: 'printed-tshirt', label: 'PRINTED T-SHIRTS' },
-        { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRTS' },
-        { value: 'shirts', label: 'SHIRTS' },
-        { value: 'hoodies', label: 'HOODIES' },
-    ]
-
-    const categoriesList = []
-
-    defaultCategories.forEach(c => {
-        if (!categoriesList.some(item => item.value === c.value)) {
-            categoriesList.push(c)
-        }
-    })
-
-    uniqueProductCategories.forEach(cat => {
-        const value = cat.toLowerCase().trim()
-        if (!categoriesList.some(item => item.value === value)) {
-            const label = cat.replace(/-/g, ' ').toUpperCase()
-            categoriesList.push({ value, label })
-        }
-    })
-
-    const getCategoryImage = (catValue) => {
-        try {
-            const overrides = JSON.parse(localStorage.getItem('category_images')) || {};
-            if (overrides[catValue]) return overrides[catValue];
-        } catch (e) {
-            console.error("Error reading category_images from localStorage:", e);
-        }
-
-        if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg';
-        if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg';
-        if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg';
-        if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=300&q=80';
-
-        const firstProd = products.find(p => p.category === catValue);
-        return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/300x400?text=Streetwear';
+  useEffect(() => {
+    if (shouldScroll) {
+      const el = document.getElementById('categories-section')
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100)
     }
+  }, [shouldScroll])
 
-    return (
-        <section id="categories-section" className="bg-[var(--color-bg)] py-16 px-4 border-b border-[var(--color-border)]">
-            {/* Styled Section Headers */}
-            <div className="mb-12 text-center">
-                <h1 className="text-xl md:text-2xl font-black tracking-[0.25em] text-[#1D3557] uppercase">
-                    CATEGORIES
-                </h1>
-            </div>
+  useEffect(() => {
+    let active = true;
+    const fetchConfigs = async () => {
+      try {
+        const configs = await categoryService.getCategoryConfigs();
+        if (active) {
+          setCategoryConfigs(configs);
+        }
+      } catch (err) {
+        console.error("Failed to load category configs:", err);
+      }
+    };
+    fetchConfigs();
+    return () => { active = false; };
+  }, []);
 
-            {/* Category Cards Balanced Grid */}
-            <div className="flex flex-wrap justify-center gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto px-4 w-full">
-                {categoriesList.filter(c => {
-                    try {
-                        const deleted = JSON.parse(localStorage.getItem('deleted_categories')) || [];
-                        return !deleted.includes(c.value);
-                    } catch {
-                        return true;
-                    }
-                }).map((c) => {
-                    const img = getCategoryImage(c.value);
-                    const targetLink = `/category/${c.value}`;
+  const products = useSelector(state => state.products.items || [])
 
-                    return (
-                        <Link
-                            key={c.value}
-                            to={targetLink}
-                            className="group flex flex-col items-center cursor-pointer w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1.01rem)] lg:w-[calc(33.333%-1.34rem)] max-w-[320px] mx-auto"
-                        >
-                            {/* Image Container */}
-                            <div className="w-full aspect-[4/5] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-md group-hover:shadow-xl transition-shadow duration-300">
-                                <img 
-                                    src={img} 
-                                    alt={c.label} 
-                                    className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                                />
-                            </div>
-                            
-                            {/* Category Name below */}
-                            <span className="mt-4 text-xs md:text-sm font-black tracking-widest text-[var(--color-text)] uppercase group-hover:text-[var(--color-accent)] transition-colors duration-200 text-center">
-                                {c.label}
-                            </span>
-                        </Link>
-                    );
-                })}
-            </div>
-        </section>
-    )
+  const uniqueProductCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
+
+  const defaultCategories = [
+    { value: 'printed-tshirt', label: 'Printed T-Shirts' },
+    { value: 'oversized-tshirt', label: 'Oversized T-Shirts' },
+    { value: 'shirts', label: 'Shirts' },
+    { value: 'hoodies', label: 'Hoodies' },
+  ]
+
+  const categoriesList = [...defaultCategories]
+  uniqueProductCategories.forEach(cat => {
+    const value = cat.toLowerCase().trim()
+    if (!categoriesList.some(item => item.value === value)) {
+      categoriesList.push({ value, label: cat.replace(/-/g, ' ') })
+    }
+  })
+
+  const getCategoryImage = (catValue) => {
+    const overrides = {};
+    categoryConfigs.forEach(c => {
+      if (c.imageUrl) overrides[c.category] = c.imageUrl;
+    });
+    if (overrides[catValue]) return overrides[catValue];
+    if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg'
+    if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg'
+    if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg'
+    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=300&q=80'
+    const firstProd = products.find(p => p.category === catValue)
+    return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/300x400?text=Vakrayan'
+  }
+
+  const visibleCategories = categoriesList.filter(c => {
+    const deleted = categoryConfigs.filter(cfg => cfg.isDeleted).map(cfg => cfg.category);
+    return !deleted.includes(c.value);
+  })
+
+  return (
+    <section
+      id="categories-section"
+      style={{ background: 'var(--color-bg)', padding: '72px 0', borderBottom: '1px solid var(--color-border)' }}
+    >
+      <div className="max-w-7xl mx-auto px-4 md:px-12">
+
+        {/* Section header */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-3">
+            <div className="accent-line" />
+          </div>
+          <p className="eyebrow mb-3">Shop By</p>
+          <h2 style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', color: 'var(--color-text)', lineHeight: 1.1 }}>
+            Collections
+          </h2>
+        </div>
+
+        {/* Equal-size category grid */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"
+        >
+          {visibleCategories.map((c) => {
+            const img = getCategoryImage(c.value)
+            return (
+              <motion.div key={c.value} variants={cardVariants}>
+                <Link
+                  to={`/category/${c.value}`}
+                  className="group block relative overflow-hidden cursor-pointer"
+                  style={{
+                    borderRadius: 16,
+                    height: 'clamp(160px, 28vw, 260px)',
+                    border: '1px solid var(--glass-border-green)',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}
+                >
+                  {/* Image */}
+                  <img
+                    src={img}
+                    alt={c.label}
+                    className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-108"
+                  />
+
+                  {/* Gradient overlay */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(to top, rgba(5,26,14,0.70) 0%, rgba(5,26,14,0.10) 60%, transparent 100%)',
+                    }}
+                  />
+
+                  {/* Hover tint */}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ background: 'rgba(5,150,105,0.10)' }}
+                  />
+
+                  {/* Label bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 px-3 pb-3">
+                    <div
+                      className="flex items-center justify-between gap-2"
+                      style={{
+                        background: 'rgba(10,30,20,0.55)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: 10,
+                        padding: '8px 10px'
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: '#fff',
+                          fontFamily: "'Jost', sans-serif",
+                          fontWeight: 600,
+                          fontSize: 12,
+                          letterSpacing: '0.02em',
+                          lineHeight: 1.2
+                        }}
+                      >
+                        {c.label}
+                      </span>
+                      <div
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5"
+                        style={{ background: '#059669', borderRadius: 6 }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            )
+          })}
+        </motion.div>
+      </div>
+    </section>
+  )
 }
 
 export default CategoryGrid

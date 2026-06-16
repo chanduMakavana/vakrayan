@@ -1,62 +1,180 @@
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import campaignService from '../../appwrite/campaign'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.12, delayChildren: 0.05 } }
+}
+
+const childVariants = {
+  hidden: { opacity: 0, y: 28 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.75, ease: [0.16, 1, 0.3, 1] } }
+}
+
+const statsData = [
+  { value: '500+', label: 'Happy Customers' },
+  { value: '50+', label: 'Premium Styles' },
+  { value: '7 Days', label: 'Easy Returns' },
+  { value: '100%', label: 'Quality Assured' },
+]
 
 function PromoBanner() {
   const [promoText, setPromoText] = useState('⚡ FREE EXPRESS SHIPPING & 7-DAY EASY RETURNS ON ALL ORDERS')
 
   useEffect(() => {
-    // Reset old jargon-filled promo text from localStorage if present
-    const localText = localStorage.getItem('campaignPromoText');
+    const localText = localStorage.getItem('campaignPromoText')
     if (localText && (localText.includes('DROP VOLUMES') || localText.includes('DEPLOYED ON ALL'))) {
-      localStorage.removeItem('campaignPromoText');
+      localStorage.removeItem('campaignPromoText')
     }
-
     campaignService.getPromoText()
-      .then(text => {
-        if (text) setPromoText(text);
-      })
-      .catch(err => console.error("Failed to load promo text:", err));
+      .then(text => { if (text) setPromoText(text) })
+      .catch(err => console.error('Failed to load promo text:', err))
   }, [])
 
   return (
-    <section className="relative w-full h-[65vh] md:h-[55vh] overflow-hidden bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center flex flex-col justify-between border-t border-b border-[var(--color-border)] pt-16 pb-14">
-      
-      {/* Light Tint Overlay */}
-      <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-xs" />
+    <section
+      className="relative w-full overflow-hidden"
+      style={{ borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)' }}
+    >
+      {/* Background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(135deg, #F4FAF7 0%, #EDFAF3 50%, #F0F7F3 100%)'
+        }}
+      />
 
-      {/* Content Area */}
-      <div className="relative z-10 text-center px-6 max-w-3xl mx-auto my-auto border-t-2 border-dotted border-[var(--color-border)] pt-8">
-        <h4 className="text-xs tracking-[0.6em] text-[var(--color-accent)] font-black uppercase mb-4 animate-pulse">
+      {/* Ambient blobs */}
+      <div className="absolute top-0 left-1/4 w-80 h-80 blob blob-green animate-blob" style={{ animationDelay: '0s' }} />
+      <div className="absolute bottom-0 right-1/4 w-60 h-60 blob blob-teal animate-blob" style={{ animationDelay: '3s' }} />
+      <div className="absolute top-1/2 left-0 w-40 h-40 blob blob-emerald animate-blob" style={{ animationDelay: '5s', opacity: 0.08 }} />
+
+      {/* Content */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: '-80px' }}
+        className="relative z-10 max-w-5xl mx-auto px-6 py-20 text-center"
+      >
+        <motion.div variants={childVariants} className="flex justify-center mb-5">
+          <div className="accent-line" />
+        </motion.div>
+
+        <motion.p variants={childVariants} className="eyebrow mb-4">
           Our Philosophy
-        </h4>
-        <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-[var(--color-text)] uppercase leading-none mb-6">
-          RAW AESTHETICS.<br />
-          NO COMPROMISE.
-        </h2>
-        <p className="text-sm md:text-base text-[var(--color-muted)] font-light tracking-wide max-w-xl mx-auto leading-relaxed">
-          We don't just drop clothing; we define subculture. Every thread is engineered for heavy operations, keeping comfort locked in and motion unbothered.
-        </p>
-        
-        {/* Subtle Branding Accent */}
-        <div className="mt-8 flex justify-center items-center gap-4 text-xs tracking-widest text-[var(--color-muted)] font-bold uppercase">
-          <span>EST. 2026</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]" />
-          <span>MADE IN INDIA</span>
-        </div>
-      </div>
+        </motion.p>
 
-      {/* Streetwear Live Campaign Scrolling Ticker Banner */}
-      <div className="absolute bottom-0 left-0 w-full bg-black border-t border-b border-neutral-900 py-3.5 overflow-hidden flex z-20 shadow-2xs">
+        <motion.h2
+          variants={childVariants}
+          style={{
+            fontFamily: "'Chelsea Market', cursive",
+            fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+            color: 'var(--color-text)',
+            lineHeight: 1.15,
+            marginBottom: 20
+          }}
+        >
+          Raw Aesthetics.
+          <br />
+          <span style={{ color: 'var(--color-accent)' }}>No Compromise.</span>
+        </motion.h2>
+
+        <motion.p
+          variants={childVariants}
+          style={{
+            color: 'var(--color-muted)',
+            fontSize: 16,
+            lineHeight: 1.75,
+            maxWidth: 520,
+            margin: '0 auto 40px',
+            fontFamily: "'Jost', sans-serif"
+          }}
+        >
+          We don't just drop clothing — we define subculture. Every thread is engineered for heavy operations, keeping comfort locked in and motion unbothered.
+        </motion.p>
+
+        {/* Stats row */}
+        <motion.div
+          variants={childVariants}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+        >
+          {statsData.map(({ value, label }) => (
+            <div
+              key={label}
+              className="glass-card p-5 text-center"
+              style={{ borderRadius: 16 }}
+            >
+              <p style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 26, color: 'var(--color-accent)', lineHeight: 1, marginBottom: 6 }}>
+                {value}
+              </p>
+              <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {label}
+              </p>
+            </div>
+          ))}
+        </motion.div>
+
+        {/* Brand tags */}
+        <motion.div variants={childVariants} className="mt-8 flex justify-center items-center gap-4 flex-wrap">
+          {['EST. 2026', 'MADE IN INDIA', 'PREMIUM QUALITY'].map((tag, i) => (
+            <span
+              key={tag}
+              style={{
+                fontFamily: "'Jost', sans-serif",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)'
+              }}
+            >
+              {i > 0 && <span style={{ marginRight: 16, color: 'var(--color-accent)' }}>·</span>}
+              {tag}
+            </span>
+          ))}
+        </motion.div>
+      </motion.div>
+
+      {/* Scrolling ticker */}
+      <div
+        className="relative w-full py-4 overflow-hidden flex z-20"
+        style={{
+          background: 'linear-gradient(90deg, #059669 0%, #047857 50%, #059669 100%)',
+          boxShadow: '0 4px 20px rgba(5,150,105,0.25)'
+        }}
+      >
         <div className="flex whitespace-nowrap animate-marquee">
-          <span className="text-[10px] sm:text-xs font-black font-mono tracking-[0.2em] text-white mx-4 uppercase">
-            {promoText} &nbsp;&nbsp;&nbsp;&nbsp;★&nbsp;&nbsp;&nbsp;&nbsp; {promoText} &nbsp;&nbsp;&nbsp;&nbsp;★&nbsp;&nbsp;&nbsp;&nbsp; {promoText} &nbsp;&nbsp;&nbsp;&nbsp;★&nbsp;&nbsp;&nbsp;&nbsp;
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              fontFamily: "'Jost', sans-serif",
+              letterSpacing: '0.18em',
+              color: '#fff',
+              margin: '0 16px',
+              textTransform: 'uppercase'
+            }}
+          >
+            {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp;
           </span>
-          <span className="text-[10px] sm:text-xs font-black font-mono tracking-[0.2em] text-white mx-4 uppercase select-none">
-            {promoText} &nbsp;&nbsp;&nbsp;&nbsp;★&nbsp;&nbsp;&nbsp;&nbsp; {promoText} &nbsp;&nbsp;&nbsp;&nbsp;★&nbsp;&nbsp;&nbsp;&nbsp; {promoText} &nbsp;&nbsp;&nbsp;&nbsp;★&nbsp;&nbsp;&nbsp;&nbsp;
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              fontFamily: "'Jost', sans-serif",
+              letterSpacing: '0.18em',
+              color: '#fff',
+              margin: '0 16px',
+              textTransform: 'uppercase'
+            }}
+            aria-hidden="true"
+          >
+            {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp;
           </span>
         </div>
       </div>
-
     </section>
   )
 }

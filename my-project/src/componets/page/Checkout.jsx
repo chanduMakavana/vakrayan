@@ -8,6 +8,7 @@ import ordersService from '../../appwrite/orders'
 import productsService from '../../appwrite/products'
 import campaignService from '../../appwrite/campaign'
 import addressService from '../../appwrite/address'
+import walletService from '../../appwrite/wallet'
 import { clearCartState, setCartItems as setCartItemsAction } from '../../features/addToCart'
 import { setProducts } from '../../features/productsSlice'
 import Footer from '../pageComponets/Footer'
@@ -17,6 +18,7 @@ import { useToast } from '../../context/ToastContext'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
+import { calculateOffersDiscount } from '../../utils/discountCalculator'
 
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
 
@@ -90,28 +92,15 @@ function Checkout() {
   const [razorpayModalOpen, setRazorpayModalOpen] = useState(false)
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
-  const [orders, setOrders] = useState([])
+  const [walletBalance, setWalletBalance] = useState(0);
 
   useEffect(() => {
     if (user?.$id) {
-      ordersService.getUserOrders(user.$id)
-        .then(res => setOrders(res || []))
-        .catch(err => console.error("Failed to load user orders in checkout:", err));
+      walletService.getUserWalletBalance(user.$id)
+        .then(bal => setWalletBalance(bal))
+        .catch(err => console.error("Failed to load wallet balance in checkout:", err));
     }
   }, [user]);
-
-  const walletBalance = useMemo(() => {
-    const credit = orders
-      .filter(o => o.status === 'CANCELLED' && o.paymentMethod === 'ONLINE')
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const topUpCredit = orders
-      .filter(o => o.paymentMethod === 'WALLET_TOPUP' && o.paymentStatus === 'PAID')
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const debit = orders
-      .filter(o => o.paymentMethod === 'WALLET' && o.status !== 'CANCELLED')
-      .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    return Math.max(0, credit + topUpCredit - debit);
-  }, [orders]);
 
   // Multiple Saved Addresses State
   const [savedAddresses, setSavedAddresses] = useState([])
@@ -126,9 +115,17 @@ function Checkout() {
     return Number(sessionStorage.getItem('checkout_discount') || 0);
   })
 
-  const cartTotalAmount = cartItems.reduce((acc, item) => acc + Number(item.subtotal || 0), 0)
-  const discountAmount = cartTotalAmount * (discountPercent / 100)
-  const discountedAmount = cartTotalAmount - discountAmount
+  const allProducts = useSelector(state => state.products.allItems || []);
+  const offers = useSelector(state => state.products.offers || []);
+
+  const cartTotalBeforeDiscount = cartItems.reduce((acc, item) => acc + Number((item.price || 0) * (item.quantity || 0)), 0);
+  const { totalDiscount: bundleDiscount, appliedOffers } = useMemo(() => {
+    return calculateOffersDiscount(cartItems, allProducts, offers);
+  }, [cartItems, allProducts, offers]);
+
+  const cartTotalAmount = cartTotalBeforeDiscount - bundleDiscount;
+  const discountAmount = Math.round(cartTotalAmount * (discountPercent / 100));
+  const discountedAmount = Math.round(cartTotalAmount - discountAmount);
 
   // Watch address fields to dynamically calculate remote route surcharge (₹80)
   const watchedPin = watch('pincode')
@@ -243,10 +240,10 @@ function Checkout() {
 
   const applyAddressFields = useCallback((addr) => {
     if (!addr) return;
-    setValue('name', addr.customerName || user?.name || '');
+    setValue('name', addr.name || addr.customerName || user?.name || '');
     setValue('email', addr.email || user?.email || '');
     setValue('phone', addr.phone || '');
-    setValue('address', addr.addressLine || '');
+    setValue('address', addr.address || addr.addressLine || '');
     setValue('city', addr.city || '');
     setValue('pincode', addr.pincode || '');
     setValue('state', addr.state || '');
@@ -494,8 +491,8 @@ function Checkout() {
             key: liveKey,
             amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
             currency: "INR",
-            name: "Streetwear",
-            description: "Streetwear Drops Secure Transaction Gateway",
+            name: "Vakrayan",
+            description: "Vakrayan Secure Transaction Gateway",
             image: "https://cdn-icons-png.flaticon.com/512/5752/5752538.png", // Company store logo icon
             prefill: {
               name: data.name,
@@ -511,7 +508,7 @@ function Checkout() {
               max_count: 4
             },
             theme: {
-              color: "#4f46e5" // Premium Indigo theme color
+              color: "#00B7B5" // Matching website accent Teal/Cyan color
             },
             handler: function (response) {
               const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
@@ -559,7 +556,7 @@ function Checkout() {
 
     try {
       const orderNumber = generateOrderNumber();
-      const discountedAmount = cartTotalAmount - discountAmount;
+      const discountedAmount = Math.round(cartTotalAmount - discountAmount);
       const baseShipping = cartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
       const currentCodFee = method === 'COD' ? 30 : 0;
       const isRemote = isRemoteRoute(formData.pincode, formData.state);
@@ -675,6 +672,21 @@ function Checkout() {
       const response = await ordersService.createOrder(orderPayload);
       if (!response) {
         throw new Error("Order creation returned null — check Appwrite collection configuration.");
+      }
+
+      // If paid via Wallet, deduct balance in wallet collection
+      if (method === 'WALLET') {
+        try {
+          await walletService.createWalletTransaction({
+            userId: user.$id,
+            amount: calculatedFinalAmount,
+            type: 'debit',
+            title: `Payment for Order ${orderNumber}`,
+            referenceId: response.$id || response.id
+          });
+        } catch (walletErr) {
+          console.error("Failed to write debit wallet transaction:", walletErr.message);
+        }
       }
 
       // 3.1. Send Order Notification Webhook (Make.com, Zapier, Discord, Telegram, etc.)
@@ -865,7 +877,7 @@ function Checkout() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {savedAddresses.map((addr) => {
                       const id = addr.$id || addr.id;
-                      const line = addr.addressLine || '';
+                      const line = addr.address || addr.addressLine || '';
                       const stateStr = addr.state || '';
                       
                       return (
@@ -882,7 +894,7 @@ function Checkout() {
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-black uppercase truncate">{addr.customerName}</span>
+                            <span className="text-xs font-black uppercase truncate">{addr.name || addr.customerName}</span>
                             {(addr.is_default || addr.isDefault) && (
                               <span className="text-[8px] bg-[var(--color-accent)] text-white font-mono uppercase px-1.5 py-0.5 font-bold">DEFAULT</span>
                             )}
@@ -1227,6 +1239,25 @@ function Checkout() {
 
               {/* Calculations */}
               <div className="space-y-3 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                {bundleDiscount > 0 && (
+                  <div className="flex justify-between">
+                    <span>ORIGINAL VALUE</span>
+                    <span className="font-mono text-[var(--color-muted)] line-through">
+                      ₹{cartTotalBeforeDiscount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                )}
+                {bundleDiscount > 0 && (
+                  <div className="space-y-1.5 bg-[var(--color-subtle)] border border-[var(--color-accent)]/10 p-3 rounded-lg text-[9px] uppercase font-mono tracking-wider text-[var(--color-text)] normal-case">
+                    <span className="font-bold block mb-1">Bundle Savings</span>
+                    {appliedOffers.map((o) => (
+                      <div key={o.id} className="flex justify-between">
+                        <span>• {o.name} {o.timesApplied > 1 ? `(x${o.timesApplied})` : ''}</span>
+                        <span className="font-bold text-emerald-600 font-mono">-₹{o.discount.toLocaleString('en-IN')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>CART VALUE</span>
                   <span className="font-mono text-[var(--color-text)] font-bold">

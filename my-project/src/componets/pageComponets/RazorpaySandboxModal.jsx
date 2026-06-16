@@ -267,7 +267,7 @@ const RazorpaySandboxModal = ({
         <div className="px-6 py-4 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-surface)]/50">
           <div>
             <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase font-black">{t.merchant}</span>
-            <span className="text-xs font-black text-[var(--color-text)] uppercase tracking-wide">Aashis Streetwear HQ</span>
+            <span className="text-xs font-black text-[var(--color-text)] uppercase tracking-wide">Vakrayan HQ</span>
           </div>
           <div className="text-right">
             <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase font-black">{t.amount}</span>

@@ -65,7 +65,7 @@ function VipPromoModal({ isOpen, onClose }) {
             </div>
             <div>
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">🔒 Unlock VIP Early Access Drops</h4>
-              <p className="text-[11px] text-neutral-400 mt-0.5">Shop limited-edition releases, custom streetwear, and hyped drops before they sell out.</p>
+              <p className="text-[11px] text-neutral-400 mt-0.5">Shop limited-edition releases, custom vakrayan, and hyped drops before they sell out.</p>
             </div>
           </div>
 

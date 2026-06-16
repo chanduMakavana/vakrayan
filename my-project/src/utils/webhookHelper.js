@@ -31,7 +31,7 @@ export const sendWebhookNotification = async (event, payload) => {
         let content = '';
         if (event === 'order.created') {
           const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity} @ ₹${i.price}`).join('\n');
-          content = `🚨 **NEW STREETWEAR ORDER RECEIVED!** 🚨\n\n` +
+          content = `🚨 **NEW VAKRAYAN ORDER RECEIVED!** 🚨\n\n` +
                    `**Order Number:** \`${payload.orderNumber}\`\n` +
                    `**Customer Name:** ${payload.customerName}\n` +
                    `**Email:** ${payload.email}\n` +
@@ -42,7 +42,7 @@ export const sendWebhookNotification = async (event, payload) => {
                    `**Items Ordered:**\n${itemsList}`;
         } else if (event === 'order.cancelled') {
           const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity}`).join('\n');
-          content = `🚫 **STREETWEAR ORDER CANCELLED BY CUSTOMER** 🚫\n\n` +
+          content = `🚫 **VAKRAYAN ORDER CANCELLED BY CUSTOMER** 🚫\n\n` +
                    `**Order Number:** \`${payload.orderNumber}\`\n` +
                    `**Customer Name:** ${payload.customerName}\n` +
                    `**Email:** ${payload.email}\n` +
@@ -108,7 +108,7 @@ export const sendWebhookNotification = async (event, payload) => {
       let text = '';
       if (event === 'order.created') {
         const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity} @ ₹${i.price}`).join('\n');
-        text = `<b>🚨 NEW STREETWEAR ORDER RECEIVED! 🚨</b>\n\n` +
+        text = `<b>🚨 NEW VAKRAYAN ORDER RECEIVED! 🚨</b>\n\n` +
                `<b>Order Number:</b> <code>${payload.orderNumber}</code>\n` +
                `<b>Customer Name:</b> ${payload.customerName}\n` +
                `<b>Email:</b> ${payload.email}\n` +
@@ -119,7 +119,7 @@ export const sendWebhookNotification = async (event, payload) => {
                `<b>Items Ordered:</b>\n${itemsList}`;
       } else if (event === 'order.cancelled') {
         const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity}`).join('\n');
-        text = `<b>🚫 STREETWEAR ORDER CANCELLED BY CUSTOMER 🚫</b>\n\n` +
+        text = `<b>🚫 VAKRAYAN ORDER CANCELLED BY CUSTOMER 🚫</b>\n\n` +
                `<b>Order Number:</b> <code>${payload.orderNumber}</code>\n` +
                `<b>Customer Name:</b> ${payload.customerName}\n` +
                `<b>Email:</b> ${payload.email}\n` +

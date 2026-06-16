@@ -1,4 +1,4 @@
-import { Client, ID, Databases } from "appwrite";
+import { Client, ID, Databases, Query } from "appwrite";
 import { conf } from "./conf/conf";
 
 export class RestockService {
@@ -20,12 +20,56 @@ export class RestockService {
                 return null;
             }
 
+            const cleanEmail = email.trim().toLowerCase();
+
+            // Check if there is an existing, unresolved restock alert for this email + productId + size
+            let isAlreadyRegistered = false;
+            try {
+                const response = await this.databases.listDocuments(
+                    conf.appwriteDatabaseId,
+                    conf.appwriteRestockCollectionId,
+                    [
+                        Query.equal("email", cleanEmail),
+                        Query.equal("productId", productId),
+                        Query.equal("size", size),
+                        Query.equal("notified", false)
+                    ]
+                );
+                if (response.documents && response.documents.length > 0) {
+                    isAlreadyRegistered = true;
+                }
+            } catch {
+                // Fallback: list documents and filter locally if indexes are not configured
+                try {
+                    const response = await this.databases.listDocuments(
+                        conf.appwriteDatabaseId,
+                        conf.appwriteRestockCollectionId,
+                        [Query.limit(100)]
+                    );
+                    const match = response.documents.find(doc => 
+                        doc.email === cleanEmail && 
+                        doc.productId === productId && 
+                        doc.size === size && 
+                        doc.notified === false
+                    );
+                    if (match) {
+                        isAlreadyRegistered = true;
+                    }
+                } catch (innerError) {
+                    console.warn("⚠️ Appwrite check failed, checking local fallback:", innerError.message);
+                }
+            }
+
+            if (isAlreadyRegistered) {
+                throw new Error(`You have already registered a restock alert for size ${size}.`);
+            }
+
             return await this.databases.createDocument(
                 conf.appwriteDatabaseId,
                 conf.appwriteRestockCollectionId,
                 ID.unique(),
                 {
-                    email: email.trim().toLowerCase(),
+                    email: cleanEmail,
                     productId,
                     size,
                     notified: false,

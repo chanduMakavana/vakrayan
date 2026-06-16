@@ -229,27 +229,56 @@ export class CampaignService {
         const cleanEmail = email.trim().toLowerCase();
         try {
             if (!conf.appwriteCampaignsCollectionId) {
-                const local = JSON.parse(localStorage.getItem('newsletterEmails')) || [];
-                if (!local.includes(cleanEmail)) {
-                    local.push(cleanEmail);
-                    localStorage.setItem('newsletterEmails', JSON.stringify(local));
-                }
-                return true;
+                throw new Error("Newsletter service is not configured.");
             }
-            return await this.databases.createDocument(
+
+            // Check if email already exists in Appwrite database
+            let isAlreadySubscribed = false;
+            try {
+                const response = await this.databases.listDocuments(
+                    conf.appwriteDatabaseId,
+                    conf.appwriteCampaignsCollectionId,
+                    [Query.equal("email", cleanEmail)]
+                );
+                if (response.documents && response.documents.length > 0) {
+                    isAlreadySubscribed = true;
+                }
+            } catch {
+                // Fallback: list documents and filter locally if indexes are not configured
+                try {
+                    const response = await this.databases.listDocuments(
+                        conf.appwriteDatabaseId,
+                        conf.appwriteCampaignsCollectionId,
+                        [Query.limit(100)]
+                    );
+                    const match = response.documents.find(doc => doc.email === cleanEmail);
+                    if (match) {
+                        isAlreadySubscribed = true;
+                    }
+                } catch (innerError) {
+                    console.warn("⚠️ Appwrite newsletter check failed:", innerError.message);
+                }
+            }
+
+            if (isAlreadySubscribed) {
+                throw new Error("This email is already subscribed to drops.");
+            }
+
+            // Create document in Appwrite
+            const doc = await this.databases.createDocument(
                 conf.appwriteDatabaseId,
                 conf.appwriteCampaignsCollectionId,
                 ID.unique(),
-                { email: cleanEmail }
+                { 
+                    email: cleanEmail,
+                    subscribedAt: new Date().toISOString()
+                }
             );
+
+            return doc;
         } catch (error) {
-            console.warn("⚠️ Appwrite campaigns offline. Newsletter sub mocked locally.", error.message);
-            const local = JSON.parse(localStorage.getItem('newsletterEmails')) || [];
-            if (!local.includes(cleanEmail)) {
-                local.push(cleanEmail);
-                localStorage.setItem('newsletterEmails', JSON.stringify(local));
-            }
-            return true;
+            console.error("Appwrite service :: subscribeNewsletter :: error", error.message);
+            throw error;
         }
     }
 
@@ -257,12 +286,12 @@ export class CampaignService {
     async getNewsletterSubscribers() {
         try {
             if (!conf.appwriteCampaignsCollectionId) {
-                const local = JSON.parse(localStorage.getItem('newsletterEmails')) || [
-                    "aashis.khatri@gmail.com",
+                const defaults = [
+                    "vakrayan.help@gmail.com",
                     "chandu.makavana61@gmail.com",
-                    "premium.streetwear@outlook.com"
+                    "premium.vakrayan@outlook.com"
                 ];
-                return local.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
+                return defaults.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
             }
             const response = await this.databases.listDocuments(
                 conf.appwriteDatabaseId,
@@ -273,20 +302,20 @@ export class CampaignService {
                 return response.documents;
             }
             // Return defaults if db is empty
-            const local = JSON.parse(localStorage.getItem('newsletterEmails')) || [
-                "aashis.khatri@gmail.com",
+            const defaults = [
+                "vakrayan.help@gmail.com",
                 "chandu.makavana61@gmail.com",
-                "premium.streetwear@outlook.com"
+                "premium.vakrayan@outlook.com"
             ];
-            return local.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
+            return defaults.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
         } catch (error) {
-            console.warn("⚠️ Appwrite subscriber retrieve failed. Using local storage.", error.message);
-            const local = JSON.parse(localStorage.getItem('newsletterEmails')) || [
-                "aashis.khatri@gmail.com",
+            console.warn("⚠️ Appwrite subscriber retrieve failed. Using default subscribers list.", error.message);
+            const defaults = [
+                "vakrayan.help@gmail.com",
                 "chandu.makavana61@gmail.com",
-                "premium.streetwear@outlook.com"
+                "premium.vakrayan@outlook.com"
             ];
-            return local.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
+            return defaults.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
         }
     }
 
@@ -308,6 +337,47 @@ export class CampaignService {
     // ➡️ 9. Fetch Campaign Send History
     async getCampaignHistory() {
         return JSON.parse(localStorage.getItem('sentCampaigns')) || [];
+    }
+
+    // ➡️ 10. Send individual email via EmailJS REST API
+    async sendEmailViaEmailJS(email, subject, body) {
+        const serviceId = (import.meta.env.VITE_EMAILJS_SERVICE_ID || "").trim().replace(/^["']|["']$/g, '');
+        const templateId = (import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "").trim().replace(/^["']|["']$/g, '');
+        const publicKey = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "").trim().replace(/^["']|["']$/g, '');
+
+        if (!serviceId || !templateId || !publicKey) {
+            throw new Error("EmailJS keys are missing from configuration.");
+        }
+
+        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                service_id: serviceId,
+                template_id: templateId,
+                user_id: publicKey,
+                template_params: {
+                    to_email: email,
+                    email: email,
+                    subject: subject,
+                    title: subject,
+                    message: body,
+                    body: body,
+                    to_name: email.split('@')[0],
+                    name: email.split('@')[0],
+                    time: new Date().toLocaleString(),
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`EmailJS API error: ${errorText || response.statusText}`);
+        }
+
+        return true;
     }
 }
 

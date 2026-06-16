@@ -11,6 +11,9 @@ import couponUsageService from '../../appwrite/couponUsage';
 import cartService from '../../appwrite/cart';
 import storageService from '../../appwrite/storage';
 import slidesService from '../../appwrite/slides';
+import offersService from '../../appwrite/offers';
+import walletService from '../../appwrite/wallet';
+import categoryService from '../../appwrite/category';
 import { FiFileText } from 'react-icons/fi';
 
 
@@ -98,6 +101,12 @@ function AdminPanel() {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [broadcastingProgress, setBroadcastingProgress] = useState(0);
 
+  const isEmailJSConfigured = Boolean(
+    (import.meta.env.VITE_EMAILJS_SERVICE_ID || "").trim() &&
+    (import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "").trim() &&
+    (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "").trim()
+  );
+
   // Store Database Telemetry States
   const [restockNotifications, setRestockNotifications] = useState([]);
   const [couponUsages, setCouponUsages] = useState([]);
@@ -112,6 +121,19 @@ function AdminPanel() {
   const [slides, setSlides] = useState([]);
   const [slidesLoading, setSlidesLoading] = useState(false);
   const [slideImage, setSlideImage] = useState("");
+
+  // Offers Management States
+  const [offersList, setOffersList] = useState([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [newOfferName, setNewOfferName] = useState('');
+  const [newOfferQty, setNewOfferQty] = useState(3);
+  const [newOfferPrice, setNewOfferPrice] = useState('');
+  const [newOfferCategory, setNewOfferCategory] = useState('');
+  const [newOfferTag, setNewOfferTag] = useState('');
+  const [newOfferProductIds, setNewOfferProductIds] = useState([]);
+  const [isEditingOffer, setIsEditingOffer] = useState(false);
+  const [editingOfferId, setEditingOfferId] = useState(null);
+  const [offerSearchQuery, setOfferSearchQuery] = useState('');
   const [slideMobileImage, setSlideMobileImage] = useState("");
   const [slideLink, setSlideLink] = useState("");
   const [slideUploading, setSlideUploading] = useState(false);
@@ -127,25 +149,41 @@ function AdminPanel() {
   const [deletedCategories, setDeletedCategories] = useState([]);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('category_images')) || {};
-      setTimeout(() => {
-        setCategoryImages(saved);
-      }, 0);
-      const deleted = JSON.parse(localStorage.getItem('deleted_categories')) || [];
-      setTimeout(() => {
+    const loadConfigs = async () => {
+      try {
+        const configs = await categoryService.getCategoryConfigs();
+        const images = {};
+        const deleted = [];
+        configs.forEach(config => {
+          if (config.imageUrl) {
+            images[config.category] = config.imageUrl;
+          }
+          if (config.isDeleted) {
+            deleted.push(config.category);
+          }
+        });
+        setCategoryImages(images);
         setDeletedCategories(deleted);
-      }, 0);
-    } catch (e) {
-      console.error("Failed to parse category configuration metadata:", e);
-    }
+      } catch (err) {
+        console.error("Failed to load category configs:", err);
+      }
+    };
+    loadConfigs();
   }, []);
 
-  const handleSaveCategoryImage = (catValue, url) => {
-    const updated = { ...categoryImages, [catValue]: url.trim() };
-    setCategoryImages(updated);
-    localStorage.setItem('category_images', JSON.stringify(updated));
-    showToast("✓ Category cover image mapping updated!", "success");
+  const handleSaveCategoryImage = async (catValue, url) => {
+    try {
+      setActionLoading(true);
+      await categoryService.saveCategoryImage(catValue, url);
+      const updated = { ...categoryImages, [catValue]: url.trim() };
+      setCategoryImages(updated);
+      showToast("✓ Category cover image mapping updated!", "success");
+    } catch (err) {
+      console.error("Failed to save category image:", err);
+      showToast("Failed to save category image.", "error");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleCategoryImageUpload = async (e, catValue) => {
@@ -159,9 +197,9 @@ function AdminPanel() {
         const fileUrl = storageService.getFileView(response.$id);
         setNewCategoryImageUrls(prev => ({ ...prev, [catValue]: fileUrl }));
         // Auto save it
+        await categoryService.saveCategoryImage(catValue, fileUrl);
         const updated = { ...categoryImages, [catValue]: fileUrl };
         setCategoryImages(updated);
-        localStorage.setItem('category_images', JSON.stringify(updated));
         showToast("✓ Category cover uploaded and saved successfully!", "success");
       } else {
         throw new Error("Failed to upload image file");
@@ -224,11 +262,11 @@ function AdminPanel() {
 
       // Update custom category image override mapping if it exists
       if (categoryImages[oldSlug]) {
+        await categoryService.renameCategoryConfig(oldSlug, newSlug);
         const updatedImages = { ...categoryImages };
         updatedImages[newSlug] = updatedImages[oldSlug];
         delete updatedImages[oldSlug];
         setCategoryImages(updatedImages);
-        localStorage.setItem('category_images', JSON.stringify(updatedImages));
       }
 
       showToast(`✓ Category renamed! Success: ${successCount}, Failed: ${errorCount}`, "success");
@@ -269,18 +307,18 @@ function AdminPanel() {
         showToast(`✓ Category cleared from products! Success: ${successCount}, Failed: ${errorCount}`, "success");
       }
 
-      // Clear cover image override from localStorage
+      // Clear cover image override from Appwrite and set isDeleted = true
+      await categoryService.deleteCategory(targetSlug);
+
       if (categoryImages[targetSlug]) {
         const updated = { ...categoryImages };
         delete updated[targetSlug];
         setCategoryImages(updated);
-        localStorage.setItem('category_images', JSON.stringify(updated));
       }
 
-      // Add targetSlug to deleted_categories in localStorage to exclude it from rendering
+      // Add targetSlug to deleted_categories in state
       const updatedDeleted = [...deletedCategories, targetSlug];
       setDeletedCategories(updatedDeleted);
-      localStorage.setItem('deleted_categories', JSON.stringify(updatedDeleted));
 
       showToast(`✓ Category "${label}" deleted successfully!`, "success");
       setDeleteTargetCategory(null);
@@ -303,6 +341,120 @@ function AdminPanel() {
     
     const firstProd = products.find(p => p.category === catValue);
     return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/150x150?text=FITS';
+  };
+
+  const loadOffersList = async () => {
+    try {
+      setLoadingOffers(true);
+      const res = await offersService.getOffers();
+      setOffersList(res || []);
+    } catch (err) {
+      console.error("Failed to load offers:", err);
+    } finally {
+      setLoadingOffers(false);
+    }
+  };
+
+  const handleAddOffer = async () => {
+    if (!newOfferName.trim()) {
+      showToast("Offer Name is required.", "error");
+      return;
+    }
+    if (!newOfferQty || Number(newOfferQty) <= 0) {
+      showToast("Quantity must be greater than 0.", "error");
+      return;
+    }
+    if (!newOfferPrice || Number(newOfferPrice) <= 0) {
+      showToast("Price must be greater than 0.", "error");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const payload = {
+        name: newOfferName.trim(),
+        qty: Number(newOfferQty),
+        price: Number(newOfferPrice),
+        category: newOfferCategory,
+        tag: newOfferTag.trim(),
+        productIds: newOfferProductIds,
+        is_active: true
+      };
+
+      if (isEditingOffer && editingOfferId) {
+        await offersService.updateOffer(editingOfferId, payload);
+        showToast("✓ Offer updated successfully!", "success");
+      } else {
+        await offersService.createOffer(payload);
+        showToast("🚀 Offer created successfully!", "success");
+      }
+
+      // Reset form
+      setNewOfferName('');
+      setNewOfferQty(3);
+      setNewOfferPrice('');
+      setNewOfferCategory('');
+      setNewOfferTag('');
+      setNewOfferProductIds([]);
+      setIsEditingOffer(false);
+      setEditingOfferId(null);
+      
+      await loadOffersList();
+    } catch (err) {
+      console.error("Failed to save offer:", err);
+      showToast("Failed to save offer.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartEditOffer = (offer) => {
+    setNewOfferName(offer.name);
+    setNewOfferQty(offer.qty);
+    setNewOfferPrice(offer.price);
+    setNewOfferCategory(offer.category || '');
+    setNewOfferTag(offer.tag || '');
+    setNewOfferProductIds(offer.productIds || []);
+    setEditingOfferId(offer.$id || offer.id);
+    setIsEditingOffer(true);
+  };
+
+  const handleCancelEditOffer = () => {
+    setNewOfferName('');
+    setNewOfferQty(3);
+    setNewOfferPrice('');
+    setNewOfferCategory('');
+    setNewOfferTag('');
+    setNewOfferProductIds([]);
+    setIsEditingOffer(false);
+    setEditingOfferId(null);
+  };
+
+  const handleToggleOfferActive = async (offer) => {
+    try {
+      const newStatus = !offer.is_active;
+      await offersService.updateOffer(offer.$id || offer.id, { is_active: newStatus });
+      showToast(`✓ Offer ${newStatus ? 'activated' : 'deactivated'} successfully!`, "success");
+      await loadOffersList();
+    } catch (err) {
+      console.error("Failed to toggle offer status:", err);
+      showToast("Failed to update status.", "error");
+    }
+  };
+
+  const handleDeleteOffer = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this offer?")) return;
+    setActionLoading(true);
+    try {
+      await offersService.deleteOffer(id);
+      showToast("🗑️ Offer deleted successfully.", "success");
+      await loadOffersList();
+    } catch (err) {
+      console.error("Failed to delete offer:", err);
+      showToast("Failed to delete offer.", "error");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const loadSlides = async () => {
@@ -457,6 +609,7 @@ function AdminPanel() {
     loadProductCatalog();
     loadCustomerOrders();
     loadSlides();
+    loadOffersList();
 
     // Hydrate campaigns
     campaignService.getPromoText()
@@ -554,6 +707,7 @@ function AdminPanel() {
       compare_at_price: data.compare_at_price ? Number(data.compare_at_price) : 0,
       is_featured: !!data.is_featured,
       is_vip_only: !!data.is_vip_only,
+      is_live: !!data.is_live,
       slug: data.slug?.trim() || data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || ""
     };
 
@@ -576,6 +730,7 @@ function AdminPanel() {
           delete stripped.is_vip_only;
           delete stripped.slug;
           delete stripped.return_policy;
+          delete stripped.is_live;
           return await productsService.updateProduct(id, stripped);
         }
         throw err;
@@ -601,6 +756,7 @@ function AdminPanel() {
           delete stripped.is_vip_only;
           delete stripped.slug;
           delete stripped.return_policy;
+          delete stripped.is_live;
           return await productsService.createProduct(stripped);
         }
         throw err;
@@ -613,7 +769,7 @@ function AdminPanel() {
         showToast('🔥 Drop variations updated in cloud servers successfully!', 'success');
       } else {
         await createHelper(productPayload);
-        showToast('⚡ Fresh Streetwear Drop Deployed Globally!', 'success');
+        showToast('⚡ Fresh Vakrayan Drop Deployed Globally!', 'success');
       }
     } catch (cloudError) {
       console.error("Appwrite product write failed:", cloudError.message);
@@ -627,6 +783,7 @@ function AdminPanel() {
       setValue('compare_at_price', '');
       setValue('is_featured', false);
       setValue('is_vip_only', false);
+      setValue('is_live', false);
       setValue('slug', '');
       setValue('return_policy', '7 Day Return');
       setEditingId(null);
@@ -697,6 +854,7 @@ function AdminPanel() {
       setValue('compare_at_price', product.compare_at_price || '');
       setValue('is_featured', product.is_featured === true || product.is_featured === 'true' || product.is_featured === 1 || product.is_featured === '1');
       setValue('is_vip_only', product.is_vip_only === true || product.is_vip_only === 'true' || product.is_vip_only === 1 || product.is_vip_only === '1');
+      setValue('is_live', product.is_live === true || product.is_live === 'true' || product.is_live === 1 || product.is_live === '1');
       setValue('slug', product.slug || '');
       setEditingId(id);
       setProductsSubTab('form');
@@ -743,6 +901,7 @@ function AdminPanel() {
     setValue('compare_at_price', '');
     setValue('is_featured', false);
     setValue('is_vip_only', false);
+    setValue('is_live', false);
     setValue('slug', '');
     setValue('color_hex', '');
     setValue('fit_type', '');
@@ -770,6 +929,20 @@ function AdminPanel() {
     } finally {
       setSweepTargetProductId(null);
       await loadProductCatalog();
+    }
+  };
+
+  const handleToggleLiveStatus = async (productId, currentIsLive) => {
+    setActionLoading(true);
+    try {
+      await productsService.updateProduct(productId, { is_live: !currentIsLive });
+      showToast(`Product ${!currentIsLive ? 'published Live' : 'saved to Draft'} successfully!`, 'success');
+      await loadProductCatalog();
+    } catch (err) {
+      console.error("Failed to toggle live status:", err);
+      showToast("Failed to update status. Check Appwrite connection.", "error");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -858,7 +1031,7 @@ function AdminPanel() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `streetwear_orders_manifest_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `vakrayan_orders_manifest_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1002,7 +1175,7 @@ function AdminPanel() {
       return `
         <div class="label-card">
           <div class="header">
-            <div class="store-name">AASHIS</div>
+            <div class="store-name">VAKRAYAN</div>
             <div class="carrier">${paymentType}</div>
           </div>
           
@@ -1159,6 +1332,10 @@ function AdminPanel() {
     if (previousStatus === targetStatus) return; // No change
 
     let extraData = { ...providedExtraData };
+    if (targetStatus === 'DELIVERED') {
+      extraData.paymentStatus = 'PAID';
+      extraData.payment_status = 'PAID';
+    }
 
     setActionLoading(true);
     try {
@@ -1231,6 +1408,34 @@ function AdminPanel() {
 
       // 2. Perform status change
       await ordersService.updateOrderStatus(orderId, targetStatus, extraData);
+
+      // If cancelling or returning, credit back to user wallet
+      if (
+        (targetStatus === 'CANCELLED' && (order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET')) ||
+        (targetStatus === 'RETURNED')
+      ) {
+        let orderNumber = order.order_number;
+        try {
+          const parsed = JSON.parse(order.address);
+          if (parsed?.metadata?.order_number) orderNumber = parsed.metadata.order_number;
+        } catch {
+          // ignore parsing error
+        }
+        orderNumber = orderNumber || order.$id?.substring(0, 8).toUpperCase();
+
+        try {
+          await walletService.createWalletTransaction({
+            userId: order.userId,
+            amount: order.total,
+            type: 'credit',
+            title: targetStatus === 'RETURNED' ? `Refund for Returned Order ${orderNumber}` : `Refund for Order ${orderNumber}`,
+            referenceId: orderId
+          });
+        } catch (walletErr) {
+          console.error("Failed to write credit wallet transaction on admin action:", walletErr.message);
+        }
+      }
+
       showToast(`✅ Order status transitioned to ${targetStatus}!`, 'success');
       await loadProductCatalog(); // Update active catalog stock display
     } catch (err) {
@@ -1253,7 +1458,10 @@ function AdminPanel() {
     }
 
     setIsAdminCancelModalOpen(false);
-    await handleOrderStatusShift(cancelTargetOrder, 'CANCELLED', { cancel_reason: finalReason });
+    await handleOrderStatusShift(cancelTargetOrder, 'CANCELLED', { 
+      cancel_reason: finalReason,
+      cancelled_by: 'admin'
+    });
     setCancelTargetOrder(null);
   };
 
@@ -1457,35 +1665,72 @@ function AdminPanel() {
     setIsBroadcasting(true);
     setBroadcastingProgress(0);
 
-    let sentCount = 0;
-    const interval = setInterval(async () => {
-      sentCount += Math.ceil(total / 5);
-      if (sentCount >= total) {
-        sentCount = total;
-        clearInterval(interval);
-        
+    const subjectText = campaignSubject.trim();
+    const bodyText = campaignBody.trim();
+
+    if (isEmailJSConfigured) {
+      let successCount = 0;
+      let failCount = 0;
+
+      // Send actual emails sequentially and update progress
+      for (let i = 0; i < total; i++) {
+        const subscriber = subs[i];
+        const emailAddress = subscriber.email;
         try {
-          await campaignService.sendCampaign(
-            campaignSubject.trim(), 
-            campaignBody.trim(), 
-            total
-          );
-          
-          const updatedHistory = await campaignService.getCampaignHistory();
-          setCampaignHistory(updatedHistory);
-          
-          showToast(`🚀 Campaign broadcasted successfully to all ${total} subscribers!`, "success");
-          setCampaignSubject('');
-          setCampaignBody('');
-        } catch (err) {
-          console.error("Failed to save campaign:", err);
-          showToast("Failed to complete campaign broadcast.", "error");
-        } finally {
-          setIsBroadcasting(false);
+          await campaignService.sendEmailViaEmailJS(emailAddress, subjectText, bodyText);
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to send email to ${emailAddress}:`, error);
+          failCount++;
         }
+        setBroadcastingProgress(i + 1);
       }
-      setBroadcastingProgress(sentCount);
-    }, 300);
+
+      try {
+        await campaignService.sendCampaign(subjectText, bodyText, total);
+        const updatedHistory = await campaignService.getCampaignHistory();
+        setCampaignHistory(updatedHistory);
+
+        if (failCount === 0) {
+          showToast(`🚀 Campaign sent successfully to all ${successCount} subscribers!`, "success");
+        } else {
+          showToast(`🚀 Campaign sent. Succeeded: ${successCount}, Failed: ${failCount}.`, failCount === total ? "error" : "warning");
+        }
+        setCampaignSubject('');
+        setCampaignBody('');
+      } catch (err) {
+        console.error("Failed to save campaign history:", err);
+        showToast("Failed to save campaign history.", "error");
+      } finally {
+        setIsBroadcasting(false);
+      }
+    } else {
+      // Simulation Mode
+      let sentCount = 0;
+      const interval = setInterval(async () => {
+        sentCount += Math.ceil(total / 5);
+        if (sentCount >= total) {
+          sentCount = total;
+          clearInterval(interval);
+          
+          try {
+            await campaignService.sendCampaign(subjectText, bodyText, total);
+            const updatedHistory = await campaignService.getCampaignHistory();
+            setCampaignHistory(updatedHistory);
+            
+            showToast(`🚀 [SIMULATION] Campaign broadcasted to ${total} subscribers!`, "success");
+            setCampaignSubject('');
+            setCampaignBody('');
+          } catch (err) {
+            console.error("Failed to save campaign:", err);
+            showToast("Failed to complete campaign broadcast.", "error");
+          } finally {
+            setIsBroadcasting(false);
+          }
+        }
+        setBroadcastingProgress(sentCount);
+      }, 300);
+    }
   };
 
   const handleAddCoupon = async () => {
@@ -1669,6 +1914,12 @@ function AdminPanel() {
               className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'categories' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
             >
               Category Manager
+            </button>
+            <button 
+              onClick={() => { setActiveTab('offers'); loadOffersList(); }}
+              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'offers' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
+            >
+              Bundle Offers
             </button>
           </div>
 
@@ -2011,6 +2262,20 @@ function AdminPanel() {
                     </label>
                   </div>
 
+                  {/* Live Status Flag */}
+                  <div className="flex items-center gap-3 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
+                    <input
+                      type="checkbox"
+                      id="is_live"
+                      disabled={actionLoading}
+                      className="w-4 h-4 text-[var(--color-text)] border-[var(--color-border)] focus:ring-0 focus:ring-offset-0 rounded-none accent-[var(--color-accent)] cursor-pointer"
+                      {...register('is_live')}
+                    />
+                    <label htmlFor="is_live" className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer select-none">
+                      🚀 Go Live / Publish Drop (Visible to customers on the site)
+                    </label>
+                  </div>
+
 
 
                 </div>
@@ -2176,10 +2441,6 @@ function AdminPanel() {
                           {filteredProducts.map((p) => {
                             const targetId = p.$id || p.id;
                             const coverThumbnailUrl = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x100?text=No+Asset';
-                            const badgeStr = p.tag ? `[${p.tag}]` : "[NO BADGE]";
-                            const keywordsStr = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags.join(', ') : "no keywords";
-                            const parsedTagsString = `${badgeStr} Keywords: ${keywordsStr}`;
-                            
                             // Parse sizes and stock
                             let parsedStock = {};
                             try {
@@ -2189,22 +2450,58 @@ function AdminPanel() {
                               parsedStock = {};
                             }
 
-                            const sizesWithStockArray = (p.sizes || []).map(size => {
-                              const stock = parsedStock[size] !== undefined ? parsedStock[size] : 10;
-                              return `${size} (${stock})`;
-                            });
-                            const parsedSizesString = sizesWithStockArray.join(', ') || "NONE";
+                            const totalStock = (p.sizes || []).reduce((sum, size) => {
+                              const stock = parsedStock[size] !== undefined ? Number(parsedStock[size]) : 10;
+                              return sum + stock;
+                            }, 0);
                             const backImagesArrayCount = Array.isArray(p.back_image_links) ? p.back_image_links.length : p.back_image_link ? 1 : 0;
 
+                            const isProductLive = p.is_live === true || p.is_live === 'true' || p.is_live === 1 || p.is_live === '1';
                             return (
                               <div key={targetId} className="flex items-center gap-4 p-3 border border-[var(--color-accent)] bg-[var(--color-subtle)]/50 group hover:bg-[var(--color-subtle)]/30 transition-colors duration-200 rounded-none">
                                 <img src={coverThumbnailUrl} alt={p.name} className="w-12 h-12 object-cover border border-[var(--color-accent)] shrink-0 rounded-none" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
-                                  <p className="text-xs text-[var(--color-muted)] mt-0.5 uppercase tracking-tight">
-                                    ₹{p.price} · <span className="text-[var(--color-accent)] font-bold">{parsedTagsString}</span> · Stocks: {parsedSizesString} · Backframes: {backImagesArrayCount}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
+                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide ${
+                                      isProductLive 
+                                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-250' 
+                                      : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
+                                    }`}>
+                                      {isProductLive ? 'LIVE' : 'DRAFT'}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] text-[var(--color-muted)] uppercase tracking-tight font-medium">
+                                    <span className="font-bold text-[var(--color-text)] text-xs">₹{p.price}</span>
+                                    {p.tag && (
+                                      <>
+                                        <span>·</span>
+                                        <span className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 px-1 py-0.2 text-[8px] font-bold rounded-sm tracking-wider">
+                                          {p.tag}
+                                        </span>
+                                      </>
+                                    )}
+                                    <span>·</span>
+                                    <span className={totalStock > 0 ? 'text-[var(--color-text)]' : 'text-rose-500 font-bold'}>
+                                      {totalStock > 0 ? `STOCK: ${totalStock} QTY` : 'OUT OF STOCK'}
+                                    </span>
+                                    <span>·</span>
+                                    <span>
+                                      {backImagesArrayCount + 1} IMAGES
+                                    </span>
+                                  </div>
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleLiveStatus(targetId, isProductLive)}
+                                  className={`text-[9px] px-3 py-1.5 font-mono font-black uppercase tracking-widest cursor-pointer shrink-0 transition-colors duration-150 rounded-none border ${
+                                    isProductLive
+                                    ? 'bg-amber-500/10 text-amber-700 border-amber-300 hover:bg-amber-600 hover:text-white'
+                                    : 'bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-600 hover:text-white'
+                                  }`}
+                                >
+                                  {isProductLive ? 'Set Draft' : 'Go Live'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleEdit(targetId)}
@@ -2979,8 +3276,33 @@ function AdminPanel() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left Column: Compose Form */}
                   <div className="lg:col-span-2 space-y-4 bg-[var(--color-surface)] p-5 rounded-none border border-[var(--color-border)]">
-                    <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase border-b border-[var(--color-border)] pb-2">COMPOSE BROADCAST CAMPAIGN</h4>
-                    
+                    <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+                      <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">COMPOSE BROADCAST CAMPAIGN</h4>
+                      {isEmailJSConfigured ? (
+                        <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 uppercase tracking-wider animate-pulse">
+                          🟢 EmailJS Active (Live)
+                        </span>
+                      ) : (
+                        <span className="text-[8px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 uppercase tracking-wider">
+                          🟡 Simulation Mode
+                        </span>
+                      )}
+                    </div>
+
+                    {!isEmailJSConfigured && (
+                      <div className="bg-amber-500/5 border border-amber-500/15 p-3.5 font-mono text-[9px] text-amber-400/90 uppercase tracking-wider space-y-1">
+                        <span className="font-bold block text-amber-300">ℹ️ SETUP EMAILJS FOR REAL EMAILS:</span>
+                        <p className="normal-case text-[9px] text-[var(--color-muted)] leading-relaxed">
+                          Currently running in offline simulation mode. To send real emails to your subscribers, configure these keys in your <code className="bg-black/30 px-1 py-0.5 rounded text-neutral-200">.env</code> file:
+                        </p>
+                        <div className="pt-1 select-all font-bold text-[8px] text-neutral-400 font-mono space-y-0.5">
+                          <div>VITE_EMAILJS_SERVICE_ID="your_service_id"</div>
+                          <div>VITE_EMAILJS_TEMPLATE_ID="your_template_id"</div>
+                          <div>VITE_EMAILJS_PUBLIC_KEY="your_public_key"</div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[8px] font-black text-[var(--color-muted)] block tracking-widest uppercase">CAMPAIGN SUBJECT</span>
                       <input
@@ -3459,10 +3781,18 @@ function AdminPanel() {
                 {deletedCategories.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setDeletedCategories([]);
-                      localStorage.removeItem('deleted_categories');
-                      showToast("✓ All deleted categories restored!", "success");
+                    onClick={async () => {
+                      try {
+                        setActionLoading(true);
+                        await categoryService.restoreAllCategories();
+                        setDeletedCategories([]);
+                        showToast("✓ All deleted categories restored!", "success");
+                      } catch (err) {
+                        console.error("Failed to restore categories:", err);
+                        showToast("Failed to restore categories.", "error");
+                      } finally {
+                        setActionLoading(false);
+                      }
                     }}
                     className="border border-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-all cursor-pointer select-none shrink-0"
                   >
@@ -3597,13 +3927,21 @@ function AdminPanel() {
                                     {categoryImages[cat.value] && (
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          const updated = { ...categoryImages };
-                                          delete updated[cat.value];
-                                          setCategoryImages(updated);
-                                          localStorage.setItem('category_images', JSON.stringify(updated));
-                                          setNewCategoryImageUrls(prev => ({ ...prev, [cat.value]: "" }));
-                                          showToast("✓ Custom cover override cleared.", "success");
+                                        onClick={async () => {
+                                          try {
+                                            setActionLoading(true);
+                                            await categoryService.saveCategoryImage(cat.value, "");
+                                            const updated = { ...categoryImages };
+                                            delete updated[cat.value];
+                                            setCategoryImages(updated);
+                                            setNewCategoryImageUrls(prev => ({ ...prev, [cat.value]: "" }));
+                                            showToast("✓ Custom cover override cleared.", "success");
+                                          } catch (err) {
+                                            console.error("Failed to clear custom cover:", err);
+                                            showToast("Failed to clear custom cover.", "error");
+                                          } finally {
+                                            setActionLoading(false);
+                                          }
                                         }}
                                         className="text-[9px] font-mono text-red-500 hover:text-red-700 uppercase tracking-widest cursor-pointer ml-auto"
                                       >
@@ -3664,6 +4002,296 @@ function AdminPanel() {
                       })()}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'offers' && (
+            <div className="space-y-8 animate-fade-in text-[var(--color-text)]">
+              {/* Header */}
+              <div className="pb-4 border-b border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xs font-mono font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Bundle Offers Manager</h2>
+                  <p className="text-[10px] text-[var(--color-muted)] font-mono mt-1 uppercase">Configure automatic buy-X-for-Y bundle promotions and discounts.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Form Col */}
+                <div className="lg:col-span-1 bg-[var(--color-surface)] border border-[var(--color-border)] p-6 space-y-6">
+                  <div>
+                    <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
+                      {isEditingOffer ? 'EDIT OFFER DETAIL' : 'CREATE NEW PROMOTION'}
+                    </span>
+                    <h3 className="text-xs font-mono font-black tracking-wider uppercase mt-1">
+                      {isEditingOffer ? 'Modify Bundle Offer' : 'Add Bundle Offer'}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-4 font-mono text-[9px] uppercase tracking-wider text-[var(--color-muted)]">
+                    {/* Name */}
+                    <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                      <span className="font-black text-[var(--color-muted)]">Offer Title / Name</span>
+                      <input
+                        type="text"
+                        value={newOfferName}
+                        onChange={(e) => setNewOfferName(e.target.value)}
+                        placeholder="E.G., BUY 3 TEES FOR 999"
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Qty */}
+                      <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                        <span className="font-black text-[var(--color-muted)]">Qty Required</span>
+                        <input
+                          type="number"
+                          value={newOfferQty}
+                          onChange={(e) => setNewOfferQty(Number(e.target.value))}
+                          placeholder="3"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                        />
+                      </div>
+
+                      {/* Price */}
+                      <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                        <span className="font-black text-[var(--color-muted)]">Bundle Price (₹)</span>
+                        <input
+                          type="number"
+                          value={newOfferPrice}
+                          onChange={(e) => setNewOfferPrice(e.target.value)}
+                          placeholder="999"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Category */}
+                    <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                      <span className="font-black text-[var(--color-muted)]">Apply to Category (Optional)</span>
+                      <select
+                        value={newOfferCategory}
+                        onChange={(e) => setNewOfferCategory(e.target.value)}
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)] cursor-pointer"
+                      >
+                        <option value="" className="text-[var(--color-muted)] bg-[var(--color-surface)]">-- NONE (CHOOSE PRODUCTS BELOW) --</option>
+                        {allCategories.map(cat => (
+                          <option key={cat.value} value={cat.value} className="text-[var(--color-text)] bg-[var(--color-surface)]">{cat.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Tag */}
+                    <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                      <span className="font-black text-[var(--color-muted)]">Apply by Keyword Tag (Optional)</span>
+                      <input
+                        type="text"
+                        value={newOfferTag}
+                        onChange={(e) => setNewOfferTag(e.target.value)}
+                        placeholder="E.G., BUY3TEES999"
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                      />
+                    </div>
+
+                    {/* Product checklist bulk selector */}
+                    <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-[var(--color-muted)]">
+                          Specific Products ({newOfferProductIds.length} Selected)
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const visibleIds = products
+                                .filter(p => p.name.toLowerCase().includes(offerSearchQuery.toLowerCase()))
+                                .map(p => p.$id || p.id);
+                              setNewOfferProductIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+                            }}
+                            className="text-[8px] font-mono text-[var(--color-accent)] uppercase hover:underline cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const visibleIds = products
+                                .filter(p => p.name.toLowerCase().includes(offerSearchQuery.toLowerCase()))
+                                .map(p => p.$id || p.id);
+                              setNewOfferProductIds(prev => prev.filter(id => !visibleIds.includes(id)));
+                            }}
+                            className="text-[8px] font-mono text-rose-600 uppercase hover:underline cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={offerSearchQuery}
+                        onChange={(e) => setOfferSearchQuery(e.target.value)}
+                        placeholder="SEARCH PRODUCTS TO SELECT..."
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)] mb-2"
+                      />
+
+                      <div className="border border-[var(--color-border)] bg-[var(--color-bg)] h-44 overflow-y-auto p-2 divide-y divide-[var(--color-border)] rounded-md font-sans">
+                        {products
+                          .filter(p => p.name.toLowerCase().includes(offerSearchQuery.toLowerCase()))
+                          .map(p => {
+                            const pId = p.$id || p.id;
+                            const isChecked = newOfferProductIds.includes(pId);
+                            return (
+                              <label key={pId} className="flex items-center gap-2 py-1.5 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900 px-1 select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setNewOfferProductIds(prev => [...prev, pId]);
+                                    } else {
+                                      setNewOfferProductIds(prev => prev.filter(id => id !== pId));
+                                    }
+                                  }}
+                                  className="w-3.5 h-3.5 accent-[var(--color-accent)] rounded-none cursor-pointer"
+                                />
+                                <img src={p.front_image_link} alt="" className="w-6 h-6 object-cover object-center shrink-0 border border-[var(--color-border)] rounded" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[9px] font-bold truncate uppercase tracking-wider text-[var(--color-text)]">{p.name}</p>
+                                  <p className="text-[8px] text-[var(--color-muted)] font-mono uppercase">₹{p.price} | {p.category}</p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      {isEditingOffer && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditOffer}
+                          className="w-full py-2.5 border border-neutral-300 hover:bg-[var(--color-subtle)] text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-lg cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleAddOffer}
+                        className={`py-2.5 text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-lg cursor-pointer transition-colors ${
+                          isEditingOffer 
+                            ? 'w-full bg-emerald-600 hover:bg-emerald-700' 
+                            : 'col-span-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)]'
+                        }`}
+                      >
+                        {isEditingOffer ? 'Save Changes' : 'Create Offer'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Listing Col */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex justify-between items-center pb-2 border-b border-[var(--color-border)]">
+                    <span className="text-[8px] font-mono font-black text-[var(--color-muted)] block tracking-widest uppercase">
+                      Active Bundle Promotions ({offersList.length})
+                    </span>
+                  </div>
+
+                  {loadingOffers ? (
+                    <div className="text-center py-12 font-mono text-xs text-[var(--color-muted)] animate-pulse uppercase">
+                      Loading offers list from database...
+                    </div>
+                  ) : offersList.length === 0 ? (
+                    <div className="text-center py-12 font-mono text-xs text-[var(--color-muted)] border border-dashed border-[var(--color-border)] uppercase">
+                      No offers configured yet. Use the panel on left to create one!
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {offersList.map((offer) => {
+                        let criteria = [];
+                        if (offer.category) {
+                          const catObj = allCategories.find(c => c.value === offer.category);
+                          criteria.push(`Category: ${catObj ? catObj.label : offer.category.toUpperCase()}`);
+                        }
+                        if (offer.tag) criteria.push(`Tag: ${offer.tag.toUpperCase()}`);
+                        if (Array.isArray(offer.productIds) && offer.productIds.length > 0) {
+                          criteria.push(`${offer.productIds.length} Products`);
+                        }
+                        const criteriaText = criteria.join(" OR ") || "All Products (No Filter)";
+
+                        return (
+                          <div
+                            key={offer.$id || offer.id}
+                            className={`flex flex-col justify-between bg-[var(--color-surface)] p-5 rounded-xl border space-y-4 shadow-2xs hover:shadow-xs transition-all ${
+                              !offer.is_active ? 'opacity-65 border-rose-200' : 'border-[var(--color-border)]'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="space-y-1">
+                                <h4 className="text-xs font-mono font-black text-[var(--color-text)] uppercase tracking-wider">
+                                  {offer.name}
+                                </h4>
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  <span className="text-[9px] font-mono font-black bg-[var(--color-accent)] text-white px-2.5 py-0.5 rounded uppercase tracking-wider">
+                                    BUY {offer.qty} FOR ₹{offer.price}
+                                  </span>
+                                  <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                                    offer.is_active 
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                                  }`}>
+                                    {offer.is_active ? 'ACTIVE' : 'INACTIVE'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditOffer(offer)}
+                                  className="text-[9.5px] font-bold text-blue-600 hover:text-blue-750 uppercase cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteOffer(offer.$id || offer.id)}
+                                  className="text-[9.5px] font-bold text-rose-600 hover:text-rose-750 uppercase cursor-pointer"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-[var(--color-border)] pt-3 space-y-2.5 text-[9px] font-mono uppercase tracking-wider text-[var(--color-muted)]">
+                              <div>
+                                <span className="font-bold text-[var(--color-text)] block">Criteria</span>
+                                <span className="text-[8.5px] leading-relaxed break-all block text-[var(--color-text)]">{criteriaText}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-1">
+                                <span className="font-bold text-[var(--color-text)]">Status Toggle</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleOfferActive(offer)}
+                                  className={`px-3 py-1 text-[8.5px] font-mono font-black rounded-lg border uppercase cursor-pointer transition-all ${
+                                    offer.is_active 
+                                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100' 
+                                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                  }`}
+                                >
+                                  {offer.is_active ? 'Deactivate' : 'Activate'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
