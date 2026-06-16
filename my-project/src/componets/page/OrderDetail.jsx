@@ -426,21 +426,25 @@ function OrderDetail() {
     showToast("Generating PDF Invoice, please wait...", "info");
     
     try {
+      // Wait for all custom web fonts to be fully loaded first
+      await document.fonts.ready;
+
       const canvas = await html2canvas(element, {
-        scale: 2.2, // Higher scale for crisp text resolution
+        scale: 4, // Ultra-high scale (Retina/4K resolution) for ultra-sharp text
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
       });
       
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/png', 1.0); // Maximum quality PNG
       
       // Calculate A4 dimensions (595.28 x 841.89 points)
       const pdf = new jsPDF('p', 'pt', 'a4');
       const imgWidth = 595.28;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      // Use 'NONE' compression to keep details crisp without JPEG artifacting
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'NONE');
       pdf.save(`invoice-${metadata.order_number || order.$id || 'order'}.pdf`);
       showToast("✓ Invoice PDF downloaded successfully!", "success");
     } catch (err) {
@@ -1516,6 +1520,9 @@ function OrderDetail() {
                   fontFamily: "'Inter', system-ui, sans-serif",
                   color: "#000000",
                   backgroundColor: "#ffffff",
+                  WebkitFontSmoothing: "antialiased",
+                  MozOsxFontSmoothing: "grayscale",
+                  textRendering: "optimizeLegibility",
                   // Override Tailwind v4 oklch colors with standard hex for html2canvas compatibility
                   "--color-neutral-50": "#f9f9f9",
                   "--color-neutral-100": "#f5f5f5",
