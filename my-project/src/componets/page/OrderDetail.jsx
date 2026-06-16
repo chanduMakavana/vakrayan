@@ -430,21 +430,21 @@ function OrderDetail() {
       await document.fonts.ready;
 
       const canvas = await html2canvas(element, {
-        scale: 4, // Ultra-high scale (Retina/4K resolution) for ultra-sharp text
+        scale: 2.5, // Balanced scale for high sharpness and fast performance
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
       });
       
-      const imgData = canvas.toDataURL('image/png', 1.0); // Maximum quality PNG
+      const imgData = canvas.toDataURL('image/png'); // Standard PNG
       
       // Calculate A4 dimensions (595.28 x 841.89 points)
       const pdf = new jsPDF('p', 'pt', 'a4');
       const imgWidth = 595.28;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      // Use 'NONE' compression to keep details crisp without JPEG artifacting
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'NONE');
+      // Use 'FAST' compression to optimize generation speed and reduce PDF file size
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
       pdf.save(`invoice-${metadata.order_number || order.$id || 'order'}.pdf`);
       showToast("✓ Invoice PDF downloaded successfully!", "success");
     } catch (err) {
