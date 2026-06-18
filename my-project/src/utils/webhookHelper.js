@@ -103,7 +103,9 @@ export const sendWebhookNotification = async (event, payload) => {
   };
 
   const telegramChatId = getTelegramChatId(event);
-  if (telegramToken && telegramToken.trim() && telegramChatId) {
+  if (!telegramToken || !telegramToken.trim() || !telegramChatId) {
+    console.warn(`⚠️ Telegram Notification Skipped for "${event}": VITE_TELEGRAM_BOT_TOKEN or Chat ID is missing. If you recently edited your .env file, please restart your Vite dev server (Ctrl+C and 'npm run dev') so React can load the new variables.`);
+  } else {
     try {
       let text = '';
       if (event === 'order.created') {
