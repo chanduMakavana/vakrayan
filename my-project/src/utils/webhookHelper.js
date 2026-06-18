@@ -150,15 +150,50 @@ export const sendWebhookNotification = async (event, payload) => {
                `<pre>${JSON.stringify(payload, null, 2)}</pre>`;
       }
 
+      const getTelegramReplyMarkup = (evt, pld) => {
+        const baseUrl = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://vakrayan.in';
+        const inlineKeyboard = [];
+
+        if (evt === 'order.created' && pld.orderId) {
+          inlineKeyboard.push([
+            { text: '👁️ View Order', url: `${baseUrl}/order/${pld.orderId}` },
+            { text: '⚙️ Manage in Admin', url: `${baseUrl}/admin` }
+          ]);
+        } else if (evt === 'return.requested' && pld.orderId) {
+          inlineKeyboard.push([
+            { text: '👁️ View Order Info', url: `${baseUrl}/order/${pld.orderId}` },
+            { text: '⚙️ Manage in Admin', url: `${baseUrl}/admin` }
+          ]);
+        } else if (evt === 'restock.requested' && pld.productId) {
+          inlineKeyboard.push([
+            { text: '🛍️ View Product', url: `${baseUrl}/product/${pld.productId}` }
+          ]);
+        } else if (evt === 'order.cancelled' && pld.orderId) {
+          inlineKeyboard.push([
+            { text: '👁️ View Order Details', url: `${baseUrl}/order/${pld.orderId}` }
+          ]);
+        }
+
+        return inlineKeyboard.length > 0 ? { inline_keyboard: inlineKeyboard } : null;
+      };
+
       const telegramUrl = `https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`;
+      const replyMarkup = getTelegramReplyMarkup(event, payload);
+      
+      const requestBody = {
+        chat_id: telegramChatId,
+        text,
+        parse_mode: 'HTML'
+      };
+
+      if (replyMarkup) {
+        requestBody.reply_markup = replyMarkup;
+      }
+
       fetch(telegramUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: telegramChatId,
-          text,
-          parse_mode: 'HTML'
-        })
+        body: JSON.stringify(requestBody)
       }).catch(err => console.warn(`Failed to dispatch ${event} Telegram notification:`, err.message));
     } catch (err) {
       console.warn(`Telegram dispatcher error for ${event}:`, err.message);
