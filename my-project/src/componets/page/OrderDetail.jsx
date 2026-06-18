@@ -184,8 +184,12 @@ function OrderDetail() {
         setLoading(true);
         const orderData = await ordersService.getOrderById(id);
         if (orderData) {
-          // Security lock: Ensure users can only view their own orders
-          if (orderData.userId !== user.$id && user.email !== import.meta.env.VITE_ADMIN_EMAIL) {
+          // Security lock: Ensure only the order owner or the store admin can view the order details
+          const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+          const isOwner = orderData.userId && user?.$id && orderData.userId === user.$id;
+          const isAdmin = user?.email && adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase();
+
+          if (!isOwner && !isAdmin) {
             showToast("Security Clearance Required. Access Aborted.", "error");
             navigate('/profile');
             return;
