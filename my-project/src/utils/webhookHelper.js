@@ -2,6 +2,14 @@
  * Centralized utility helper to dispatch notifications to Discord Webhook and Telegram Bot.
  * Supports auto-formatting and channel routing based on event types.
  */
+const escapeHtml = (unsafe) => {
+  if (!unsafe) return '';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+};
+
 export const sendWebhookNotification = async (event, payload) => {
   // 1. Resolve Discord target Webhook URL
   const getDiscordUrl = (evt) => {
@@ -109,47 +117,47 @@ export const sendWebhookNotification = async (event, payload) => {
     try {
       let text = '';
       if (event === 'order.created') {
-        const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity} @ ₹${i.price}`).join('\n');
+        const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity} @ ₹${i.price}`).join('\n');
         text = `<b>🚨 NEW VAKRAYAN ORDER RECEIVED! 🚨</b>\n\n` +
-               `<b>Order Number:</b> <code>${payload.orderNumber}</code>\n` +
-               `<b>Customer Name:</b> ${payload.customerName}\n` +
-               `<b>Email:</b> ${payload.email}\n` +
-               `<b>Phone:</b> ${payload.phone}\n` +
-               `<b>Payment Method:</b> ${payload.paymentMethod}\n` +
+               `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+               `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
+               `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
+               `<b>Phone:</b> ${escapeHtml(payload.phone)}\n` +
+               `<b>Payment Method:</b> ${escapeHtml(payload.paymentMethod)}\n` +
                `<b>Total Amount:</b> ₹${payload.total}\n` +
-               `<b>Shipping Address:</b> ${payload.shippingAddress}\n\n` +
+               `<b>Shipping Address:</b> ${escapeHtml(payload.shippingAddress)}\n\n` +
                `<b>Items Ordered:</b>\n${itemsList}`;
       } else if (event === 'order.cancelled') {
-        const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity}`).join('\n');
+        const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity}`).join('\n');
         text = `<b>🚫 VAKRAYAN ORDER CANCELLED BY CUSTOMER 🚫</b>\n\n` +
-               `<b>Order Number:</b> <code>${payload.orderNumber}</code>\n` +
-               `<b>Customer Name:</b> ${payload.customerName}\n` +
-               `<b>Email:</b> ${payload.email}\n` +
+               `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+               `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
+               `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
                `<b>Total Refund Amount:</b> ₹${payload.total}\n` +
-               `<b>Reason for Cancellation:</b> <i>${payload.reason}</i>\n\n` +
+               `<b>Reason for Cancellation:</b> <i>${escapeHtml(payload.reason)}</i>\n\n` +
                `<b>Items in Cancelled Order:</b>\n${itemsList}`;
       } else if (event === 'user.signup') {
         text = `<b>👤 NEW USER REGISTERED! 👤</b>\n\n` +
-               `<b>Name:</b> ${payload.name}\n` +
-               `<b>Email:</b> ${payload.email}\n` +
-               `<b>User ID:</b> <code>${payload.userId}</code>`;
+               `<b>Name:</b> ${escapeHtml(payload.name)}\n` +
+               `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
+               `<b>User ID:</b> <code>${escapeHtml(payload.userId)}</code>`;
       } else if (event === 'newsletter.subscribe') {
         text = `<b>📧 NEW NEWSLETTER SUBSCRIPTION! 📧</b>\n\n` +
-               `<b>Email Address:</b> ${payload.email}`;
+               `<b>Email Address:</b> ${escapeHtml(payload.email)}`;
       } else if (event === 'restock.requested') {
         text = `<b>🔄 RESTOCK NOTIFICATION REQUESTED! 🔄</b>\n\n` +
-               `<b>Product:</b> ${payload.productName} (ID: <code>${payload.productId}</code>)\n` +
-               `<b>Size Requested:</b> <code>${payload.size}</code>\n` +
-               `<b>Email:</b> ${payload.email}`;
+               `<b>Product:</b> ${escapeHtml(payload.productName)} (ID: <code>${escapeHtml(payload.productId)}</code>)\n` +
+               `<b>Size Requested:</b> <code>${escapeHtml(payload.size)}</code>\n` +
+               `<b>Email:</b> ${escapeHtml(payload.email)}`;
       } else if (event === 'return.requested') {
         text = `<b>📦 RETURN/EXCHANGE REQUESTED! 📦</b>\n\n` +
-               `<b>Order Number:</b> <code>${payload.orderNumber}</code>\n` +
-               `<b>Type:</b> ${payload.type} (Return or Exchange)\n` +
-               `<b>Reason:</b> ${payload.reason}\n` +
-               `<b>Customer Email:</b> ${payload.email}`;
+               `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+               `<b>Type:</b> ${escapeHtml(payload.type)} (Return or Exchange)\n` +
+               `<b>Reason:</b> ${escapeHtml(payload.reason)}\n` +
+               `<b>Customer Email:</b> ${escapeHtml(payload.email)}`;
       } else {
         text = `<b>🔔 WEBSITE EVENT: ${event.toUpperCase()} 🔔</b>\n\n` +
-               `<pre>${JSON.stringify(payload, null, 2)}</pre>`;
+               `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
       }
 
       const getTelegramReplyMarkup = (evt, pld) => {
@@ -196,7 +204,16 @@ export const sendWebhookNotification = async (event, payload) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
-      }).catch(err => console.warn(`Failed to dispatch ${event} Telegram notification:`, err.message));
+      })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.warn(`❌ Telegram API Error ${res.status}:`, errData.description || 'Unknown error');
+        } else {
+          console.log(`✅ Telegram Notification dispatched successfully for "${event}"`);
+        }
+      })
+      .catch(err => console.warn(`Failed to dispatch ${event} Telegram notification:`, err.message));
     } catch (err) {
       console.warn(`Telegram dispatcher error for ${event}:`, err.message);
     }
