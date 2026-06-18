@@ -161,7 +161,16 @@ export const sendWebhookNotification = async (event, payload) => {
       }
 
       const getTelegramReplyMarkup = (evt, pld) => {
-        const baseUrl = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://vakrayan.in';
+        let baseUrl = 'https://vakrayan.in'; // Default to production domain so links work on mobile and satisfy Telegram's URL validation
+        
+        if (typeof window !== 'undefined' && window.location) {
+          const origin = window.location.origin;
+          // Use current origin only if it's a public domain (not localhost / local IP)
+          if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+            baseUrl = origin;
+          }
+        }
+
         const inlineKeyboard = [];
 
         if (evt === 'order.created' && pld.orderId) {
