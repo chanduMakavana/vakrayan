@@ -136,45 +136,6 @@ function PromoBanner() {
           ))}
         </motion.div>
       </motion.div>
-
-      {/* Scrolling ticker */}
-      <div
-        className="relative w-full py-4 overflow-hidden flex z-20"
-        style={{
-          background: 'linear-gradient(90deg, #059669 0%, #047857 50%, #059669 100%)',
-          boxShadow: '0 4px 20px rgba(5,150,105,0.25)'
-        }}
-      >
-        <div className="flex whitespace-nowrap animate-marquee">
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 800,
-              fontFamily: "'Jost', sans-serif",
-              letterSpacing: '0.18em',
-              color: '#fff',
-              margin: '0 16px',
-              textTransform: 'uppercase'
-            }}
-          >
-            {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp;
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 800,
-              fontFamily: "'Jost', sans-serif",
-              letterSpacing: '0.18em',
-              color: '#fff',
-              margin: '0 16px',
-              textTransform: 'uppercase'
-            }}
-            aria-hidden="true"
-          >
-            {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp; {promoText} &nbsp;&nbsp;✦&nbsp;&nbsp;
-          </span>
-        </div>
-      </div>
     </section>
   )
 }

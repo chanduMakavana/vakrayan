@@ -14,7 +14,7 @@ import slidesService from '../../appwrite/slides';
 import offersService from '../../appwrite/offers';
 import walletService from '../../appwrite/wallet';
 import categoryService from '../../appwrite/category';
-import { FiFileText } from 'react-icons/fi';
+import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu } from 'react-icons/fi';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -1854,74 +1854,145 @@ function AdminPanel() {
     }
   });
 
-  return (
-    <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] p-6 md:p-12 relative selection:bg-[var(--color-accent)] selection:text-white">
-      <div className="relative z-20 max-w-4xl mx-auto space-y-8">
+  const pendingOrdersCount = orders.filter(o => o.status === 'PENDING').length;
+  const activeOrdersCount = orders.filter(o => ['PENDING', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT', 'CANCELLATION_REQUESTED'].includes(o.status)).length;
 
-        {/* Header Display Node */}
-        <div className="bg-[var(--color-surface)] p-8 rounded-none border border-[var(--color-accent)]">
-          <div className="mb-6 pb-6 border-b border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h4 className="text-xs tracking-[0.4em] text-[var(--color-muted)] font-bold uppercase mb-1">HQ Operations</h4>
-              <h1 className="text-3xl font-black tracking-widest uppercase text-[var(--color-text)]">
-                Operations Console
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link to="/" className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-4 py-2.5 rounded-none uppercase h-fit transition-colors">
-                HOME
-              </Link>
-              <div className="border border-[var(--color-accent)] text-[var(--color-text)] text-[10px] font-mono font-black tracking-widest px-4 py-2.5 rounded-none uppercase h-fit">
-                Admin Mode Active
+  return (
+    <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] py-6 px-4 md:py-10 md:px-8 relative selection:bg-[var(--color-accent)] selection:text-white">
+      {/* Background decoration */}
+      <div className="absolute top-1/4 left-1/12 w-96 h-96 bg-[var(--color-accent)]/5 rounded-full blur-3xl pointer-events-none z-0"></div>
+      <div className="absolute bottom-1/4 right-1/12 w-96 h-96 bg-[var(--color-info)]/5 rounded-full blur-3xl pointer-events-none z-0"></div>
+
+      <div className="relative z-20 max-w-7xl mx-auto space-y-8">
+        
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          
+          {/* Sidebar Navigation - Glassmorphic, Sticky on Desktop */}
+          <aside className="w-full lg:w-72 shrink-0 lg:sticky lg:top-8 z-30">
+            <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] rounded-2xl shadow-glass p-6 space-y-6">
+              <div className="pb-4 border-b border-[var(--color-border)]">
+                <h4 className="text-[10px] tracking-[0.3em] text-[var(--color-muted)] font-black uppercase mb-1">HQ Operations</h4>
+                <h1 className="text-xl font-black tracking-widest uppercase text-[var(--color-text)] flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-[var(--color-accent)] rounded-full animate-pulse"></span>
+                  Console
+                </h1>
+              </div>
+
+              {/* Navigation Menu */}
+              <nav className="flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-visible pb-3 lg:pb-0 scrollbar-none -mx-4 px-4 lg:mx-0 lg:px-0">
+                <button 
+                  onClick={() => { setActiveTab('products'); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'products' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiPackage className="text-xs" />
+                  <span>Drops Manager</span>
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('orders'); loadCustomerOrders(); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'orders' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiTruck className="text-xs" />
+                  <span>Fulfillment ({activeOrdersCount})</span>
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('campaigns'); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'campaigns' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiMail className="text-xs" />
+                  <span>Campaign Panel</span>
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('slider'); loadSlides(); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'slider' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiImage className="text-xs" />
+                  <span>Hero Slider</span>
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('telemetry'); loadStoreTelemetry(); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'telemetry' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiActivity className="text-xs" />
+                  <span>Activity Logs</span>
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('categories'); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'categories' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiLayers className="text-xs" />
+                  <span>Categories</span>
+                </button>
+                <button 
+                  onClick={() => { setActiveTab('offers'); loadOffersList(); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'offers' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiTag className="text-xs" />
+                  <span>Bundle Offers</span>
+                </button>
+              </nav>
+
+              <div className="pt-4 border-t border-[var(--color-border)] flex flex-col gap-2.5">
+                <Link to="/" className="w-full text-center bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-4 py-3 rounded-xl uppercase transition-all shadow-xs hover:shadow-sm hover:translate-y-[-1px] active:scale-[0.98]">
+                  HOME
+                </Link>
+                <div className="w-full text-center border border-[var(--color-border)] text-slate-300 text-[9px] font-mono font-black tracking-widest px-4 py-2.5 rounded-xl uppercase bg-[var(--color-surface-alt)]">
+                  Admin Mode Active
+                </div>
               </div>
             </div>
-          </div>
+          </aside>
 
-          {/* Tab Navigation Menu */}
-          <div className="flex gap-6 border-b border-[var(--color-border)] pb-3 mb-8 flex-wrap">
-            <button 
-              onClick={() => { setActiveTab('products'); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'products' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Drops Manager
-            </button>
-            <button 
-              onClick={() => { setActiveTab('orders'); loadCustomerOrders(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'orders' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Fulfillment ({orders.length})
-            </button>
-            <button 
-              onClick={() => { setActiveTab('campaigns'); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'campaigns' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Campaign Panel
-            </button>
-            <button 
-              onClick={() => { setActiveTab('slider'); loadSlides(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'slider' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Hero Slider
-            </button>
-            <button 
-              onClick={() => { setActiveTab('telemetry'); loadStoreTelemetry(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'telemetry' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Activity Logs
-            </button>
-            <button 
-              onClick={() => { setActiveTab('categories'); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'categories' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Category Manager
-            </button>
-            <button 
-              onClick={() => { setActiveTab('offers'); loadOffersList(); }}
-              className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1 transition-all cursor-pointer ${activeTab === 'offers' ? 'text-[var(--color-text)] border-b-2 border-[var(--color-accent)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}
-            >
-              Bundle Offers
-            </button>
-          </div>
+          {/* Main Content Pane */}
+          <div className="flex-grow w-full space-y-6 min-w-0">
+            {/* Header Block inside main area */}
+            <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 md:p-8 rounded-2xl shadow-glass flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-[10px] tracking-[0.3em] text-[var(--color-muted)] font-black uppercase mb-1">HQ Operations Console</h4>
+                <h1 className="text-2xl font-black tracking-widest uppercase text-[var(--color-text)]">
+                  {activeTab === 'products' && 'Drops Manager'}
+                  {activeTab === 'orders' && 'Fulfillment Engine'}
+                  {activeTab === 'campaigns' && 'Campaigns & Coupons'}
+                  {activeTab === 'slider' && 'Hero Slider Manager'}
+                  {activeTab === 'telemetry' && 'Store Activity Logs'}
+                  {activeTab === 'categories' && 'Category Manager'}
+                  {activeTab === 'offers' && 'Bundle Offers Manager'}
+                </h1>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-250 text-[9px] font-black tracking-wider uppercase">
+                  <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-pulse"></span>
+                  Active Registry
+                </span>
+              </div>
+            </div>
 
           {/* ==========================================
               TAB 1: DROPS CATALOG & LAUNCH DROP
@@ -1935,7 +2006,7 @@ function AdminPanel() {
                   onClick={() => setProductsSubTab('list')}
                   className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1.5 transition-all border-b-2 cursor-pointer ${
                     productsSubTab === 'list' 
-                      ? 'text-[var(--color-text)] border-[var(--color-accent)]' 
+                      ? 'text-[var(--color-text)] border-[var(--color-border)]' 
                       : 'text-[var(--color-muted)] border-transparent hover:text-[var(--color-text)]'
                   }`}
                 >
@@ -1951,7 +2022,7 @@ function AdminPanel() {
                   }}
                   className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase pb-1.5 transition-all border-b-2 cursor-pointer ${
                     productsSubTab === 'form' 
-                      ? 'text-[var(--color-text)] border-[var(--color-accent)]' 
+                      ? 'text-[var(--color-text)] border-[var(--color-border)]' 
                       : 'text-[var(--color-muted)] border-transparent hover:text-[var(--color-text)]'
                   }`}
                 >
@@ -1960,7 +2031,15 @@ function AdminPanel() {
               </div>
 
               {productsSubTab === 'form' ? (
-                <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 md:col-span-2 w-full text-left">
+                  
+                  {/* CARD 1: GENERAL SPECIFICATIONS */}
+                  <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-6">
+                    <div className="border-b border-[var(--color-border)] pb-3 flex items-center gap-2">
+                      <FiPackage className="text-[var(--color-accent)] text-lg" />
+                      <h3 className="text-xs font-black tracking-widest uppercase text-[var(--color-text)]">General Specs & Pricing</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
               {/* Product Name */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
@@ -1969,7 +2048,7 @@ function AdminPanel() {
                   type="text"
                   disabled={actionLoading}
                   placeholder="E.G., GOTHIC OVERSIZED HOODIE"
-                  className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors uppercase font-medium disabled:opacity-50`}
+                  className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors uppercase font-medium disabled:opacity-50`}
                   {...register('name', { required: 'Product name is required' })}
                 />
                 {errors.name && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -1982,7 +2061,7 @@ function AdminPanel() {
                   type="number"
                   placeholder="1499"
                   disabled={actionLoading}
-                  className={`w-full bg-[var(--color-subtle)] border ${errors.price ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50`}
+                  className={`w-full bg-[var(--color-subtle)] border ${errors.price ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50`}
                   {...register('price', { 
                     required: 'Price is required',
                     min: { value: 1, message: 'Price must be greater than 0' }
@@ -1998,7 +2077,7 @@ function AdminPanel() {
                   type="number"
                   placeholder="1999"
                   disabled={actionLoading}
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50"
                   {...register('compare_at_price')}
                 />
               </div>
@@ -2010,7 +2089,7 @@ function AdminPanel() {
                   <div className="relative">
                     <select
                       disabled={actionLoading}
-                      className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 pr-10 text-sm text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
+                      className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 pr-10 text-sm text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium appearance-none cursor-pointer disabled:opacity-50 uppercase"
                       {...register('category', { 
                         required: 'Category is required',
                         onChange: (e) => {
@@ -2039,7 +2118,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., CARGO PANTS"
-                      className="grow bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors uppercase font-medium disabled:opacity-50"
+                      className="grow bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors uppercase font-medium disabled:opacity-50"
                       {...register('category', { required: 'Category is required' })}
                     />
                     <button
@@ -2064,7 +2143,7 @@ function AdminPanel() {
                   type="text"
                   placeholder="gothic-oversized-hoodie"
                   disabled={actionLoading}
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50 lowercase"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50 lowercase"
                   {...register('slug')}
                 />
               </div>
@@ -2076,11 +2155,21 @@ function AdminPanel() {
                   type="text"
                   disabled={actionLoading}
                   placeholder="E.G., OVERSIZED, HEAVYWEIGHT, BLACK, GRAPHIC, COTTON"
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors uppercase font-medium disabled:opacity-50"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors uppercase font-medium disabled:opacity-50"
                   {...register('search_keywords')}
                 />
               </div>
 
+                    </div>
+                  </div>
+
+                  {/* CARD 2: MEDIA & IMAGES */}
+                  <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-6">
+                    <div className="border-b border-[var(--color-border)] pb-3 flex items-center gap-2">
+                      <FiImage className="text-[var(--color-accent)] text-lg" />
+                      <h3 className="text-xs font-black tracking-widest uppercase text-[var(--color-text)]">Media & Image Views</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Front Image Link */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
                 <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Front Image Link</label>
@@ -2089,10 +2178,10 @@ function AdminPanel() {
                     type="text"
                     disabled={actionLoading}
                     placeholder="PASTE FRONT IMAGE LINK"
-                    className={`flex-1 bg-[var(--color-subtle)] border ${errors.front_image_link ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium disabled:opacity-50`}
+                    className={`flex-1 bg-[var(--color-subtle)] border ${errors.front_image_link ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50`}
                     {...register('front_image_link', { required: 'Front image link is required' })}
                   />
-                  <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-accent)] text-center select-none disabled:opacity-50">
+                  <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-border)] text-center select-none disabled:opacity-50">
                     {uploadingFields['front_image_link'] ? 'Uploading...' : 'Upload'}
                     <input
                       type="file"
@@ -2116,10 +2205,10 @@ function AdminPanel() {
                         type="text"
                         disabled={actionLoading}
                         placeholder={`BACK IMAGE LINK ${index + 1}`}
-                        className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
+                        className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
                         {...register(fieldName, index === 0 ? { required: 'At least one back view link is required.' } : undefined)}
                       />
-                      <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-accent)] text-center select-none disabled:opacity-50">
+                      <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-border)] text-center select-none disabled:opacity-50">
                         {uploadingFields[fieldName] ? 'Uploading...' : 'Upload'}
                         <input
                           type="file"
@@ -2135,6 +2224,16 @@ function AdminPanel() {
                 {errors.back_image_link_1 && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.back_image_link_1.message}</span>}
               </div>
 
+                    </div>
+                  </div>
+
+                  {/* CARD 3: INVENTORY, VARIATIONS & POLICIES */}
+                  <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-6">
+                    <div className="border-b border-[var(--color-border)] pb-3 flex items-center gap-2">
+                      <FiSliders className="text-[var(--color-accent)] text-lg" />
+                      <h3 className="text-xs font-black tracking-widest uppercase text-[var(--color-text)]">Inventory, Variations & Policies</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Size-wise Stock Management (Option 2) */}
               <div className="flex flex-col gap-3 md:col-span-2">
                 <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Size-wise Stock Inventory Configuration</label>
@@ -2147,7 +2246,7 @@ function AdminPanel() {
                         placeholder="0"
                         min="0"
                         disabled={actionLoading}
-                        className="w-full text-center text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-full text-center text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         {...register(`stock_${size}`)}
                       />
                     </div>
@@ -2164,7 +2263,7 @@ function AdminPanel() {
                     <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Status Badge Tag</label>
                     <select
                       disabled={actionLoading}
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase appearance-none cursor-pointer text-[var(--color-text)]"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase appearance-none cursor-pointer text-[var(--color-text)]"
                       {...register('single_tag')}
                     >
                       <option value="">NONE / NO BADGE</option>
@@ -2183,7 +2282,7 @@ function AdminPanel() {
                       placeholder="0"
                       min="0"
                       max="100"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
                       {...register('discount_percent')}
                     />
                   </div>
@@ -2195,7 +2294,7 @@ function AdminPanel() {
                           type="text"
                           disabled={actionLoading}
                           placeholder="E.G., CG-TEE-01"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
                           {...register('color_group_id')}
                         />
                       </div>
@@ -2207,7 +2306,7 @@ function AdminPanel() {
                           type="text"
                           disabled={actionLoading}
                           placeholder="E.G., JET BLACK"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
                           {...register('color_name')}
                         />
                       </div>
@@ -2219,7 +2318,7 @@ function AdminPanel() {
                           type="text"
                           disabled={actionLoading}
                           placeholder="E.G., #000000"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
                           {...register('color_hex')}
                         />
                       </div>
@@ -2231,7 +2330,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., OVERSIZED BOX FIT"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
                       {...register('fit_type')}
                     />
                   </div>
@@ -2243,7 +2342,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., 240 GSM 100% COMBED COTTON"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
                       {...register('fabric_gsm')}
                     />
                   </div>
@@ -2254,7 +2353,7 @@ function AdminPanel() {
                       type="checkbox"
                       id="is_featured"
                       disabled={actionLoading}
-                      className="w-4 h-4 text-[var(--color-text)] border-[var(--color-border)] focus:ring-0 focus:ring-offset-0 rounded-none accent-[var(--color-accent)] cursor-pointer"
+                      className="w-4 h-4 text-[var(--color-text)] border-[var(--color-border)] focus:ring-0 focus:ring-offset-0 rounded-xl accent-[var(--color-accent)] cursor-pointer"
                       {...register('is_featured')}
                     />
                     <label htmlFor="is_featured" className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer select-none">
@@ -2268,7 +2367,7 @@ function AdminPanel() {
                       type="checkbox"
                       id="is_live"
                       disabled={actionLoading}
-                      className="w-4 h-4 text-[var(--color-text)] border-[var(--color-border)] focus:ring-0 focus:ring-offset-0 rounded-none accent-[var(--color-accent)] cursor-pointer"
+                      className="w-4 h-4 text-[var(--color-text)] border-[var(--color-border)] focus:ring-0 focus:ring-offset-0 rounded-xl accent-[var(--color-accent)] cursor-pointer"
                       {...register('is_live')}
                     />
                     <label htmlFor="is_live" className="text-[10px] font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer select-none">
@@ -2288,7 +2387,7 @@ function AdminPanel() {
                   rows="3"
                   disabled={actionLoading}
                   placeholder="E.G., 280 GSM 100% FRENCH TERRY COTTON. BOOTCUT BOXED DROP LAYOUT SPEC..."
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors font-medium resize-none disabled:opacity-50 uppercase"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium resize-none disabled:opacity-50 uppercase"
                   {...register('description')}
                 />
               </div>
@@ -2298,7 +2397,7 @@ function AdminPanel() {
                 <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Return Policy *</label>
                 <select
                   disabled={actionLoading}
-                  className="w-full bg-[var(--color-subtle)] border border-neutral-250 hover:border-neutral-450 focus:border-[var(--color-accent)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50 uppercase cursor-pointer"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50 uppercase cursor-pointer"
                   {...register('return_policy')}
                 >
                   <option value="7 Day Return">7 Day Return & Exchange</option>
@@ -2308,12 +2407,15 @@ function AdminPanel() {
                 </select>
               </div>
 
+                    </div>
+                  </div>
+
               {/* Form actions and submission */}
               <div className="md:col-span-2 mt-2 flex gap-3">
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-xs tracking-widest uppercase py-4 rounded-none border border-[var(--color-accent)] transition-all active:scale-[0.99] disabled:opacity-40 cursor-pointer"
+                  className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl border border-[var(--color-border)] transition-all active:scale-[0.99] disabled:opacity-40 cursor-pointer"
                 >
                   {actionLoading ? 'PROCESSING REQUEST...' : editingId ? 'UPDATE DROP SPECIFICATION' : 'DEPLOY DROP TO PUBLIC'}
                 </button>
@@ -2321,7 +2423,7 @@ function AdminPanel() {
                   type="button"
                   disabled={actionLoading}
                   onClick={handleCancelEdit}
-                  className="px-6 bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-black text-xs tracking-widest uppercase py-4 rounded-none border border-[var(--color-border)] transition-all active:scale-[0.99] cursor-pointer"
+                  className="px-6 bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-black text-xs tracking-widest uppercase py-4 rounded-xl border border-[var(--color-border)] transition-all active:scale-[0.99] cursor-pointer"
                 >
                   {editingId ? 'CANCEL' : 'RETURN TO POOL'}
                 </button>
@@ -2374,7 +2476,7 @@ function AdminPanel() {
                   return (
                     <div className="space-y-6">
                       {/* Search & Filter Controls */}
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-[var(--color-subtle)]/50 p-4 border border-[var(--color-accent)] rounded-none">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-[var(--color-subtle)]/30 p-5 border border-[var(--glass-border-green)] rounded-2xl backdrop-blur-sm shadow-xs">
                         {/* Search Input */}
                         <div className="flex flex-col gap-1.5 sm:col-span-1">
                           <span className="text-[8px] font-mono text-[var(--color-muted)] font-bold uppercase tracking-widest">Search Drops</span>
@@ -2383,7 +2485,7 @@ function AdminPanel() {
                             value={productSearchQuery}
                             onChange={(e) => setProductSearchQuery(e.target.value)}
                             placeholder="Search name, slug, tag..."
-                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold px-3 py-2 outline-hidden placeholder-neutral-450 uppercase tracking-wider rounded-none focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)]"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-mono font-bold px-3 py-2 outline-hidden placeholder-neutral-450 uppercase tracking-wider rounded-xl focus:border-[var(--color-border)] focus:bg-[var(--color-surface)]"
                           />
                         </div>
                         {/* Category Selector */}
@@ -2392,7 +2494,7 @@ function AdminPanel() {
                           <select
                             value={productCategoryFilter}
                             onChange={(e) => setProductCategoryFilter(e.target.value)}
-                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] uppercase cursor-pointer rounded-none px-2 py-2"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-border)] uppercase cursor-pointer rounded-xl px-2 py-2"
                           >
                             <option value="ALL">ALL CATEGORIES</option>
                             {allCategories.map(cat => (
@@ -2406,7 +2508,7 @@ function AdminPanel() {
                           <select
                             value={productTagFilter}
                             onChange={(e) => setProductTagFilter(e.target.value)}
-                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] uppercase cursor-pointer rounded-none px-2 py-2"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-border)] uppercase cursor-pointer rounded-xl px-2 py-2"
                           >
                             <option value="ALL">ALL BADGES</option>
                             <option value="NEW DROP">NEW DROP</option>
@@ -2421,7 +2523,7 @@ function AdminPanel() {
                           <select
                             value={productStockFilter}
                             onChange={(e) => setProductStockFilter(e.target.value)}
-                            className="w-full bg-[var(--color-surface)] border border-[var(--color-accent)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-accent)] uppercase cursor-pointer rounded-none px-2 py-2"
+                            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-mono font-bold text-[var(--color-text)] outline-hidden tracking-wider focus:border-[var(--color-border)] uppercase cursor-pointer rounded-xl px-2 py-2"
                           >
                             <option value="ALL">ALL STOCK STATUS</option>
                             <option value="IN_STOCK">IN STOCK ONLY</option>
@@ -2431,7 +2533,7 @@ function AdminPanel() {
                       </div>
 
                       {filteredProducts.length === 0 ? (
-                        <div className="py-12 text-center border border-dashed border-[var(--color-accent)] rounded-none bg-[var(--color-subtle)]/50">
+                        <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-xl bg-[var(--color-subtle)]/50">
                           <p className="text-xs font-mono font-black tracking-widest text-[var(--color-muted)] uppercase">
                             No active product drops match the search criteria or filters.
                           </p>
@@ -2458,64 +2560,68 @@ function AdminPanel() {
 
                             const isProductLive = p.is_live === true || p.is_live === 'true' || p.is_live === 1 || p.is_live === '1';
                             return (
-                              <div key={targetId} className="flex items-center gap-4 p-3 border border-[var(--color-accent)] bg-[var(--color-subtle)]/50 group hover:bg-[var(--color-subtle)]/30 transition-colors duration-200 rounded-none">
-                                <img src={coverThumbnailUrl} alt={p.name} className="w-12 h-12 object-cover border border-[var(--color-accent)] shrink-0 rounded-none" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-xs font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
-                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide ${
-                                      isProductLive 
-                                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-250' 
-                                      : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
-                                    }`}>
-                                      {isProductLive ? 'LIVE' : 'DRAFT'}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10px] text-[var(--color-muted)] uppercase tracking-tight font-medium">
-                                    <span className="font-bold text-[var(--color-text)] text-xs">₹{p.price}</span>
-                                    {p.tag && (
-                                      <>
-                                        <span>·</span>
-                                        <span className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 px-1 py-0.2 text-[8px] font-bold rounded-sm tracking-wider">
-                                          {p.tag}
-                                        </span>
-                                      </>
-                                    )}
-                                    <span>·</span>
-                                    <span className={totalStock > 0 ? 'text-[var(--color-text)]' : 'text-rose-500 font-bold'}>
-                                      {totalStock > 0 ? `STOCK: ${totalStock} QTY` : 'OUT OF STOCK'}
-                                    </span>
-                                    <span>·</span>
-                                    <span>
-                                      {backImagesArrayCount + 1} IMAGES
-                                    </span>
+                              <div key={targetId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-subtle)]/30 transition-all rounded-2xl shadow-xs">
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                  <img src={coverThumbnailUrl} alt={p.name} className="w-14 h-14 object-cover border border-[var(--color-border)] shrink-0 rounded-xl shadow-xs" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="text-sm font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
+                                      <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                        isProductLive 
+                                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-250' 
+                                        : 'bg-slate-800 text-[var(--color-muted)] border border-slate-700'
+                                      }`}>
+                                        {isProductLive ? 'LIVE' : 'DRAFT'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-[var(--color-muted)] uppercase tracking-tight font-medium">
+                                      <span className="font-bold text-[var(--color-text)] text-xs">₹{p.price}</span>
+                                      {p.tag && (
+                                        <>
+                                          <span>·</span>
+                                          <span className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-border)]/20 px-2 py-0.5 text-[8px] font-bold rounded-full tracking-wider">
+                                            {p.tag}
+                                          </span>
+                                        </>
+                                      )}
+                                      <span>·</span>
+                                      <span className={totalStock > 0 ? 'text-[var(--color-text)]' : 'text-rose-500 font-bold'}>
+                                        {totalStock > 0 ? `STOCK: ${totalStock} QTY` : 'OUT OF STOCK'}
+                                      </span>
+                                      <span>·</span>
+                                      <span>
+                                        {backImagesArrayCount + 1} IMAGES
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleLiveStatus(targetId, isProductLive)}
-                                  className={`text-[9px] px-3 py-1.5 font-mono font-black uppercase tracking-widest cursor-pointer shrink-0 transition-colors duration-150 rounded-none border ${
-                                    isProductLive
-                                    ? 'bg-amber-500/10 text-amber-700 border-amber-300 hover:bg-amber-600 hover:text-white'
-                                    : 'bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-600 hover:text-white'
-                                  }`}
-                                >
-                                  {isProductLive ? 'Set Draft' : 'Go Live'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEdit(targetId)}
-                                  className="text-[9px] bg-[var(--color-surface)] border border-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white px-3 py-1.5 font-mono font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer shrink-0 transition-colors duration-150 rounded-none"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveProductItem(targetId)}
-                                  className="text-[9px] bg-rose-50 hover:bg-rose-600 hover:text-white border border-rose-950 px-3 py-1.5 font-mono font-black text-rose-950 uppercase tracking-widest cursor-pointer shrink-0 transition-colors duration-150 rounded-none"
-                                >
-                                  Sweep
-                                </button>
+                                <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleLiveStatus(targetId, isProductLive)}
+                                    className={`text-[9px] px-3.5 py-2 font-mono font-black uppercase tracking-widest cursor-pointer transition-all duration-150 rounded-xl border ${
+                                      isProductLive
+                                      ? 'bg-amber-500/10 text-amber-700 border-amber-300 hover:bg-amber-600 hover:text-white'
+                                      : 'bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-600 hover:text-white'
+                                    }`}
+                                  >
+                                    {isProductLive ? 'Set Draft' : 'Go Live'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEdit(targetId)}
+                                    className="text-[9px] bg-[var(--color-surface)] border border-[var(--color-border)] hover:bg-[var(--color-accent)] hover:text-white px-3.5 py-2 font-mono font-black text-[var(--color-text)] uppercase tracking-widest cursor-pointer transition-all duration-150 rounded-xl shadow-xs"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveProductItem(targetId)}
+                                    className="text-[9px] bg-rose-50 hover:bg-rose-600 hover:text-white border border-rose-950 text-rose-950 hover:text-white px-3.5 py-2 font-mono font-black text-rose-950 uppercase tracking-widest cursor-pointer transition-all duration-150 rounded-xl shadow-xs"
+                                  >
+                                    Sweep
+                                  </button>
+                                </div>
                               </div>
                             );
                           })}
@@ -2693,14 +2799,14 @@ function AdminPanel() {
               })()}
 
               {/* Search and Export Utilities Row */}
-              <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-xl">
+              <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-slate-900/60 border border-[var(--color-border)] p-4 rounded-xl shadow-md">
                 <div className="flex-1 relative">
                   <input
                     type="text"
                     value={orderSearchQuery}
                     onChange={(e) => setOrderSearchQuery(e.target.value)}
                     placeholder="Search name, email, or order ID..."
-                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-accent)] text-xs font-semibold px-4 py-2.5 outline-hidden placeholder-[var(--color-muted)] uppercase tracking-wider rounded-lg font-sans"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-border)] text-xs font-semibold px-4 py-2.5 outline-hidden placeholder-[var(--color-muted)] uppercase tracking-wider rounded-lg font-sans"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
@@ -2733,7 +2839,7 @@ function AdminPanel() {
                       onClick={() => setOrderFilter(filterVal)}
                       className={`px-3.5 py-2 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg border cursor-pointer ${
                         orderFilter === filterVal
-                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
+                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-border)] shadow-xs'
                           : 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-neutral-450'
                       }`}
                     >
@@ -2840,8 +2946,56 @@ function AdminPanel() {
                             </div>
                           </div>
 
+                          {/* Fulfillment Stepper */}
+                          {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'].includes(order.status) && (
+                            <div className="py-4 px-3 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl mt-1 select-none">
+                              <div className="flex justify-between items-center relative max-w-md mx-auto">
+                                {/* Track Line */}
+                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-neutral-200 -translate-y-1/2 z-0"></div>
+                                {/* Active progress line */}
+                                <div className="absolute top-1/2 left-0 h-0.5 bg-[var(--color-accent)] -translate-y-1/2 z-0 transition-all duration-500"
+                                  style={{
+                                    width: order.status === 'PENDING' ? '0%' :
+                                           order.status === 'PROCESSING' ? '33%' :
+                                           order.status === 'SHIPPED' ? '66%' : '100%'
+                                  }}
+                                ></div>
+                                
+                                {/* Steps */}
+                                {[
+                                  { label: 'Pending', status: 'PENDING' },
+                                  { label: 'Processing', status: 'PROCESSING' },
+                                  { label: 'Shipped', status: 'SHIPPED' },
+                                  { label: 'Delivered', status: 'DELIVERED' }
+                                ].map((step, stepIdx) => {
+                                  const isCurrent = order.status === step.status;
+                                  const isCompleted = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'].indexOf(order.status) >= ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'].indexOf(step.status);
+                                  
+                                  return (
+                                    <div key={step.status} className="flex flex-col items-center z-10">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[9px] border transition-all duration-300 ${
+                                        isCurrent 
+                                          ? 'bg-white border-[var(--color-accent)] text-[var(--color-accent)] ring-4 ring-[var(--color-accent-glow)]' 
+                                          : isCompleted 
+                                            ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white' 
+                                            : 'bg-white border-neutral-250 text-neutral-400'
+                                      }`}>
+                                        {isCompleted && !isCurrent ? '✓' : stepIdx + 1}
+                                      </div>
+                                      <span className={`text-[8px] font-bold uppercase tracking-wider mt-1.5 ${
+                                        isCurrent ? 'text-[var(--color-accent)] font-extrabold' : isCompleted ? 'text-[var(--color-text)]' : 'text-neutral-400'
+                                      }`}>
+                                        {step.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           {order.status === 'CANCELLED' && cancelReason && (
-                            <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg text-rose-700 text-[10px] font-medium uppercase tracking-wide">
+                            <div className="bg-rose-50 border border-rose-100 p-3 rounded-lg text-rose-750 text-[10px] font-medium uppercase tracking-wide">
                               <span className="font-bold block text-[8px] text-rose-500">CANCELLATION REASON</span>
                               &ldquo;{cancelReason}&rdquo;
                             </div>
@@ -2867,7 +3021,7 @@ function AdminPanel() {
                                       </span>
                                       <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase ${
                                         request.status === 'PENDING'
-                                        ? 'bg-amber-100 text-amber-700 border-amber-250 animate-pulse'
+                                        ? 'bg-amber-100 text-amber-700 border border-amber-250 animate-pulse'
                                         : request.status === 'APPROVED'
                                         ? 'bg-emerald-50 text-emerald-600 border-emerald-250'
                                         : 'bg-rose-50 text-rose-600 border-rose-250'
@@ -2958,7 +3112,7 @@ function AdminPanel() {
                           {/* Purchased Garments */}
                           <div className="bg-[var(--color-surface)]/80 p-4 rounded-xl border border-[var(--color-border)]/50 space-y-2">
                             <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest">GARMENTS SPECIFICATION LIST</span>
-                            <div className="divide-y divide-neutral-100">
+                            <div className="divide-y divide-slate-850">
                               {parsedItems.map((item, itemIdx) => (
                                 <div key={itemIdx} className="flex justify-between items-center py-2 text-xs">
                                   <span className="font-black text-[var(--color-text)] uppercase tracking-wide truncate max-w-sm">{item.name}</span>
@@ -2975,7 +3129,7 @@ function AdminPanel() {
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'PENDING')}
-                                className="bg-[var(--color-subtle)] hover:bg-neutral-300 text-[var(--color-text)] font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-[var(--color-subtle)] hover:bg-slate-800 text-[var(--color-text)] font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Reset to Pending
                               </button>
@@ -2997,7 +3151,7 @@ function AdminPanel() {
                                 <button
                                   disabled={actionLoading}
                                   onClick={() => handleOrderStatusShift(order, 'PROCESSING')}
-                                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-accent)] cursor-pointer transition-colors disabled:opacity-50"
+                                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-border)] cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                   Start Processing
                                 </button>
@@ -3009,7 +3163,7 @@ function AdminPanel() {
                                     setAdminTrackingUrl('');
                                     setIsShippedModalOpen(true);
                                   }}
-                                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-accent)] cursor-pointer transition-colors disabled:opacity-50"
+                                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-border)] cursor-pointer transition-colors disabled:opacity-50"
                                 >
                                   Mark as Shipped
                                 </button>
@@ -3026,7 +3180,7 @@ function AdminPanel() {
                                   setAdminTrackingUrl('');
                                   setIsShippedModalOpen(true);
                                 }}
-                                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-accent)] cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg border border-[var(--color-border)] cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Mark as Shipped
                               </button>
@@ -3113,7 +3267,7 @@ function AdminPanel() {
             <div className="space-y-8">
               
               {/* Marquee Announcer Manager */}
-              <div className="bg-[var(--color-surface)] p-6 rounded-none border border-[var(--color-accent)] space-y-4">
+              <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-4">
                 <div>
                   <h3 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase">DYNAMIC BANNER ANNOUNCEMENT</h3>
                   <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5">Edit the live marquee banner announcement text displayed globally on the homepage.</p>
@@ -3125,11 +3279,11 @@ function AdminPanel() {
                     value={campaignPromoText}
                     onChange={(e) => setCampaignPromoText(e.target.value)}
                     placeholder="ENTER MARQUEE ANNOUNCEMENT TEXT..."
-                    className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-4 py-3 text-xs font-bold uppercase tracking-wider outline-hidden"
+                    className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-wider outline-hidden"
                   />
                   <button
                     onClick={saveCampaignPromoText}
-                    className="bg-[var(--color-accent)] hover:bg-[var(--color-accent)] text-white font-mono font-black text-xs tracking-widest uppercase px-6 rounded-none cursor-pointer transition-all duration-300"
+                    className="bg-[var(--color-accent)] hover:bg-[var(--color-accent)] text-white font-mono font-black text-xs tracking-widest uppercase px-6 rounded-xl cursor-pointer transition-all duration-300"
                   >
                     SAVE
                   </button>
@@ -3137,14 +3291,14 @@ function AdminPanel() {
               </div>
 
               {/* Coupons Generator */}
-              <div className="bg-[var(--color-surface)] p-6 rounded-none border border-[var(--color-accent)] space-y-4">
+              <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-4">
                 <div>
                   <h3 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase">PROMO COUPON MANAGER</h3>
                   <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5">Activate or revoke coupon discount codes to enable live checkouts promotions.</p>
                 </div>
 
                 {/* Coupon Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-[var(--color-surface)] p-4 rounded-none border border-[var(--color-border)]">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-[var(--color-surface)] p-4 rounded-xl border border-[var(--color-border)]">
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[8px] font-black text-neutral-550 block tracking-widest uppercase">COUPON CODE</span>
                     <input
@@ -3152,7 +3306,7 @@ function AdminPanel() {
                       value={newCouponCode}
                       onChange={(e) => setNewCouponCode(e.target.value)}
                       placeholder="E.G., STREET50"
-                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -3160,7 +3314,7 @@ function AdminPanel() {
                     <select
                       value={newCouponDiscount}
                       onChange={(e) => setNewCouponDiscount(Number(e.target.value))}
-                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-none px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden cursor-pointer"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden cursor-pointer"
                     >
                       <option value="10">10% OFF</option>
                       <option value="20">20% OFF</option>
@@ -3176,7 +3330,7 @@ function AdminPanel() {
                       value={newCouponMinOrderValue}
                       onChange={(e) => setNewCouponMinOrderValue(e.target.value)}
                       placeholder="e.g. 1999"
-                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs font-mono font-black w-full outline-hidden"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-3 py-2 text-xs font-mono font-black w-full outline-hidden"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -3185,14 +3339,14 @@ function AdminPanel() {
                       type="date"
                       value={newCouponValidUntil}
                       onChange={(e) => setNewCouponValidUntil(e.target.value)}
-                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-1.5 text-xs font-mono font-black w-full outline-hidden"
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-3 py-1.5 text-xs font-mono font-black w-full outline-hidden"
                     />
                   </div>
                   <div className="flex flex-col gap-2 w-full md:col-span-2 lg:col-span-1">
                     <button
                       type="button"
                       onClick={isEditingCoupon ? handleUpdateCoupon : handleAddCoupon}
-                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-widest uppercase py-2.5 rounded-none cursor-pointer transition-colors w-full"
+                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-widest uppercase py-2.5 rounded-xl cursor-pointer transition-colors w-full"
                     >
                       {isEditingCoupon ? 'UPDATE' : 'ACTIVATE'}
                     </button>
@@ -3200,7 +3354,7 @@ function AdminPanel() {
                       <button
                         type="button"
                         onClick={handleCancelEditCoupon}
-                        className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-mono font-black text-xs tracking-widest uppercase py-1.5 rounded-none cursor-pointer transition-colors w-full text-center"
+                        className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-mono font-black text-xs tracking-widest uppercase py-1.5 rounded-xl cursor-pointer transition-colors w-full text-center"
                       >
                         CANCEL
                       </button>
@@ -3220,7 +3374,7 @@ function AdminPanel() {
                         <div key={idx} className={`flex flex-col justify-between bg-[var(--color-surface)] p-4 rounded-xl border space-y-3 shadow-2xs hover:shadow-xs transition-shadow ${isExpired ? 'opacity-65 border-rose-200' : 'border-[var(--color-border)]'}`}>
                           <div className="flex justify-between items-start">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-mono font-black bg-[var(--color-accent)] text-white px-2.5 py-1 rounded border border-[var(--color-accent)] tracking-wider">
+                              <span className="text-xs font-mono font-black bg-[var(--color-accent)] text-white px-2.5 py-1 rounded border border-[var(--color-border)] tracking-wider">
                                 {coupon.code}
                               </span>
                               <span className="text-[10px] font-black text-emerald-655 tracking-wider uppercase">
@@ -3267,7 +3421,7 @@ function AdminPanel() {
               </div>
 
               {/* Newsletter & Campaign Broadcaster Section */}
-              <div className="bg-[var(--color-surface)] p-6 rounded-none border border-[var(--color-accent)] space-y-6">
+              <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-6">
                 <div>
                   <h3 className="text-xs font-mono font-black tracking-widest text-[var(--color-text)] uppercase">NEWSLETTER & EMAIL CAMPAIGN BROADCASTER</h3>
                   <p className="text-[10px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5">Send a one-click newsletter broadcast email or notification to all subscribed users.</p>
@@ -3275,7 +3429,7 @@ function AdminPanel() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left Column: Compose Form */}
-                  <div className="lg:col-span-2 space-y-4 bg-[var(--color-surface)] p-5 rounded-none border border-[var(--color-border)]">
+                  <div className="lg:col-span-2 space-y-4 backdrop-blur-sm bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-5 rounded-2xl shadow-glass">
                     <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
                       <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">COMPOSE BROADCAST CAMPAIGN</h4>
                       {isEmailJSConfigured ? (
@@ -3311,7 +3465,7 @@ function AdminPanel() {
                         onChange={(e) => setCampaignSubject(e.target.value)}
                         placeholder="ENTER CAMPAIGN SUBJECT..."
                         disabled={isBroadcasting}
-                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3.5 py-3 text-xs font-bold uppercase tracking-wider w-full outline-hidden disabled:opacity-50"
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-3.5 py-3 text-xs font-bold uppercase tracking-wider w-full outline-hidden disabled:opacity-50"
                       />
                     </div>
 
@@ -3323,7 +3477,7 @@ function AdminPanel() {
                         onChange={(e) => setCampaignBody(e.target.value)}
                         placeholder="WRITE YOUR BROADCAST EMAIL OR NOTIFICATION MESSAGE HERE..."
                         disabled={isBroadcasting}
-                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3.5 py-3 text-xs font-medium w-full outline-hidden disabled:opacity-50 font-sans"
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-3.5 py-3 text-xs font-medium w-full outline-hidden disabled:opacity-50 font-sans"
                       />
                     </div>
 
@@ -3343,7 +3497,7 @@ function AdminPanel() {
                       ) : (
                         <button
                           onClick={handleSendCampaign}
-                          className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-widest uppercase py-3.5 px-6 rounded-none cursor-pointer transition-colors"
+                          className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-widest uppercase py-3.5 px-6 rounded-xl cursor-pointer transition-colors"
                         >
                           🚀 Send Broadcast Campaign Once
                         </button>
@@ -3352,7 +3506,7 @@ function AdminPanel() {
                   </div>
 
                   {/* Right Column: Subscribers List */}
-                  <div className="space-y-4 bg-[var(--color-surface)] p-5 rounded-none border border-[var(--color-border)] flex flex-col max-h-[360px] overflow-hidden">
+                  <div className="space-y-4 backdrop-blur-sm bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-5 rounded-2xl shadow-glass flex flex-col max-h-[360px] overflow-hidden">
                     <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase border-b border-[var(--color-border)] pb-2 flex justify-between items-center">
                       <span>SUBSCRIBERS</span>
                       <span className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] px-2 py-0.5 rounded text-[8px] font-bold">
@@ -3382,7 +3536,7 @@ function AdminPanel() {
                     <p className="text-[9px] text-[var(--color-muted)] font-mono uppercase py-4">No broadcast history recorded</p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-[10px] text-left font-mono">
+                      <div className="overflow-x-auto w-full rounded-xl border border-[var(--color-border)]"><table className="w-full border-collapse text-[10px] text-left font-mono">
                         <thead>
                           <tr className="border-b border-[var(--color-border)] text-[var(--color-muted)] uppercase tracking-wider">
                             <th className="py-2.5 px-3">Subject</th>
@@ -3409,7 +3563,7 @@ function AdminPanel() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     </div>
                   )}
                 </div>
@@ -3433,13 +3587,13 @@ function AdminPanel() {
                 {telemetryLoading ? (
                   <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading data...</div>
                 ) : restockNotifications.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-subtle)]/50">
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-xl bg-[var(--color-subtle)]/50">
                     <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No size restock requests logged.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-[var(--color-accent)] rounded-none bg-[var(--color-surface)]">
+                  <div className="overflow-hidden border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <div className="overflow-x-auto w-full rounded-xl border border-[var(--color-border)]"><table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                             <th className="p-4">Email Address</th>
@@ -3518,7 +3672,7 @@ function AdminPanel() {
                           );
                         })}
                         </tbody>
-                      </table>
+                      </table></div>
                     </div>
                   </div>
                 )}
@@ -3534,13 +3688,13 @@ function AdminPanel() {
                 {telemetryLoading ? (
                   <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading data...</div>
                 ) : couponUsages.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-subtle)]/50">
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-xl bg-[var(--color-subtle)]/50">
                     <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No active coupon usage history has been recorded.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-[var(--color-accent)] rounded-none bg-[var(--color-surface)]">
+                  <div className="overflow-hidden border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <div className="overflow-x-auto w-full rounded-xl border border-[var(--color-border)]"><table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                             <th className="p-4">Customer ID</th>
@@ -3559,7 +3713,7 @@ function AdminPanel() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     </div>
                   </div>
                 )}
@@ -3575,13 +3729,13 @@ function AdminPanel() {
                 {telemetryLoading ? (
                   <div className="py-12 text-center text-xs font-bold text-[var(--color-muted)] animate-pulse uppercase tracking-widest">Loading data...</div>
                 ) : activeCarts.length === 0 ? (
-                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-none bg-[var(--color-subtle)]/50">
+                  <div className="py-12 text-center border border-dashed border-[var(--color-border)] rounded-xl bg-[var(--color-subtle)]/50">
                     <p className="text-xs font-black tracking-wide text-[var(--color-muted)] uppercase">No active cart activity recorded.</p>
                   </div>
                 ) : (
-                  <div className="overflow-hidden border border-[var(--color-accent)] rounded-none bg-[var(--color-surface)]">
+                  <div className="overflow-hidden border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <div className="overflow-x-auto w-full rounded-xl border border-[var(--color-border)]"><table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)]">
                             <th className="p-4">Customer ID</th>
@@ -3612,7 +3766,7 @@ function AdminPanel() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     </div>
                   </div>
                 )}
@@ -3631,7 +3785,7 @@ function AdminPanel() {
               </div>
 
               {/* Add New Slide Form */}
-              <div className="bg-[#fcfcfd] border border-[var(--color-border)] p-6 rounded-none space-y-6">
+              <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-6">
                 <h3 className="text-[10px] font-mono font-black tracking-widest text-[var(--color-text)] uppercase">➕ Add New Banner Slide</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3644,7 +3798,7 @@ function AdminPanel() {
                         placeholder="Paste image URL or upload file..."
                         value={slideImage}
                         onChange={(e) => setSlideImage(e.target.value)}
-                        className="grow bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
+                        className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                       />
                       <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
                         {slideUploading ? "Uploading..." : "Upload"}
@@ -3674,7 +3828,7 @@ function AdminPanel() {
                         placeholder="Paste mobile image URL or upload..."
                         value={slideMobileImage}
                         onChange={(e) => setSlideMobileImage(e.target.value)}
-                        className="grow bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
+                        className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                       />
                       <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
                         {slideUploading ? "Uploading..." : "Upload"}
@@ -3703,7 +3857,7 @@ function AdminPanel() {
                       placeholder="E.G., /shop"
                       value={slideLink}
                       onChange={(e) => setSlideLink(e.target.value)}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
+                      className="w-full bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-3 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                     />
                   </div>
                 </div>
@@ -3712,7 +3866,7 @@ function AdminPanel() {
                   type="button"
                   onClick={handleAddSlide}
                   disabled={actionLoading || slideUploading || !slideImage.trim()}
-                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-none uppercase transition-colors disabled:opacity-50 cursor-pointer"
+                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-xl uppercase transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   🚀 DEPLOY BANNER SLIDE
                 </button>
@@ -3731,7 +3885,7 @@ function AdminPanel() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {slides.map((slide) => (
-                      <div key={slide.$id} className="border border-[var(--color-accent)]/10 bg-[var(--color-surface)] p-4 flex flex-col justify-between space-y-4">
+                      <div key={slide.$id} className="border border-[var(--color-border)]/10 bg-[var(--color-surface)] p-4 flex flex-col justify-between space-y-4">
                         <div className="space-y-2">
                           <div className="flex gap-4">
                             <div className="w-1/2 aspect-[16/9] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
@@ -3794,18 +3948,18 @@ function AdminPanel() {
                         setActionLoading(false);
                       }
                     }}
-                    className="border border-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-all cursor-pointer select-none shrink-0"
+                    className="border border-[var(--color-border)] hover:bg-[var(--color-accent)] hover:text-white text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-xl uppercase transition-all cursor-pointer select-none shrink-0"
                   >
                     🔄 Restore Defaults ({deletedCategories.length})
                   </button>
                 )}
               </div>
 
-              <div className="bg-[var(--color-surface)] border border-[var(--color-accent)] p-6 rounded-none space-y-6">
+              <div className="backdrop-blur-md bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-6 rounded-2xl shadow-glass space-y-6">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <div className="overflow-x-auto w-full rounded-xl border border-[var(--color-border)]"><table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-[var(--color-accent)]">
+                      <tr className="border-b border-[var(--color-border)]">
                         <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase w-16">Preview</th>
                         <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase">Category Information</th>
                         <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase w-28 text-center">Live Drops</th>
@@ -3813,7 +3967,7 @@ function AdminPanel() {
                         <th className="pb-3 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] uppercase text-right w-40">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-slate-850">
                       {(() => {
                         const uniqueProductCategories = Array.from(
                           new Set(products.map(p => p.category).filter(Boolean))
@@ -3843,7 +3997,7 @@ function AdminPanel() {
                             <tr key={cat.value} className="align-middle">
                               {/* Preview Column */}
                               <td className="py-4 pr-4">
-                                <div className="w-12 h-12 rounded-full overflow-hidden border border-[var(--color-accent)]/10">
+                                <div className="w-12 h-12 rounded-full overflow-hidden border border-[var(--color-border)]/10">
                                   <img 
                                     src={currentImageUrl} 
                                     alt={cat.label} 
@@ -3863,7 +4017,7 @@ function AdminPanel() {
                                       type="text"
                                       value={editCategoryName}
                                       onChange={(e) => setEditCategoryName(e.target.value)}
-                                      className="bg-[var(--color-surface)] border border-[var(--color-accent)] rounded-none px-3 py-1.5 text-xs text-[var(--color-text)] font-bold outline-hidden uppercase tracking-wider"
+                                      className="bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-3 py-1.5 text-xs text-[var(--color-text)] font-bold outline-hidden uppercase tracking-wider"
                                       placeholder="New Category Name..."
                                       autoFocus
                                     />
@@ -3884,7 +4038,7 @@ function AdminPanel() {
 
                               {/* Live Drops Column */}
                               <td className="py-4 pr-4 text-center">
-                                <span className="inline-block px-2.5 py-1 text-[9px] font-mono font-bold tracking-widest rounded-none bg-[var(--color-subtle)] text-[var(--color-text)] uppercase">
+                                <span className="inline-block px-2.5 py-1 text-[9px] font-mono font-bold tracking-widest rounded-xl bg-[var(--color-subtle)] text-[var(--color-text)] uppercase">
                                   {productCount} Drop{productCount !== 1 ? 's' : ''}
                                 </span>
                               </td>
@@ -3901,12 +4055,12 @@ function AdminPanel() {
                                         const urlVal = e.target.value;
                                         setNewCategoryImageUrls(prev => ({ ...prev, [cat.value]: urlVal }));
                                       }}
-                                      className="grow bg-[var(--color-surface)] border border-[var(--color-border)] rounded-none px-3 py-1.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-accent)] transition-colors"
+                                      className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-3 py-1.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                                     />
                                     <button
                                       type="button"
                                       onClick={() => handleSaveCategoryImage(cat.value, inputUrl)}
-                                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors shrink-0 cursor-pointer"
+                                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-xl uppercase transition-colors shrink-0 cursor-pointer"
                                     >
                                       Save Cover
                                     </button>
@@ -3959,14 +4113,14 @@ function AdminPanel() {
                                     <button
                                       type="button"
                                       onClick={() => handleRenameCategory(cat.value, editCategoryName)}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors cursor-pointer"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-xl uppercase transition-colors cursor-pointer"
                                     >
                                       Confirm
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditingCategory(null)}
-                                      className="border border-[var(--color-border)] hover:bg-[var(--color-subtle)] text-[var(--color-muted)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-none uppercase transition-colors cursor-pointer"
+                                      className="border border-[var(--color-border)] hover:bg-[var(--color-subtle)] text-[var(--color-muted)] text-[9px] font-mono font-bold tracking-widest px-3 py-1.5 rounded-xl uppercase transition-colors cursor-pointer"
                                     >
                                       Cancel
                                     </button>
@@ -3979,7 +4133,7 @@ function AdminPanel() {
                                         setEditingCategory(cat.value);
                                         setEditCategoryName(cat.label);
                                       }}
-                                      className="border border-[var(--color-accent)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-none uppercase transition-colors cursor-pointer"
+                                      className="border border-[var(--color-border)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-xl uppercase transition-colors cursor-pointer"
                                     >
                                       ✏️ Rename
                                     </button>
@@ -3989,7 +4143,7 @@ function AdminPanel() {
                                         setDeleteTargetCategory(cat);
                                         setIsDeleteCategoryModalOpen(true);
                                       }}
-                                      className="border border-rose-600 hover:bg-rose-50 text-rose-600 text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-none uppercase transition-colors cursor-pointer"
+                                      className="border border-rose-600 hover:bg-rose-50 text-rose-600 text-[9px] font-mono font-bold tracking-widest px-3 py-2 rounded-xl uppercase transition-colors cursor-pointer"
                                     >
                                       🗑️ Delete
                                     </button>
@@ -4001,7 +4155,7 @@ function AdminPanel() {
                         });
                       })()}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
               </div>
             </div>
@@ -4038,7 +4192,7 @@ function AdminPanel() {
                         value={newOfferName}
                         onChange={(e) => setNewOfferName(e.target.value)}
                         placeholder="E.G., BUY 3 TEES FOR 999"
-                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase text-[var(--color-text)]"
                       />
                     </div>
 
@@ -4051,7 +4205,7 @@ function AdminPanel() {
                           value={newOfferQty}
                           onChange={(e) => setNewOfferQty(Number(e.target.value))}
                           placeholder="3"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase text-[var(--color-text)]"
                         />
                       </div>
 
@@ -4063,7 +4217,7 @@ function AdminPanel() {
                           value={newOfferPrice}
                           onChange={(e) => setNewOfferPrice(e.target.value)}
                           placeholder="999"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase text-[var(--color-text)]"
                         />
                       </div>
                     </div>
@@ -4074,7 +4228,7 @@ function AdminPanel() {
                       <select
                         value={newOfferCategory}
                         onChange={(e) => setNewOfferCategory(e.target.value)}
-                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)] cursor-pointer"
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase text-[var(--color-text)] cursor-pointer"
                       >
                         <option value="" className="text-[var(--color-muted)] bg-[var(--color-surface)]">-- NONE (CHOOSE PRODUCTS BELOW) --</option>
                         {allCategories.map(cat => (
@@ -4091,7 +4245,7 @@ function AdminPanel() {
                         value={newOfferTag}
                         onChange={(e) => setNewOfferTag(e.target.value)}
                         placeholder="E.G., BUY3TEES999"
-                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)]"
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase text-[var(--color-text)]"
                       />
                     </div>
 
@@ -4134,7 +4288,7 @@ function AdminPanel() {
                         value={offerSearchQuery}
                         onChange={(e) => setOfferSearchQuery(e.target.value)}
                         placeholder="SEARCH PRODUCTS TO SELECT..."
-                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-accent)] bg-transparent py-1 uppercase text-[var(--color-text)] mb-2"
+                        className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase text-[var(--color-text)] mb-2"
                       />
 
                       <div className="border border-[var(--color-border)] bg-[var(--color-bg)] h-44 overflow-y-auto p-2 divide-y divide-[var(--color-border)] rounded-md font-sans">
@@ -4155,7 +4309,7 @@ function AdminPanel() {
                                       setNewOfferProductIds(prev => prev.filter(id => id !== pId));
                                     }
                                   }}
-                                  className="w-3.5 h-3.5 accent-[var(--color-accent)] rounded-none cursor-pointer"
+                                  className="w-3.5 h-3.5 accent-[var(--color-accent)] rounded-xl cursor-pointer"
                                 />
                                 <img src={p.front_image_link} alt="" className="w-6 h-6 object-cover object-center shrink-0 border border-[var(--color-border)] rounded" />
                                 <div className="min-w-0 flex-1">
@@ -4297,20 +4451,17 @@ function AdminPanel() {
             </div>
           )}
         </div>
-
-
-
-      {/* Admin Cancellation Reason Modal Popup */}
+        </div>{/* Admin Cancellation Reason Modal Popup */}
       {isAdminCancelModalOpen && cancelTargetOrder && (
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => setIsAdminCancelModalOpen(false)}
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4334,7 +4485,7 @@ function AdminPanel() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
                     adminCancelReason === opt
-                    ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    ? 'border-[var(--color-border)] bg-[var(--color-subtle)]/50'
                     : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
@@ -4362,7 +4513,7 @@ function AdminPanel() {
                 onChange={(e) => setAdminCancelCustomText(e.target.value)}
                 placeholder="ENTER CUSTOM REASON DETAILS..."
                 rows={3}
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-border)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
@@ -4371,14 +4522,14 @@ function AdminPanel() {
               <button
                 type="button"
                 onClick={() => setIsAdminCancelModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Keep Order
               </button>
               <button
                 type="button"
                 onClick={submitAdminCancelOrder}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Cancel Order
               </button>
@@ -4392,12 +4543,12 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => setIsSweepProductModalOpen(false)}
           />
           
           {/* Modal Container */}
-           <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+           <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">DELETE PRODUCT</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4413,14 +4564,14 @@ function AdminPanel() {
               <button
                 type="button"
                 onClick={() => setIsSweepProductModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmSweepProductItem}
-                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Delete
               </button>
@@ -4434,12 +4585,12 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => setIsDeleteOrderModalOpen(false)}
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+          <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">DELETE CANCELLED ORDER</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4455,14 +4606,14 @@ function AdminPanel() {
               <button
                 type="button"
                 onClick={() => setIsDeleteOrderModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDeleteOrder}
-                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Delete
               </button>
@@ -4474,12 +4625,12 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => setIsShippedModalOpen(false)}
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4500,7 +4651,7 @@ function AdminPanel() {
                 value={adminTrackingNumber}
                 onChange={(e) => setAdminTrackingNumber(e.target.value)}
                 placeholder="E.G., Delhivery: 123456789"
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] uppercase tracking-wider"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-border)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] uppercase tracking-wider"
               />
             </div>
 
@@ -4514,7 +4665,7 @@ function AdminPanel() {
                 value={adminTrackingUrl}
                 onChange={(e) => setAdminTrackingUrl(e.target.value)}
                 placeholder="LEAVE BLANK TO DEFAULT TO DELHIVERY TRACKER..."
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] tracking-wider"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-border)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] tracking-wider"
               />
             </div>
 
@@ -4523,14 +4674,14 @@ function AdminPanel() {
               <button
                 type="button"
                 onClick={() => setIsShippedModalOpen(false)}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={submitAdminShippedOrder}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Dispatch shipment
               </button>
@@ -4544,7 +4695,7 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => {
               setIsDeleteCategoryModalOpen(false);
               setDeleteTargetCategory(null);
@@ -4552,7 +4703,7 @@ function AdminPanel() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+          <div className="relative z-60 w-full max-w-sm bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">DELETE CATEGORY</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4574,14 +4725,14 @@ function AdminPanel() {
                   setIsDeleteCategoryModalOpen(false);
                   setDeleteTargetCategory(null);
                 }}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeleteCategory}
-                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Confirm Delete
               </button>
@@ -4595,7 +4746,7 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => {
               setIsRejectModalOpen(false);
               setRejectTargetOrder(null);
@@ -4604,7 +4755,7 @@ function AdminPanel() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4628,7 +4779,7 @@ function AdminPanel() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
                     adminRejectReason === opt
-                    ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    ? 'border-[var(--color-border)] bg-[var(--color-subtle)]/50'
                     : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
@@ -4656,7 +4807,7 @@ function AdminPanel() {
                 onChange={(e) => setAdminRejectCustomText(e.target.value)}
                 placeholder="ENTER CUSTOM REJECTION DETAIL..."
                 rows={3}
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-border)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
@@ -4669,14 +4820,14 @@ function AdminPanel() {
                   setRejectTargetOrder(null);
                   setRejectTargetItemIndex(null);
                 }}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Cancel Action
               </button>
               <button
                 type="button"
                 onClick={submitAdminRejectRequest}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Reject Request
               </button>
@@ -4690,7 +4841,7 @@ function AdminPanel() {
         <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
           {/* Backdrop overlay */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-neutral-950/40 backdrop-blur-xs" 
             onClick={() => {
               setIsApproveModalOpen(false);
               setApproveTargetOrder(null);
@@ -4699,7 +4850,7 @@ function AdminPanel() {
           />
           
           {/* Modal Container */}
-          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto">
+          <div className="relative z-60 w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-border)] p-6 md:p-8 rounded-2xl shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">ADMIN PANEL OPERATIONS</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
@@ -4722,7 +4873,7 @@ function AdminPanel() {
                   key={opt} 
                   className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
                     adminApproveInstructions === opt
-                    ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    ? 'border-[var(--color-border)] bg-[var(--color-subtle)]/50'
                     : 'border-[var(--color-border)] hover:border-neutral-400'
                   }`}
                 >
@@ -4750,7 +4901,7 @@ function AdminPanel() {
                 onChange={(e) => setAdminApproveCustomText(e.target.value)}
                 placeholder="ENTER RETURN SHIPPING INSTRUCTIONS OR REVERSE TRACKING URL..."
                 rows={3}
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-border)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
               />
             </div>
 
@@ -4763,14 +4914,14 @@ function AdminPanel() {
                   setApproveTargetOrder(null);
                   setApproveTargetRequest(null);
                 }}
-                className="w-full py-3 border border-neutral-250 hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-xl cursor-pointer"
               >
                 Cancel Action
               </button>
               <button
                 type="button"
                 onClick={submitAdminApproveRequest}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-md"
               >
                 Approve Request
               </button>

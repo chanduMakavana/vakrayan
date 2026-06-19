@@ -460,6 +460,12 @@ function OrderDetail() {
   };
 
   const submitCancelOrder = async () => {
+    if (order.status !== 'PENDING' && order.status !== 'PROCESSING') {
+      showToast("Orders cannot be cancelled once they have been shipped.", "error");
+      setIsCancelModalOpen(false);
+      return;
+    }
+
     let finalReason = cancellationReasonOption;
     if (cancellationReasonOption === "Other (Explain in box below)") {
       finalReason = customCancellationText.trim() || "Other reason unspecified";
@@ -541,7 +547,7 @@ function OrderDetail() {
                   <h1 className="text-xl md:text-2xl font-black tracking-wide text-neutral-950 uppercase">
                     {metadata.order_number}
                   </h1>
-                  {order.status === 'PENDING' && (
+                  {(order.status === 'PENDING' || order.status === 'PROCESSING') && (
                     <button
                       onClick={handleCancelOrder}
                       className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
@@ -625,6 +631,28 @@ function OrderDetail() {
                     <p className="text-[10px] text-emerald-600 font-bold leading-relaxed uppercase">
                       Your return has been approved and processed. A refund of ₹{(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.
                     </p>
+                  </div>
+                )}
+
+                {/* Conditional Cancellation Warning Notice */}
+                {['PENDING', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT'].includes(order.status) && (
+                  <div className={`p-4 rounded-xl border flex gap-3 items-start animate-fade-in ${
+                    (order.status === 'PENDING' || order.status === 'PROCESSING')
+                      ? 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-200/60 text-rose-800'
+                      : 'bg-neutral-50 dark:bg-neutral-900/40 border-neutral-200/60 text-neutral-600'
+                  }`}>
+                    <span className="text-sm mt-0.5">⚠️</span>
+                    <div className="space-y-0.5">
+                      <h4 className={`text-[9px] font-black tracking-widest uppercase ${(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'text-rose-600' : 'text-neutral-500'}`}>
+                        {(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'Cancellation Policy' : 'Cancellation Locked'}
+                      </h4>
+                      <p className="text-[9px] font-mono leading-relaxed uppercase">
+                        {(order.status === 'PENDING' || order.status === 'PROCESSING')
+                          ? 'This order can be cancelled while it is in "Pending" or "Processing" status. Once shipped, cancellation is disabled.'
+                          : 'This order has been shipped and cannot be cancelled anymore.'
+                        }
+                      </p>
+                    </div>
                   </div>
                 )}
                 

@@ -827,6 +827,13 @@ function Checkout() {
             Your order details have been saved in our system. We are preparing to ship your order soon.
           </p>
 
+          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
+            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
+            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
+              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
+            </p>
+          </div>
+
           <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
 
           <button 
@@ -1279,6 +1286,11 @@ function Checkout() {
                     {baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}
                   </span>
                 </div>
+                {baseShippingCharge > 0 && (
+                  <div className="text-[9px] text-[var(--color-danger)] font-mono font-bold text-left uppercase tracking-wider mt-1">
+                    Add ₹{(999 - discountedAmount).toLocaleString('en-IN')} more to unlock FREE SHIPPING!
+                  </div>
+                )}
 
                 {remoteSurcharge > 0 && (
                   <div className="flex justify-between text-[var(--color-muted)]">

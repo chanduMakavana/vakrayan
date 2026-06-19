@@ -1,4 +1,5 @@
 import Hero from '../pageComponets/Hero'
+import PromoMarquee from '../pageComponets/PromoMarquee'
 import CategoryGrid from '../pageComponets/CategoryGrid'
 import BestSellers from '../pageComponets/BestSeller'
 import PromoBanner from '../pageComponets/PromoBanner'
@@ -9,6 +10,7 @@ function Home() {
   return (
     <>
       <Hero />
+      <PromoMarquee />
       <BestSellers />
       <CategoryGrid />
       <PromoBanner />
