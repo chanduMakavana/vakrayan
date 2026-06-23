@@ -130,7 +130,7 @@ function SignUp() {
               type="text" 
               placeholder="ENTER YOUR NAME" 
               disabled={loading}
-              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-none px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-medium disabled:opacity-50`}
+              className={`input-glow w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-none px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50`}
               {...register("name", { required: "Name is required" })}
             />
             {errors.name && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}

@@ -151,6 +151,11 @@
     background: var(--color-accent);
     color: #fff;
   }
+
+  /* ── Input placeholder opacity override ─────────────────── */
+  ::placeholder {
+    opacity: 0.45 !important;
+  }
 }
 
 /* ============================================================

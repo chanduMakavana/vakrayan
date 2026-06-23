@@ -559,12 +559,17 @@ function Navbar() {
             {/* Brand */}
             <Link
               to="/"
-              className="flex-shrink-0 flex items-center"
+              className="flex-shrink-0 flex  items-center group"
             >
               <img
                 src="/vakrayan-logo.png"
                 alt="Vakrayan Logo"
-                className="h-15 w-15 object-contain drop-shadow-md"
+                className="h-13 w-13 object-contain drop-shadow-md"
+              />
+              <img
+                src="/vakrayan-text.png"
+                alt="Vakrayan"
+                className="h-7 w-25 md:h-8  object-contain drop-shadow-xs transition-all duration-200 group-hover:opacity-80"
               />
             </Link>
 

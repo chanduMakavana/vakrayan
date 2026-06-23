@@ -19,7 +19,7 @@ import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-const BACK_IMAGE_FIELDS = ['back_image_link_1', 'back_image_link_2', 'back_image_link_3', 'back_image_link_4'];
+const BACK_IMAGE_FIELDS = Array.from({ length: 8 }, (_, i) => `back_image_link_${i + 1}`);
 const DEFAULT_CATEGORIES = [
   { value: 'printed-tshirt', label: 'PRINTED T-SHIRT' },
   { value: 'oversized-tshirt', label: 'OVERSIZED T-SHIRT' },
@@ -82,6 +82,7 @@ function AdminPanel() {
   const [productTagFilter, setProductTagFilter] = useState('ALL');
   const [productStockFilter, setProductStockFilter] = useState('ALL');
   const [productsSubTab, setProductsSubTab] = useState('list'); // 'list' or 'form'
+  const [backImageCount, setBackImageCount] = useState(1);
 
   // Campaign State
   const [campaignPromoText, setCampaignPromoText] = useState('');
@@ -786,6 +787,7 @@ function AdminPanel() {
       setValue('is_live', false);
       setValue('slug', '');
       setValue('return_policy', '7 Day Return');
+      setBackImageCount(1);
       setEditingId(null);
       setIsCustomCategory(false);
       setProductsSubTab('list');
@@ -838,6 +840,8 @@ function AdminPanel() {
       const backImageLinks = Array.isArray(product.back_image_links)
         ? product.back_image_links
         : [product.back_image_link].filter(Boolean);
+
+      setBackImageCount(Math.max(1, backImageLinks.length));
 
       BACK_IMAGE_FIELDS.forEach((fieldName, index) => {
         setValue(fieldName, backImageLinks[index] || '');
@@ -907,6 +911,7 @@ function AdminPanel() {
     setValue('fit_type', '');
     setValue('fabric_gsm', '');
     setValue('return_policy', '7 Day Return');
+    setBackImageCount(1);
     setEditingId(null);
     setIsCustomCategory(false);
     setProductsSubTab('list');
@@ -2048,7 +2053,7 @@ function AdminPanel() {
                   type="text"
                   disabled={actionLoading}
                   placeholder="E.G., GOTHIC OVERSIZED HOODIE"
-                  className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors uppercase font-medium disabled:opacity-50`}
+                  className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50`}
                   {...register('name', { required: 'Product name is required' })}
                 />
                 {errors.name && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -2118,7 +2123,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., CARGO PANTS"
-                      className="grow bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors uppercase font-medium disabled:opacity-50"
+                      className="grow bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50"
                       {...register('category', { required: 'Category is required' })}
                     />
                     <button
@@ -2155,7 +2160,7 @@ function AdminPanel() {
                   type="text"
                   disabled={actionLoading}
                   placeholder="E.G., OVERSIZED, HEAVYWEIGHT, BLACK, GRAPHIC, COTTON"
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors uppercase font-medium disabled:opacity-50"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50"
                   {...register('search_keywords')}
                 />
               </div>
@@ -2197,29 +2202,45 @@ function AdminPanel() {
 
               {/* Gallery Images */}
               <div className="flex flex-col gap-3 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Back Image Links (Max 4)</label>
+                <div className="flex justify-between items-center pb-1">
+                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">
+                    Back Image Links ({backImageCount} Views)
+                  </label>
+                  {backImageCount < 8 && (
+                    <button
+                      type="button"
+                      onClick={() => setBackImageCount(prev => prev + 1)}
+                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-[9px] px-3 py-1.5 rounded-lg uppercase tracking-widest transition-all cursor-pointer inline-flex items-center gap-1 border border-[var(--color-border)]/10"
+                    >
+                      <FiPlus className="text-xs" /> Add Image
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {BACK_IMAGE_FIELDS.map((fieldName, index) => (
-                    <div key={fieldName} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        disabled={actionLoading}
-                        placeholder={`BACK IMAGE LINK ${index + 1}`}
-                        className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
-                        {...register(fieldName, index === 0 ? { required: 'At least one back view link is required.' } : undefined)}
-                      />
-                      <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-border)] text-center select-none disabled:opacity-50">
-                        {uploadingFields[fieldName] ? 'Uploading...' : 'Upload'}
+                  {Array.from({ length: backImageCount }).map((_, index) => {
+                    const fieldName = `back_image_link_${index + 1}`;
+                    return (
+                      <div key={fieldName} className="flex gap-2 items-center">
                         <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleProductImageUpload(e, fieldName)}
-                          disabled={actionLoading || uploadingFields[fieldName]}
-                          className="hidden"
+                          type="text"
+                          disabled={actionLoading}
+                          placeholder={`BACK IMAGE LINK ${index + 1}`}
+                          className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
+                          {...register(fieldName, index === 0 ? { required: 'At least one back view link is required.' } : undefined)}
                         />
-                      </label>
-                    </div>
-                  ))}
+                        <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-border)] text-center select-none disabled:opacity-50">
+                          {uploadingFields[fieldName] ? 'Uploading...' : 'Upload'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleProductImageUpload(e, fieldName)}
+                            disabled={actionLoading || uploadingFields[fieldName]}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
                 </div>
                 {errors.back_image_link_1 && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.back_image_link_1.message}</span>}
               </div>
@@ -2306,7 +2327,7 @@ function AdminPanel() {
                           type="text"
                           disabled={actionLoading}
                           placeholder="E.G., JET BLACK"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
                           {...register('color_name')}
                         />
                       </div>
@@ -2330,7 +2351,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., OVERSIZED BOX FIT"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
                       {...register('fit_type')}
                     />
                   </div>
@@ -2342,7 +2363,7 @@ function AdminPanel() {
                       type="text"
                       disabled={actionLoading}
                       placeholder="E.G., 240 GSM 100% COMBED COTTON"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
+                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
                       {...register('fabric_gsm')}
                     />
                   </div>
@@ -2387,7 +2408,7 @@ function AdminPanel() {
                   rows="3"
                   disabled={actionLoading}
                   placeholder="E.G., 280 GSM 100% FRENCH TERRY COTTON. BOOTCUT BOXED DROP LAYOUT SPEC..."
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium resize-none disabled:opacity-50 uppercase"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium resize-none disabled:opacity-50"
                   {...register('description')}
                 />
               </div>

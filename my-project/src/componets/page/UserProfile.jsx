@@ -479,15 +479,32 @@ function UserProfile() {
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
     setSaveLoading(true);
+
+    // 1. Validate Phone Number (10 digits)
+    const phonePattern = /^[0-9]{10}$/;
+    if (!phonePattern.test(formData.phone.trim())) {
+      showToast("Phone number must be a valid 10-digit number.", "error");
+      setSaveLoading(false);
+      return;
+    }
+
+    // 2. Validate Pincode (6 digits)
+    const pincodePattern = /^[0-9]{6}$/;
+    if (!pincodePattern.test(formData.pincode.trim())) {
+      showToast("Pincode must be a valid 6-digit number.", "error");
+      setSaveLoading(false);
+      return;
+    }
+
     try {
       const payload = {
-        name: formData.name,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        country: formData.country,
-        pincode: formData.pincode,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        address: formData.address.trim(),
+        city: formData.city.trim(),
+        state: formData.state.trim(),
+        country: formData.country.trim(),
+        pincode: formData.pincode.trim(),
         is_default: formData.is_default
       };
       
@@ -541,7 +558,7 @@ function UserProfile() {
                 onClick={() => { switchTab('overview'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'overview'
-                    ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black'
                     : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
                 }`}
               >
@@ -554,7 +571,7 @@ function UserProfile() {
                 onClick={() => { switchTab('orders'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'orders'
-                    ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
                     : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
                 }`}
               >
@@ -568,7 +585,7 @@ function UserProfile() {
                 onClick={() => { switchTab('wallet'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'wallet'
-                    ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
                     : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
                 }`}
               >
@@ -581,7 +598,7 @@ function UserProfile() {
                 onClick={() => { switchTab('addresses'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'addresses'
-                    ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
                     : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
                 }`}
               >
@@ -594,7 +611,7 @@ function UserProfile() {
                 onClick={() => { switchTab('profile'); setEditingAddress(null); }}
                 className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'profile'
-                    ? 'bg-amber-500/10 text-amber-600 lg:border-l-4 lg:border-amber-500 font-black border border-amber-200 lg:border-0'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
                     : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
                 }`}
               >
@@ -621,13 +638,13 @@ function UserProfile() {
               {activeProfileTab === 'overview' && (
                 <div className="space-y-6 animate-fade-in">
                   
-                  {/* Yellow Cream Header Card */}
-                  <div className="bg-amber-50 border border-amber-200/70 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-center gap-6 justify-between relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-250/10 rounded-full blur-2xl pointer-events-none" />
+                  {/* Emerald Green Header Card */}
+                  <div className="bg-[var(--color-surface-alt)] border border-[var(--color-border-hard)] rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-center gap-6 justify-between relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-accent-glow)] rounded-full blur-2xl pointer-events-none" />
                     
                     <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
                       {/* Avatar initial circle */}
-                      <div className="w-16 h-16 rounded-full bg-amber-400 text-black flex items-center justify-center text-2xl font-black font-mono shadow-xs shrink-0 select-none">
+                      <div className="w-16 h-16 rounded-full bg-[var(--color-accent)] text-white flex items-center justify-center text-2xl font-black font-mono shadow-xs shrink-0 select-none">
                         {user?.name ? user.name[0].toUpperCase() : 'C'}
                       </div>
                       <div className="space-y-1">
@@ -645,7 +662,7 @@ function UserProfile() {
                     
                     <button
                       onClick={() => switchTab('profile')}
-                      className="w-full md:w-auto bg-amber-400 hover:bg-amber-500 text-black font-mono font-black text-[10px] tracking-widest uppercase py-3 px-8 rounded-lg transition-all duration-200 cursor-pointer shadow-xs border border-amber-350 shrink-0"
+                      className="w-full md:w-auto bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-[10px] tracking-widest uppercase py-3 px-8 rounded-lg transition-all duration-200 cursor-pointer shadow-xs border border-[var(--color-accent-dark)] shrink-0"
                     >
                       EDIT PROFILE
                     </button>
@@ -656,9 +673,9 @@ function UserProfile() {
                     {/* My Orders Card */}
                     <div 
                       onClick={() => switchTab('orders')}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
+                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-[var(--color-accent)] transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-[var(--color-accent-light)] text-[var(--color-accent)] flex items-center justify-center group-hover:scale-105 transition-transform">
                         <FiShoppingBag className="text-lg" />
                       </div>
                       <h3 className="text-xs font-black text-[var(--color-text)] uppercase tracking-wider">My Orders</h3>
@@ -670,9 +687,9 @@ function UserProfile() {
                     {/* My Wallet Card */}
                     <div 
                       onClick={() => switchTab('wallet')}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
+                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-[var(--color-accent)] transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-[var(--color-accent-light)] text-[var(--color-accent)] flex items-center justify-center group-hover:scale-105 transition-transform">
                         <FaWallet className="text-lg" />
                       </div>
                       <h3 className="text-xs font-black text-[var(--color-text)] uppercase tracking-wider">My Wallet</h3>
@@ -682,9 +699,9 @@ function UserProfile() {
                     {/* My Addresses Card */}
                     <div 
                       onClick={() => switchTab('addresses')}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
+                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-[var(--color-accent)] transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-[var(--color-accent-light)] text-[var(--color-accent)] flex items-center justify-center group-hover:scale-105 transition-transform">
                         <FiMapPin className="text-lg" />
                       </div>
                       <h3 className="text-xs font-black text-[var(--color-text)] uppercase tracking-wider">My Addresses</h3>
@@ -694,9 +711,9 @@ function UserProfile() {
                     {/* My Profile Card */}
                     <div 
                       onClick={() => switchTab('profile')}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
+                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-[var(--color-accent)] transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-[var(--color-accent-light)] text-[var(--color-accent)] flex items-center justify-center group-hover:scale-105 transition-transform">
                         <FiUser className="text-lg" />
                       </div>
                       <h3 className="text-xs font-black text-[var(--color-text)] uppercase tracking-wider">My Profile</h3>
@@ -706,9 +723,9 @@ function UserProfile() {
                     {/* Help & Support Card */}
                     <div 
                       onClick={() => showToast("📞 Reach out to us at support@vakrayan.com for any order assistance.", "info")}
-                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-amber-400 transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
+                      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5 hover:border-[var(--color-accent)] transition-all shadow-2xs hover:shadow-sm cursor-pointer text-center flex flex-col items-center justify-center space-y-2 group"
                     >
-                      <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-[var(--color-accent-light)] text-[var(--color-accent)] flex items-center justify-center group-hover:scale-105 transition-transform">
                         <FiHelpCircle className="text-lg" />
                       </div>
                       <h3 className="text-xs font-black text-[var(--color-text)] uppercase tracking-wider">Help & Support</h3>
@@ -887,18 +904,18 @@ function UserProfile() {
 
                   <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 space-y-6">
                     {/* Wallet Balance Display */}
-                    <div className="bg-amber-500/10 border border-amber-400/35 rounded-xl p-6 flex flex-col md:flex-row items-center gap-4 justify-between">
+                    <div className="bg-[var(--color-accent-light)] border border-[var(--color-accent)]/20 rounded-xl p-6 flex flex-col md:flex-row items-center gap-4 justify-between">
                       <div className="space-y-1 text-center md:text-left">
-                        <span className="text-[9px] font-mono font-bold text-amber-800 uppercase tracking-widest">Available Balance</span>
-                        <h2 className="text-2xl font-black text-amber-950 font-mono">
+                        <span className="text-[9px] font-mono font-bold text-[var(--color-accent-dark)] uppercase tracking-widest">Available Balance</span>
+                        <h2 className="text-2xl font-black text-[var(--color-text)] font-mono">
                           ₹{walletBalance.toFixed(2)}
                         </h2>
-                        <p className="text-[8px] text-amber-800 font-bold uppercase tracking-wider">Instant checkout discount balance · never expires</p>
+                        <p className="text-[8px] text-[var(--color-muted)] font-bold uppercase tracking-wider">Instant checkout discount balance · never expires</p>
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => setIsTopUpModalOpen(true)}
-                          className="bg-amber-50 hover:bg-amber-600 text-black font-mono font-black text-[10px] tracking-widest uppercase py-3 px-6 rounded-lg transition-colors cursor-pointer"
+                          className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-[10px] tracking-widest uppercase py-3 px-6 rounded-lg transition-colors cursor-pointer shadow-xs"
                         >
                           Top-Up Wallet
                         </button>
@@ -1113,9 +1130,9 @@ function UserProfile() {
                         </div>
                       ) : (
                         addresses.map((addr) => (
-                          <div key={addr.$id || addr.id} className={`bg-[var(--color-surface)] border rounded-xl p-5 shadow-2xs space-y-4 hover:border-neutral-950 transition-all relative ${addr.is_default ? 'border-amber-400 bg-amber-500/5' : 'border-[var(--color-border)]'}`}>
+                          <div key={addr.$id || addr.id} className={`bg-[var(--color-surface)] border rounded-xl p-5 shadow-2xs space-y-4 hover:border-neutral-950 transition-all relative ${addr.is_default ? 'border-[var(--color-accent)] bg-[var(--color-accent-light)]' : 'border-[var(--color-border)]'}`}>
                             {addr.is_default && (
-                              <span className="absolute top-4 right-4 bg-amber-500 text-black text-[8px] font-mono font-black px-2 py-0.5 uppercase tracking-wider select-none shadow-2xs">
+                              <span className="absolute top-4 right-4 bg-[var(--color-accent)] text-white text-[8px] font-mono font-black px-2 py-0.5 uppercase tracking-wider select-none shadow-2xs">
                                 Primary
                               </span>
                             )}
@@ -1142,7 +1159,7 @@ function UserProfile() {
                                     is_default: addr.is_default || false
                                   });
                                 }}
-                                className="font-bold text-amber-500 hover:text-amber-600 uppercase cursor-pointer"
+                                className="font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] uppercase cursor-pointer"
                               >
                                 Edit
                               </button>

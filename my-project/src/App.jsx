@@ -198,6 +198,7 @@ function AppContent() {
     // 2. Preload critical images (logo & initial home banner slides)
     const criticalImageUrls = [
       '/vakrayan-logo.png',
+      '/vakrayan-text.png',
       'https://images.unsplash.com/photo-1509281373149-e957c6296406?q=80&w=1600',
       'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?q=80&w=1600',
       'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1600'

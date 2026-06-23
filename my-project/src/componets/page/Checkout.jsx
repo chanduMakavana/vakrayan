@@ -925,7 +925,7 @@ function Checkout() {
                     type="text"
                     defaultValue={user?.name || ''}
                     placeholder="ENTER YOUR NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
                     {...register('name', { required: 'Name is required' })}
                   />
                   {errors.name && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -938,7 +938,7 @@ function Checkout() {
                     type="text"
                     defaultValue={user?.email || ''}
                     placeholder="YOU@EXAMPLE.COM"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
                     {...register('email', { 
                       required: 'Email is required',
                       pattern: {
@@ -974,7 +974,7 @@ function Checkout() {
                   <input
                     type="text"
                     placeholder="HOUSE NO, APARTMENT, STREET NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
                     {...register('address', { required: 'Street address is required' })}
                   />
                   {errors.address && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.address.message}</span>}
@@ -986,7 +986,7 @@ function Checkout() {
                   <input
                     type="text"
                     placeholder="MUMBAI"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
                     {...register('city', { required: 'City is required' })}
                   />
                   {errors.city && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.city.message}</span>}
@@ -1017,7 +1017,7 @@ function Checkout() {
                   <input
                     type="text"
                     placeholder="MAHARASHTRA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
                     {...register('state', { required: 'State is required' })}
                   />
                   {errors.state && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.state.message}</span>}
@@ -1030,7 +1030,7 @@ function Checkout() {
                     type="text"
                     placeholder="INDIA"
                     defaultValue="INDIA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors uppercase font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
                     {...register('country', { required: 'Country is required' })}
                   />
                   {errors.country && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.country.message}</span>}
