@@ -16,9 +16,9 @@ import { playSuccessChime, triggerConfetti } from '../../utils/sensoryHelper'
 import couponUsageService from '../../appwrite/couponUsage'
 import { useToast } from '../../context/ToastContext'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
-
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
+import { isCodAvailableForPincode } from '../../utils/pincodeHelper'
 
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
 
@@ -28,28 +28,14 @@ const generateOrderNumber = () => {
   return `ORD-${year}-${randomNum}`;
 };
 
-const isRemoteRoute = (pin, stateName = '') => {
-  if (!pin) return false;
-  const cleanedPin = String(pin).trim();
-  const state = String(stateName).toUpperCase().trim();
-  if (cleanedPin.startsWith('19') || cleanedPin.startsWith('79') || cleanedPin.startsWith('744')) {
-    return true;
-  }
-  if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP', 'JAMMU & KASHMIR STATE', 'J&K', 'ANDAMAN AND NICOBAR'].includes(state)) {
-    return true;
-  }
-  return false;
-};
-
-const isCodAvailableForPincode = (pin, stateName = '') => {
-  return !isRemoteRoute(pin, stateName);
-};
-
 function Checkout() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const { showToast } = useToast()
   const confettiCanvasRef = useRef(null)
+  // ✅ SECURITY FIX: Double-submit protection ref — prevents duplicate orders
+  // if user clicks 'Place Order' rapidly or form re-renders during submission.
+  const isSubmittingRef = useRef(false)
 
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm()
 
@@ -74,6 +60,9 @@ function Checkout() {
   const { items: products, fetched: productsFetched } = useSelector(state => state.products)
 
   const [checkoutStatus, setCheckoutStatus] = useState('idle') // idle | processing | success
+
+  // ✅ SEO: Dynamic page title
+  useEffect(() => { document.title = 'Checkout — Vakrayan' }, [])
 
   useEffect(() => {
     if (checkoutStatus === 'success') {
@@ -409,6 +398,11 @@ function Checkout() {
   const onSubmit = async (data) => {
     if (!user) return
 
+    // ✅ SECURITY FIX: Prevent double-submit (e.g., user rapid-clicks 'Place Order')
+    // A ref is used (not state) to avoid triggering a re-render when setting the flag.
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
     // 0. Live Pincode Deliverability Check
     const pin = (data.pincode || '').trim();
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
@@ -559,7 +553,7 @@ function Checkout() {
       const discountedAmount = Math.round(cartTotalAmount - discountAmount);
       const baseShipping = cartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
       const currentCodFee = method === 'COD' ? 30 : 0;
-      const isRemote = isRemoteRoute(formData.pincode, formData.state);
+      const isRemote = !isCodAvailableForPincode(formData.pincode, formData.state);
       const remoteSurcharge = isRemote ? 80 : 0;
       const currentShippingCharge = baseShipping + currentCodFee + remoteSurcharge;
       const calculatedFinalAmount = discountedAmount + currentShippingCharge;
@@ -767,6 +761,8 @@ function Checkout() {
       console.error("Billing pipeline crash:", error)
       showToast("Logistics error. Transaction aborted.", "error")
       setCheckoutStatus('idle')
+      // ✅ Reset the double-submit lock on failure so user can retry
+      isSubmittingRef.current = false
     }
   };
 

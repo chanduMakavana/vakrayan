@@ -1,32 +1,24 @@
-import { Client, Account, ID } from 'appwrite';
-import { conf } from './conf/conf';
+import { Account, ID } from 'appwrite';
+import { client } from './client';
 
 export class AuthService {
-    client = new Client();
     account;
-    
+
     constructor() {
-        this.client
-            .setEndpoint(conf.appwriteurl)
-            .setProject(conf.appwriteProjectId);
-        this.account = new Account(this.client);
+        this.account = new Account(client);
     }
 
     // Create a new user account
     async createAccount({ email, password, name }) {
         try {
             const userAccount = await this.account.create(ID.unique(), email, password, name);
-            
             if (userAccount) {
-                // Automatically log in after registration
                 return await this.login({ email, password });
-            } else {
-                return null;
             }
-        }
-        catch (error) {
+            return null;
+        } catch (error) {
             console.error("Appwrite service :: createAccount :: error", error.message);
-            throw error; // Re-throw to be handled by the component
+            throw error;
         }
     }
 
@@ -34,8 +26,7 @@ export class AuthService {
     async login({ email, password }) {
         try {
             return await this.account.createEmailPasswordSession(email, password);
-        }
-        catch (error) {
+        } catch (error) {
             console.error("Appwrite service :: login :: error", error.message);
             throw error;
         }
@@ -45,7 +36,7 @@ export class AuthService {
     async getCurrentUser() {
         try {
             const user = await this.account.get();
-            return user ? JSON.parse(JSON.stringify(user)) : null;
+            return user ?? null;
         } catch (error) {
             // No active session is a normal state on initial mount, do not throw
             console.log("Appwrite service :: getCurrentUser :: Not Logged In", error.message);
@@ -58,9 +49,8 @@ export class AuthService {
         try {
             return await this.account.deleteSession('current');
         } catch (error) {
-            // Log exception but do not throw to avoid breaking the frontend state
             console.log("Appwrite service :: logout :: No active session found or already logged out", error.message);
-            return null; 
+            return null;
         }
     }
 
@@ -94,7 +84,6 @@ export class AuthService {
         }
     }
 
-
     // Create recovery link for forgotten password
     async createRecovery(email, url) {
         try {
@@ -105,7 +94,7 @@ export class AuthService {
         }
     }
 
-    // Complete recovery with userId, secret, new password, and confirmed new password
+    // Complete recovery with userId, secret, and new password
     async updateRecovery(userId, secret, password) {
         try {
             return await this.account.updateRecovery(userId, secret, password);

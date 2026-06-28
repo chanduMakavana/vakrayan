@@ -10,8 +10,6 @@ import { addWishlistItemState, removeWishlistItemState } from '../../features/wi
 import Fuse from 'fuse.js'
 import { scatterProducts } from '../../utils/colorHelper'
 
-
-
 function Shop() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
@@ -24,6 +22,17 @@ function Shop() {
   const wishlist = useSelector(state => state.wishlist || [])
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
   const reduxFetched = useSelector(state => state.products.fetched)
+
+  // ✅ SEO: Dynamic page title — updates when category URL changes
+  useEffect(() => {
+    const label = urlCategory
+      ? urlCategory.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      : null
+    document.title = label
+      ? `${label} — Vakrayan`
+      : 'Shop All Drops — Vakrayan'
+  }, [urlCategory])
+
   
   const [loading, setLoading] = useState(!reduxFetched)
   const [searchQuery, setSearchQuery] = useState('')
@@ -47,11 +56,9 @@ function Shop() {
   useEffect(() => {
     if (products.length > 0) {
       const highest = Math.max(...products.map(p => Number(p.price || 0)))
-      if (highest > 0) {
-        setTimeout(() => {
-          setMaxPriceFilter(Math.ceil(highest / 500) * 500)
-        }, 0)
-      }
+      // ✅ Fixed: setTimeout(() => setState, 0) is an anti-pattern in React 18.
+      // React 18 automatic batching handles this without setTimeout.
+      if (highest > 0) setMaxPriceFilter(Math.ceil(highest / 500) * 500)
     }
   }, [products])
 
@@ -80,17 +87,15 @@ function Shop() {
 
   useEffect(() => {
     if (!reduxFetched) {
-      setTimeout(() => loadProductCatalog(), 0)
+      loadProductCatalog()
     } else {
-      setTimeout(() => setLoading(false), 0)
+      setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduxFetched])
 
   useEffect(() => {
-    setTimeout(() => {
-      setSelectedCategory(urlCategory || 'all')
-    }, 0)
+    setSelectedCategory(urlCategory || 'all')
   }, [urlCategory])
 
   useEffect(() => {
@@ -108,16 +113,14 @@ function Shop() {
   }, [urlCategory])
 
   useEffect(() => {
-    setTimeout(() => setSelectedTag(tagParam || 'all'), 0)
+    setSelectedTag(tagParam || 'all')
   }, [tagParam])
 
   // Synchronize search input with URL search parameter
   const searchParam = searchParams.get('search') || ''
   useEffect(() => {
-    setTimeout(() => {
-      setSearchQuery(searchParam);
-      setTempSearch(searchParam);
-    }, 0);
+    setSearchQuery(searchParam)
+    setTempSearch(searchParam)
   }, [searchParam])
 
   // Debounced search query analytics logging — baseFiltered ke baad hona chahiye

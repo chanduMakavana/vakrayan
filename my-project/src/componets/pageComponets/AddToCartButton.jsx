@@ -6,8 +6,7 @@ import cartService from '../../appwrite/cart'
 import { addCartItemState } from '../../features/addToCart'
 import { playZip } from '../../utils/sensoryHelper'
 import { useToast } from '../../context/ToastContext'
-
-const generateGuestCartId = () => `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+import { generateGuestCartId, loadGuestCartItems, saveGuestCartItems } from '../../utils/guestCartHelper'
 
 function AddToCartButton({ product, selectedSize, selectedColor, variant = "default" }) {
     const dispatch = useDispatch()
@@ -59,13 +58,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
                 }
                 const targetProductId = product.$id || product.id
                 
-                let guestItems = []
-                try {
-                    const saved = localStorage.getItem('guest_cart_items')
-                    guestItems = saved ? JSON.parse(saved) : []
-                } catch {
-                    guestItems = []
-                }
+                let guestItems = loadGuestCartItems();
 
                 const existingCartItem = guestItems.find(
                     item => item.product_id === targetProductId && item.size === targetSize
@@ -100,7 +93,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
                     guestItems.push(response);
                 }
 
-                localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+                saveGuestCartItems(guestItems);
                 dispatch(addCartItemState(response))
                 playZip()
                 window.dispatchEvent(new Event('cart-item-added'))

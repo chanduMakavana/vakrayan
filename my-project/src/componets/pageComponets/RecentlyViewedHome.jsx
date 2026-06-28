@@ -59,7 +59,8 @@ function RecentlyViewedHome() {
         <div className="mb-12">
           <div className="accent-line mb-3" />
           <p className="eyebrow mb-2">Your History</p>
-          <h2 style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: 'var(--color-text)', lineHeight: 1.1 }}>
+          <h2 className="section-title">
+
             Recently Viewed
           </h2>
         </div>

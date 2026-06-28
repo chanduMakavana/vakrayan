@@ -1,15 +1,12 @@
-import { Client, ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "appwrite";
+import { client } from "./client";
 import { conf } from "./conf/conf";
 
 export class ReviewsService {
-    client = new Client();
     databases;
 
     constructor() {
-        this.client
-            .setEndpoint(conf.appwriteurl)
-            .setProject(conf.appwriteProjectId);
-        this.databases = new Databases(this.client);
+        this.databases = new Databases(client);
     }
 
     // Helper: Local fallback reviews getter

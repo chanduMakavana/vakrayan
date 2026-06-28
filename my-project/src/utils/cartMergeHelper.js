@@ -1,4 +1,6 @@
-import cartService from "../appwrite/cart";
+import cartService from '../appwrite/cart';
+import { setCartItems } from '../features/addToCart';
+import { clearGuestCart, loadGuestCartItems } from './guestCartHelper';
 
 /**
  * Merges guest cart items from localStorage into the Appwrite database for a logged-in user.
@@ -7,16 +9,13 @@ import cartService from "../appwrite/cart";
  */
 export const mergeLocalCartToDb = async (userId) => {
   try {
-    const localItemsStr = localStorage.getItem('guest_cart_items');
-    if (!localItemsStr) return;
-
-    const localItems = JSON.parse(localItemsStr);
+    const localItems = loadGuestCartItems();
     if (!Array.isArray(localItems) || localItems.length === 0) return;
 
-    // 1. Fetch user's existing DB cart items to check for duplicates
+    // Fetch user's existing DB cart items to check for duplicates
     const dbItems = await cartService.getCartItems(userId);
 
-    // 2. Loop and merge each local item into DB
+    // Loop and merge each local item into DB
     for (const localItem of localItems) {
       const existingCartItem = dbItems.find(
         dbItem => dbItem.product_id === localItem.product_id && dbItem.size === localItem.size
@@ -30,13 +29,32 @@ export const mergeLocalCartToDb = async (userId) => {
         product_id: localItem.product_id,
         product_Image: localItem.product_Image,
         userId: userId,
-        existingCartItem: existingCartItem
+        existingCartItem: existingCartItem,
       });
     }
 
-    // 3. Clear guest cart from localStorage
-    localStorage.removeItem('guest_cart_items');
+    clearGuestCart();
   } catch (error) {
-    console.error("Error merging guest cart to database:", error);
+    console.error('Error merging guest cart to database:', error);
+  }
+};
+
+/**
+ * After login or session restore: merge guest cart then hydrate Redux store
+ * from the user's DB cart. Returns the fetched cart items.
+ *
+ * Usage (eliminates the duplicate pattern in App.jsx + Login.jsx):
+ *   const items = await hydrateCartFromDb(userId);
+ *   dispatch(setCartItems(items));
+ */
+export const hydrateCartFromDb = async (userId, dispatch) => {
+  try {
+    await mergeLocalCartToDb(userId);
+    const cartItems = await cartService.getCartItems(userId);
+    if (dispatch) dispatch(setCartItems(cartItems));
+    return cartItems;
+  } catch (err) {
+    console.error('Cart retrieval or merge failed:', err);
+    return [];
   }
 };

@@ -8,29 +8,30 @@ export const wishlistSlice = createSlice({
     reducers: {
         // Hydrate Redux wishlist with catalog-mapped objects
         setWishlistItems: (state, action) => {
-            const rawPayload = action.payload || [];
-            return JSON.parse(JSON.stringify(rawPayload));
+            // Immer handles immutability — no need for JSON.parse(JSON.stringify())
+            return action.payload ?? [];
         },
-        // Synchronously add a product to wishlist
+
+        // Synchronously add a product to wishlist (no duplicate check)
         addWishlistItemState: (state, action) => {
-            const newItem = JSON.parse(JSON.stringify(action.payload || {}));
+            const newItem = action.payload ?? {};
             const targetId = newItem.$id || newItem.id;
-            const existingIndex = state.findIndex(
-                item => (item.$id === targetId || item.id === targetId)
-            );
-            if (existingIndex === -1) {
+            const exists = state.some(item => (item.$id === targetId || item.id === targetId));
+            if (!exists) {
                 state.push(newItem);
             }
         },
-        // Synchronously remove a product from wishlist
+
+        // Synchronously remove a product from wishlist by ID
         removeWishlistItemState: (state, action) => {
             const targetId = action.payload;
             return state.filter(item => item.$id !== targetId && item.id !== targetId);
         },
+
         // Clear wishlist on logout
         clearWishlistState: () => {
             return [];
-        }
+        },
     }
 });
 
@@ -38,7 +39,7 @@ export const {
     setWishlistItems,
     addWishlistItemState,
     removeWishlistItemState,
-    clearWishlistState
+    clearWishlistState,
 } = wishlistSlice.actions;
 
 export default wishlistSlice.reducer;

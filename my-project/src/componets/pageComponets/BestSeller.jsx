@@ -56,7 +56,7 @@ function BestSellers() {
           <div>
             <div className="accent-line mb-3" />
             <p className="eyebrow mb-2">In Focus</p>
-            <h2 style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: 'var(--color-text)', lineHeight: 1.1 }}>
+            <h2 className="section-title">
               Heavyweight Drops
             </h2>
           </div>
@@ -78,9 +78,15 @@ function BestSellers() {
 
         {/* Empty state */}
         {!loading && products.length === 0 && (
-          <p className="text-center py-20" style={{ color: 'var(--color-muted)', fontSize: 13 }}>
-            No products yet. Add them from Admin Panel.
-          </p>
+          <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>
+            </svg>
+            <div>
+              <p style={{ color: 'var(--color-text)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>New Drops Coming Soon</p>
+              <p style={{ color: 'var(--color-muted)', fontSize: 14, marginTop: 6, lineHeight: 1.6 }}>Be first in line — join the drop list below.</p>
+            </div>
+          </div>
         )}
 
         {/* Products Grid */}

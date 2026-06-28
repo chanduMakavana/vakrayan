@@ -6,14 +6,15 @@ export const cartSlice = createSlice({
     name: "cart",
     initialState,
     reducers: {
-        // Hydrate the Redux store with live items fetched from Appwrite DB
+        // Hydrate the Redux store with live items fetched from Appwrite DB or localStorage
         setCartItems: (state, action) => {
-            const rawPayload = action.payload || [];
-            return JSON.parse(JSON.stringify(rawPayload));
+            // Immer handles immutability — no need for JSON.parse(JSON.stringify())
+            return action.payload ?? [];
         },
+
         // Synchronously append or update a cart item document in store
         addCartItemState: (state, action) => {
-            const newItem = JSON.parse(JSON.stringify(action.payload || {}));
+            const newItem = action.payload ?? {};
             const existingIndex = state.findIndex(
                 item => item.$id === newItem.$id || (item.product_id === newItem.product_id && item.size === newItem.size)
             );
@@ -23,11 +24,13 @@ export const cartSlice = createSlice({
                 state.push(newItem);
             }
         },
+
         // Remove an item document by its Appwrite ID
         removeCartItemState: (state, action) => {
             return state.filter(item => item.$id !== action.payload);
         },
-        // Safely update specific properties like quantity, size or subtotal
+
+        // Safely update specific properties like quantity, size, or subtotal
         updateCartItemState: (state, action) => {
             const { $id, ...updates } = action.payload;
             const item = state.find(i => i.$id === $id);
@@ -35,19 +38,20 @@ export const cartSlice = createSlice({
                 Object.assign(item, updates);
             }
         },
+
         // Clear all cart items inside Redux
         clearCartState: () => {
             return [];
-        }
+        },
     }
 });
 
-export const { 
-    setCartItems, 
-    addCartItemState, 
-    removeCartItemState, 
-    updateCartItemState, 
-    clearCartState 
+export const {
+    setCartItems,
+    addCartItemState,
+    removeCartItemState,
+    updateCartItemState,
+    clearCartState,
 } = cartSlice.actions;
 
 export default cartSlice.reducer;

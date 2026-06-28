@@ -30,6 +30,12 @@ function UserProfile() {
 
   const location = useLocation();
 
+  // ✅ SEO: Dynamic page title — shows user's name in the browser tab
+  useEffect(() => {
+    const name = user?.name ? `${user.name}'s Profile` : 'My Profile'
+    document.title = `${name} — Vakrayan`
+  }, [user?.name])
+
   const [activeProfileTab, setActiveProfileTab] = useState(() => {
     const params = new URLSearchParams(location.search);
     return params.get('tab') || 'overview';

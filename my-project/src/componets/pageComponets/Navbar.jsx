@@ -12,6 +12,7 @@ import wishlistService from '../../appwrite/wishlist';
 import { useToast } from '../../context/ToastContext';
 import { filterProductsForMode } from '../../features/productsSlice';
 import { calculateOffersDiscount } from '../../utils/discountCalculator';
+import { generateGuestCartId, loadGuestCartItems, saveGuestCartItems } from '../../utils/guestCartHelper';
 
 // Icons (inline SVGs — no extra dependency)
 const SearchIcon = () => (
@@ -108,16 +109,7 @@ const DrawerWrapper = ({ open, onClose, children }) => (
   </AnimatePresence>
 );
 
-const generateGuestCartId = () => `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-const loadGuestCartItems = () => {
-  try {
-    const saved = localStorage.getItem('guest_cart_items');
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-};
 
 function Navbar() {
   const dispatch   = useDispatch();
@@ -365,7 +357,7 @@ function Navbar() {
           };
           guestItems.push(response);
         }
-        localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+        saveGuestCartItems(guestItems);
         dispatch(addCartItemState(response));
         handleToggleWishlist(product);
         showToast(`"${product.name}" moved to bag!`, 'success');
@@ -423,7 +415,7 @@ function Navbar() {
         } else {
           let guestItems = loadGuestCartItems();
           guestItems = guestItems.filter(i => i.$id !== item.$id);
-          localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+          saveGuestCartItems(guestItems);
         }
         return;
       }
@@ -437,7 +429,7 @@ function Navbar() {
         if (idx !== -1) {
           guestItems[idx].quantity = qty;
           guestItems[idx].subtotal = sub;
-          localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+          saveGuestCartItems(guestItems);
         }
       }
     } catch (e) {
@@ -458,7 +450,7 @@ function Navbar() {
       } else {
         let guestItems = loadGuestCartItems();
         guestItems = guestItems.filter(i => i.$id !== id);
-        localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+        saveGuestCartItems(guestItems);
       }
     } catch (e) {
       console.error('Cart remove failed:', e);
@@ -503,7 +495,7 @@ function Navbar() {
             guestItems[existIdx].subtotal = updatedSub;
           }
           guestItems = guestItems.filter(i => i.$id !== item.$id);
-          localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+          saveGuestCartItems(guestItems);
         }
 
         showToast(`Merged with existing size ${newSize} item in your cart.`, "success");
@@ -516,7 +508,7 @@ function Navbar() {
           const idx = guestItems.findIndex(i => i.$id === item.$id);
           if (idx !== -1) {
             guestItems[idx].size = newSize;
-            localStorage.setItem('guest_cart_items', JSON.stringify(guestItems));
+            saveGuestCartItems(guestItems);
           }
         }
         showToast(`Size updated to ${newSize}.`, "success");

@@ -1,15 +1,12 @@
-import { Client, ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "appwrite";
+import { client } from "./client";
 import { conf } from "./conf/conf";
 
 export class ProductsService {
-    client = new Client();
     databases;
 
     constructor() {
-        this.client
-            .setEndpoint(conf.appwriteurl)
-            .setProject(conf.appwriteProjectId);
-        this.databases = new Databases(this.client);
+        this.databases = new Databases(client);
     }
 
     // Create a new product entry
@@ -36,7 +33,7 @@ export class ProductsService {
                 conf.appwriteProductsCollectionId,
                 [
                     Query.orderDesc("$createdAt"),
-                    Query.limit(100) // Explicit cap — Appwrite defaults silently to 25
+                    Query.limit(500) // Raised from 100 to prevent silent catalog truncation
                 ]
             );
             return response.documents;

@@ -30,7 +30,7 @@ class ErrorBoundary extends Component {
     console.error('ErrorBoundary caught a crash:', error, info.componentStack)
   }
 
-  handleReload() {
+  handleReload = () => {
     window.location.reload()
   }
 
@@ -61,7 +61,7 @@ class ErrorBoundary extends Component {
               marginBottom: '2rem'
             }}
           >
-            STREET<span style={{ color: 'var(--theme-primary, #6366f1)' }}>-</span>WEAR
+            VAKRAYAN
           </h1>
 
           {/* Error icon */}

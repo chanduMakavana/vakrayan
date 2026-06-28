@@ -93,7 +93,7 @@ function CategoryGrid() {
             <div className="accent-line" />
           </div>
           <p className="eyebrow mb-3">Shop By</p>
-          <h2 style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', color: 'var(--color-text)', lineHeight: 1.1 }}>
+          <h2 className="section-title">
             Collections
           </h2>
         </div>

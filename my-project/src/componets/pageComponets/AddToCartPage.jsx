@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { HiX, HiMinus, HiPlus } from 'react-icons/hi'
 import { FiShield, FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, Link } from 'react-router-dom'
@@ -10,15 +10,8 @@ import couponUsageService from '../../appwrite/couponUsage'
 import { setCartItems as setCartItemsAction, removeCartItemState, updateCartItemState } from '../../features/addToCart'
 import { useToast } from '../../context/ToastContext'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
+import { loadGuestCartItems } from '../../utils/guestCartHelper'
 
-const loadGuestCartItems = () => {
-  try {
-    const saved = localStorage.getItem('guest_cart_items');
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-};
 
 function AddToCartPage() {
   const navigate = useNavigate()
@@ -57,7 +50,11 @@ function AddToCartPage() {
   const offers = useSelector(state => state.products.offers || []);
 
   const cartTotalBeforeDiscount = selectedCartItems.reduce((acc, item) => acc + Number((item.price || 0) * (item.quantity || 0)), 0);
-  const { totalDiscount: bundleDiscount, appliedOffers } = calculateOffersDiscount(selectedCartItems, allProducts, offers);
+  // ✅ PERF FIX: useMemo prevents re-running the O(n*m) discount calculation on every render
+  const { totalDiscount: bundleDiscount, appliedOffers } = useMemo(
+    () => calculateOffersDiscount(selectedCartItems, allProducts, offers),
+    [selectedCartItems, allProducts, offers]
+  );
 
   // ➡️ 4. INVENTORY MATHEMATICS MATRIX (Accumulators)
   const cartTotalAmount = cartTotalBeforeDiscount - bundleDiscount;

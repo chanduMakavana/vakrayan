@@ -60,7 +60,7 @@ export const ToastProvider = ({ children }) => {
       {children}
       
       {/* Toast Notification Container Portal */}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 w-[calc(100%-3rem)] max-w-sm pointer-events-none">
+      <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-3 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
         <AnimatePresence mode="popLayout">
           {toasts.map((toast) => (
             <motion.div
@@ -81,7 +81,8 @@ export const ToastProvider = ({ children }) => {
               {toast.type === 'error' && <ErrorIcon />}
               {toast.type === 'info' && <InfoIcon />}
               
-              <div className="flex-1 text-[11px] font-bold tracking-wide uppercase leading-relaxed pt-0.5">
+              {/* ✅ Fixed: font size 11px→13px, removed uppercase (11px uppercase is inaccessible) */}
+              <div className="flex-1 text-[13px] font-medium leading-relaxed pt-0.5">
                 {toast.message}
               </div>
               

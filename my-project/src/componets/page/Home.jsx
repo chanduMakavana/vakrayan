@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import Hero from '../pageComponets/Hero'
 import PromoMarquee from '../pageComponets/PromoMarquee'
 import CategoryGrid from '../pageComponets/CategoryGrid'
@@ -7,6 +8,9 @@ import RecentlyViewedHome from '../pageComponets/RecentlyViewedHome'
 import Footer from '../pageComponets/Footer'
 
 function Home() {
+  useEffect(() => {
+    document.title = 'Vakrayan — Premium Apparel'
+  }, [])
   return (
     <>
       <Hero />

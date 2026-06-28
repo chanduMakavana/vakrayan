@@ -28,7 +28,7 @@ function Hero() {
   const navigate = useNavigate()
   const [slides, setSlides] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(false) // ✅ Fixed: no direct window access during render
   const [imagesLoaded, setImagesLoaded] = useState(false)
 
   useEffect(() => {
@@ -61,7 +61,9 @@ function Hero() {
   }, [])
 
   useEffect(() => {
+    // ✅ Fixed: window.innerWidth read after mount, not during render
     const handleResize = () => setIsMobile(window.innerWidth < 768)
+    setIsMobile(window.innerWidth < 768) // Set correct value after hydration
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
@@ -126,6 +128,7 @@ function Hero() {
         </AnimatePresence>
       </div>
 
+
       {/* Bottom hero content overlay */}
       <div className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-10 md:pb-14">
         <motion.div
@@ -145,7 +148,7 @@ function Hero() {
             }}
           >
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399' }} />
-            <span style={{ color: '#fff', fontFamily: "'Chelsea Market', cursive", fontSize: 20 }}>
+            <span style={{ color: '#fff', fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Vakrayan
             </span>
             <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontFamily: "'Jost', sans-serif", fontWeight: 500, letterSpacing: '0.1em' }}>

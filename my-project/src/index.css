@@ -1,16 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Chelsea+Market&family=Bungee&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap');
+
 @import "tailwindcss";
 
 /* ============================================================
    DESIGN SYSTEM — VAKRAYAN GLOBAL TOKENS
-   Theme: Fresh Glassmorphism · Emerald Green · Chelsea Market
+   Theme: Streetwear Editorial · Emerald Green · Barlow Condensed
    ============================================================ */
+
 @layer base {
   :root {
     /* ── Fonts ─────────────────────────────────────────────── */
     --font-sans:    'Jost', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Chelsea Market', cursive;
-    --font-label:   'Bungee', 'Impact', sans-serif;
+    --font-display: 'Barlow Condensed', 'Impact', sans-serif; /* Hard, streetwear condensed */
+    --font-display-alt: 'Syne', ui-sans-serif, sans-serif;    /* Geometric editorial alt */
+    --font-label:   'Jost', ui-sans-serif, sans-serif;        /* Removed Bungee — use Jost 900 */
+
 
     /* ── Core Palette — Fresh Cream + Emerald ───────────────── */
     --color-bg:          #F4FAF7;        /* Soft green-tinted white bg */
@@ -120,11 +124,13 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    line-height: 1.2;
-    font-weight: 400; /* Chelsea Market is naturally bold */
+    line-height: 1.1;
+    font-weight: 800; /* Barlow Condensed needs explicit heavy weight */
     letter-spacing: 0.01em;
+    text-transform: uppercase; /* Barlow Condensed reads best uppercase */
     color: var(--color-text);
   }
+
 
   button, input, textarea, select {
     font: inherit;
@@ -222,33 +228,52 @@
     border-radius: var(--radius-md);
   }
 
-  /* ── Typography utilities ───────────────────────────────── */
+  /* ── Typography utilities ───────────────────────────────────── */
   .eyebrow {
-    font-family: var(--font-label);
-    font-size: 11px;
-    letter-spacing: 0.12em;
+    font-family: var(--font-sans);
+    font-size: 13px;             /* Fixed: was 11px, below WCAG legibility minimum */
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--color-accent);
   }
 
   .display-title {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 5vw, 4rem);
-    line-height: 1.1;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    font-weight: 900;
+    line-height: 1.0;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
     color: var(--color-text);
   }
 
   .section-title {
     font-family: var(--font-display);
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 800;
+    line-height: 1.05;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    color: var(--color-text);
+  }
+
+  /* Syne for smaller, editorial headings */
+  .section-title-alt {
+    font-family: var(--font-display-alt);
     font-size: clamp(1.4rem, 3vw, 2.2rem);
+    font-weight: 700;
     line-height: 1.15;
     color: var(--color-text);
   }
 
   .label-font {
-    font-family: var(--font-label);
-    letter-spacing: 0.06em;
+    font-family: var(--font-sans);
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
+
 
   /* ── Buttons ─────────────────────────────────────────────── */
   .btn-primary {

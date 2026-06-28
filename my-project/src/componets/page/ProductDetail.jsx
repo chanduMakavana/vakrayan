@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
@@ -18,72 +19,6 @@ import cartService from '../../appwrite/cart';
 import { addCartItemState } from '../../features/addToCart';
 
 
-const isCodAvailableForPincode = (pin, stateName = '') => {
-  if (!pin) return true;
-  const state = stateName.toUpperCase().trim();
-  if (pin.startsWith('19') || pin.startsWith('79') || pin.startsWith('744')) {
-    return false;
-  }
-  if (['JAMMU & KASHMIR', 'JAMMU AND KASHMIR', 'ANDAMAN & NICOBAR ISLANDS', 'ANDAMAN AND NICOBAR ISLANDS', 'LAKSHADWEEP'].includes(state)) {
-    return false;
-  }
-  return true;
-};
-
-const calculateDeliveryDetails = (pin, stateName = '') => {
-  const state = stateName.toUpperCase().trim();
-  const firstDigit = pin[0];
-
-  let minTransit;
-  let maxTransit;
-  let desc;
-  let carrier;
-
-  if (pin === '395006') {
-    minTransit = 0;
-    maxTransit = 1;
-    desc = 'Surat Warehouse Local Dispatch';
-    carrier = 'Surat Local Express / Self Pickup';
-  } else if (state === 'GUJARAT' || pin.startsWith('39')) {
-    minTransit = 1;
-    maxTransit = 2;
-    desc = 'Gujarat Regional Delivery';
-    carrier = 'Delhivery Express';
-  } else if (state === 'MAHARASHTRA' || state === 'RAJASTHAN' || state === 'MADHYA PRADESH' || firstDigit === '4' || pin.startsWith('30') || pin.startsWith('31') || pin.startsWith('32') || pin.startsWith('33') || pin.startsWith('34')) {
-    minTransit = 2;
-    maxTransit = 3;
-    desc = 'West/Central India Express Shipping';
-    carrier = 'Delhivery Air';
-  } else if (['DELHI', 'HARYANA', 'PUNJAB', 'UTTAR PRADESH', 'KARNATAKA', 'TELANGANA', 'ANDHRA PRADESH', 'TAMIL NADU'].includes(state) || ['1', '2', '5'].includes(firstDigit)) {
-    minTransit = 3;
-    maxTransit = 4;
-    desc = 'Metro Connect Express Delivery';
-    carrier = 'Bluedart Air';
-  } else if (['7', '8'].includes(firstDigit)) {
-    minTransit = 4;
-    maxTransit = 5;
-    desc = 'East India Connect';
-    carrier = 'Xpressbees Courier';
-  } else {
-    minTransit = 5;
-    maxTransit = 7;
-    desc = 'National Connect Remote Delivery';
-    carrier = 'India Post Speed Post';
-  }
-
-  const today = new Date();
-  const minDeliveryDate = new Date();
-  minDeliveryDate.setDate(today.getDate() + 1 + minTransit);
-
-  const maxDeliveryDate = new Date();
-  maxDeliveryDate.setDate(today.getDate() + 2 + maxTransit);
-
-  const options = { weekday: 'short', day: 'numeric', month: 'short' };
-  const dateRange = `${minDeliveryDate.toLocaleDateString('en-IN', options)} - ${maxDeliveryDate.toLocaleDateString('en-IN', options)}`;
-
-  return { days: `${minTransit + 1}-${maxTransit + 2} Days`, dateRange, desc, carrier };
-};
-
 function ProductDetail() {
   const { idOrSlug } = useParams();
   const navigate = useNavigate();
@@ -99,6 +34,48 @@ function ProductDetail() {
 
   const [product, setProduct] = useState(null);
   const id = product?.$id || product?.id;
+
+  // ✅ SEO: Dynamic page title + JSON-LD Product schema
+  // Fires whenever product loads (cached or API). Each product gets a unique <title>.
+  useEffect(() => {
+    if (!product) {
+      document.title = 'Loading... — Vakrayan';
+      return;
+    }
+    const productName = product.name || 'Product';
+    document.title = `${productName} — Vakrayan`;
+
+    // Remove any existing product schema
+    const existing = document.getElementById('product-jsonld');
+    if (existing) existing.remove();
+
+    // Add JSON-LD Product schema for Google rich snippets (price, availability, reviews)
+    const schema = {
+      '@context': 'https://schema.org/',
+      '@type': 'Product',
+      name: productName,
+      description: product.description || `${productName} by Vakrayan`,
+      brand: { '@type': 'Brand', name: 'Vakrayan' },
+      image: product.front_image_link || product.image_url || product.image,
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'INR',
+        price: String(product.price || ''),
+        availability: 'https://schema.org/InStock',
+        seller: { '@type': 'Organization', name: 'Vakrayan' },
+      },
+    };
+    const script = document.createElement('script');
+    script.id = 'product-jsonld';
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify(schema);
+    document.head.appendChild(script);
+
+    return () => {
+      const s = document.getElementById('product-jsonld');
+      if (s) s.remove();
+    };
+  }, [product]);
 
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
@@ -1401,8 +1378,9 @@ function ProductDetail() {
                     onClick={() => navigate('/admin', { state: { editProductId: product.$id || product.id } })}
                     className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1.5 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
                   >
-                    ✏️ Edit Drop
+                    Edit Drop
                   </button>
+
                 )}
               </div>
 
@@ -1479,7 +1457,8 @@ function ProductDetail() {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
-                  showToast("📋 Drop link copied to clipboard!", "success");
+                  showToast("Link copied to clipboard!", "success");
+
                 }}
                 className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] px-2.5 py-1 transition-all cursor-pointer font-sans"
               >
@@ -1620,8 +1599,8 @@ function ProductDetail() {
                         <div className="space-y-2 mt-2.5 animate-fade-in">
                           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 animate-pulse">
                             <span className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-rose-500" />
-                              <span>⚠️ Low Stock in Size {selectedSize}!</span>
+                              <svg className="w-3 h-3 fill-rose-500" viewBox="0 0 24 24"><path d="M12 2l11 19H1L12 2zM12 6l-7 12h14L12 6zm0 2l5.5 9.5H6.5L12 8z"/></svg>
+                              <span>Low Stock in Size {selectedSize}!</span>
                             </span>
                             <span>Only {stockVal} items left</span>
                           </div>
@@ -1636,9 +1615,9 @@ function ProductDetail() {
                     }
                     return (
                       <div className="p-3 bg-emerald-50/50 border border-emerald-100/60 rounded-none flex items-center gap-2 mt-2 animate-fade-in">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        <svg className="w-3 h-3 fill-emerald-500 animate-pulse" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                         <p className="text-[10px] text-emerald-700 font-mono font-bold uppercase tracking-wider">
-                          ✓ Size {selectedSize} is In Stock - Ready for immediate drop
+                          Size {selectedSize} is In Stock - Ready for immediate drop
                         </p>
                       </div>
                     );
@@ -1647,7 +1626,64 @@ function ProductDetail() {
               );
             })()}
 
+
+            {/* ── MOBILE STICKY ADD-TO-CART BAR ─────────────────────────────
+                Visible only on mobile (< lg). Desktop uses the inline CTA above.
+                This is the highest-impact conversion fix — keeps the primary action
+                reachable as users scroll through description, reviews, and policy. */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden"
+              style={{
+                background: 'rgba(255,255,255,0.97)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderTop: '1px solid var(--color-border-hard)',
+                padding: '12px 16px',
+                paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+                boxShadow: '0 -8px 32px rgba(0,0,0,0.08)'
+              }}
+            >
+              {/* Size reminder + price */}
+              <div className="flex items-center justify-between mb-2">
+                <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {selectedSize ? `Size: ${selectedSize}` : 'Select a size above'}
+                </span>
+                <span style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 20, fontWeight: 900, color: 'var(--color-text)', letterSpacing: '0.01em' }}>
+                  ₹{Number(product.price || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <AddToCartButton
+                    product={product}
+                    selectedSize={selectedSize}
+                    selectedColor={selectedColor}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBuyNow}
+                  disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
+                  className="w-14 flex items-center justify-center border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'var(--color-text)',
+                    borderColor: 'var(--color-text)',
+                    borderRadius: 0
+                  }}
+                  title="Buy Now"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m5 12 7-7 7 7M12 5v14"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Extra bottom padding on mobile so content isn't hidden behind sticky bar */}
+            <div className="h-24 lg:hidden" aria-hidden="true" />
+
             <div className="hidden md:block space-y-4 pt-2 border-t border-neutral-150">
+
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex gap-3 w-full sm:w-auto sm:flex-1">
                     <div className="flex-1 transform active:scale-[0.99] transition-transform duration-150">
@@ -1713,7 +1749,7 @@ function ProductDetail() {
                       disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
                       className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-2 sm:px-4 md:px-6 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? '✕ Sold Out' : '⚡ Buy Now'}
+                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : 'Buy Now'}
                     </button>
                   </div>
                 </div>
@@ -1739,7 +1775,7 @@ function ProductDetail() {
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                     <p className="text-[10px] text-neutral-300 font-bold uppercase tracking-wider font-mono">
-                      ✕ {isAllOutOfStock ? 'This product is Sold Out' : `Size ${selectedSize} is Out of Stock`}
+                      {isAllOutOfStock ? 'This product is Sold Out' : `Size ${selectedSize} is Out of Stock`}
                     </p>
                   </div>
                   

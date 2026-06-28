@@ -69,10 +69,13 @@ function PromoBanner() {
         <motion.h2
           variants={childVariants}
           style={{
-            fontFamily: "'Chelsea Market', cursive",
-            fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+            fontFamily: "'Barlow Condensed', 'Impact', sans-serif",
+            fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            letterSpacing: '0.01em',
             color: 'var(--color-text)',
-            lineHeight: 1.15,
+            lineHeight: 1.0,
             marginBottom: 20
           }}
         >
@@ -106,7 +109,8 @@ function PromoBanner() {
               className="glass-card p-5 text-center"
               style={{ borderRadius: 16 }}
             >
-              <p style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 26, color: 'var(--color-accent)', lineHeight: 1, marginBottom: 6 }}>
+              <p style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 30, fontWeight: 900, color: 'var(--color-accent)', lineHeight: 1, marginBottom: 6 }}>
+
                 {value}
               </p>
               <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

@@ -23,4 +23,5 @@ export const conf = {
     appwriteCategoryConfigsCollectionId: String(import.meta.env.VITE_APPWRITE_CATEGORY_CONFIGS_COLLECTION_ID || "category_configs").trim(),
     appwriteBucketId: String(import.meta.env.VITE_APPWRITE_BUCKET_ID || "images").trim(),
     appwriteApiKey: String(import.meta.env.VITE_APPWRITE_API_KEY || "").trim(),
-}
+    appwriteCloudflareWorkerUrl: String(import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "").trim(),
+}

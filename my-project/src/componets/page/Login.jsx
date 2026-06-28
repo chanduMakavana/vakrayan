@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { login as loginAction } from '../../features/login' // Alias used to avoid naming collision with local submit function
+import { login as loginAction } from '../../features/login'
 import authService from '../../appwrite/auth'
-import cartService from '../../appwrite/cart'
-import { setCartItems } from '../../features/addToCart'
 import { useToast } from '../../context/ToastContext'
-import { mergeLocalCartToDb } from '../../utils/cartMergeHelper'
+import { hydrateCartFromDb } from '../../utils/cartMergeHelper'
 
 function Login() {
   const {
@@ -28,6 +26,9 @@ function Login() {
   const [serverError, setServerError] = useState("")
   const [isForgotPassword, setIsForgotPassword] = useState(false)
 
+  // ✅ SEO: Dynamic page title
+  useEffect(() => { document.title = 'Login — Vakrayan' }, [])
+
   const onSubmit = async (data) => {
     setServerError("") 
     setLoading(true)   
@@ -44,12 +45,9 @@ function Login() {
         const userData = await authService.getCurrentUser();
         if (userData) {
           dispatch(loginAction({ user: userData }));
-          try {
-            await mergeLocalCartToDb(userData.$id);
-            const cartItems = await cartService.getCartItems(userData.$id);
-            dispatch(setCartItems(cartItems));
-          } catch (cartErr) {
-            console.error("Cart retrieval or merge on login failed:", cartErr);
+          // ✅ DEDUP FIX: replaced 3-line merge+fetch+dispatch with shared hydrateCartFromDb
+          try { await hydrateCartFromDb(userData.$id, dispatch) } catch (e) {
+            console.error("Cart merge on login failed:", e)
           }
         }
         
@@ -127,7 +125,7 @@ function Login() {
       >
         {/* Brand header */}
         <div className="text-center mb-8">
-          <h1 style={{ fontFamily: "'Chelsea Market', cursive", fontSize: 30, color: 'var(--color-text)', marginBottom: 6 }}>
+          <h1 style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 36, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-text)', marginBottom: 6 }}>
             Vakrayan
           </h1>
           <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 13, color: 'var(--color-muted)', fontWeight: 500 }}>

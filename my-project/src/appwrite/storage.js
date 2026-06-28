@@ -1,19 +1,45 @@
-import { Client, Storage, ID } from 'appwrite';
+import { Storage, ID } from 'appwrite';
+import { client } from './client';
 import { conf } from './conf/conf';
 
 export class StorageService {
-    client = new Client();
     storage;
 
     constructor() {
-        this.client
-            .setEndpoint(conf.appwriteurl)
-            .setProject(conf.appwriteProjectId)
-        .setKey(conf.appwriteApiKey);
-        this.storage = new Storage(this.client);
+        this.storage = new Storage(client);
     }
 
     async uploadFile(file, bucketId = conf.appwriteBucketId || 'images') {
+        // If a Cloudflare Worker URL is configured, use it to upload to Backblaze B2.
+        // Otherwise, fall back to standard Appwrite Storage.
+        if (conf.appwriteCloudflareWorkerUrl) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(conf.appwriteCloudflareWorkerUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Worker upload failed: ${response.status} - ${errorText}`);
+                }
+
+                const result = await response.json();
+                if (result && result.success && result.url) {
+                    // Return the URL as $id so that direct references in components load it instantly.
+                    return { $id: result.url };
+                } else {
+                    throw new Error(result?.error || 'Invalid response from upload gateway');
+                }
+            } catch (error) {
+                console.error("Cloudflare Worker B2 Upload :: error", error.message);
+                throw error;
+            }
+        }
+
         try {
             const response = await this.storage.createFile(
                 bucketId,
@@ -28,6 +54,11 @@ export class StorageService {
     }
 
     getFileView(fileId, bucketId = conf.appwriteBucketId || 'images') {
+        // If the fileId is a full URL (e.g. from Backblaze B2), return it directly.
+        if (fileId && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+            return fileId;
+        }
+
         try {
             // getFileView returns a URL string (or object that can be converted to string)
             const result = this.storage.getFileView(bucketId, fileId);
@@ -38,6 +69,7 @@ export class StorageService {
         }
     }
 }
+
 
 export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
   return new Promise((resolve) => {
