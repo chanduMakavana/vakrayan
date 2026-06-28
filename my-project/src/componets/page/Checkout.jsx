@@ -18,8 +18,7 @@ import { useToast } from '../../context/ToastContext'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
-import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelper'
-
+import { isCodAvailableForPincode } from '../../utils/pincodeHelper'
 
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
 
@@ -123,11 +122,10 @@ function Checkout() {
   const isRemote = isRemoteRoute(watchedPin, watchedState)
   const remoteSurcharge = isRemote ? 80 : 0
 
-  // Calculate Shipping Expenses & COD Fees (Temporarily 100% Free Shipping for all orders)
-  const baseShippingCharge = 0;
+  // Calculate Shipping Expenses & COD Fees
+  const baseShippingCharge = cartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
   const codFee = selectedPayment === 'COD' ? 30 : 0;
   const shippingCharge = baseShippingCharge + codFee + remoteSurcharge;
-
 
   const finalAmount = discountedAmount + shippingCharge
 

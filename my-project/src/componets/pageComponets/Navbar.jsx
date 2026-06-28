@@ -1016,26 +1016,28 @@ function Navbar() {
           </button>
         </div>
 
-        {/* Free Shipping Progress (Temporarily 100% Free Shipping event) */}
+        {/* Free Shipping Progress */}
         {cartItems.length > 0 && (
           <div className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] p-4 px-6 space-y-2">
             <div className="flex justify-between items-center text-[10px] font-bold tracking-wider uppercase">
               <span className="text-[var(--color-text)]">
-                ✓ Free Shipping Activated (Limited Time)
+                {cartTotal >= 999 
+                  ? "✓ You've unlocked free shipping!" 
+                  : `₹${Math.round(999 - cartTotal)} away from free shipping`
+                }
               </span>
               <span className="text-[var(--color-muted)] font-mono">
-                100%
+                {Math.min(100, Math.round((cartTotal / 999) * 100))}%
               </span>
             </div>
             <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
               <div 
                 className="h-full bg-blue-500 rounded-full transition-all duration-500" 
-                style={{ width: '100%' }}
+                style={{ width: `${Math.min(100, (cartTotal / 999) * 100)}%` }}
               />
             </div>
           </div>
         )}
-
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-thin">
