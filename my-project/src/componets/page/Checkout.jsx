@@ -122,10 +122,11 @@ function Checkout() {
   const isRemote = isRemoteRoute(watchedPin, watchedState)
   const remoteSurcharge = isRemote ? 80 : 0
 
-  // Calculate Shipping Expenses & COD Fees
-  const baseShippingCharge = cartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
+  // Calculate Shipping Expenses & COD Fees (Temporarily 100% Free Shipping for all orders)
+  const baseShippingCharge = 0;
   const codFee = selectedPayment === 'COD' ? 30 : 0;
   const shippingCharge = baseShippingCharge + codFee + remoteSurcharge;
+
 
   const finalAmount = discountedAmount + shippingCharge
 
