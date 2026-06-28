@@ -188,7 +188,6 @@ function UserProfile() {
         currency: "INR",
         name: "Vakrayan",
         description: `Wallet Top-Up`,
-        image: "https://ik.imagekit.io/yash123/brand_logo.png",
         prefill: {
           name: user?.name || '',
           email: user?.email || '',

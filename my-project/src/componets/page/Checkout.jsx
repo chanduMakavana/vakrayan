@@ -481,14 +481,13 @@ function Checkout() {
       if (window.Razorpay && liveKey) {
         // Launch REAL Razorpay Standard Payment Gateway Popup
         try {
-          const options = {
-            key: liveKey,
-            amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
-            currency: "INR",
-            name: "Vakrayan",
-            description: "Vakrayan Secure Transaction Gateway",
-            image: "https://cdn-icons-png.flaticon.com/512/5752/5752538.png", // Company store logo icon
-            prefill: {
+            const options = {
+              key: liveKey,
+              amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
+              currency: "INR",
+              name: "Vakrayan",
+              description: "Vakrayan Secure Transaction Gateway",
+              prefill: {
               name: data.name,
               email: data.email,
               contact: data.phone
