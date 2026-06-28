@@ -18,7 +18,7 @@ import { useToast } from '../../context/ToastContext'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
-import { isCodAvailableForPincode } from '../../utils/pincodeHelper'
+import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelper'
 
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
 
