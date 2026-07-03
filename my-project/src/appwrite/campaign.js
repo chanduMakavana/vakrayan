@@ -19,15 +19,10 @@ export class CampaignService {
     }
 
     // Helper: Local Coupons Fallback hydration
+    // ✅ SECURITY FIX: Removed hardcoded STREET50/CREW10 coupons that were a revenue leak
+    // if Appwrite DB went offline. Now returns an empty array — no free discounts on DB failure.
     getLocalCoupons() {
-        const local = JSON.parse(localStorage.getItem('campaignCoupons')) || [
-            { id: 'local-1', code: 'STREET50', discount: 50 },
-            { id: 'local-2', code: 'CREW10', discount: 10 }
-        ];
-        return local.map(c => ({
-            ...c,
-            isExpired: this.checkIsExpired(c.valid_until)
-        }));
+        return [];
     }
 
     // Helper: Local Promo Announcement Fallback hydration

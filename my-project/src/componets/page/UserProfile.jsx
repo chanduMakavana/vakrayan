@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle } from 'react-icons/fi';
@@ -66,22 +67,8 @@ function UserProfile() {
   const [topUpAmount, setTopUpAmount] = useState('500');
   const [isRazorpayOpen, setIsRazorpayOpen] = useState(false);
 
-  // Programmatically inject official Razorpay SDK script on mount
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => console.log("Razorpay Secured SDK initialized successfully in UserProfile.");
-    script.onerror = () => console.warn("Razorpay SDK offline in UserProfile. Reverting transaction channel to Sandbox.");
-    document.body.appendChild(script);
-    return () => {
-      try {
-        document.body.removeChild(script);
-      } catch(e) {
-        console.warn("Razorpay script cleanup ignored in UserProfile:", e.message);
-      }
-    }
-  }, []);
+  // ✅ PERFORMANCE FIX: Replaced duplicate Razorpay script injection with shared hook.
+  useRazorpaySDK();
 
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletTransactions, setWalletTransactions] = useState([]);
@@ -374,21 +361,13 @@ function UserProfile() {
   // Fetch products catalog on mount if empty in Redux cache
   useEffect(() => {
     if (isAuthenticated && !productsFetched) {
-      const getLocalStorageFallbackData = () => {
-        return JSON.parse(localStorage.getItem('products')) || [];
-      };
-
       const loadProducts = async () => {
         try {
           const response = await productsService.getProducts();
           const structuredData = response?.documents || response || [];
-          if (structuredData && structuredData.length > 0) {
-            dispatch(setProducts(structuredData));
-          } else {
-            dispatch(setProducts(getLocalStorageFallbackData()));
-          }
+          dispatch(setProducts(structuredData));
         } catch {
-          dispatch(setProducts(getLocalStorageFallbackData()));
+          dispatch(setProducts([]));
         }
       };
       loadProducts();
@@ -815,29 +794,29 @@ function UserProfile() {
                             </div>
 
                             <div className="space-y-2.5 flex-1 min-w-0">
-                              <div className="space-y-0.5">
-                                <span className="text-[10px] text-[var(--color-muted)] block font-medium">
-                                  Order Date: {orderDate} / ID: {orderNum}
+                              <div className="space-y-1">
+                                <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider block">
+                                  ORDER {orderNum} • {orderDate}
                                 </span>
-                                <h4 className="text-xs font-semibold text-[var(--color-text)] leading-relaxed truncate">
-                                  {parsedItems.map(i => `${i.name} (${i.size || 'M'})`).join(' , ')}
+                                <h4 className="text-[13px] font-bold text-[var(--color-text)] uppercase tracking-wide leading-relaxed line-clamp-2">
+                                  {parsedItems.map(i => `${i.name} (${i.size || 'M'})`).join(' • ')}
                                 </h4>
                               </div>
 
-                              <div className="flex items-center gap-3">
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                              <div className="flex items-center gap-3 pt-1">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-sm uppercase tracking-widest ${
                                   order.status === 'DELIVERED' 
-                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
                                   : order.status === 'SHIPPED' 
-                                  ? 'bg-amber-50 text-amber-600 border border-amber-100' 
+                                  ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
                                   : order.status === 'CANCELLED'
-                                  ? 'bg-rose-50 text-rose-600 border border-rose-100'
-                                  : 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border border-[var(--color-border)] animate-pulse'
+                                  ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                                  : 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 animate-pulse'
                                 }`}>
                                   {order.status || 'PENDING'}
                                 </span>
-                                <span className="text-[10px] text-[var(--color-muted)] font-semibold whitespace-nowrap">
-                                  {parsedItems.reduce((acc, i) => acc + Number(i.quantity || 1), 0)} Items
+                                <span className="text-[10px] text-[var(--color-muted)] font-mono font-bold tracking-wider whitespace-nowrap">
+                                  {parsedItems.reduce((acc, i) => acc + Number(i.quantity || 1), 0)} ITEM(S)
                                 </span>
                               </div>
 
@@ -882,8 +861,8 @@ function UserProfile() {
 
                             <div className="flex items-center gap-4 justify-end shrink-0">
                               <div className="text-right">
-                                <span className="text-[10px] text-[var(--color-muted)] block font-medium">Total Paid</span>
-                                <span className="text-sm font-semibold text-[var(--color-text)]">
+                                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">Total Paid</span>
+                                <span className="text-base font-bold tracking-wide text-[var(--color-text)]">
                                   ₹{Number(order.total || 0).toLocaleString('en-IN')}
                                 </span>
                               </div>
@@ -1142,7 +1121,7 @@ function UserProfile() {
                               </span>
                             )}
                             <div className="space-y-1.5">
-                              <h4 className="text-xs font-black text-[var(--color-text)] uppercase">{addr.name || addr.customerName}</h4>
+                              <h4 className="text-sm font-bold text-[var(--color-text)] uppercase tracking-wide">{addr.name || addr.customerName}</h4>
                               <p className="text-xs text-[var(--color-text)] font-medium leading-relaxed">
                                 {[addr.address || addr.addressLine, addr.city, addr.state].filter(Boolean).join(', ')} - {addr.pincode}
                               </p>

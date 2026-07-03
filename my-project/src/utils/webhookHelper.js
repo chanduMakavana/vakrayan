@@ -87,9 +87,9 @@ export const sendWebhookNotification = async (event, payload) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyPayload)
-      }).catch(err => console.warn(`Failed to dispatch ${event} Discord notification:`, err.message));
+      }).catch(() => {});
     } catch (err) {
-      console.warn(`Discord dispatcher error for ${event}:`, err.message);
+      // Silently catch dispatcher errors
     }
   }
 
@@ -112,7 +112,8 @@ export const sendWebhookNotification = async (event, payload) => {
 
   const telegramChatId = getTelegramChatId(event);
   if (!telegramToken || !telegramToken.trim() || !telegramChatId) {
-    console.warn(`⚠️ Telegram Notification Skipped for "${event}": VITE_TELEGRAM_BOT_TOKEN or Chat ID is missing. If you recently edited your .env file, please restart your Vite dev server (Ctrl+C and 'npm run dev') so React can load the new variables.`);
+    // Silently skip if misconfigured
+
   } else {
     try {
       let text = '';
@@ -215,16 +216,11 @@ export const sendWebhookNotification = async (event, payload) => {
         body: JSON.stringify(requestBody)
       })
       .then(async (res) => {
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.warn(`❌ Telegram API Error ${res.status}:`, errData.description || 'Unknown error');
-        } else {
-          console.log(`✅ Telegram Notification dispatched successfully for "${event}"`);
-        }
+        // Silently handle success or API errors
       })
-      .catch(err => console.warn(`Failed to dispatch ${event} Telegram notification:`, err.message));
+      .catch(() => {});
     } catch (err) {
-      console.warn(`Telegram dispatcher error for ${event}:`, err.message);
+      // Silently catch dispatcher errors
     }
   }
 };

@@ -77,7 +77,13 @@ function SignUp() {
           message: "This email is already registered with us."
         })
       } else {
-        setServerError(error?.message || "Something went wrong. Try again.")
+        let errorMsg = error?.message || "Something went wrong. Try again.";
+        if (errorMsg.includes('auth/weak-password')) {
+          errorMsg = "Password is too weak. Please use a stronger password.";
+        } else if (errorMsg.includes('Firebase: Error')) {
+          errorMsg = "Registration failed. Please try again.";
+        }
+        setServerError(errorMsg)
       }
     } finally {
       setLoading(false)
@@ -91,7 +97,11 @@ function SignUp() {
       await authService.loginWithGoogle();
     } catch (error) {
       console.error("Google Auth Error:", error);
-      setServerError(error?.message || "Google authentication failed. Please try again.");
+      let errorMsg = error?.message || "Google authentication failed. Please try again.";
+      if (errorMsg.includes('Firebase: Error')) {
+        errorMsg = "Google authentication failed. Please try again.";
+      }
+      setServerError(errorMsg);
       setLoading(false);
     }
   };

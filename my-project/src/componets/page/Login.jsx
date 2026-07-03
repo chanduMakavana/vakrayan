@@ -58,7 +58,15 @@ function Login() {
       }
     } catch (error) {
       console.error("Login Error:", error);
-      setServerError(error?.message || "Invalid email or password.");
+      let errorMsg = error?.message || "Invalid email or password.";
+      if (errorMsg.includes('auth/invalid-credential') || errorMsg.includes('auth/wrong-password') || errorMsg.includes('auth/user-not-found')) {
+        errorMsg = "Invalid email or password. Please try again.";
+      } else if (errorMsg.includes('auth/too-many-requests')) {
+        errorMsg = "Too many failed attempts. Please try again later.";
+      } else if (errorMsg.includes('Firebase: Error')) {
+        errorMsg = "Authentication failed. Please try again.";
+      }
+      setServerError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -75,7 +83,13 @@ function Login() {
       reset();
     } catch (error) {
       console.error("Recovery link error:", error);
-      setServerError(error?.message || "Failed to trigger password recovery. Ensure your email is correct.");
+      let errorMsg = error?.message || "Failed to trigger password recovery. Ensure your email is correct.";
+      if (errorMsg.includes('auth/user-not-found') || errorMsg.includes('auth/invalid-email')) {
+        errorMsg = "Failed to trigger password recovery. Ensure your email is correct.";
+      } else if (errorMsg.includes('Firebase: Error')) {
+        errorMsg = "Failed to send recovery email. Please try again.";
+      }
+      setServerError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -86,9 +100,15 @@ function Login() {
     setLoading(true);
     try {
       await authService.loginWithGoogle();
+      // Appwrite handles OAuth via redirect, so if it succeeds, the page will reload.
+      // If it fails, it will throw an error and we catch it below.
     } catch (error) {
       console.error("Google Auth Error:", error);
-      setServerError(error?.message || "Google authentication failed. Please try again.");
+      let errorMsg = error?.message || "Google authentication failed. Please try again.";
+      if (errorMsg.includes('Firebase: Error')) {
+        errorMsg = "Google authentication failed. Please try again.";
+      }
+      setServerError(errorMsg);
       setLoading(false);
     }
   };

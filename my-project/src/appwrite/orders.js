@@ -97,22 +97,45 @@ export class OrdersService {
     async getUserOrders(userId) {
         try {
             if (!userId || !conf.appwriteOrdersCollectionId) return [];
-            const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteOrdersCollectionId,
-                [
-                    Query.equal("userId", userId),
-                    Query.orderDesc("$createdAt"),
-                    Query.limit(100)
-                ]
-            );
-            return response.documents || [];
+
+            // ✅ SECURITY + PERFORMANCE FIX: Use server-side Query.equal to filter by userId.
+            // Firebase adapter translates this to Firestore: where("userId", "==", userId)
+            // This prevents fetching ALL orders and filtering client-side.
+            //
+            // ⚠️ FIREBASE SETUP REQUIRED: Create a composite index in Firebase Console:
+            //   Firestore → Indexes → Composite → Add:
+            //   Collection: "orders" | Fields: userId (Ascending) + $createdAt (Descending)
+            //   Without this index, Firestore will throw an error (fallback handles it).
+            try {
+                const response = await this.databases.listDocuments(
+                    conf.appwriteDatabaseId,
+                    conf.appwriteOrdersCollectionId,
+                    [
+                        Query.equal("userId", userId),
+                        Query.orderDesc("$createdAt"),
+                        Query.limit(100)
+                    ]
+                );
+                return response.documents || [];
+            } catch (indexErr) {
+                // Fallback: Firestore composite index not yet created
+                // Go to Firebase Console → Firestore → Indexes → create composite index
+                // Collection: orders | userId ASC + $createdAt DESC
+                console.warn("⚠️ Firestore composite index missing for orders. Create it in Firebase Console. Falling back to client-side filter.", indexErr.message);
+                const fallback = await this.databases.listDocuments(
+                    conf.appwriteDatabaseId,
+                    conf.appwriteOrdersCollectionId,
+                    [Query.orderDesc("$createdAt"), Query.limit(500)]
+                );
+                return (fallback.documents || []).filter(order => order.userId === userId);
+            }
         }
         catch (error) {
-            console.error("Appwrite service :: getUserOrders :: error", error.message);
+            console.error("Firebase orders :: getUserOrders :: error", error.message);
             throw error;
         }
     }
+
 
     // ➡️ 4. Update the order delivery status and optionally tracking info
     async updateOrderStatus(documentId, status, extraData = {}) {

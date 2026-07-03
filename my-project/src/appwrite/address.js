@@ -9,27 +9,23 @@ export class AddressService {
         this.databases = new Databases(client);
     }
 
-    // Helper: Local fallback address getter
-    getLocalAddress(userId) {
-        return JSON.parse(localStorage.getItem(`userAddress_${userId}`)) || null;
-    }
+    // ✅ SECURITY FIX: Removed localStorage helpers for address data.
+    // Customer PII (name, address, phone, pincode) must NEVER be cached in localStorage
+    // as it is accessible to any JS on the page including third-party scripts.
+    // Addresses are always fetched from Appwrite DB on demand.
 
-    // Helper: Local fallback address setter
-    saveLocalAddress(userId, data) {
-        localStorage.setItem(`userAddress_${userId}`, JSON.stringify(data));
-        return data;
-    }
+    /** @deprecated — localStorage address caching removed for security */
+    getLocalAddress(_userId) { return null; }
 
-    // Helper: Local fallback address list getter
-    getLocalAddresses(userId) {
-        return JSON.parse(localStorage.getItem(`userAddresses_${userId}`)) || [];
-    }
+    /** @deprecated — localStorage address caching removed for security */
+    saveLocalAddress(_userId, data) { return data; }
 
-    // Helper: Local fallback address list setter
-    saveLocalAddresses(userId, list) {
-        localStorage.setItem(`userAddresses_${userId}`, JSON.stringify(list));
-        return list;
-    }
+    /** @deprecated — localStorage address caching removed for security */
+    getLocalAddresses(_userId) { return []; }
+
+    /** @deprecated — localStorage address caching removed for security */
+    saveLocalAddresses(_userId, list) { return list; }
+
 
     // ➡️ 1. Get default saved address for a user
     async getUserAddress(userId) {

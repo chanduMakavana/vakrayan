@@ -1,3 +1,4 @@
+import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -5,6 +6,14 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [tailwindcss(), react()],
+
+  resolve: {
+    alias: {
+      // 'appwrite': path.resolve(__dirname, 'src/appwrite-mock/index.js'), // MOCK ADAPTER
+      // 'appwrite': path.resolve(__dirname, 'src/appwrite/localAdapter.js'), // LOCAL BACKEND ADAPTER
+      'appwrite': path.resolve(__dirname, 'src/firebase/adapter.js'), // FIREBASE ADAPTER
+    }
+  },
 
   build: {
     // Warn when a chunk exceeds 500 KB (default is 500 but making it explicit)
@@ -30,9 +39,7 @@ export default defineConfig({
           if (id.includes('node_modules/framer-motion')) {
             return 'vendor-motion';
           }
-          if (id.includes('node_modules/appwrite')) {
-            return 'vendor-appwrite';
-          }
+          // Note: 'appwrite' npm package is aliased to Firebase adapter — no vendor chunk needed
         },
       },
     },

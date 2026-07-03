@@ -1627,58 +1627,6 @@ function ProductDetail() {
             })()}
 
 
-            {/* ── MOBILE STICKY ADD-TO-CART BAR ─────────────────────────────
-                Visible only on mobile (< lg). Desktop uses the inline CTA above.
-                This is the highest-impact conversion fix — keeps the primary action
-                reachable as users scroll through description, reviews, and policy. */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden"
-              style={{
-                background: 'rgba(255,255,255,0.97)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                borderTop: '1px solid var(--color-border-hard)',
-                padding: '12px 16px',
-                paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
-                boxShadow: '0 -8px 32px rgba(0,0,0,0.08)'
-              }}
-            >
-              {/* Size reminder + price */}
-              <div className="flex items-center justify-between mb-2">
-                <span style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {selectedSize ? `Size: ${selectedSize}` : 'Select a size above'}
-                </span>
-                <span style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 20, fontWeight: 900, color: 'var(--color-text)', letterSpacing: '0.01em' }}>
-                  ₹{Number(product.price || 0).toLocaleString('en-IN')}
-                </span>
-              </div>
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <AddToCartButton
-                    product={product}
-                    selectedSize={selectedSize}
-                    selectedColor={selectedColor}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleBuyNow}
-                  disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
-                  className="w-14 flex items-center justify-center border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{
-                    background: 'var(--color-text)',
-                    borderColor: 'var(--color-text)',
-                    borderRadius: 0
-                  }}
-                  title="Buy Now"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="m5 12 7-7 7 7M12 5v14"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
             {/* Extra bottom padding on mobile so content isn't hidden behind sticky bar */}
             <div className="h-24 lg:hidden" aria-hidden="true" />
 

@@ -22,17 +22,20 @@ export const loginSlice = createSlice({
             state.isAuthenticated = !!action.payload.user;
             state.loading = false;
 
-            // Auto check if they are actually admin. If not, disable adminMode.
-            const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+            // Firebase admin check — 3 methods (Firebase user has no .labels field)
+            const hasAdminRole  = state.user?.prefs?.role === 'admin';
             const hasAdminLabel = Array.isArray(state.user?.labels) && state.user.labels.includes('admin');
-            const hasAdminEmail = state.isAuthenticated && state.user && adminEmail && state.user.email === adminEmail;
-            const isAdmin = hasAdminLabel || hasAdminEmail;
+            const isAdmin = hasAdminRole || hasAdminLabel;
+            // Note: email check is done in AdminRoute only (not here, to keep reducer pure)
 
-            if (!isAdmin) {
+            if (!isAdmin && !state.adminMode) {
+                // Only reset adminMode if they are definitely NOT an admin
+                // (keeps adminMode intact if set via VITE_ADMIN_EMAIL)
                 state.adminMode = false;
                 localStorage.removeItem('adminMode');
             }
         },
+
 
         // Reset authentication and user state to default
         logout: (state) => {

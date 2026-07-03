@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText } from 'react-icons/fi';
+import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy } from 'react-icons/fi';
 import ordersService from '../../appwrite/orders';
 import reviewsService from '../../appwrite/reviews';
 import { useToast } from '../../context/ToastContext';
@@ -184,10 +184,14 @@ function OrderDetail() {
         setLoading(true);
         const orderData = await ordersService.getOrderById(id);
         if (orderData) {
-          // Security lock: Ensure only the order owner or the store admin can view the order details
+          // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
           const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+          const hasAdminRole = user?.prefs?.role === 'admin';
+          const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
+          const hasAdminEmail = adminEmail && user?.email === adminEmail;
           const isOwner = orderData.userId && user?.$id && orderData.userId === user.$id;
-          const isAdmin = user?.email && adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase();
+          const isAdmin = hasAdminRole || hasAdminLabel || hasAdminEmail;
+
 
           if (!isOwner && !isAdmin) {
             showToast("Security Clearance Required. Access Aborted.", "error");
@@ -521,9 +525,10 @@ function OrderDetail() {
     <>
 
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
-        <div className="absolute inset-0 bg-[var(--color-surface)]/96 backdrop-blur-xs z-10" />
+        <div className="absolute inset-0 bg-[var(--color-bg)]/90 backdrop-blur-sm z-10" />
 
-        <div className="max-w-4xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-8">
+
+        <div className="max-w-6xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-8">
           
           {/* Header Action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]/40">
@@ -537,20 +542,35 @@ function OrderDetail() {
           </div>
 
           {/* Core Invoice Summary Card */}
-          <div className="bg-[var(--color-surface)] p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-6">
+          <div className="bg-[var(--color-surface)] p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-8">
             
             {/* ID & Date */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--color-border)]">
-              <div className="space-y-1">
-                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase">ORDER ID</span>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[var(--color-border)]">
+              <div className="space-y-2">
+                <span className="text-[9px] font-mono font-bold tracking-widest text-[var(--color-muted)] block uppercase">
+                  ORDER IDENTIFICATION
+                </span>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-xl md:text-2xl font-black tracking-wide text-neutral-950 uppercase">
-                    {metadata.order_number}
-                  </h1>
+                  <div className="flex items-center gap-2 bg-[var(--color-subtle)] border border-[var(--color-border)] px-3.5 py-1.5 rounded-lg">
+                    <h1 className="text-xl md:text-2xl font-black tracking-wider text-neutral-950 font-display uppercase select-all">
+                      {metadata.order_number}
+                    </h1>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(metadata.order_number);
+                        showToast("Order Number copied to clipboard!", "success");
+                      }}
+                      className="text-[var(--color-muted)] hover:text-neutral-950 transition-colors p-1 rounded hover:bg-neutral-100 cursor-pointer"
+                      title="Copy Order ID"
+                    >
+                      <FiCopy className="text-xs" />
+                    </button>
+                  </div>
+
                   {(order.status === 'PENDING' || order.status === 'PROCESSING') && (
                     <button
                       onClick={handleCancelOrder}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[10px] tracking-wider uppercase px-4 py-2.5 rounded-lg transition-colors cursor-pointer"
                     >
                       Cancel Order
                     </button>
@@ -558,22 +578,41 @@ function OrderDetail() {
                   {order.status === 'DELIVERED' && (
                     <button
                       onClick={handlePrintInvoice}
-                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-250 font-bold text-[10px] tracking-wider uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-250 font-bold text-[10px] tracking-wider uppercase px-4 py-2.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                     >
                       <FiFileText className="text-xs" /> Download Invoice
                     </button>
                   )}
                 </div>
-                <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">Database ID: {order.$id || order.id}</span>
+                <div className="flex items-center gap-2 text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                  <span>DB Reference ID: {order.$id || order.id}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(order.$id || order.id);
+                      showToast("Database ID copied to clipboard!", "success");
+                    }}
+                    className="hover:text-neutral-950 transition-colors p-0.5 rounded cursor-pointer"
+                    title="Copy Database ID"
+                  >
+                    <FiCopy className="text-[10px]" />
+                  </button>
+                </div>
               </div>
-              <div className="text-left md:text-right">
-                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase">TRANSACTION TIMESTAMP</span>
-                <span className="text-xs font-mono font-bold text-[var(--color-muted)] block mt-0.5 uppercase">
+              <div className="text-left md:text-right space-y-1">
+                <span className="text-[9px] font-mono font-bold tracking-widest text-[var(--color-muted)] block uppercase">
+                  TRANSACTION TIMESTAMP
+                </span>
+                <span className="text-[11px] font-mono font-black text-neutral-950 block uppercase bg-[var(--color-subtle)] md:bg-transparent border md:border-0 border-[var(--color-border)] px-3 py-1.5 md:p-0 rounded-lg">
                   {orderDate}
                 </span>
               </div>
             </div>
 
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+              {/* Left Column */}
+              <div className="lg:col-span-7 space-y-8">
+            
             {/* Industrial Fulfillment Status Track / Cancellation Alert */}
             {order.status === 'CANCELLED' ? (
               <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 space-y-3">
@@ -622,17 +661,32 @@ function OrderDetail() {
                 )}
               </div>
             ) : (
-              <div className="bg-[var(--color-surface)] p-8 rounded-2xl border border-[var(--color-border)] space-y-6">
-                {order.status === 'RETURNED' && (
-                  <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-150 space-y-1 mb-2 animate-fade-in">
-                    <h3 className="text-[10px] font-black tracking-widest text-emerald-700 uppercase flex items-center gap-1.5">
-                      <span>↩️ RETURN APPROVED & REFUNDED</span>
-                    </h3>
-                    <p className="text-[10px] text-emerald-600 font-bold leading-relaxed uppercase">
-                      Your return has been approved and processed. A refund of ₹{(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.
-                    </p>
-                  </div>
-                )}
+              <div className="bg-[var(--color-subtle)]/40 p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] space-y-6 shadow-xs">
+                {(order.status === 'RETURNED' || order.status === 'EXCHANGED') && (() => {
+                  const req = Array.isArray(metadata.return_requests) ? metadata.return_requests.find(r => r.status === 'APPROVED') : null;
+                  return (
+                    <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 space-y-3 mb-2 animate-fade-in shadow-xs">
+                      <div className="space-y-1">
+                        <h3 className="text-[11px] font-black tracking-widest text-emerald-800 uppercase flex items-center gap-1.5">
+                          <span>{order.status === 'RETURNED' ? '↩️ RETURN APPROVED & REFUNDED' : '🔄 EXCHANGE APPROVED & INITIATED'}</span>
+                        </h3>
+                        <p className="text-[10px] text-emerald-700 font-bold leading-relaxed uppercase">
+                          {order.status === 'RETURNED' 
+                            ? `Your return has been approved and processed. A refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.` 
+                            : 'Your exchange request has been approved. Your replacement item is being prepared for dispatch.'}
+                        </p>
+                      </div>
+                      {req?.adminComment && (
+                        <div className="bg-emerald-100/50 p-3 rounded-lg border border-emerald-200/50">
+                          <span className="text-[8px] font-black tracking-widest text-emerald-600 uppercase block mb-1">💬 MESSAGE FROM ADMIN</span>
+                          <p className="text-[11px] text-emerald-900 font-semibold leading-relaxed">
+                            "{req.adminComment}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Conditional Cancellation Warning Notice */}
                 {['PENDING', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT'].includes(order.status) && (
@@ -656,13 +710,14 @@ function OrderDetail() {
                   </div>
                 )}
                 
-                <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
-                  🚚 SHIPMENT STATUS
+                <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] inline-block"></span>
+                  Fulfillment Timeline
                 </h3>
                 
                 <div className="relative pl-6 space-y-8 select-none">
-                  {/* Vertical Line */}
-                  <div className="absolute left-[35px] top-4 bottom-4 w-1 bg-neutral-200 rounded-full overflow-hidden">
+                  {/* Vertical Line — mathematically centered at 40px (pl-6 = 24px + w-8/2 = 16px) */}
+                  <div className="absolute left-[38px] top-4 bottom-4 w-1 bg-neutral-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-[var(--color-accent)] transition-all duration-1000 ease-out" 
                       style={{ height: `${(currentStepIdx / (statusSteps.length - 1)) * 100}%` }}
@@ -678,9 +733,9 @@ function OrderDetail() {
                         {/* Checkpoint Dot */}
                         <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
                           isCurrent 
-                          ? `bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-lg scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
+                          ? `bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-md scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
                           : isActive 
-                          ? 'bg-neutral-900 border-neutral-900 text-white' 
+                          ? 'bg-[var(--color-accent-dark)] border-[var(--color-accent-dark)] text-white' 
                           : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-muted)]'
                         }`}>
                           {step.icon === 'check' ? (
@@ -697,7 +752,7 @@ function OrderDetail() {
                           <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-neutral-950 font-black' : 'text-[var(--color-muted)]'}`}>
                             {step.label}
                           </h4>
-                          <p className="text-[10px] text-[var(--color-muted)] max-w-lg leading-relaxed">
+                          <p className="text-[10px] text-[var(--color-muted)] max-w-lg leading-relaxed normal-case font-medium">
                             {step.desc}
                           </p>
                         </div>
@@ -710,23 +765,29 @@ function OrderDetail() {
 
             {/* Tracking details */}
             {(order.tracking_number || metadata.tracking_number) && (
-              <div className="bg-indigo-50 border border-indigo-100/60 p-6 rounded-2xl space-y-3">
+              <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-6 rounded-2xl space-y-4 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <FiTruck className="text-indigo-600 text-lg" />
-                  <h3 className="text-xs font-black tracking-widest text-indigo-900 uppercase">
+                  <FiTruck className="text-[var(--color-accent)] text-lg" />
+                  <h3 className="text-xs font-black tracking-widest text-[var(--color-accent-dark)] uppercase">
                     SHIPMENT DISPATCH METRICS
                   </h3>
                 </div>
-                <div className="text-xs font-mono uppercase text-indigo-800 space-y-1">
-                  <div>Tracking Number: <strong className="font-black select-all text-[var(--color-text)]">{order.tracking_number || metadata.tracking_number}</strong></div>
-                  <div>Carrier Channel: <span className="font-black">Delhivery/DTDC Express</span></div>
+                <div className="text-xs font-mono uppercase text-[var(--color-text)] space-y-2">
+                  <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
+                    <span className="text-[var(--color-muted)]">Tracking Number:</span>
+                    <strong className="font-black select-all text-neutral-950">{order.tracking_number || metadata.tracking_number}</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
+                    <span className="text-[var(--color-muted)]">Carrier Channel:</span>
+                    <span className="font-bold text-neutral-950">Delhivery/DTDC Express</span>
+                  </div>
                   {(order.tracking_url || metadata.tracking_url) && (
                     <div className="pt-2">
                       <a 
                         href={order.tracking_url || metadata.tracking_url} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="inline-block bg-indigo-600 hover:bg-indigo-750 text-white font-sans font-black text-[10px] tracking-widest uppercase px-4 py-2 rounded-lg transition-all"
+                        className="inline-block w-full text-center bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-black text-[10px] tracking-widest uppercase py-3 rounded-lg transition-all cursor-pointer"
                       >
                         Track Package Live &rarr;
                       </a>
@@ -736,34 +797,42 @@ function OrderDetail() {
               </div>
             )}
 
+
             {/* Itemized Garments Specification List */}
             <div className="space-y-4">
               <h3 className="text-[9px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
                 Claimed Garments specification
               </h3>
 
-              <div className="divide-y divide-neutral-100 border border-[var(--color-border)] rounded-2xl overflow-hidden bg-[var(--color-surface)]/20 p-4 space-y-4">
+              <div className="divide-y divide-neutral-100 border border-[var(--color-border)] rounded-2xl overflow-hidden bg-[var(--color-subtle)]/40 p-4 space-y-4">
                 {parsedItems.map((item, idx) => {
                   const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
                   const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
 
                   return (
                     <div key={idx} className="flex justify-between items-center py-4 text-xs first:pt-0 last:pb-0">
-                      <div className="flex gap-4 items-center">
+                      <div className="flex gap-4 items-center min-w-0">
                         {img ? (
-                          <img 
-                            src={img} 
-                            alt={item.name} 
-                            className="w-12 h-16 object-cover border border-[var(--color-border)] shrink-0 bg-[var(--color-surface)]"
-                          />
+                          <Link 
+                            to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}
+                            className="shrink-0 hover:opacity-85 transition-opacity"
+                          >
+                            <img 
+                              src={img} 
+                              alt={item.name} 
+                              className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-xs bg-[var(--color-surface)]"
+                            />
+                          </Link>
                         ) : (
-                          <div className="w-12 h-16 bg-neutral-100 border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)]">
+                          <div className="w-12 h-16 bg-neutral-100 border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)] rounded-xs">
                             NO IMG
                           </div>
                         )}
-                        <div className="space-y-1">
-                          <h4 className="font-black text-neutral-950 uppercase tracking-wide">
-                            {item.name}
+                        <div className="space-y-1 min-w-0">
+                          <h4 className="font-black text-neutral-950 uppercase tracking-wide truncate max-w-[200px] sm:max-w-xs hover:text-[var(--color-accent)] transition-colors">
+                            <Link to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}>
+                              {item.name}
+                            </Link>
                           </h4>
                           <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
                             Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
@@ -783,7 +852,7 @@ function OrderDetail() {
 
                             return (
                               <div className="space-y-2 pt-1.5">
-                                <div className="flex flex-wrap gap-2 items-center">
+                                <div className="flex flex-wrap gap-2.5 items-center">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -799,7 +868,7 @@ function OrderDetail() {
                                         showToast("Failed to locate product in current catalog.", "error");
                                       }
                                     }}
-                                    className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer border border-neutral-950"
+                                    className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-bold text-[9px] tracking-widest px-4 py-2.5 rounded-[4px] uppercase transition-all duration-200 cursor-pointer border border-neutral-950 hover:border-[var(--color-accent)] shadow-xs"
                                   >
                                     Write Review
                                   </button>
@@ -818,9 +887,9 @@ function OrderDetail() {
                                             setRequestBackImage("");
                                             setIsRequestModalOpen(true);
                                           }}
-                                          className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-250 font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer"
+                                          className="inline-flex items-center gap-1.5 bg-transparent hover:bg-rose-50 text-neutral-950 border border-neutral-900 hover:border-rose-600 hover:text-rose-600 font-sans font-bold text-[9px] tracking-widest px-4 py-2.5 rounded-[4px] uppercase transition-all duration-200 cursor-pointer"
                                         >
-                                          ↩️ Return
+                                          Request Return
                                         </button>
                                       )}
                                       {(itemPolicy === "7 Day Return" || itemPolicy === "default" || itemPolicy === "Exchange Only") && (
@@ -835,13 +904,15 @@ function OrderDetail() {
                                             setRequestBackImage("");
                                             setIsRequestModalOpen(true);
                                           }}
-                                          className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-250 font-mono font-bold text-[9px] tracking-wider px-2.5 py-1 rounded-none uppercase transition-all cursor-pointer"
+                                          className="inline-flex items-center gap-1.5 bg-transparent hover:bg-amber-50 text-neutral-950 border border-neutral-900 hover:border-amber-600 hover:text-amber-600 font-sans font-bold text-[9px] tracking-widest px-4 py-2.5 rounded-[4px] uppercase transition-all duration-200 cursor-pointer"
                                         >
-                                          🔄 Exchange
+                                          Request Exchange
                                         </button>
                                       )}
                                     </>
                                   )}
+
+
                                 </div>
 
                                 {existingRequest && (
@@ -892,9 +963,14 @@ function OrderDetail() {
                 })}
               </div>
             </div>
+            
+            </div> {/* End Left Column */}
+
+            {/* Right Column */}
+            <div className="lg:col-span-5 space-y-8">
 
             {/* Calculations & Total Invoice */}
-            <div className="space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] pt-4 border-t border-[var(--color-border)] select-none">
+            <div className="bg-[var(--color-subtle)]/70 p-6 rounded-2xl border border-[var(--color-border)] space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] select-none shadow-xs">
               <div className="flex justify-between">
                 <span>Gross catalog Value ({totalItemsCount} items)</span>
                 <span className="text-neutral-950 font-bold">
@@ -917,7 +993,7 @@ function OrderDetail() {
                     ₹{baseShippingCharge}
                   </span>
                 ) : (
-                  <span className="text-emerald-600 font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded animate-scale-up">
+                  <span className="text-[var(--color-accent-dark)] font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50 animate-scale-up">
                     FREE SHIPPING
                   </span>
                 )}
@@ -947,7 +1023,7 @@ function OrderDetail() {
               {order.paymentProvider && order.paymentProvider !== 'NONE' && (
                 <div className="flex justify-between">
                   <span>PAYMENT PROVIDER</span>
-                  <span className="text-indigo-600 font-black tracking-wide bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">
+                  <span className="text-[var(--color-accent-dark)] font-black tracking-wide bg-emerald-50 border border-emerald-100/50 px-1.5 py-0.5 rounded text-[10px]">
                     {order.paymentProvider}
                   </span>
                 </div>
@@ -985,7 +1061,7 @@ function OrderDetail() {
             </div>
 
             {/* Shipping Logistics Coordinates */}
-            <div className="bg-[var(--color-surface)] p-6 rounded-2xl border border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide">
+            <div className="bg-[var(--color-subtle)]/70 p-6 rounded-2xl border border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide">
               <div>
                 <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CUSTOMER DETAILS</span>
                 <span className="text-neutral-950 font-bold block mt-1">{order.customerName}</span>
@@ -1001,7 +1077,7 @@ function OrderDetail() {
             </div>
 
             {/* Security Shield */}
-            <div className="flex items-center gap-3 text-[8px] font-mono text-[var(--color-muted)] border border-[var(--color-border)] bg-[var(--color-surface)]/50 p-4 rounded-xl leading-normal uppercase">
+            <div className="flex items-center gap-3 text-[8px] font-mono text-[var(--color-muted)] border border-[var(--color-border)] bg-[var(--color-subtle)]/50 p-4 rounded-xl leading-normal uppercase">
               <FiShield className="text-base text-[var(--color-text)] shrink-0" />
               <div>
                 <span className="font-bold text-[var(--color-text)] block mb-0.5">🔒 SECURE TRANSACTION DETAILS</span>
@@ -1009,8 +1085,10 @@ function OrderDetail() {
               </div>
             </div>
 
-
-          </div>
+            </div>
+            
+            </div> {/* End Right Column */}
+            </div> {/* End Main Grid */}
         </div>
       </div>
 

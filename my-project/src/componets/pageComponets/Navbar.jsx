@@ -227,9 +227,13 @@ function Navbar() {
   }, []);
 
 
-  // Admin check
+  // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
   const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
-  const isAdmin    = isAuthenticated && user && adminEmail && user.email === adminEmail;
+  const hasAdminRole = user?.prefs?.role === 'admin';
+  const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
+  const hasAdminEmail = adminEmail && user?.email === adminEmail;
+  const isAdmin    = isAuthenticated && user && (hasAdminRole || hasAdminLabel || hasAdminEmail);
+
 
   // Search suggestions (keywords and products matching searchVal)
   const searchSuggestions = useMemo(() => {

@@ -39,6 +39,9 @@ const Checkout     = lazy(() => import('./componets/page/Checkout'))
 const UserProfile  = lazy(() => import('./componets/page/UserProfile'))
 const OrderDetail  = lazy(() => import('./componets/page/OrderDetail'))
 
+// ✅ PERFORMANCE FIX: Module-level constant — not recreated on every render
+const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin', '/cart']
+
 // Elegant Vertical Lift page transition variants
 const pageVariants = {
   initial: { opacity: 0, y: 16 },
@@ -146,7 +149,10 @@ function AppContent() {
   // Images loading (especially slow Unsplash URLs on mobile) was blocking the entire
   // app render for 5-10 seconds. Images now load progressively in the background.
   // Auth + fonts resolve quickly, and products are fetched in parallel.
-  const loading = authLoading || !productsFetched || !fontsLoaded
+  const loading = authLoading || !fontsLoaded
+  // ✅ PERFORMANCE FIX: Removed !productsFetched from loading gate.
+  // Products now load in the background — Shop/Home show skeleton loaders instead.
+  // Previously, a slow Appwrite products fetch blocked the ENTIRE app for 3-10 seconds.
 
   useEffect(() => {
     // ── AUTH: Restore session ─────────────────────────────────────────────────
@@ -271,10 +277,8 @@ function AppContent() {
     )
   }
 
-  // ✅ FIX: Simplified navbar visibility logic.
-  // Shows navbar everywhere EXCEPT on auth/admin/cart routes.
-  // Previously had two separate lists that had to be kept in sync — now just one.
-  const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin', '/cart']
+  // ✅ PERFORMANCE FIX: Moved HIDE_NAVBAR_ON outside the component (module level)
+  // to prevent a new array being created on every single render of AppContent.
   const shouldShowNavbar = !HIDE_NAVBAR_ON.some(route => location.pathname.startsWith(route))
 
   return (

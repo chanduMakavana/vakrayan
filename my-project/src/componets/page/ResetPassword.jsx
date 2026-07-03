@@ -17,8 +17,8 @@ function ResetPassword() {
   const [searchParams] = useSearchParams()
   const { showToast } = useToast()
 
-  const userId = searchParams.get('userId')
-  const secret = searchParams.get('secret')
+  const userId = searchParams.get('userId') || 'firebase-user'
+  const secret = searchParams.get('oobCode') || searchParams.get('secret')
 
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState("")
@@ -43,7 +43,15 @@ function ResetPassword() {
       navigate('/login', { replace: true })
     } catch (error) {
       console.error("Reset Password Error:", error)
-      setServerError(error?.message || "Failed to update password. Link may be expired.")
+      let errorMsg = error?.message || "Failed to update password. Link may be expired.";
+      if (errorMsg.includes('auth/invalid-action-code') || errorMsg.includes('auth/expired-action-code')) {
+        errorMsg = "The reset link is invalid or has expired. Please request a new one.";
+      } else if (errorMsg.includes('auth/weak-password')) {
+        errorMsg = "Password is too weak. Please use a stronger password.";
+      } else if (errorMsg.includes('Firebase: Error')) {
+        errorMsg = "Failed to update password. Please try again.";
+      }
+      setServerError(errorMsg)
     } finally {
       setLoading(false)
     }

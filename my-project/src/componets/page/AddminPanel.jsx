@@ -598,9 +598,14 @@ function AdminPanel() {
   };
 
   // Admin role validation — single env-var lookup, no hardcoded emails
+  // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
   const { user, isAuthenticated } = useSelector((state) => state.auth);
   const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
-  const isAdmin = isAuthenticated && user && adminEmail && user.email === adminEmail;
+  const hasAdminRole = user?.prefs?.role === 'admin';
+  const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
+  const hasAdminEmail = adminEmail && user?.email === adminEmail;
+  const isAdmin = isAuthenticated && user && (hasAdminRole || hasAdminLabel || hasAdminEmail);
+
 
   // Load active campaign announcements & coupons on mount
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -2937,8 +2942,21 @@ function AdminPanel() {
                         <div key={uniqueOrderId || idx} className="bg-[var(--color-subtle)] p-6 rounded-2xl border border-[var(--color-border)] flex flex-col gap-4">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[var(--color-border)]/60 pb-3 gap-2">
                             <div className="space-y-1">
-                              <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">ORDER: {orderNumber}</span>
-                              <span className="text-xs font-black text-[var(--color-text)] uppercase tracking-wide">{order.customerName}</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[9px] font-mono font-black text-[var(--color-accent)] bg-[var(--color-accent-light)] px-2 py-0.5 rounded uppercase tracking-wider">#{idx + 1}</span>
+                                <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase">ORDER ID: {orderNumber}</span>
+                              </div>
+                              <span className="text-sm font-black text-[var(--color-text)] uppercase tracking-wide">{order.customerName}</span>
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                                  📅 {new Date(order.$createdAt || order.createdAt || '').toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {order.paymentMethod && (
+                                  <span className="text-[9px] font-mono font-black text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] px-2 py-0.5 rounded uppercase tracking-wider">
+                                    💳 {order.paymentMethod}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             
                             <div className="flex items-center gap-2">
@@ -3034,86 +3052,109 @@ function AdminPanel() {
                             <div className="bg-amber-50 border border-amber-200/80 p-4 rounded-xl space-y-3">
                               <span className="text-[8px] font-bold text-amber-700 block tracking-widest uppercase">⚠️ Active Return/Exchange Requests</span>
                               <div className="space-y-2">
-                                {parsedAddr.metadata.return_requests.map((request, reqIdx) => (
-                                  <div key={reqIdx} className="text-xs border-b border-amber-200/40 pb-2 last:border-b-0 last:pb-0 space-y-1 font-medium uppercase tracking-wide">
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-black text-[var(--color-text)]">
-                                        {request.type === 'RETURN' ? '↩️ Return' : '🔄 Exchange'} for {request.productName}
-                                      </span>
-                                      <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase ${
-                                        request.status === 'PENDING'
-                                        ? 'bg-amber-100 text-amber-700 border border-amber-250 animate-pulse'
-                                        : request.status === 'APPROVED'
-                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-250'
-                                        : 'bg-rose-50 text-rose-600 border-rose-250'
-                                      }`}>
-                                        {request.status}
-                                      </span>
-                                    </div>
-                                    <p className="text-[var(--color-muted)] text-[10px] font-mono">
-                                      Original Size: {request.originalSize} 
-                                      {request.type === 'EXCHANGE' && ` · Desired Size: ${request.exchangeTargetSize}`}
-                                    </p>
-                                    <p className="text-[var(--color-text)] text-[10px] normal-case italic font-medium">
-                                      Reason: "{request.reason}"
-                                    </p>
-                                    
-                                    {/* Uploaded Condition Verification Photos */}
-                                    {Array.isArray(request.images) && request.images.length > 0 && (
-                                      <div className="pt-1.5 pb-1">
-                                        <span className="text-[9px] text-[var(--color-muted)] font-mono block mb-1">📷 Verification Images:</span>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {request.images.map((imgUrl, imgIdx) => (
-                                            <a href={imgUrl} target="_blank" rel="noopener noreferrer" key={imgIdx} className="block hover:opacity-90 transition-opacity">
-                                              <img 
-                                                src={imgUrl} 
-                                                alt={`Verification proof ${imgIdx + 1}`} 
-                                                className="w-16 h-20 object-cover border border-amber-300 rounded hover:scale-105 transition-all cursor-pointer" 
-                                              />
-                                            </a>
-                                          ))}
+                                {parsedAddr.metadata.return_requests.map((request, reqIdx) => {
+                                  const matchingProd = products.find(p => p.$id === request.productId || p.id === request.productId || p.name.trim().toUpperCase() === request.productName?.trim().toUpperCase());
+                                  const imgUrl = matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image || 'https://placehold.co/100x100?text=No+Asset';
+                                  return (
+                                    <div key={reqIdx} className="text-xs border-b border-amber-200/40 pb-2 last:border-b-0 last:pb-0 space-y-1.5 font-medium uppercase tracking-wide">
+                                      <div className="flex justify-between items-center gap-3">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <a 
+                                            href={`/product/${matchingProd?.$id || matchingProd?.id || request.productId}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="hover:opacity-80 transition-opacity shrink-0"
+                                          >
+                                            <img 
+                                              src={imgUrl} 
+                                              alt={request.productName} 
+                                              className="w-8 h-10 object-cover object-center rounded border border-amber-300 bg-neutral-900" 
+                                            />
+                                          </a>
+                                          <a 
+                                            href={`/product/${matchingProd?.$id || matchingProd?.id || request.productId}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="font-black text-[var(--color-text)] truncate max-w-[150px] sm:max-w-xs hover:text-[var(--color-accent)] transition-colors"
+                                          >
+                                            {request.type === 'RETURN' ? '↩️ Return' : '🔄 Exchange'} for {request.productName}
+                                          </a>
                                         </div>
+                                        <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${
+                                          request.status === 'PENDING'
+                                          ? 'bg-amber-100 text-amber-700 border border-amber-250 animate-pulse'
+                                          : request.status === 'APPROVED'
+                                          ? 'bg-emerald-50 text-emerald-600 border-emerald-250'
+                                          : 'bg-rose-50 text-rose-600 border-rose-250'
+                                        }`}>
+                                          {request.status}
+                                        </span>
                                       </div>
-                                    )}
-                                    
-                                    {request.status === 'PENDING' && (
-                                      <div className="flex gap-2 pt-1.5">
-                                        <button
-                                          disabled={actionLoading}
-                                          onClick={() => {
-                                            setApproveTargetOrder(order);
-                                            setApproveTargetRequest(request);
-                                            setAdminApproveInstructions('Reverse Pickup Scheduled (Courier agent will collect the package in 24-48 hours. Please keep tags intact.)');
-                                            setAdminApproveCustomText('');
-                                            setIsApproveModalOpen(true);
-                                          }}
-                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-[9px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors"
-                                        >
-                                          Approve
-                                        </button>
-                                        <button
-                                          disabled={actionLoading}
-                                          onClick={() => {
-                                            setRejectTargetOrder(order);
-                                            setRejectTargetItemIndex(request.itemIndex);
-                                            setAdminRejectReason('Product has visible wear / tags removed');
-                                            setAdminRejectCustomText('');
-                                            setIsRejectModalOpen(true);
-                                          }}
-                                          className="bg-rose-600 hover:bg-rose-700 text-white font-mono font-bold text-[9px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors"
-                                        >
-                                          Reject
-                                        </button>
-                                      </div>
-                                    )}
-
-                                    {request.status === 'REJECTED' && request.adminComment && (
-                                      <p className="text-[9px] font-sans text-rose-600 font-semibold normal-case">
-                                        Rejection Note: {request.adminComment}
+                                      <p className="text-[var(--color-muted)] text-[10px] font-mono pl-[42px]">
+                                        Original Size: {request.originalSize} 
+                                        {request.type === 'EXCHANGE' && ` · Desired Size: ${request.exchangeTargetSize}`}
                                       </p>
-                                    )}
-                                  </div>
-                                ))}
+                                      <p className="text-[var(--color-text)] text-[10px] normal-case italic font-medium pl-[42px]">
+                                        Reason: "{request.reason}"
+                                      </p>
+                                      
+                                      {/* Uploaded Condition Verification Photos */}
+                                      {Array.isArray(request.images) && request.images.length > 0 && (
+                                        <div className="pt-1.5 pb-1 pl-[42px]">
+                                          <span className="text-[9px] text-[var(--color-muted)] font-mono block mb-1">📷 Verification Images:</span>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {request.images.map((imgUrl, imgIdx) => (
+                                              <a href={imgUrl} target="_blank" rel="noopener noreferrer" key={imgIdx} className="block hover:opacity-90 transition-opacity">
+                                                <img 
+                                                  src={imgUrl} 
+                                                  alt={`Verification proof ${imgIdx + 1}`} 
+                                                  className="w-16 h-20 object-cover border border-amber-300 rounded hover:scale-105 transition-all cursor-pointer" 
+                                                />
+                                              </a>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {request.status === 'PENDING' && (
+                                        <div className="flex gap-2 pt-1.5 pl-[42px]">
+                                          <button
+                                            disabled={actionLoading}
+                                            onClick={() => {
+                                              setApproveTargetOrder(order);
+                                              setApproveTargetRequest(request);
+                                              setAdminApproveInstructions('Reverse Pickup Scheduled (Courier agent will collect the package in 24-48 hours. Please keep tags intact.)');
+                                              setAdminApproveCustomText('');
+                                              setIsApproveModalOpen(true);
+                                            }}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-[9px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                                          >
+                                            Approve
+                                          </button>
+                                          <button
+                                            disabled={actionLoading}
+                                            onClick={() => {
+                                              setRejectTargetOrder(order);
+                                              setRejectTargetItemIndex(request.itemIndex);
+                                              setAdminRejectReason('Product has visible wear / tags removed');
+                                              setAdminRejectCustomText('');
+                                              setIsRejectModalOpen(true);
+                                            }}
+                                            className="bg-rose-600 hover:bg-rose-700 text-white font-mono font-bold text-[9px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                                          >
+                                            Reject
+                                          </button>
+                                        </div>
+                                      )}
+  
+                                      {request.status === 'REJECTED' && request.adminComment && (
+                                        <p className="text-[9px] font-sans text-rose-600 font-semibold normal-case pl-[42px]">
+                                          Rejection Note: {request.adminComment}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -3134,12 +3175,37 @@ function AdminPanel() {
                           <div className="bg-[var(--color-surface)]/80 p-4 rounded-xl border border-[var(--color-border)]/50 space-y-2">
                             <span className="text-[8px] font-bold text-[var(--color-muted)] block tracking-widest">GARMENTS SPECIFICATION LIST</span>
                             <div className="divide-y divide-slate-850">
-                              {parsedItems.map((item, itemIdx) => (
-                                <div key={itemIdx} className="flex justify-between items-center py-2 text-xs">
-                                  <span className="font-black text-[var(--color-text)] uppercase tracking-wide truncate max-w-sm">{item.name}</span>
-                                  <span className="font-mono text-[var(--color-muted)]">Size: {item.size || 'M'} · Qty: {item.quantity} · ₹{item.price}</span>
-                                </div>
-                              ))}
+                              {parsedItems.map((item, itemIdx) => {
+                                const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
+                                const imgUrl = matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image || 'https://placehold.co/100x100?text=No+Asset';
+                                return (
+                                  <div key={itemIdx} className="flex justify-between items-center py-2 text-xs">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <a 
+                                        href={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="hover:opacity-80 transition-opacity shrink-0"
+                                      >
+                                        <img 
+                                          src={imgUrl} 
+                                          alt={item.name} 
+                                          className="w-8 h-10 object-cover object-center rounded border border-[var(--color-border)]/40 bg-neutral-900" 
+                                        />
+                                      </a>
+                                      <a 
+                                        href={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="font-black text-[var(--color-text)] uppercase tracking-wide truncate max-w-[200px] sm:max-w-xs hover:text-[var(--color-accent)] transition-colors"
+                                      >
+                                        {item.name}
+                                      </a>
+                                    </div>
+                                    <span className="font-mono text-[var(--color-muted)] shrink-0 pl-2">Size: {item.size || 'M'} · Qty: {item.quantity} · ₹{item.price}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import productsService from '../../appwrite/products'
@@ -62,24 +62,16 @@ function Shop() {
     }
   }, [products])
 
-  const getLocalStorageFallbackData = () => {
-    return JSON.parse(localStorage.getItem('products')) || []
-  }
-
   const loadProductCatalog = async () => {
     try {
       setLoading(true)
       const response = await productsService.getProducts()
       const structuredData = response?.documents || response || []
       
-      if (structuredData && structuredData.length > 0) {
-        dispatch(setProducts(structuredData))
-      } else {
-        dispatch(setProducts(getLocalStorageFallbackData()))
-      }
+      dispatch(setProducts(structuredData))
     } catch (error) {
-      console.error("Failed to load catalog, using local sandbox fallback:", error)
-      dispatch(setProducts(getLocalStorageFallbackData()))
+      console.error("Failed to load catalog:", error)
+      dispatch(setProducts([]))
     } finally {
       setLoading(false)
     }
@@ -123,135 +115,110 @@ function Shop() {
     setTempSearch(searchParam)
   }, [searchParam])
 
-  // Debounced search query analytics logging — baseFiltered ke baad hona chahiye
+  // ✅ PERFORMANCE FIX: Wrapped entire filter + search + sort pipeline in useMemo.
+  // Previously ran on EVERY render (e.g. when filterDrawerOpen or mobileSortOpen changed).
+  // Now only re-runs when actual filter data or criteria change.
+  const filteredProducts = useMemo(() => {
+    // 1. Base filter: category, tag, price, size, stock
+    let baseFiltered = products.filter(product => {
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
 
-  let baseFiltered = products.filter(product => {
-    // Category Filter
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+      const activeOfferMatch = offers.find(o =>
+        (o.tag && selectedTag && o.tag.toLowerCase() === selectedTag.toLowerCase()) ||
+        (o.$id && selectedTag && o.$id.toLowerCase() === selectedTag.toLowerCase()) ||
+        (o.id && selectedTag && o.id.toLowerCase() === selectedTag.toLowerCase())
+      );
+      let matchesTag = selectedTag === 'all' ||
+        (product.tag && product.tag.toUpperCase() === selectedTag.toUpperCase()) ||
+        (Array.isArray(product.tags) && product.tags.some(t => t && t.toUpperCase() === selectedTag.toUpperCase()));
 
-    // Tag Filter
-    const activeOfferMatch = offers.find(o => 
-      (o.tag && selectedTag && o.tag.toLowerCase() === selectedTag.toLowerCase()) || 
-      (o.$id && selectedTag && o.$id.toLowerCase() === selectedTag.toLowerCase()) || 
-      (o.id && selectedTag && o.id.toLowerCase() === selectedTag.toLowerCase())
-    );
-    let matchesTag = selectedTag === 'all' || 
-      (product.tag && product.tag.toUpperCase() === selectedTag.toUpperCase()) ||
-      (Array.isArray(product.tags) && product.tags.some(t => t && t.toUpperCase() === selectedTag.toUpperCase()));
+      if (activeOfferMatch) {
+        const matchesId = Array.isArray(activeOfferMatch.productIds) && activeOfferMatch.productIds.includes(product.$id || product.id);
+        const matchesCat = activeOfferMatch.category && product.category && product.category.toLowerCase() === activeOfferMatch.category.toLowerCase();
+        const matchesOfferTag = activeOfferMatch.tag && Array.isArray(product.tags) && product.tags.some(t => t && t.toLowerCase() === activeOfferMatch.tag.toLowerCase());
+        matchesTag = matchesId || matchesCat || matchesOfferTag;
+      }
 
-    if (activeOfferMatch) {
-      const matchesId = Array.isArray(activeOfferMatch.productIds) && activeOfferMatch.productIds.includes(product.$id || product.id);
-      const matchesCategory = activeOfferMatch.category && product.category && product.category.toLowerCase() === activeOfferMatch.category.toLowerCase();
-      const matchesOfferTag = activeOfferMatch.tag && Array.isArray(product.tags) && product.tags.some(t => t && t.toLowerCase() === activeOfferMatch.tag.toLowerCase());
-      matchesTag = matchesId || matchesCategory || matchesOfferTag;
-    }
+      const priceNum = Number(product.price || 0)
+      const matchesPrice = priceNum >= minPriceFilter && priceNum <= maxPriceFilter
 
-    // Price Filter
-    const priceNum = Number(product.price || 0)
-    const matchesPrice = priceNum >= minPriceFilter && priceNum <= maxPriceFilter
-
-    // Stock & Size parsing
-    let stocks = {};
-    try {
-      stocks = JSON.parse(product?.sizes_stock || '{}');
-    } catch {
-      stocks = {};
-    }
-
-    // Size Filter
-    const matchesSize = selectedSizes.length === 0 || selectedSizes.some(sz => Number(stocks[sz] || 0) > 0);
-
-    // In-Stock Filter
-    let isAllOutOfStock;
-    if (product.sizes && product.sizes.length > 0) {
-      const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
-      isAllOutOfStock = totalStock === 0;
-    } else {
-      isAllOutOfStock = true;
-    }
-    const matchesStock = !inStockOnly || !isAllOutOfStock;
-
-    return matchesCategory && matchesTag && matchesPrice && matchesSize && matchesStock
-  })
-
-  // 2. Apply Fuzzy Search using Fuse.js (Amazon-style typo-tolerant engine)
-  if (searchQuery.trim()) {
-    const fuse = new Fuse(baseFiltered, {
-      keys: [
-        { name: 'name', weight: 0.6 },
-        { name: 'category', weight: 0.2 },
-        { name: 'tags', weight: 0.3 }, // Search keywords array
-        { name: 'description', weight: 0.1 }
-      ],
-      threshold: 0.4, // Optimal balance for typo tolerance vs specificity
-      distance: 100,
-      ignoreLocation: true
-    })
-    
-    // Fuzzy results
-    let fuseResults = fuse.search(searchQuery.trim()).map(r => r.item)
-    
-    // Alphanumeric fallback normalization (ensures matches for custom spellings like 'tshrt' or 'tshirt')
-    const normalize = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-    const normQuery = normalize(searchQuery)
-    
-    let fallbackResults = baseFiltered.filter(product => {
-      const matchName = normalize(product.name).includes(normQuery)
-      const matchCategory = normalize(product.category).includes(normQuery)
-      const matchTags = Array.isArray(product.tags) && product.tags.some(tag => normalize(tag).includes(normQuery))
-      return matchName || matchCategory || matchTags
-    })
-
-    // 🧠 Smart E-commerce Semantics: If the user searches strictly for "shirt" or "shirts",
-    // we want casual/formal shirts, NOT t-shirts! Exclude t-shirt categories for this specific query.
-    const isSearchJustShirt = normQuery === 'shirt' || normQuery === 'shirts'
-    if (isSearchJustShirt) {
-      fuseResults = fuseResults.filter(p => !p.category?.toLowerCase().includes('tshirt'))
-      fallbackResults = fallbackResults.filter(p => !p.category?.toLowerCase().includes('tshirt'))
-    }
-
-    // Merge uniquely, keeping fuzzy prioritized
-    const merged = [...fuseResults]
-    fallbackResults.forEach(item => {
-      const exists = merged.some(m => (m.$id || m.id) === (item.$id || item.id))
-      if (!exists) merged.push(item)
-    })
-    
-    baseFiltered = merged
-  }
-
-  // 3. Sort Results
-  const filteredProducts = baseFiltered.sort((a, b) => {
-    const isOutOfStock = (product) => {
       let stocks = {};
-      try {
-        stocks = JSON.parse(product?.sizes_stock || '{}');
-      } catch {
-        stocks = {};
-      }
-      if (product && product.sizes && product.sizes.length > 0) {
+      try { stocks = JSON.parse(product?.sizes_stock || '{}'); } catch { stocks = {}; }
+
+      const matchesSize = selectedSizes.length === 0 || selectedSizes.some(sz => Number(stocks[sz] || 0) > 0);
+
+      let isAllOutOfStock;
+      if (product.sizes && product.sizes.length > 0) {
         const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
-        return totalStock === 0;
+        isAllOutOfStock = totalStock === 0;
+      } else {
+        isAllOutOfStock = true;
       }
-      return false;
-    };
+      const matchesStock = !inStockOnly || !isAllOutOfStock;
 
-    const aOut = isOutOfStock(a);
-    const bOut = isOutOfStock(b);
+      return matchesCategory && matchesTag && matchesPrice && matchesSize && matchesStock
+    })
 
-    if (aOut && !bOut) return 1;
-    if (!aOut && bOut) return -1;
+    // 2. Apply Fuzzy Search using Fuse.js
+    if (searchQuery.trim()) {
+      const fuse = new Fuse(baseFiltered, {
+        keys: [
+          { name: 'name', weight: 0.6 },
+          { name: 'category', weight: 0.2 },
+          { name: 'tags', weight: 0.3 },
+          { name: 'description', weight: 0.1 }
+        ],
+        threshold: 0.4,
+        distance: 100,
+        ignoreLocation: true
+      })
 
-    if (sortBy === 'popularity') {
-      return Number(b.total_sold || 0) - Number(a.total_sold || 0)
+      let fuseResults = fuse.search(searchQuery.trim()).map(r => r.item)
+      const normalize = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      const normQuery = normalize(searchQuery)
+
+      let fallbackResults = baseFiltered.filter(product => {
+        const matchName = normalize(product.name).includes(normQuery)
+        const matchCategory = normalize(product.category).includes(normQuery)
+        const matchTags = Array.isArray(product.tags) && product.tags.some(tag => normalize(tag).includes(normQuery))
+        return matchName || matchCategory || matchTags
+      })
+
+      const isSearchJustShirt = normQuery === 'shirt' || normQuery === 'shirts'
+      if (isSearchJustShirt) {
+        fuseResults = fuseResults.filter(p => !p.category?.toLowerCase().includes('tshirt'))
+        fallbackResults = fallbackResults.filter(p => !p.category?.toLowerCase().includes('tshirt'))
+      }
+
+      const merged = [...fuseResults]
+      fallbackResults.forEach(item => {
+        const exists = merged.some(m => (m.$id || m.id) === (item.$id || item.id))
+        if (!exists) merged.push(item)
+      })
+      baseFiltered = merged
     }
-    if (sortBy === 'price-low') {
-      return Number(a.price) - Number(b.price)
-    }
-    if (sortBy === 'price-high') {
-      return Number(b.price) - Number(a.price)
-    }
-  })
+
+    // 3. Sort Results
+    return [...baseFiltered].sort((a, b) => {
+      const isOutOfStock = (product) => {
+        let stocks = {};
+        try { stocks = JSON.parse(product?.sizes_stock || '{}'); } catch { stocks = {}; }
+        if (product && product.sizes && product.sizes.length > 0) {
+          const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+          return totalStock === 0;
+        }
+        return false;
+      };
+      const aOut = isOutOfStock(a);
+      const bOut = isOutOfStock(b);
+      if (aOut && !bOut) return 1;
+      if (!aOut && bOut) return -1;
+      if (sortBy === 'popularity') return Number(b.total_sold || 0) - Number(a.total_sold || 0)
+      if (sortBy === 'price-low') return Number(a.price) - Number(b.price)
+      if (sortBy === 'price-high') return Number(b.price) - Number(a.price)
+      return 0;
+    })
+  }, [products, selectedCategory, selectedTag, offers, minPriceFilter, maxPriceFilter, selectedSizes, inStockOnly, searchQuery, sortBy])
 
   const hasActiveFilters = 
     selectedCategory !== 'all' || 
