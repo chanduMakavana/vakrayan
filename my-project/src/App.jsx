@@ -38,6 +38,7 @@ const Shop         = lazy(() => import('./componets/page/Shop'))
 const Checkout     = lazy(() => import('./componets/page/Checkout'))
 const UserProfile  = lazy(() => import('./componets/page/UserProfile'))
 const OrderDetail  = lazy(() => import('./componets/page/OrderDetail'))
+const ProductReviews = lazy(() => import('./componets/page/ProductReviews'))
 
 // ✅ PERFORMANCE FIX: Module-level constant — not recreated on every render
 const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin', '/cart']
@@ -111,6 +112,7 @@ function AppRoutes() {
           <Route path='/reset-password'      element={<PageWrapper><ResetPassword /></PageWrapper>} />
           <Route path='/'                    element={<PageWrapper><Home /></PageWrapper>} />
           <Route path='/product/:idOrSlug'   element={<PageWrapper><ProductDetail /></PageWrapper>} />
+          <Route path='/product/:idOrSlug/reviews' element={<PageWrapper><ProductReviews /></PageWrapper>} />
           <Route path='/shop'                element={<PageWrapper><Shop /></PageWrapper>} />
           <Route path='/category/:category'  element={<PageWrapper><Shop /></PageWrapper>} />
           <Route path='/cart'                element={<PageWrapper><AddToCartPage /></PageWrapper>} />
@@ -159,6 +161,23 @@ function AppContent() {
     authService.getCurrentUser()
       .then(async (userData) => {
         if (userData) {
+          const rememberMe = localStorage.getItem('remember_me') === 'true';
+          const sessionActive = sessionStorage.getItem('session_active') === 'true';
+
+          if (!rememberMe && !sessionActive) {
+            // Log out immediately from Appwrite since the user didn't request remember me
+            // and this is a new browser/tab session.
+            await authService.logout();
+            localStorage.removeItem('remember_me');
+            sessionStorage.removeItem('session_active');
+            dispatch(logoutAction());
+            const guestItems = loadGuestCartItems();
+            dispatch(setCartItems(guestItems));
+            return;
+          }
+
+          // Mark session active for the duration of this tab/browser session
+          sessionStorage.setItem('session_active', 'true');
           dispatch(loginAction({ user: userData }))
 
           // Check for new user signups (within 10 min) to trigger webhook

@@ -469,6 +469,7 @@ function ProductDetail() {
 
   const [reviews, setReviews] = useState([]);
   const [showAllReviews, setShowAllReviews] = useState(false);
+  const [visibleReviewsCount, setVisibleReviewsCount] = useState(10);
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState('');
   const [newReviewTitle, setNewReviewTitle] = useState('');
@@ -968,10 +969,10 @@ function ProductDetail() {
         title: newReviewTitle,
         images: imageLinks,
         is_verified_purchase: hasDeliveredOrder,
-        fit: newFit,
-        comfort: newComfort,
-        quality: newQuality,
-        breathable: newBreathable
+        fit: '',
+        comfort: 0,
+        quality: 0,
+        breathable: 0
       });
 
       if (newDoc) {
@@ -980,10 +981,6 @@ function ProductDetail() {
         setNewRating(5);
         setNewReviewTitle('');
         setNewReviewImages('');
-        setNewFit('true');
-        setNewComfort(5);
-        setNewQuality(5);
-        setNewBreathable(5);
         showToast("Review submitted successfully.", "success");
       }
     } catch (err) {
@@ -2157,48 +2154,7 @@ function ProductDetail() {
                 </div>
               )}
 
-              {reviews.length > 0 && (
-                <div className="bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl space-y-4 shadow-sm">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-neutral-855">
-                      Fit Statistics
-                    </h3>
-                    <span className="text-[9px] text-emerald-600 font-mono font-bold bg-emerald-50 border border-emerald-250 px-2 py-0.5 rounded-none">
-                      {fitStats.verifiedFitPercent}% Verified Fit
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-[var(--color-muted)]">
-                        <span>Tight ({fitStats.fitTightPercent}%)</span>
-                        <span className="text-neutral-950 font-bold">True To Size ({fitStats.fitTruePercent}%)</span>
-                        <span>Loose ({fitStats.fitLoosePercent}%)</span>
-                      </div>
-                      <div className="relative h-2 bg-neutral-100 rounded-none overflow-hidden flex">
-                        <div className="h-full bg-rose-300 transition-all duration-550" style={{ width: `${fitStats.fitTightPercent}%` }} />
-                        <div className="h-full bg-neutral-950 transition-all duration-550" style={{ width: `${fitStats.fitTruePercent}%` }} />
-                        <div className="h-full bg-amber-300 transition-all duration-550" style={{ width: `${fitStats.fitLoosePercent}%` }} />
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-                      <div className="p-3 bg-[var(--color-surface)] rounded-none border border-neutral-950/10">
-                        <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgComfort}</span>
-                        <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Comfort</span>
-                      </div>
-                      <div className="p-3 bg-[var(--color-surface)] rounded-none border border-neutral-950/10">
-                        <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgQuality}</span>
-                        <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Quality</span>
-                      </div>
-                      <div className="p-3 bg-[var(--color-surface)] rounded-none border border-neutral-950/10">
-                        <span className="text-[18px] font-mono font-bold text-neutral-950">{fitStats.avgBreathable}</span>
-                        <span className="text-[9px] text-neutral-455 font-mono font-bold uppercase tracking-wider block mt-1">Breathable</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl space-y-4 shadow-sm">
                 <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-[var(--color-text)]">
@@ -2239,91 +2195,9 @@ function ProductDetail() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Size Fit Preference</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { key: 'tight', label: 'TIGHT' },
-                          { key: 'true', label: 'TRUE TO SIZE' },
-                          { key: 'loose', label: 'LOOSE' }
-                        ].map((item) => (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => setNewFit(item.key)}
-                            className={`py-2 rounded-none font-bold text-[10px] tracking-wider transition-all cursor-pointer border uppercase font-mono ${
-                              newFit === item.key
-                                ? 'bg-neutral-950 text-white border-neutral-950'
-                                : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Comfort Rating</span>
-                        <div className="flex gap-1.5">
-                          {[1, 2, 3, 4, 5].map((val) => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => setNewComfort(val)}
-                              className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                                newComfort === val
-                                  ? 'bg-neutral-950 text-white border-neutral-950'
-                                  : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                              }`}
-                            >
-                              {val}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
 
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Quality Rating</span>
-                        <div className="flex gap-1.5">
-                          {[1, 2, 3, 4, 5].map((val) => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => setNewQuality(val)}
-                              className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                                newQuality === val
-                                  ? 'bg-neutral-950 text-white border-neutral-950'
-                                  : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                              }`}
-                            >
-                              {val}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
 
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Breathable Rating</span>
-                        <div className="flex gap-1.5">
-                          {[1, 2, 3, 4, 5].map((val) => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => setNewBreathable(val)}
-                              className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                                newBreathable === val
-                                  ? 'bg-neutral-950 text-white border-neutral-950'
-                                  : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                              }`}
-                            >
-                              {val}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
 
                     <div className="flex flex-col gap-1.5">
                       <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Review Title</span>
@@ -2347,30 +2221,65 @@ function ProductDetail() {
                       />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Customer Image URLs (comma-separated, optional)</span>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          value={newReviewImages}
-                          onChange={(e) => setNewReviewImages(e.target.value)}
-                          placeholder="https://example.com/pic1.jpg, https://example.com/pic2.jpg"
-                          className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden transition-colors font-sans"
-                        />
-                        <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center">
-                          {uploadingImage ? 'Uploading...' : 'Upload File'}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleImageUpload(e, setNewReviewImages, newReviewImages)}
-                            disabled={uploadingImage}
-                            className="hidden"
-                          />
-                        </label>
+                    {/* Review Image Upload Section */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                        <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
+                          {newReviewImages.split(',').filter(Boolean).length} / 5 Uploaded
+                        </span>
                       </div>
-                      <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wide">
-                        TIP: PASTE DIRECT HTTPS LINKS OR CHOOSE A LOCAL IMAGE TO UPLOAD TEMPORARILY.
-                      </span>
+
+                      {/* Thumbnail grid */}
+                      <div className="flex flex-wrap gap-2.5 min-h-[40px] p-2 border border-dashed border-[var(--color-border)] bg-[var(--color-subtle)]/40 rounded-lg">
+                        {newReviewImages.split(',').map(url => url.trim()).filter(Boolean).map((url, idx) => (
+                          <div key={idx} className="relative w-16 h-16 bg-white shrink-0">
+                            <img src={url} alt="Review Preview" className="w-full h-full object-cover border border-[var(--color-border)] rounded-md" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const remaining = newReviewImages.split(',')
+                                  .map(u => u.trim())
+                                  .filter(Boolean)
+                                  .filter((_, i) => i !== idx)
+                                  .join(', ');
+                                setNewReviewImages(remaining);
+                              }}
+                              className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold shadow-md cursor-pointer z-10 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {uploadingImage && (
+                          <div className="w-16 h-16 border border-[var(--color-border)] rounded-md flex items-center justify-center bg-white/50 animate-pulse">
+                            <div className="w-4 h-4 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                        {!uploadingImage && newReviewImages.split(',').filter(Boolean).length === 0 && (
+                          <div className="flex-1 flex items-center justify-center py-2 text-[10px] font-mono text-[var(--color-muted)] uppercase select-none">
+                            No photos attached. Click below to add.
+                          </div>
+                        )}
+                      </div>
+
+                      <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
+                        {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const currentCount = newReviewImages.split(',').filter(Boolean).length;
+                            if (currentCount >= 5) {
+                              showToast("You can upload a maximum of 5 photos.", "error");
+                              return;
+                            }
+                            handleImageUpload(e, setNewReviewImages, newReviewImages);
+                          }}
+                          disabled={uploadingImage}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
 
                     <button
@@ -2403,147 +2312,125 @@ function ProductDetail() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {reviews.slice(0, showAllReviews ? reviews.length : 3).map((rev) => {
-                    const uniqueId = rev.$id || rev.id;
-                    const formattedDate = new Date(rev.$createdAt || '1970-01-01').toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    });
+                  <div className="space-y-4">
+                    {reviews.slice(0, 3).map((rev) => {
+                      const uniqueId = rev.$id || rev.id;
+                      const formattedDate = new Date(rev.$createdAt || '1970-01-01').toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      });
 
-                    let titleText = rev.title || "";
-                    let commentText = rev.comment || "";
-                    let imagesList = [];
-                    let verifiedPurchase = !!rev.is_verified_purchase;
-                    let fitPreference = "";
-                    let comfortRating = 0;
-                    let qualityRating = 0;
-                    let breathableRating = 0;
+                      let titleText = rev.title || "";
+                      let commentText = rev.comment || "";
+                      let imagesList = [];
+                      let verifiedPurchase = !!rev.is_verified_purchase;
+                      let fitPreference = "";
+                      let comfortRating = 0;
+                      let qualityRating = 0;
+                      let breathableRating = 0;
 
-                    try {
-                      const parsed = JSON.parse(rev.comment);
-                      if (parsed && typeof parsed === 'object') {
-                        titleText = parsed.title || rev.title || "";
-                        commentText = parsed.comment || "";
-                        imagesList = parsed.images || [];
-                        if (parsed.is_verified_purchase !== undefined) {
-                          verifiedPurchase = !!parsed.is_verified_purchase;
+                      try {
+                        const parsed = JSON.parse(rev.comment);
+                        if (parsed && typeof parsed === 'object') {
+                          titleText = parsed.title || rev.title || "";
+                          commentText = parsed.comment || "";
+                          imagesList = parsed.images || [];
+                          if (parsed.is_verified_purchase !== undefined) {
+                            verifiedPurchase = !!parsed.is_verified_purchase;
+                          }
+                          fitPreference = parsed.fit || "";
+                          comfortRating = Number(parsed.comfort) || 0;
+                          qualityRating = Number(parsed.quality) || 0;
+                          breathableRating = Number(parsed.breathable) || 0;
                         }
-                        fitPreference = parsed.fit || "";
-                        comfortRating = Number(parsed.comfort) || 0;
-                        qualityRating = Number(parsed.quality) || 0;
-                        breathableRating = Number(parsed.breathable) || 0;
-                      }
-                    } catch (e) {
-                      console.warn("Could not parse review comment JSON, using fallback parsing:", e.message);
-                      commentText = rev.comment || "";
-                      if (rev.images) {
-                        try {
-                          imagesList = JSON.parse(rev.images);
-                        } catch (err) {
-                          console.warn("Could not parse review images JSON, using fallback splitting:", err.message);
-                          imagesList = typeof rev.images === 'string' ? rev.images.split(',').filter(Boolean) : (Array.isArray(rev.images) ? rev.images : []);
+                      } catch (e) {
+                        console.warn("Could not parse review comment JSON, using fallback parsing:", e.message);
+                        commentText = rev.comment || "";
+                        if (rev.images) {
+                          try {
+                            imagesList = JSON.parse(rev.images);
+                          } catch (err) {
+                            console.warn("Could not parse review images JSON, using fallback splitting:", err.message);
+                            imagesList = typeof rev.images === 'string' ? rev.images.split(',').filter(Boolean) : (Array.isArray(rev.images) ? rev.images : []);
+                          }
                         }
                       }
-                    }
 
-                    return (
-                      <div key={uniqueId} className="bg-[var(--color-surface)]/60 backdrop-blur-md border border-[var(--color-border)] p-6 rounded-2xl space-y-4 hover:border-[var(--color-accent)] hover:shadow-md transition-all duration-300">
-                        <div className="flex justify-between items-start flex-wrap gap-2">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-mono text-[var(--color-muted)] block font-bold">
-                              {formattedDate}
-                            </span>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-bold text-[var(--color-text)] uppercase font-sans">
-                                {rev.userName}
+                      return (
+                        <div key={uniqueId} className="bg-[var(--color-surface)]/60 backdrop-blur-md border border-[var(--color-border)] p-6 rounded-2xl space-y-4 hover:border-[var(--color-accent)] hover:shadow-md transition-all duration-300">
+                          <div className="flex justify-between items-start flex-wrap gap-2">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-mono text-[var(--color-muted)] block font-bold">
+                                {formattedDate}
                               </span>
-                              {verifiedPurchase && (
-                                <span className="inline-flex items-center text-[8px] text-emerald-700 font-mono font-bold bg-emerald-50 border border-emerald-100 px-1.5 py-0.2 tracking-widest uppercase">
-                                  ✓ Verified Buyer
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-[var(--color-text)] uppercase font-sans">
+                                  {rev.userName}
                                 </span>
-                              )}
+                                {verifiedPurchase && (
+                                  <span className="inline-flex items-center text-[8px] text-emerald-700 font-mono font-bold bg-emerald-50 border border-emerald-100 px-1.5 py-0.2 tracking-widest uppercase">
+                                    ✓ Verified Buyer
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <FaStar
-                                key={star}
-                                className={`text-[10px] ${star <= (isNaN(Number(rev.rating)) ? 5 : Number(rev.rating)) ? 'text-amber-400' : 'text-neutral-200'}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          {titleText && (
-                            <h4 className="text-xs font-mono font-bold text-[var(--color-text)] uppercase tracking-wide">
-                              &ldquo;{titleText}&rdquo;
-                            </h4>
-                          )}
-
-                          {(fitPreference || comfortRating > 0 || qualityRating > 0 || breathableRating > 0) && (
-                            <div className="flex flex-wrap gap-1.5 pt-0.5 pb-1">
-                              {fitPreference && (
-                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
-                                  Cut Profile: {fitPreference === 'true' ? 'Optimal True size' : fitPreference === 'tight' ? 'Compressed Cut' : 'Oversized Silhouette'}
-                                </span>
-                              )}
-                              {comfortRating > 0 && (
-                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
-                                  Comfort: {comfortRating}/5
-                                </span>
-                              )}
-                              {qualityRating > 0 && (
-                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
-                                  Material: {qualityRating}/5
-                                </span>
-                              )}
-                              {breathableRating > 0 && (
-                                <span className="text-[8px] font-mono font-semibold uppercase bg-[var(--color-subtle)] text-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.2 rounded-md">
-                                  Breathable: {breathableRating}/5
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          <p className="text-xs text-[var(--color-text)]/90 leading-relaxed font-sans whitespace-pre-wrap pl-0.5">
-                            {commentText}
-                          </p>
-                        </div>
-                        {imagesList && imagesList.length > 0 && (
-                          <div className="flex flex-wrap gap-2.5 pt-1">
-                            {imagesList.map((img, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setActiveReviewImage(img)}
-                                className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-zoom-in shadow-xs bg-[var(--color-surface)]/20"
-                              >
-                                <img
-                                  src={img}
-                                  alt={`Customer image ${idx + 1}`}
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                  onError={(e) => { e.target.style.display = 'none'; }}
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <FaStar
+                                  key={star}
+                                  className={`text-[10px] ${star <= (isNaN(Number(rev.rating)) ? 5 : Number(rev.rating)) ? 'text-amber-400' : 'text-neutral-200'}`}
                                 />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                                  <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md text-xs font-mono">🔍</span>
-                                </div>
-                              </button>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          <div className="space-y-2">
+                            {titleText && (
+                              <h4 className="text-xs font-mono font-bold text-[var(--color-text)] uppercase tracking-wide">
+                                &ldquo;{titleText}&rdquo;
+                              </h4>
+                            )}
+
+
+
+                            <p className="text-xs text-[var(--color-text)]/90 leading-relaxed font-sans whitespace-pre-wrap pl-0.5">
+                              {commentText}
+                            </p>
+                          </div>
+                          {imagesList && imagesList.length > 0 && (
+                            <div className="flex flex-wrap gap-2.5 pt-1">
+                              {imagesList.map((img, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setActiveReviewImage(img)}
+                                  className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-zoom-in shadow-xs bg-[var(--color-surface)]/20"
+                                >
+                                  <img
+                                    src={img}
+                                    alt={`Customer image ${idx + 1}`}
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                    <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md text-xs font-mono">🔍</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                   
                   {reviews.length > 3 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllReviews(!showAllReviews)}
-                      className="w-full mt-6 py-3 border border-[var(--color-border)] rounded-xl text-xs font-bold text-[var(--color-text)] uppercase tracking-widest hover:bg-[var(--color-surface)] hover:border-[var(--color-accent)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    <Link
+                      to={`/product/${idOrSlug}/reviews`}
+                      className="w-full mt-6 py-3 border border-[var(--color-border)] rounded-xl text-xs font-bold text-[var(--color-text)] uppercase tracking-widest hover:bg-[var(--color-surface)] hover:border-[var(--color-accent)] transition-all flex items-center justify-center gap-2 cursor-pointer text-center"
                     >
-                      {showAllReviews ? 'Show Less' : `View All Reviews (${reviews.length})`}
-                    </button>
+                      View All Reviews ({reviews.length}) &rarr;
+                    </Link>
                   )}
                 </div>
               )}

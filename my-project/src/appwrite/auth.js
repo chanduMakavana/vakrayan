@@ -54,6 +54,16 @@ export class AuthService {
         }
     }
 
+    // Terminate all active sessions (logout from all devices)
+    async logoutAllDevices() {
+        try {
+            return await this.account.deleteSessions();
+        } catch (error) {
+            console.error("Appwrite service :: logoutAllDevices :: error", error.message);
+            throw error;
+        }
+    }
+
     // Update user preferences
     async updatePreferences(prefs) {
         try {

@@ -289,6 +289,8 @@ function Navbar() {
     try { await authService.logout(); } catch { // ignore
     }
     finally {
+      localStorage.removeItem('remember_me');
+      sessionStorage.removeItem('session_active');
       dispatch(logoutAction());
       dispatch(filterProductsForMode(false));
       dispatch(clearCartState());

@@ -37,6 +37,10 @@ function SignUp() {
       })
       
       if (session) {
+        // Automatically remember the user on sign up
+        localStorage.setItem('remember_me', 'true');
+        sessionStorage.setItem('session_active', 'true');
+
         // 2. Fetch the active registered user details
         const userData = await authService.getCurrentUser()
         if (userData) {
@@ -94,6 +98,8 @@ function SignUp() {
     setServerError("");
     setLoading(true);
     try {
+      localStorage.setItem('remember_me', 'true');
+      sessionStorage.setItem('session_active', 'true');
       await authService.loginWithGoogle();
     } catch (error) {
       console.error("Google Auth Error:", error);

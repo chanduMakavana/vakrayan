@@ -144,21 +144,18 @@ function OrderDetail() {
         rating: String(modalRating),
         comment: modalComment,
         images: imageLinks,
-        fit: modalFit,
-        comfort: modalComfort,
-        quality: modalQuality,
-        breathable: modalBreathable
+        is_verified_purchase: true,
+        fit: '',
+        comfort: 0,
+        quality: 0,
+        breathable: 0
       });
 
-      setModalSuccessMsg("Review posted successfully! Thank you for the fit feedback.");
+      setModalSuccessMsg("Review posted successfully! Thank you for the feedback.");
       showToast("Review submitted successfully!", "success");
       setModalComment('');
       setModalImages('');
       setModalRating(5);
-      setModalFit('true');
-      setModalComfort(5);
-      setModalQuality(5);
-      setModalBreathable(5);
       setTimeout(() => {
         setReviewModalItem(null);
         setModalSuccessMsg('');
@@ -1231,96 +1228,9 @@ function OrderDetail() {
                   </div>
                 </div>
 
-                {/* Size Fit Preference Selector */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Size Fit Preference</span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { key: 'tight', label: 'TIGHT' },
-                      { key: 'true', label: 'TRUE TO SIZE' },
-                      { key: 'loose', label: 'LOOSE' }
-                    ].map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => setModalFit(item.key)}
-                        className={`py-2 rounded-none font-bold text-[10px] tracking-wider transition-all cursor-pointer border uppercase font-mono ${
-                          modalFit === item.key
-                            ? 'bg-neutral-950 text-white border-neutral-950'
-                            : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Characteristics Rating Selectors */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Comfort */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Comfort</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setModalComfort(val)}
-                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                            modalComfort === val
-                              ? 'bg-neutral-950 text-white border-neutral-950'
-                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Quality */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Quality</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setModalQuality(val)}
-                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                            modalQuality === val
-                              ? 'bg-neutral-950 text-white border-neutral-950'
-                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Breathable */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Breathable</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setModalBreathable(val)}
-                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                            modalBreathable === val
-                              ? 'bg-neutral-950 text-white border-neutral-950'
-                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-neutral-950'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
 
                 {/* Review comment */}
                 <div className="flex flex-col gap-1.5">
@@ -1335,31 +1245,65 @@ function OrderDetail() {
                   />
                 </div>
 
-                {/* Review Image URLs */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Customer Image URLs (comma-separated, optional)</span>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={modalImages}
-                      onChange={(e) => setModalImages(e.target.value)}
-                      placeholder="https://example.com/pic1.jpg, https://example.com/pic2.jpg"
-                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden transition-colors"
-                    />
-                    <label className="shrink-0 bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
-                      {uploadingImage ? 'Uploading...' : 'Upload File'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, setModalImages, modalImages)}
-                        disabled={uploadingImage}
-                        className="hidden"
-                      />
-                    </label>
+                {/* Review Image Upload Section */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                    <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
+                      {modalImages.split(',').filter(Boolean).length} / 5 Uploaded
+                    </span>
                   </div>
-                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wide">
-                    TIP: PASTE DIRECT HTTPS LINKS OR CHOOSE A LOCAL IMAGE TO UPLOAD TEMPORARILY.
-                  </span>
+
+                  {/* Thumbnail grid */}
+                  <div className="flex flex-wrap gap-2.5 min-h-[40px] p-2 border border-dashed border-[var(--color-border)] bg-[var(--color-subtle)]/40 rounded-lg">
+                    {modalImages.split(',').map(url => url.trim()).filter(Boolean).map((url, idx) => (
+                      <div key={idx} className="relative w-16 h-16 bg-white shrink-0">
+                        <img src={url} alt="Review Preview" className="w-full h-full object-cover border border-[var(--color-border)] rounded-md" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const remaining = modalImages.split(',')
+                              .map(u => u.trim())
+                              .filter(Boolean)
+                              .filter((_, i) => i !== idx)
+                              .join(', ');
+                            setModalImages(remaining);
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold shadow-md cursor-pointer z-10 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {uploadingImage && (
+                      <div className="w-16 h-16 border border-[var(--color-border)] rounded-md flex items-center justify-center bg-white/50 animate-pulse">
+                        <div className="w-4 h-4 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {!uploadingImage && modalImages.split(',').filter(Boolean).length === 0 && (
+                      <div className="flex-1 flex items-center justify-center py-2 text-[10px] font-mono text-[var(--color-muted)] uppercase select-none">
+                        No photos attached. Click below to add.
+                      </div>
+                    )}
+                  </div>
+
+                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
+                    {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const currentCount = modalImages.split(',').filter(Boolean).length;
+                        if (currentCount >= 5) {
+                          showToast("You can upload a maximum of 5 photos.", "error");
+                          return;
+                        }
+                        handleImageUpload(e, setModalImages, modalImages);
+                      }}
+                      disabled={uploadingImage}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 {/* Submit / Cancel Buttons */}

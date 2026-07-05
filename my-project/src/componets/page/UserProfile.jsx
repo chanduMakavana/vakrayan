@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../appwrite/auth';
 import addressService from '../../appwrite/address';
@@ -312,21 +312,18 @@ function UserProfile() {
         rating: String(modalRating),
         comment: modalComment,
         images: imageLinks,
-        fit: modalFit,
-        comfort: modalComfort,
-        quality: modalQuality,
-        breathable: modalBreathable
+        is_verified_purchase: true,
+        fit: '',
+        comfort: 0,
+        quality: 0,
+        breathable: 0
       });
 
-      setModalSuccessMsg("Review posted successfully! Thank you for the fit feedback.");
+      setModalSuccessMsg("Review posted successfully! Thank you for the feedback.");
       showToast("Review submitted successfully!", "success");
       setModalComment('');
       setModalImages('');
       setModalRating(5);
-      setModalFit('true');
-      setModalComfort(5);
-      setModalQuality(5);
-      setModalBreathable(5);
       setTimeout(() => {
         setReviewModalItem(null);
         setModalSuccessMsg('');
@@ -447,10 +444,16 @@ function UserProfile() {
     setIsLogoutModalOpen(true);
   };
 
-  const confirmLogout = async () => {
+  const confirmLogout = async (allDevices = false) => {
     setIsLogoutModalOpen(false);
     try {
-      await authService.logout();
+      if (allDevices) {
+        await authService.logoutAllDevices();
+      } else {
+        await authService.logout();
+      }
+      localStorage.removeItem('remember_me');
+      sessionStorage.removeItem('session_active');
       dispatch(logoutAction());
       navigate('/');
     } catch (err) {
@@ -1280,6 +1283,27 @@ function UserProfile() {
                       </form>
                     </div>
                   </div>
+
+                  {/* Security & Sessions */}
+                  <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 space-y-4">
+                    <h3 className="text-[10px] font-black text-[var(--color-text)] tracking-wider uppercase border-b border-[var(--color-border)] pb-2 flex items-center gap-2">
+                      <FiShield className="text-xs text-[var(--color-accent)]" /> Security & Active Sessions
+                    </h3>
+                    <p className="text-[11px] text-[var(--color-muted)] font-medium leading-relaxed max-w-xl">
+                      Logged in on multiple devices? You can sign out from all other active sessions across your computers, tablets, and mobile devices at once.
+                    </p>
+                    <div className="pt-2">
+                      <button 
+                        type="button"
+                        onClick={handleLogout}
+                        className="px-6 py-3 bg-rose-600 hover:bg-rose-700 font-mono font-black text-xs tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer shadow-md flex items-center gap-2"
+                      >
+                        <FiLogOut className="text-xs shrink-0" />
+                        Logout from All Devices
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               )}
 
@@ -1339,96 +1363,9 @@ function UserProfile() {
                   </div>
                 </div>
 
-                {/* Size Fit Preference Selector */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Size Fit Preference</span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { key: 'tight', label: 'TIGHT' },
-                      { key: 'true', label: 'TRUE TO SIZE' },
-                      { key: 'loose', label: 'LOOSE' }
-                    ].map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => setModalFit(item.key)}
-                        className={`py-2 rounded-none font-bold text-[10px] tracking-wider transition-all cursor-pointer border uppercase font-mono ${
-                          modalFit === item.key
-                            ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)]'
-                            : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Characteristics Rating Selectors */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Comfort */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Comfort</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setModalComfort(val)}
-                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                            modalComfort === val
-                              ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)]'
-                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Quality */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Quality</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setModalQuality(val)}
-                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                            modalQuality === val
-                              ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)]'
-                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Breathable */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Breathable</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setModalBreathable(val)}
-                          className={`w-6 h-6 flex items-center justify-center font-mono font-bold text-[9px] border transition-all cursor-pointer rounded-none ${
-                            modalBreathable === val
-                              ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)]'
-                              : 'bg-[var(--color-subtle)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
 
                 {/* Review comment */}
                 <div className="flex flex-col gap-1.5">
@@ -1443,31 +1380,65 @@ function UserProfile() {
                   />
                 </div>
 
-                {/* Review Image URLs */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Customer Image URLs (comma-separated, optional)</span>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={modalImages}
-                      onChange={(e) => setModalImages(e.target.value)}
-                      placeholder="https://example.com/pic1.jpg, https://example.com/pic2.jpg"
-                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden transition-colors"
-                    />
-                    <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2 rounded-none uppercase transition-all cursor-pointer border border-[var(--color-accent)] text-center select-none">
-                      {uploadingImage ? 'Uploading...' : 'Upload File'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, setModalImages, modalImages)}
-                        disabled={uploadingImage}
-                        className="hidden"
-                      />
-                    </label>
+                {/* Review Image Upload Section */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                    <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
+                      {modalImages.split(',').filter(Boolean).length} / 5 Uploaded
+                    </span>
                   </div>
-                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wide">
-                    TIP: PASTE DIRECT HTTPS LINKS OR CHOOSE A LOCAL IMAGE TO UPLOAD TEMPORARILY.
-                  </span>
+
+                  {/* Thumbnail grid */}
+                  <div className="flex flex-wrap gap-2.5 min-h-[40px] p-2 border border-dashed border-[var(--color-border)] bg-[var(--color-subtle)]/40 rounded-lg">
+                    {modalImages.split(',').map(url => url.trim()).filter(Boolean).map((url, idx) => (
+                      <div key={idx} className="relative w-16 h-16 bg-white shrink-0">
+                        <img src={url} alt="Review Preview" className="w-full h-full object-cover border border-[var(--color-border)] rounded-md" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const remaining = modalImages.split(',')
+                              .map(u => u.trim())
+                              .filter(Boolean)
+                              .filter((_, i) => i !== idx)
+                              .join(', ');
+                            setModalImages(remaining);
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold shadow-md cursor-pointer z-10 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {uploadingImage && (
+                      <div className="w-16 h-16 border border-[var(--color-border)] rounded-md flex items-center justify-center bg-white/50 animate-pulse">
+                        <div className="w-4 h-4 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {!uploadingImage && modalImages.split(',').filter(Boolean).length === 0 && (
+                      <div className="flex-1 flex items-center justify-center py-2 text-[10px] font-mono text-[var(--color-muted)] uppercase select-none">
+                        No photos attached. Click below to add.
+                      </div>
+                    )}
+                  </div>
+
+                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
+                    {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const currentCount = modalImages.split(',').filter(Boolean).length;
+                        if (currentCount >= 5) {
+                          showToast("You can upload a maximum of 5 photos.", "error");
+                          return;
+                        }
+                        handleImageUpload(e, setModalImages, modalImages);
+                      }}
+                      disabled={uploadingImage}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 {/* Submit / Cancel Buttons */}
@@ -1511,20 +1482,27 @@ function UserProfile() {
                 Are you sure you want to log out? You will need to sign in again to place orders or view your profile.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
+            <div className="flex flex-col gap-2.5 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
-                onClick={() => setIsLogoutModalOpen(false)}
-                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                onClick={() => confirmLogout(false)}
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md text-center"
               >
-                Cancel
+                Log Out Current Device
               </button>
               <button
                 type="button"
-                onClick={confirmLogout}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                onClick={() => confirmLogout(true)}
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md text-center"
               >
-                Log Out
+                Log Out from All Devices
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsLogoutModalOpen(false)}
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer text-center"
+              >
+                Cancel
               </button>
             </div>
           </div>

@@ -41,6 +41,14 @@ function Login() {
       });
       
       if (session) {
+        // Handle remember me preference
+        if (data.remember) {
+          localStorage.setItem('remember_me', 'true');
+        } else {
+          localStorage.removeItem('remember_me');
+        }
+        sessionStorage.setItem('session_active', 'true');
+
         // Fetch authenticated user details and update Redux store
         const userData = await authService.getCurrentUser();
         if (userData) {
@@ -99,6 +107,14 @@ function Login() {
     setServerError("");
     setLoading(true);
     try {
+      const rememberChecked = document.getElementById('remember')?.checked;
+      if (rememberChecked) {
+        localStorage.setItem('remember_me', 'true');
+      } else {
+        localStorage.removeItem('remember_me');
+      }
+      sessionStorage.setItem('session_active', 'true');
+
       await authService.loginWithGoogle();
       // Appwrite handles OAuth via redirect, so if it succeeds, the page will reload.
       // If it fails, it will throw an error and we catch it below.
