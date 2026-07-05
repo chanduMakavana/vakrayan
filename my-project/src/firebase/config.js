@@ -1,6 +1,6 @@
-import { initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -13,14 +13,21 @@ const firebaseConfig = {
   measurementId: "G-T0E6LN63BC"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase safely to prevent dual-initialization in HMR
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Use initializeFirestore with forceLongPolling to bypass Edge Tracking Prevention CORS issues
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
+// Use initializeFirestore with forceLongPolling to bypass Edge Tracking Prevention CORS issues safely
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  });
+} catch (e) {
+  // If already initialized (e.g. during Hot Module Replacement), retrieve the existing instance
+  dbInstance = getFirestore(app);
+}
 
+export const db = dbInstance;
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

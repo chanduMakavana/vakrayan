@@ -5,7 +5,7 @@ import {
   sendPasswordResetEmail, confirmPasswordReset
 } from 'firebase/auth';
 import { 
-  collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit
+  collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { 
   ref, uploadBytes, getDownloadURL 
@@ -23,13 +23,23 @@ export class Account {
     async create(userId, email, password, name) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: name });
+        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('current_session_id', sessionId);
         // Store preferences in a user document
-        await setDoc(doc(firestore, 'users', userCredential.user.uid), { name, email, prefs: {} });
+        await setDoc(doc(firestore, 'users', userCredential.user.uid), { name, email, prefs: {}, activeSessions: [sessionId] });
         return { $id: userCredential.user.uid, email, name, prefs: {} };
     }
 
     async createEmailPasswordSession(email, password) {
         const cred = await signInWithEmailAndPassword(auth, email, password);
+        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('current_session_id', sessionId);
+        const userDocRef = doc(firestore, 'users', cred.user.uid);
+        await updateDoc(userDocRef, {
+            activeSessions: arrayUnion(sessionId)
+        }).catch(async () => {
+            await setDoc(userDocRef, { name: cred.user.displayName || 'User', email: cred.user.email, prefs: {}, activeSessions: [sessionId] });
+        });
         return { $id: cred.user.uid, userId: cred.user.uid };
     }
 
@@ -41,6 +51,21 @@ export class Account {
                     try {
                         const docSnap = await getDoc(doc(firestore, 'users', user.uid));
                         const data = docSnap.exists() ? docSnap.data() : { prefs: {} };
+                        
+                        // Check if session has been invalidated
+                        const activeSessions = data.activeSessions || [];
+                        const currentSessionId = localStorage.getItem('current_session_id');
+                        
+                        // If current session is no longer in activeSessions (meaning user logged out all devices), sign out
+                        if (currentSessionId && !activeSessions.includes(currentSessionId)) {
+                            await signOut(auth);
+                            localStorage.removeItem('current_session_id');
+                            localStorage.removeItem('remember_me');
+                            sessionStorage.removeItem('session_active');
+                            reject({ message: 'Session invalidated' });
+                            return;
+                        }
+
                         const prefs = data.prefs || {};
 
                         // ✅ FIX: Build labels array from Firestore prefs.role field.
@@ -75,12 +100,28 @@ export class Account {
 
 
     async deleteSession(sessionId) {
+        const currentSessionId = localStorage.getItem('current_session_id');
+        if (auth.currentUser && currentSessionId) {
+            const userDocRef = doc(firestore, 'users', auth.currentUser.uid);
+            await updateDoc(userDocRef, {
+                activeSessions: arrayRemove(currentSessionId)
+            }).catch(() => {});
+        }
+        localStorage.removeItem('current_session_id');
         await signOut(auth);
         return true;
     }
     
     async deleteSessions() {
-        return this.deleteSession('all');
+        if (auth.currentUser) {
+            const userDocRef = doc(firestore, 'users', auth.currentUser.uid);
+            await updateDoc(userDocRef, {
+                activeSessions: []
+            }).catch(() => {});
+        }
+        localStorage.removeItem('current_session_id');
+        await signOut(auth);
+        return true;
     }
 
     async updatePrefs(prefs) {
@@ -106,11 +147,18 @@ export class Account {
                 signInWithPopup(auth, googleProvider)
                     .then(async (result) => {
                         const user = result.user;
+                        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                        localStorage.setItem('current_session_id', sessionId);
+                        
                         const docRef = doc(firestore, 'users', user.uid);
                         try {
                             const docSnap = await getDoc(docRef);
                             if (!docSnap.exists()) {
-                                await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {} });
+                                await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {}, activeSessions: [sessionId] });
+                            } else {
+                                await updateDoc(docRef, {
+                                    activeSessions: arrayUnion(sessionId)
+                                });
                             }
                             if (success) window.location.href = success;
                             resolve();
