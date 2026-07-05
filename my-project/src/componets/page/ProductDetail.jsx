@@ -3,19 +3,19 @@ import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
-import productsService from '../../appwrite/products';
-import reviewsService from '../../appwrite/reviews';
-import ordersService from '../../appwrite/orders';
-import wishlistService from '../../appwrite/wishlist';
+import productsService from '../../services/products';
+import reviewsService from '../../services/reviews';
+import ordersService from '../../services/orders';
+import wishlistService from '../../services/wishlist';
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice';
 import AddToCartButton from '../pageComponets/AddToCartButton';
 import Footer from '../pageComponets/Footer';
-import restockService from '../../appwrite/restock';
+import restockService from '../../services/restock';
 import { FaStar } from 'react-icons/fa';
 import { useToast } from '../../context/ToastContext';
-import storageService, { compressImage } from '../../appwrite/storage';
+import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
-import cartService from '../../appwrite/cart';
+import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
 
 
@@ -707,7 +707,7 @@ function ProductDetail() {
           setSuggestProduct(filteredSuggestions);
        }
      } catch (error) {
-       console.error("Failed to execute data pipeline matrix updates from Appwrite:", error);
+       console.error("Failed to execute data pipeline matrix updates from Firebase:", error);
        if (isMounted) {
          showToast("Requested drop sequence untraceable inside active servers.", "error");
          navigate('/');
@@ -1006,13 +1006,13 @@ function ProductDetail() {
           ? `${currentImages.trim()}, ${fileUrl}` 
           : fileUrl;
         setImagesValue(newUrlList);
-        showToast("✓ Image uploaded successfully to Appwrite Storage!", "success");
+        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Image upload failed:", err);
-      showToast("Appwrite Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
     } finally {
       setUploadingImage(false);
     }
@@ -1654,7 +1654,7 @@ function ProductDetail() {
                             try {
                               await wishlistService.removeFromWishlist(user.$id, productId);
                             } catch (e) {
-                              console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                              console.warn("⚠️ Firebase wishlist cloud sync failed:", e.message);
                             }
                           }
                         } else {
@@ -1666,7 +1666,7 @@ function ProductDetail() {
                             try {
                               await wishlistService.addToWishlist(user.$id, productId);
                             } catch (e) {
-                              console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                              console.warn("⚠️ Firebase wishlist cloud sync failed:", e.message);
                             }
                           }
                         }
@@ -2686,7 +2686,7 @@ function ProductDetail() {
                   try {
                     await wishlistService.removeFromWishlist(user.$id, productId);
                   } catch (e) {
-                    console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                    console.warn("⚠️ Firebase wishlist cloud sync failed:", e.message);
                   }
                 }
               } else {
@@ -2698,7 +2698,7 @@ function ProductDetail() {
                   try {
                     await wishlistService.addToWishlist(user.$id, productId);
                   } catch (e) {
-                    console.warn("⚠️ Appwrite wishlist cloud sync failed:", e.message);
+                    console.warn("⚠️ Firebase wishlist cloud sync failed:", e.message);
                   }
                 }
               }

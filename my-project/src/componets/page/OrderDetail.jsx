@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy } from 'react-icons/fi';
-import ordersService from '../../appwrite/orders';
-import reviewsService from '../../appwrite/reviews';
+import ordersService from '../../services/orders';
+import reviewsService from '../../services/reviews';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
-import storageService, { compressImage } from '../../appwrite/storage';
+import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -54,13 +54,13 @@ function OrderDetail() {
           ? `${currentImages.trim()}, ${fileUrl}` 
           : fileUrl;
         setImagesValue(newUrlList);
-        showToast("✓ Image uploaded successfully to Appwrite Storage!", "success");
+        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Image upload failed:", err);
-      showToast("Appwrite Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
     } finally {
       setUploadingImage(false);
     }
@@ -109,7 +109,7 @@ function OrderDetail() {
       }
     } catch (err) {
       console.error("Return image upload failed:", err);
-      showToast("Appwrite Storage upload failed.", "error");
+      showToast("Firebase Storage upload failed.", "error");
     } finally {
       if (type === 'front') setUploadingFront(false);
       else setUploadingBack(false);
@@ -476,7 +476,7 @@ function OrderDetail() {
 
     try {
       setIsCancelModalOpen(false);
-      // 1. Update order status to CANCELLATION_REQUESTED in Appwrite with metadata reason
+      // 1. Update order status to CANCELLATION_REQUESTED in Firebase with metadata reason
       const updatedOrder = await ordersService.updateOrderStatus(order.$id || order.id, 'CANCELLATION_REQUESTED', { cancel_reason: finalReason });
       if (updatedOrder) {
         setOrder(updatedOrder);

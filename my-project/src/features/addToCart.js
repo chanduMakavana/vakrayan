@@ -6,7 +6,7 @@ export const cartSlice = createSlice({
     name: "cart",
     initialState,
     reducers: {
-        // Hydrate the Redux store with live items fetched from Appwrite DB or localStorage
+        // Hydrate the Redux store with live items fetched from Firebase DB or localStorage
         setCartItems: (state, action) => {
             // Immer handles immutability — no need for JSON.parse(JSON.stringify())
             return action.payload ?? [];
@@ -25,7 +25,7 @@ export const cartSlice = createSlice({
             }
         },
 
-        // Remove an item document by its Appwrite ID
+        // Remove an item document by its Firebase ID
         removeCartItemState: (state, action) => {
             return state.filter(item => item.$id !== action.payload);
         },

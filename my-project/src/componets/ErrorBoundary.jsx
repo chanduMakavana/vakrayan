@@ -4,7 +4,7 @@ import { Component } from 'react'
  * ErrorBoundary — Global React crash handler.
  *
  * Catches any runtime errors thrown inside its child tree (e.g., a
- * failed JSON.parse, a null dereference, or a bad Appwrite response)
+ * failed JSON.parse, a null dereference, or a bad Firebase response)
  * and renders a branded fallback UI instead of a blank white screen.
  *
  * Must be a class component — React's error boundary API requires

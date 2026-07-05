@@ -3,8 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { FiArrowLeft, FiStar, FiFilter, FiTrendingDown, FiTrendingUp, FiCalendar, FiCheckCircle } from 'react-icons/fi';
 import { FaStar } from 'react-icons/fa';
-import productsService from '../../appwrite/products';
-import reviewsService from '../../appwrite/reviews';
+import productsService from '../../services/products';
+import reviewsService from '../../services/reviews';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 

@@ -1,4 +1,4 @@
-import { Storage, ID } from 'appwrite';
+import { Storage, ID } from '../firebase/adapter.js';
 import { client } from './client';
 import { conf } from './conf/conf';
 
@@ -9,15 +9,15 @@ export class StorageService {
         this.storage = new Storage(client);
     }
 
-    async uploadFile(file, bucketId = conf.appwriteBucketId || 'images') {
+    async uploadFile(file, bucketId = conf.firebaseBucketId || 'images') {
         // If a Cloudflare Worker URL is configured, use it to upload to Backblaze B2.
-        // Otherwise, fall back to standard Appwrite Storage.
-        if (conf.appwriteCloudflareWorkerUrl) {
+        // Otherwise, fall back to standard Firebase Storage.
+        if (conf.firebaseCloudflareWorkerUrl) {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const response = await fetch(conf.appwriteCloudflareWorkerUrl, {
+                const response = await fetch(conf.firebaseCloudflareWorkerUrl, {
                     method: 'POST',
                     body: formData,
                 });
@@ -48,12 +48,12 @@ export class StorageService {
             );
             return response;
         } catch (error) {
-            console.error("Appwrite service :: uploadFile :: error", error.message);
+            console.error("Firebase service :: uploadFile :: error", error.message);
             throw error;
         }
     }
 
-    getFileView(fileId, bucketId = conf.appwriteBucketId || 'images') {
+    getFileView(fileId, bucketId = conf.firebaseBucketId || 'images') {
         // If the fileId is a full URL (e.g. from Backblaze B2), return it directly.
         if (fileId && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
             return fileId;
@@ -64,8 +64,8 @@ export class StorageService {
             const result = this.storage.getFileView(bucketId, fileId);
             return typeof result === 'string' ? result : result.toString();
         } catch (error) {
-            console.error("Appwrite service :: getFileView :: error", error.message);
-            return `${conf.appwriteurl}/storage/buckets/${bucketId}/files/${fileId}/view?project=${conf.appwriteProjectId}`;
+            console.error("Firebase service :: getFileView :: error", error.message);
+            return `${conf.firebaseurl}/storage/buckets/${bucketId}/files/${fileId}/view?project=${conf.firebaseProjectId}`;
         }
     }
 }

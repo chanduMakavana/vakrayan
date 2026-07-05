@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -12,8 +12,8 @@ export class RestockService {
     // Capture customer request for size restocking
     async requestRestockNotification(email, productId, size) {
         try {
-            if (!email || !productId || !size || !conf.appwriteRestockCollectionId) {
-                console.warn("⚠️ appwriteRestockCollectionId or inputs missing. Skipping database save.");
+            if (!email || !productId || !size || !conf.firebaseRestockCollectionId) {
+                console.warn("⚠️ firebaseRestockCollectionId or inputs missing. Skipping database save.");
                 return null;
             }
 
@@ -23,8 +23,8 @@ export class RestockService {
             let isAlreadyRegistered = false;
             try {
                 const response = await this.databases.listDocuments(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteRestockCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseRestockCollectionId,
                     [
                         Query.equal("email", cleanEmail),
                         Query.equal("productId", productId),
@@ -39,8 +39,8 @@ export class RestockService {
                 // Fallback: list documents and filter locally if indexes are not configured
                 try {
                     const response = await this.databases.listDocuments(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteRestockCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseRestockCollectionId,
                         [Query.limit(100)]
                     );
                     const match = response.documents.find(doc => 
@@ -53,7 +53,7 @@ export class RestockService {
                         isAlreadyRegistered = true;
                     }
                 } catch (innerError) {
-                    console.warn("⚠️ Appwrite check failed, checking local fallback:", innerError.message);
+                    console.warn("⚠️ Firebase check failed, checking local fallback:", innerError.message);
                 }
             }
 
@@ -62,8 +62,8 @@ export class RestockService {
             }
 
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteRestockCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseRestockCollectionId,
                 ID.unique(),
                 {
                     email: cleanEmail,
@@ -74,7 +74,7 @@ export class RestockService {
                 }
             );
         } catch (error) {
-            console.error("Appwrite service :: requestRestockNotification :: error", error.message);
+            console.error("Firebase service :: requestRestockNotification :: error", error.message);
             throw error;
         }
     }
@@ -82,14 +82,14 @@ export class RestockService {
     // Retrieve all restock notifications requests for admin analytics
     async getRestockNotifications() {
         try {
-            if (!conf.appwriteRestockCollectionId) return [];
+            if (!conf.firebaseRestockCollectionId) return [];
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteRestockCollectionId
+                conf.firebaseDatabaseId,
+                conf.firebaseRestockCollectionId
             );
             return response.documents;
         } catch (error) {
-            console.error("Appwrite service :: getRestockNotifications :: error", error.message);
+            console.error("Firebase service :: getRestockNotifications :: error", error.message);
             return [];
         }
     }
@@ -97,14 +97,14 @@ export class RestockService {
     // Delete a restock notification request by ID
     async deleteRestockNotification(documentId) {
         try {
-            if (!conf.appwriteRestockCollectionId) return null;
+            if (!conf.firebaseRestockCollectionId) return null;
             return await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteRestockCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseRestockCollectionId,
                 documentId
             );
         } catch (error) {
-            console.error("Appwrite service :: deleteRestockNotification :: error", error.message);
+            console.error("Firebase service :: deleteRestockNotification :: error", error.message);
             throw error;
         }
     }
@@ -112,15 +112,15 @@ export class RestockService {
     // Update a restock notification request (e.g. to mark as notified)
     async updateRestockNotification(documentId, data) {
         try {
-            if (!conf.appwriteRestockCollectionId) return null;
+            if (!conf.firebaseRestockCollectionId) return null;
             return await this.databases.updateDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteRestockCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseRestockCollectionId,
                 documentId,
                 data
             );
         } catch (error) {
-            console.error("Appwrite service :: updateRestockNotification :: error", error.message);
+            console.error("Firebase service :: updateRestockNotification :: error", error.message);
             throw error;
         }
     }

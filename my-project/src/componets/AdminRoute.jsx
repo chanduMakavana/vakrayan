@@ -13,7 +13,7 @@ import { Navigate } from 'react-router-dom'
  * Method 2 (Easy): VITE_ADMIN_EMAIL environment variable
  *   - .env file में: VITE_ADMIN_EMAIL="youremail@gmail.com"
  *
- * Method 3: user.labels (future Appwrite compatibility)
+ * Method 3: user.labels (future Firebase compatibility)
  */
 function AdminRoute({ children }) {
   const { user, isAuthenticated, loading } = useSelector((state) => state.auth)
@@ -29,7 +29,7 @@ function AdminRoute({ children }) {
   // Method 1: Firestore prefs.role check (most secure — set in Firebase Console)
   const hasAdminRole = user.prefs?.role === 'admin'
 
-  // Method 2: Appwrite-style labels (for future compatibility)
+  // Method 2: Firebase-style labels (for future compatibility)
   const hasAdminLabel = Array.isArray(user.labels) && user.labels.includes('admin')
 
   // Method 3: Email check via env variable (works with Firebase)

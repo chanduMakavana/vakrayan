@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginAction } from '../../features/login'
-import authService from '../../appwrite/auth'
+import authService from '../../services/auth'
 import { useToast } from '../../context/ToastContext'
 import { hydrateCartFromDb } from '../../utils/cartMergeHelper'
 
@@ -25,6 +25,8 @@ function Login() {
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState("")
   const [isForgotPassword, setIsForgotPassword] = useState(false)
+
+
 
   // ✅ SEO: Dynamic page title
   useEffect(() => { document.title = 'Login — Vakrayan' }, [])
@@ -116,7 +118,7 @@ function Login() {
       sessionStorage.setItem('session_active', 'true');
 
       await authService.loginWithGoogle();
-      // Appwrite handles OAuth via redirect, so if it succeeds, the page will reload.
+      // Firebase handles OAuth via redirect, so if it succeeds, the page will reload.
       // If it fails, it will throw an error and we catch it below.
     } catch (error) {
       console.error("Google Auth Error:", error);

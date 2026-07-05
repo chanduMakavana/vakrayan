@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -27,8 +27,8 @@ export class CartService {
                 const itemPrice = Number(price);
                 const itemQuantity = Number(quantity);
                 return await this.databases.createDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteCartCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseCartCollectionId,
                     ID.unique(),
                     {
                         name,
@@ -43,7 +43,7 @@ export class CartService {
                 );
             }
         } catch (error) {
-            console.error("Appwrite service :: addToCart :: error", error.message);
+            console.error("Firebase service :: addToCart :: error", error.message);
             throw error;
         }
     }
@@ -53,13 +53,13 @@ export class CartService {
         try {
             if (!user_id) return [];
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCartCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCartCollectionId,
                 [Query.equal("userId", user_id), Query.orderDesc("$createdAt")]
             );
             return response.documents;
         } catch (error) {
-            console.error("Appwrite service :: getCartItems :: error", error.message);
+            console.error("Firebase service :: getCartItems :: error", error.message);
             throw error;
         }
     }
@@ -68,13 +68,13 @@ export class CartService {
     async updateCartItem(documentId, data) {
         try {
             return await this.databases.updateDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCartCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCartCollectionId,
                 documentId,
                 data
             );
         } catch (error) {
-            console.error("Appwrite service :: updateCartItem :: error", error.message);
+            console.error("Firebase service :: updateCartItem :: error", error.message);
             throw error;
         }
     }
@@ -83,13 +83,13 @@ export class CartService {
     async removeFromCart(documentId) {
         try {
             await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCartCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCartCollectionId,
                 documentId
             );
             return true;
         } catch (error) {
-            console.error("Appwrite service :: removeFromCart :: error", error.message);
+            console.error("Firebase service :: removeFromCart :: error", error.message);
             throw error;
         }
     }
@@ -102,7 +102,7 @@ export class CartService {
             await Promise.all(toDelete.map(item => this.removeFromCart(item.$id)));
             return true;
         } catch (error) {
-            console.error("Appwrite service :: clearUserCart :: error", error.message);
+            console.error("Firebase service :: clearUserCart :: error", error.message);
             throw error;
         }
     }
@@ -116,12 +116,12 @@ export class CartService {
                 try {
                     await this.updateCartItem(item.$id, { cart_status: 'converted' });
                 } catch (e) {
-                    console.warn("Appwrite schema missing 'cart_status' attribute:", e.message);
+                    console.warn("Firebase schema missing 'cart_status' attribute:", e.message);
                 }
             }
             return true;
         } catch (error) {
-            console.error("Appwrite service :: convertCartItems :: error", error.message);
+            console.error("Firebase service :: convertCartItems :: error", error.message);
             return false;
         }
     }
@@ -129,14 +129,14 @@ export class CartService {
     // Retrieve all cart documents for admin abandonment analysis
     async getAllCarts() {
         try {
-            if (!conf.appwriteCartCollectionId) return [];
+            if (!conf.firebaseCartCollectionId) return [];
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCartCollectionId
+                conf.firebaseDatabaseId,
+                conf.firebaseCartCollectionId
             );
             return response.documents;
         } catch (error) {
-            console.error("Appwrite service :: getAllCarts :: error", error.message);
+            console.error("Firebase service :: getAllCarts :: error", error.message);
             return [];
         }
     }

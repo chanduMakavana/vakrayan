@@ -4,17 +4,17 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
 import { FiArrowLeft, FiCheckCircle } from 'react-icons/fi'
-import cartService from '../../appwrite/cart'
-import ordersService from '../../appwrite/orders'
-import productsService from '../../appwrite/products'
-import campaignService from '../../appwrite/campaign'
-import addressService from '../../appwrite/address'
-import walletService from '../../appwrite/wallet'
+import cartService from '../../services/cart'
+import ordersService from '../../services/orders'
+import productsService from '../../services/products'
+import campaignService from '../../services/campaign'
+import addressService from '../../services/address'
+import walletService from '../../services/wallet'
 import { clearCartState, setCartItems as setCartItemsAction } from '../../features/addToCart'
 import { setProducts } from '../../features/productsSlice'
 import Footer from '../pageComponets/Footer'
 import { playSuccessChime, triggerConfetti } from '../../utils/sensoryHelper'
-import couponUsageService from '../../appwrite/couponUsage'
+import couponUsageService from '../../services/couponUsage'
 import { useToast } from '../../context/ToastContext'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
@@ -338,7 +338,7 @@ function Checkout() {
       const activeCoupons = await campaignService.getCoupons();
       const match = activeCoupons.find(c => String(c.code || '').trim().toUpperCase() === promoInput.trim().toUpperCase());
       if (match) {
-        // Enforce single-use coupon check from Appwrite database usage collection
+        // Enforce single-use coupon check from Firebase database usage collection
         if (user && user.$id) {
           const alreadyUsed = await couponUsageService.checkCouponUsage(user.$id, match.code);
           if (alreadyUsed) {
@@ -426,7 +426,7 @@ function Checkout() {
       }
     }
 
-    // 0. Live Stock Validation — fetch fresh product data from Appwrite at submit time
+    // 0. Live Stock Validation — fetch fresh product data from Firebase at submit time
     // This eliminates the TOCTOU race condition where two users could both pass
     // a stale Redux cache check and oversell the last unit.
     for (const cartItem of cartItems) {
@@ -591,7 +591,7 @@ function Checkout() {
         }
       });
 
-      // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Appwrite compatibility)
+      // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Firebase compatibility)
       const orderPayload = {
         userId: user.$id,
         customerName: formData.name.trim(),
@@ -681,10 +681,10 @@ function Checkout() {
         await Promise.all(stockUpdatePromises);
       }
 
-      // 3. Save Order into Appwrite Database
+      // 3. Save Order into Firebase Database
       const response = await ordersService.createOrder(orderPayload);
       if (!response) {
-        throw new Error("Order creation returned null — check Appwrite collection configuration.");
+        throw new Error("Order creation returned null — check Firebase collection configuration.");
       }
 
       // If paid via Wallet, deduct balance in wallet collection
@@ -758,7 +758,7 @@ function Checkout() {
         console.warn("⚠️ Cart abandonment status conversion failed:", cartErr.message);
       }
 
-      // 4.2. Clear Cart globally on Appwrite database & Redux state & Clear Coupon
+      // 4.2. Clear Cart globally on Firebase database & Redux state & Clear Coupon
       const orderItemIds = cartItems.map(i => i.$id);
       await cartService.clearUserCart(user.$id, orderItemIds);
       

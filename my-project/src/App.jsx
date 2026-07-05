@@ -3,9 +3,9 @@ import { Route, Routes, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { AnimatePresence, motion } from 'framer-motion'
 import { login as loginAction, logout as logoutAction, setLoading } from './features/login'
-import authService from './appwrite/auth'
-import productsService from './appwrite/products'
-import offersService from './appwrite/offers'
+import authService from './services/auth'
+import productsService from './services/products'
+import offersService from './services/offers'
 import { setProducts, setOffers, filterProductsForMode } from './features/productsSlice'
 import { setCartItems } from './features/addToCart'
 import { sendWebhookNotification } from './utils/webhookHelper'
@@ -154,7 +154,7 @@ function AppContent() {
   const loading = authLoading || !fontsLoaded
   // ✅ PERFORMANCE FIX: Removed !productsFetched from loading gate.
   // Products now load in the background — Shop/Home show skeleton loaders instead.
-  // Previously, a slow Appwrite products fetch blocked the ENTIRE app for 3-10 seconds.
+  // Previously, a slow Firebase products fetch blocked the ENTIRE app for 3-10 seconds.
 
   useEffect(() => {
     // ── AUTH: Restore session ─────────────────────────────────────────────────
@@ -165,7 +165,7 @@ function AppContent() {
           const sessionActive = sessionStorage.getItem('session_active') === 'true';
 
           if (!rememberMe && !sessionActive) {
-            // Log out immediately from Appwrite since the user didn't request remember me
+            // Log out immediately from Firebase since the user didn't request remember me
             // and this is a new browser/tab session.
             await authService.logout();
             localStorage.removeItem('remember_me');

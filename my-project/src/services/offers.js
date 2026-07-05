@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -23,12 +23,12 @@ export class OffersService {
 
     async getOffers() {
         try {
-            if (!conf.appwriteOffersCollectionId) {
+            if (!conf.firebaseOffersCollectionId) {
                 return this.getLocalOffers();
             }
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteOffersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOffersCollectionId,
                 [Query.orderDesc("$createdAt")]
             );
             return response.documents || [];
@@ -50,12 +50,12 @@ export class OffersService {
         };
 
         try {
-            if (!conf.appwriteOffersCollectionId) {
-                throw new Error("appwriteOffersCollectionId is missing.");
+            if (!conf.firebaseOffersCollectionId) {
+                throw new Error("firebaseOffersCollectionId is missing.");
             }
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOffersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOffersCollectionId,
                 ID.unique(),
                 payload
             );
@@ -84,12 +84,12 @@ export class OffersService {
         if (data.tag !== undefined) payload.tag = data.tag;
 
         try {
-            if (!conf.appwriteOffersCollectionId) {
-                throw new Error("appwriteOffersCollectionId is missing.");
+            if (!conf.firebaseOffersCollectionId) {
+                throw new Error("firebaseOffersCollectionId is missing.");
             }
             return await this.databases.updateDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOffersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOffersCollectionId,
                 documentId,
                 payload
             );
@@ -108,12 +108,12 @@ export class OffersService {
 
     async deleteOffer(documentId) {
         try {
-            if (!conf.appwriteOffersCollectionId) {
-                throw new Error("appwriteOffersCollectionId is missing.");
+            if (!conf.firebaseOffersCollectionId) {
+                throw new Error("firebaseOffersCollectionId is missing.");
             }
             await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOffersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOffersCollectionId,
                 documentId
             );
             return true;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import slidesService from '../../appwrite/slides'
+import slidesService from '../../services/slides'
 
 const DEFAULT_SLIDES = [
   {

@@ -1,7 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 
 // ✅ CODE QUALITY: Helper to normalize is_live to boolean at ingestion.
-// Appwrite schema inconsistency sends is_live as: true | 'true' | 1 | '1'.
+// Firebase schema inconsistency sends is_live as: true | 'true' | 1 | '1'.
 // Normalizing once here avoids 4-way comparisons throughout the codebase.
 const normalizeIsLive = (val) =>
     val === true || val === 'true' || val === 1 || val === '1';

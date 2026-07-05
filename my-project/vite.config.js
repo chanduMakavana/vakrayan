@@ -7,13 +7,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [tailwindcss(), react()],
 
-  resolve: {
-    alias: {
-      // 'appwrite': path.resolve(__dirname, 'src/appwrite-mock/index.js'), // MOCK ADAPTER
-      // 'appwrite': path.resolve(__dirname, 'src/appwrite/localAdapter.js'), // LOCAL BACKEND ADAPTER
-      'appwrite': path.resolve(__dirname, 'src/firebase/adapter.js'), // FIREBASE ADAPTER
-    }
-  },
+
 
   build: {
     // Warn when a chunk exceeds 500 KB (default is 500 but making it explicit)
@@ -39,7 +33,6 @@ export default defineConfig({
           if (id.includes('node_modules/framer-motion')) {
             return 'vendor-motion';
           }
-          // Note: 'appwrite' npm package is aliased to Firebase adapter — no vendor chunk needed
         },
       },
     },

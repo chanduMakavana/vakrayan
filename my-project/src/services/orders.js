@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -12,13 +12,13 @@ export class OrdersService {
     // ➡️ 1. Create a new customer order entry
     async createOrder(data) {
         try {
-            if (!conf.appwriteOrdersCollectionId) {
-                console.warn("⚠️ appwriteOrdersCollectionId is missing. Skipping database push.");
+            if (!conf.firebaseOrdersCollectionId) {
+                console.warn("⚠️ firebaseOrdersCollectionId is missing. Skipping database push.");
                 return null;
             }
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOrdersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOrdersCollectionId,
                 ID.unique(),
                 data
             );
@@ -32,7 +32,7 @@ export class OrdersService {
                 error.code === 400 ||
                 error.status === 400
             ) {
-                console.warn("⚠️ Appwrite Orders schema mismatch. Retrying with sanitized legacy schema.");
+                console.warn("⚠️ Firebase Orders schema mismatch. Retrying with sanitized legacy schema.");
                 const sanitized = {
                     userId: data.userId,
                     customerName: data.customerName,
@@ -58,17 +58,17 @@ export class OrdersService {
                 };
                 try {
                     return await this.databases.createDocument(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteOrdersCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseOrdersCollectionId,
                         ID.unique(),
                         sanitized
                     );
                 } catch (retryErr) {
-                    console.error("Appwrite service :: createOrder retry :: error", retryErr.message);
+                    console.error("Firebase service :: createOrder retry :: error", retryErr.message);
                     throw retryErr;
                 }
             }
-            console.error("Appwrite service :: createOrder :: error", error.message);
+            console.error("Firebase service :: createOrder :: error", error.message);
             throw error;
         }
     }
@@ -76,10 +76,10 @@ export class OrdersService {
     // ➡️ 2. Retrieve all active orders (For Admin Dashboard)
     async getOrders() {
         try {
-            if (!conf.appwriteOrdersCollectionId) return [];
+            if (!conf.firebaseOrdersCollectionId) return [];
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteOrdersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOrdersCollectionId,
                 [
                     Query.orderDesc("$createdAt"),
                     Query.limit(500) // Safety cap for admin dashboard
@@ -88,7 +88,7 @@ export class OrdersService {
             return response.documents;
         }
         catch (error) {
-            console.error("Appwrite service :: getOrders :: error", error.message);
+            console.error("Firebase service :: getOrders :: error", error.message);
             throw error;
         }
     }
@@ -96,7 +96,7 @@ export class OrdersService {
     // ➡️ 3. Retrieve orders for a specific user (For User Order History)
     async getUserOrders(userId) {
         try {
-            if (!userId || !conf.appwriteOrdersCollectionId) return [];
+            if (!userId || !conf.firebaseOrdersCollectionId) return [];
 
             // ✅ SECURITY + PERFORMANCE FIX: Use server-side Query.equal to filter by userId.
             // Firebase adapter translates this to Firestore: where("userId", "==", userId)
@@ -108,8 +108,8 @@ export class OrdersService {
             //   Without this index, Firestore will throw an error (fallback handles it).
             try {
                 const response = await this.databases.listDocuments(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteOrdersCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseOrdersCollectionId,
                     [
                         Query.equal("userId", userId),
                         Query.orderDesc("$createdAt"),
@@ -123,8 +123,8 @@ export class OrdersService {
                 // Collection: orders | userId ASC + $createdAt DESC
                 console.warn("⚠️ Firestore composite index missing for orders. Create it in Firebase Console. Falling back to client-side filter.", indexErr.message);
                 const fallback = await this.databases.listDocuments(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteOrdersCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseOrdersCollectionId,
                     [Query.orderDesc("$createdAt"), Query.limit(500)]
                 );
                 return (fallback.documents || []).filter(order => order.userId === userId);
@@ -140,12 +140,12 @@ export class OrdersService {
     // ➡️ 4. Update the order delivery status and optionally tracking info
     async updateOrderStatus(documentId, status, extraData = {}) {
         try {
-            if (!conf.appwriteOrdersCollectionId) return null;
+            if (!conf.firebaseOrdersCollectionId) return null;
 
             // Fetch current order to preserve and append metadata inside address field
             const currentOrder = await this.databases.getDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOrdersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOrdersCollectionId,
                 documentId
             );
 
@@ -176,8 +176,8 @@ export class OrdersService {
 
             try {
                 return await this.databases.updateDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteOrdersCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseOrdersCollectionId,
                     documentId,
                     updatePayload
                 );
@@ -191,8 +191,8 @@ export class OrdersService {
                     err.status === 400
                 ) {
                     return await this.databases.updateDocument(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteOrdersCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseOrdersCollectionId,
                         documentId,
                         { status, address: updatedAddress }
                     );
@@ -200,7 +200,7 @@ export class OrdersService {
                 throw err;
             }
         } catch (error) {
-            console.error("Appwrite service :: updateOrderStatus :: error", error.message);
+            console.error("Firebase service :: updateOrderStatus :: error", error.message);
             throw error;
         }
     }
@@ -208,14 +208,14 @@ export class OrdersService {
     // ➡️ 5. Retrieve details for a specific order by ID
     async getOrderById(documentId) {
         try {
-            if (!documentId || !conf.appwriteOrdersCollectionId) return null;
+            if (!documentId || !conf.firebaseOrdersCollectionId) return null;
             return await this.databases.getDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOrdersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOrdersCollectionId,
                 documentId
             );
         } catch (error) {
-            console.error("Appwrite service :: getOrderById :: error", error.message);
+            console.error("Firebase service :: getOrderById :: error", error.message);
             throw error;
         }
     }
@@ -223,14 +223,14 @@ export class OrdersService {
     // ➡️ 6. Delete an order document by ID
     async deleteOrder(documentId) {
         try {
-            if (!conf.appwriteOrdersCollectionId) return null;
+            if (!conf.firebaseOrdersCollectionId) return null;
             return await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteOrdersCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseOrdersCollectionId,
                 documentId
             );
         } catch (error) {
-            console.error("Appwrite service :: deleteOrder :: error", error.message);
+            console.error("Firebase service :: deleteOrder :: error", error.message);
             throw error;
         }
     }

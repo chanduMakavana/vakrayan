@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -32,7 +32,7 @@ export class WalletService {
                 referenceId
             };
 
-            if (!conf.appwriteWalletCollectionId) {
+            if (!conf.firebaseWalletCollectionId) {
                 const mockTx = {
                     $id: 'wtx-' + Date.now(),
                     $createdAt: new Date().toISOString(),
@@ -43,13 +43,13 @@ export class WalletService {
             }
 
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteWalletCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseWalletCollectionId,
                 ID.unique(),
                 payload
             );
         } catch (error) {
-            console.error("Appwrite service :: createWalletTransaction :: error", error.message);
+            console.error("Firebase service :: createWalletTransaction :: error", error.message);
             // Fallback locally
             const mockTx = {
                 $id: 'wtx-' + Date.now(),
@@ -69,13 +69,13 @@ export class WalletService {
     async getUserWalletTransactions(userId) {
         try {
             if (!userId) return [];
-            if (!conf.appwriteWalletCollectionId) {
+            if (!conf.firebaseWalletCollectionId) {
                 return this.getLocalTransactions(userId);
             }
 
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteWalletCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseWalletCollectionId,
                 [
                     Query.equal("userId", userId),
                     Query.orderDesc("$createdAt"),
@@ -88,7 +88,7 @@ export class WalletService {
             }
             return this.getLocalTransactions(userId);
         } catch (error) {
-            console.warn("Appwrite wallet transactions list error. Reading locally:", error.message);
+            console.warn("Firebase wallet transactions list error. Reading locally:", error.message);
             return this.getLocalTransactions(userId);
         }
     }

@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -20,7 +20,7 @@ export class CampaignService {
 
     // Helper: Local Coupons Fallback hydration
     // ✅ SECURITY FIX: Removed hardcoded STREET50/CREW10 coupons that were a revenue leak
-    // if Appwrite DB went offline. Now returns an empty array — no free discounts on DB failure.
+    // if Firebase DB went offline. Now returns an empty array — no free discounts on DB failure.
     getLocalCoupons() {
         return [];
     }
@@ -33,12 +33,12 @@ export class CampaignService {
     // ➡️ 1. Fetch All Active Coupons
     async getCoupons() {
         try {
-            if (!conf.appwriteCouponsCollectionId) {
+            if (!conf.firebaseCouponsCollectionId) {
                 return this.getLocalCoupons();
             }
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponsCollectionId,
                 [Query.orderDesc("$createdAt")]
             );
             
@@ -50,7 +50,7 @@ export class CampaignService {
             }
             return this.getLocalCoupons();
         } catch (error) {
-            console.warn("⚠️ Appwrite Coupons DB unavailable. Falling back to local storage.", error.message);
+            console.warn("⚠️ Firebase Coupons DB unavailable. Falling back to local storage.", error.message);
             return this.getLocalCoupons();
         }
     }
@@ -73,18 +73,18 @@ export class CampaignService {
         };
 
         try {
-            if (!conf.appwriteCouponsCollectionId) {
-                throw new Error("appwriteCouponsCollectionId is missing.");
+            if (!conf.firebaseCouponsCollectionId) {
+                throw new Error("firebaseCouponsCollectionId is missing.");
             }
             const doc = await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponsCollectionId,
                 ID.unique(),
                 payload
             );
             return { ...doc, isExpired: this.checkIsExpired(doc.valid_until) };
         } catch (error) {
-            console.warn("⚠️ Appwrite Coupons offline. Saving coupon locally.", error.message);
+            console.warn("⚠️ Firebase Coupons offline. Saving coupon locally.", error.message);
             const local = this.getLocalCoupons();
             const newCoupon = { id: 'local-' + Date.now(), $id: 'local-' + Date.now(), ...payload };
             local.push(newCoupon);
@@ -111,18 +111,18 @@ export class CampaignService {
         };
 
         try {
-            if (!conf.appwriteCouponsCollectionId || documentId.startsWith('local-')) {
-                throw new Error("Appwrite unavailable or local coupon update triggered.");
+            if (!conf.firebaseCouponsCollectionId || documentId.startsWith('local-')) {
+                throw new Error("Firebase unavailable or local coupon update triggered.");
             }
             const doc = await this.databases.updateDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponsCollectionId,
                 documentId,
                 payload
             );
             return { ...doc, isExpired: this.checkIsExpired(doc.valid_until) };
         } catch (error) {
-            console.warn("⚠️ Appwrite Coupons offline. Updating coupon locally.", error.message);
+            console.warn("⚠️ Firebase Coupons offline. Updating coupon locally.", error.message);
             const local = this.getLocalCoupons();
             const idx = local.findIndex(c => c.code === code || c.$id === documentId || c.id === documentId);
             if (idx !== -1) {
@@ -138,17 +138,17 @@ export class CampaignService {
     // ➡️ 3. Deactivate/Delete a Promo Coupon
     async deleteCoupon(documentId, code) {
         try {
-            if (!conf.appwriteCouponsCollectionId || documentId.startsWith('local-')) {
-                throw new Error("Appwrite unavailable or local coupon deletion triggered.");
+            if (!conf.firebaseCouponsCollectionId || documentId.startsWith('local-')) {
+                throw new Error("Firebase unavailable or local coupon deletion triggered.");
             }
             await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponsCollectionId,
                 documentId
             );
             return true;
         } catch (error) {
-            console.warn("⚠️ Appwrite offline/local code. Swiping coupon locally.", error.message);
+            console.warn("⚠️ Firebase offline/local code. Swiping coupon locally.", error.message);
             const local = this.getLocalCoupons().filter(c => c.code !== code && c.$id !== documentId && c.id !== documentId);
             localStorage.setItem('campaignCoupons', JSON.stringify(local));
             return true;
@@ -158,12 +158,12 @@ export class CampaignService {
     // ➡️ 4. Retrieve Live Scrolling Announcement Banner Text
     async getPromoText() {
         try {
-            if (!conf.appwriteSettingsCollectionId) {
+            if (!conf.firebaseSettingsCollectionId) {
                 return this.getLocalPromoText();
             }
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteSettingsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseSettingsCollectionId,
                 [Query.limit(1)]
             );
             if (response.documents && response.documents.length > 0) {
@@ -171,7 +171,7 @@ export class CampaignService {
             }
             return this.getLocalPromoText();
         } catch (error) {
-            console.warn("⚠️ Appwrite Settings DB unavailable. Reading marquee locally.", error.message);
+            console.warn("⚠️ Firebase Settings DB unavailable. Reading marquee locally.", error.message);
             return this.getLocalPromoText();
         }
     }
@@ -180,14 +180,14 @@ export class CampaignService {
     async savePromoText(text) {
         const cleanText = text.trim();
         try {
-            if (!conf.appwriteSettingsCollectionId) {
-                throw new Error("appwriteSettingsCollectionId is missing.");
+            if (!conf.firebaseSettingsCollectionId) {
+                throw new Error("firebaseSettingsCollectionId is missing.");
             }
             
             // Check if document already exists
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteSettingsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseSettingsCollectionId,
                 [Query.limit(1)]
             );
 
@@ -195,22 +195,22 @@ export class CampaignService {
                 // Update existing banner document
                 const docId = response.documents[0].$id;
                 return await this.databases.updateDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteSettingsCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseSettingsCollectionId,
                     docId,
                     { announcementText: cleanText }
                 );
             } else {
                 // Create first banner document
                 return await this.databases.createDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteSettingsCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseSettingsCollectionId,
                     ID.unique(),
                     { announcementText: cleanText }
                 );
             }
         } catch (error) {
-            console.warn("⚠️ Appwrite Settings offline. Saving banner locally.", error.message);
+            console.warn("⚠️ Firebase Settings offline. Saving banner locally.", error.message);
             localStorage.setItem('campaignPromoText', cleanText);
             return { announcementText: cleanText };
         }
@@ -220,16 +220,16 @@ export class CampaignService {
     async subscribeNewsletter(email) {
         const cleanEmail = email.trim().toLowerCase();
         try {
-            if (!conf.appwriteCampaignsCollectionId) {
+            if (!conf.firebaseCampaignsCollectionId) {
                 throw new Error("Newsletter service is not configured.");
             }
 
-            // Check if email already exists in Appwrite database
+            // Check if email already exists in Firebase database
             let isAlreadySubscribed = false;
             try {
                 const response = await this.databases.listDocuments(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteCampaignsCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseCampaignsCollectionId,
                     [Query.equal("email", cleanEmail)]
                 );
                 if (response.documents && response.documents.length > 0) {
@@ -239,8 +239,8 @@ export class CampaignService {
                 // Fallback: list documents and filter locally if indexes are not configured
                 try {
                     const response = await this.databases.listDocuments(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteCampaignsCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseCampaignsCollectionId,
                         [Query.limit(100)]
                     );
                     const match = response.documents.find(doc => doc.email === cleanEmail);
@@ -248,7 +248,7 @@ export class CampaignService {
                         isAlreadySubscribed = true;
                     }
                 } catch (innerError) {
-                    console.warn("⚠️ Appwrite newsletter check failed:", innerError.message);
+                    console.warn("⚠️ Firebase newsletter check failed:", innerError.message);
                 }
             }
 
@@ -256,10 +256,10 @@ export class CampaignService {
                 throw new Error("This email is already subscribed to drops.");
             }
 
-            // Create document in Appwrite
+            // Create document in Firebase
             const doc = await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteCampaignsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCampaignsCollectionId,
                 ID.unique(),
                 { 
                     email: cleanEmail,
@@ -269,7 +269,7 @@ export class CampaignService {
 
             return doc;
         } catch (error) {
-            console.error("Appwrite service :: subscribeNewsletter :: error", error.message);
+            console.error("Firebase service :: subscribeNewsletter :: error", error.message);
             throw error;
         }
     }
@@ -277,7 +277,7 @@ export class CampaignService {
     // ➡️ 7. Retrieve All Newsletter Subscribers
     async getNewsletterSubscribers() {
         try {
-            if (!conf.appwriteCampaignsCollectionId) {
+            if (!conf.firebaseCampaignsCollectionId) {
                 const defaults = [
                     "vakrayan.help@gmail.com",
                     "chandu.makavana61@gmail.com",
@@ -286,8 +286,8 @@ export class CampaignService {
                 return defaults.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
             }
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCampaignsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCampaignsCollectionId,
                 [Query.limit(100), Query.orderDesc("$createdAt")]
             );
             if (response.documents && response.documents.length > 0) {
@@ -301,7 +301,7 @@ export class CampaignService {
             ];
             return defaults.map((email, idx) => ({ $id: `local-sub-${idx}`, email }));
         } catch (error) {
-            console.warn("⚠️ Appwrite subscriber retrieve failed. Using default subscribers list.", error.message);
+            console.warn("⚠️ Firebase subscriber retrieve failed. Using default subscribers list.", error.message);
             const defaults = [
                 "vakrayan.help@gmail.com",
                 "chandu.makavana61@gmail.com",

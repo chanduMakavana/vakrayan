@@ -1,4 +1,4 @@
-import { Account, ID } from 'appwrite';
+import { Account, ID } from '../firebase/adapter.js';
 import { client } from './client';
 
 export class AuthService {
@@ -17,7 +17,7 @@ export class AuthService {
             }
             return null;
         } catch (error) {
-            console.error("Appwrite service :: createAccount :: error", error.message);
+            console.error("Firebase service :: createAccount :: error", error.message);
             throw error;
         }
     }
@@ -27,10 +27,11 @@ export class AuthService {
         try {
             return await this.account.createEmailPasswordSession(email, password);
         } catch (error) {
-            console.error("Appwrite service :: login :: error", error.message);
+            console.error("Firebase service :: login :: error", error.message);
             throw error;
         }
     }
+
 
     // Retrieve current authenticated user details
     async getCurrentUser() {
@@ -39,7 +40,7 @@ export class AuthService {
             return user ?? null;
         } catch (error) {
             // No active session is a normal state on initial mount, do not throw
-            console.log("Appwrite service :: getCurrentUser :: Not Logged In", error.message);
+            console.log("Firebase service :: getCurrentUser :: Not Logged In", error.message);
             return null;
         }
     }
@@ -49,7 +50,7 @@ export class AuthService {
         try {
             return await this.account.deleteSession('current');
         } catch (error) {
-            console.log("Appwrite service :: logout :: No active session found or already logged out", error.message);
+            console.log("Firebase service :: logout :: No active session found or already logged out", error.message);
             return null;
         }
     }
@@ -59,7 +60,7 @@ export class AuthService {
         try {
             return await this.account.deleteSessions();
         } catch (error) {
-            console.error("Appwrite service :: logoutAllDevices :: error", error.message);
+            console.error("Firebase service :: logoutAllDevices :: error", error.message);
             throw error;
         }
     }
@@ -69,7 +70,7 @@ export class AuthService {
         try {
             return await this.account.updatePrefs(prefs);
         } catch (error) {
-            console.error("Appwrite service :: updatePreferences :: error", error.message);
+            console.error("Firebase service :: updatePreferences :: error", error.message);
             throw error;
         }
     }
@@ -79,7 +80,7 @@ export class AuthService {
         try {
             return await this.account.updateName(name);
         } catch (error) {
-            console.error("Appwrite service :: updateName :: error", error.message);
+            console.error("Firebase service :: updateName :: error", error.message);
             throw error;
         }
     }
@@ -89,7 +90,7 @@ export class AuthService {
         try {
             return await this.account.updatePassword(password, oldPassword);
         } catch (error) {
-            console.error("Appwrite service :: updatePassword :: error", error.message);
+            console.error("Firebase service :: updatePassword :: error", error.message);
             throw error;
         }
     }
@@ -99,7 +100,7 @@ export class AuthService {
         try {
             return await this.account.createRecovery(email, url);
         } catch (error) {
-            console.error("Appwrite service :: createRecovery :: error", error.message);
+            console.error("Firebase service :: createRecovery :: error", error.message);
             throw error;
         }
     }
@@ -109,7 +110,7 @@ export class AuthService {
         try {
             return await this.account.updateRecovery(userId, secret, password);
         } catch (error) {
-            console.error("Appwrite service :: updateRecovery :: error", error.message);
+            console.error("Firebase service :: updateRecovery :: error", error.message);
             throw error;
         }
     }
@@ -121,7 +122,7 @@ export class AuthService {
             const failureUrl = `${window.location.origin}/login`;
             return this.account.createOAuth2Session('google', successUrl, failureUrl);
         } catch (error) {
-            console.error("Appwrite service :: loginWithGoogle :: error", error.message);
+            console.error("Firebase service :: loginWithGoogle :: error", error.message);
             throw error;
         }
     }

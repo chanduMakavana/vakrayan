@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -12,15 +12,15 @@ export class SlidesService {
     // Retrieve all active hero slides
     async getSlides() {
         try {
-            if (!conf.appwriteSlidesCollectionId) return [];
+            if (!conf.firebaseSlidesCollectionId) return [];
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteSlidesCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseSlidesCollectionId,
                 [Query.orderDesc("$createdAt")]
             );
             return response.documents || [];
         } catch (error) {
-            console.error("Appwrite service :: getSlides :: error", error.message);
+            console.error("Firebase service :: getSlides :: error", error.message);
             return [];
         }
     }
@@ -28,15 +28,15 @@ export class SlidesService {
     // Create a new slide
     async createSlide(data) {
         try {
-            if (!conf.appwriteSlidesCollectionId) throw new Error("Slides Collection ID is missing.");
+            if (!conf.firebaseSlidesCollectionId) throw new Error("Slides Collection ID is missing.");
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteSlidesCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseSlidesCollectionId,
                 ID.unique(),
                 data
             );
         } catch (error) {
-            console.error("Appwrite service :: createSlide :: error", error.message);
+            console.error("Firebase service :: createSlide :: error", error.message);
             throw error;
         }
     }
@@ -44,15 +44,15 @@ export class SlidesService {
     // Delete an existing slide document
     async deleteSlide(documentId) {
         try {
-            if (!conf.appwriteSlidesCollectionId) throw new Error("Slides Collection ID is missing.");
+            if (!conf.firebaseSlidesCollectionId) throw new Error("Slides Collection ID is missing.");
             await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteSlidesCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseSlidesCollectionId,
                 documentId
             );
             return true;
         } catch (error) {
-            console.error("Appwrite service :: deleteSlide :: error", error.message);
+            console.error("Firebase service :: deleteSlide :: error", error.message);
             throw error;
         }
     }

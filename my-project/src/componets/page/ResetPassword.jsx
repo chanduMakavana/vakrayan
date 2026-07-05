@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import authService from '../../appwrite/auth'
+import authService from '../../services/auth'
 import { useToast } from '../../context/ToastContext'
 
 function ResetPassword() {

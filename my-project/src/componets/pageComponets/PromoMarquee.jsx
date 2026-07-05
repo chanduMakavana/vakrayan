@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import campaignService from '../../appwrite/campaign'
+import campaignService from '../../services/campaign'
 
 function PromoMarquee() {
   const [promoText, setPromoText] = useState('⚡ FREE EXPRESS SHIPPING & 7-DAY EASY RETURNS ON ALL ORDERS')

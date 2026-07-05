@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
-import categoryService from '../../appwrite/category'
+import categoryService from '../../services/category'
 
 const containerVariants = {
   hidden: { opacity: 0 },

@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -12,11 +12,11 @@ export class CouponUsageService {
     // Verify if a user has already redeemed a specific coupon code
     async checkCouponUsage(userId, couponCode) {
         try {
-            if (!userId || !couponCode || !conf.appwriteCouponUsageCollectionId) return false;
+            if (!userId || !couponCode || !conf.firebaseCouponUsageCollectionId) return false;
             
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponUsageCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponUsageCollectionId,
                 [
                     Query.equal("userId", userId),
                     Query.equal("couponCode", couponCode.trim().toUpperCase())
@@ -30,9 +30,9 @@ export class CouponUsageService {
             return false;
         } catch (error) {
             if (error.message?.includes("Collection with the requested ID") || error.message?.includes("not be found")) {
-                console.warn("⚠️ Appwrite 'coupon_usage' collection has not been created yet in the database. Coupon validation is skipped.");
+                console.warn("⚠️ Firebase 'coupon_usage' collection has not been created yet in the database. Coupon validation is skipped.");
             } else {
-                console.error("Appwrite service :: checkCouponUsage :: error", error.message);
+                console.error("Firebase service :: checkCouponUsage :: error", error.message);
             }
             return false;
         }
@@ -41,14 +41,14 @@ export class CouponUsageService {
     // Log coupon usage upon successful transaction placement
     async logCouponUsage(userId, couponCode) {
         try {
-            if (!userId || !couponCode || !conf.appwriteCouponUsageCollectionId) return null;
+            if (!userId || !couponCode || !conf.firebaseCouponUsageCollectionId) return null;
             
             const cleanedCode = couponCode.trim().toUpperCase();
             
             // Check if record exists
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponUsageCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponUsageCollectionId,
                 [
                     Query.equal("userId", userId),
                     Query.equal("couponCode", cleanedCode)
@@ -58,8 +58,8 @@ export class CouponUsageService {
             if (response.documents.length > 0) {
                 const doc = response.documents[0];
                 return await this.databases.updateDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteCouponUsageCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseCouponUsageCollectionId,
                     doc.$id,
                     {
                         usedCount: Number(doc.usedCount || 1) + 1,
@@ -68,8 +68,8 @@ export class CouponUsageService {
                 );
             } else {
                 return await this.databases.createDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteCouponUsageCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseCouponUsageCollectionId,
                     ID.unique(),
                     {
                         userId,
@@ -81,9 +81,9 @@ export class CouponUsageService {
             }
         } catch (error) {
             if (error.message?.includes("Collection with the requested ID") || error.message?.includes("not be found")) {
-                console.warn("⚠️ Appwrite 'coupon_usage' collection has not been created yet in the database. Coupon logging is skipped.");
+                console.warn("⚠️ Firebase 'coupon_usage' collection has not been created yet in the database. Coupon logging is skipped.");
             } else {
-                console.error("Appwrite service :: logCouponUsage :: error", error.message);
+                console.error("Firebase service :: logCouponUsage :: error", error.message);
             }
         }
     }
@@ -91,17 +91,17 @@ export class CouponUsageService {
     // Retrieve all coupon usage records for admin telemetry
     async getCouponUsages() {
         try {
-            if (!conf.appwriteCouponUsageCollectionId) return [];
+            if (!conf.firebaseCouponUsageCollectionId) return [];
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteCouponUsageCollectionId
+                conf.firebaseDatabaseId,
+                conf.firebaseCouponUsageCollectionId
             );
             return response.documents;
         } catch (error) {
             if (error.message?.includes("Collection with the requested ID") || error.message?.includes("not be found")) {
-                console.warn("⚠️ Appwrite 'coupon_usage' collection missing. Skipping coupon usages telemetry.");
+                console.warn("⚠️ Firebase 'coupon_usage' collection missing. Skipping coupon usages telemetry.");
             } else {
-                console.error("Appwrite service :: getCouponUsages :: error", error.message);
+                console.error("Firebase service :: getCouponUsages :: error", error.message);
             }
             return [];
         }

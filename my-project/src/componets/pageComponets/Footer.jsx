@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import campaignService from '../../appwrite/campaign'
+import campaignService from '../../services/campaign'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 
 // Social SVG icons (inline — no extra dep)

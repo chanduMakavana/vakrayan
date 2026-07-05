@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -13,14 +13,14 @@ export class ProductsService {
     async createProduct(data) {
         try {
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteProductsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseProductsCollectionId,
                 ID.unique(),
                 data
             );
         }
         catch (error) {
-            console.error("Appwrite service :: createProduct :: error", error.message);
+            console.error("Firebase service :: createProduct :: error", error.message);
             throw error;
         }
     }
@@ -29,8 +29,8 @@ export class ProductsService {
     async getProducts() {
         try {
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteProductsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseProductsCollectionId,
                 [
                     Query.orderDesc("$createdAt"),
                     Query.limit(500) // Raised from 100 to prevent silent catalog truncation
@@ -39,7 +39,7 @@ export class ProductsService {
             return response.documents;
         }
         catch (error) {
-            console.error("Appwrite service :: getProducts :: error", error.message);
+            console.error("Firebase service :: getProducts :: error", error.message);
             throw error;
         }
     }
@@ -48,13 +48,13 @@ export class ProductsService {
     async updateProduct(documentId, data) {
         try {
             return await this.databases.updateDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteProductsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseProductsCollectionId,
                 documentId,
                 data
             );
         } catch (error) {
-            console.error("Appwrite service :: updateProduct :: error", error.message);
+            console.error("Firebase service :: updateProduct :: error", error.message);
             throw error;
         }
     }
@@ -63,13 +63,13 @@ export class ProductsService {
     async deleteProduct(documentId) {
         try {
             await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteProductsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseProductsCollectionId,
                 documentId
             );
             return true; // Success validation flag
         } catch (error) {
-            console.error("Appwrite service :: deleteProduct :: error", error.message);
+            console.error("Firebase service :: deleteProduct :: error", error.message);
             throw error;
         }
     }
@@ -77,12 +77,12 @@ export class ProductsService {
     async getProductById(documentId) {
         try {
             return await this.databases.getDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteProductsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseProductsCollectionId,
                 documentId
             );
         } catch (error) {
-            console.error("Appwrite service :: getProductById :: error", error.message);
+            console.error("Firebase service :: getProductById :: error", error.message);
             throw error;
         }
     }
@@ -92,8 +92,8 @@ export class ProductsService {
         try {
             // First try listing documents by slug
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteProductsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseProductsCollectionId,
                 [
                     Query.equal('slug', idOrSlug),
                     Query.limit(1)
@@ -123,15 +123,15 @@ export class ProductsService {
             searched_at: new Date().toISOString()
         };
         try {
-            const collectionId = import.meta.env.VITE_APPWRITE_SEARCH_LOGS_COLLECTION_ID || 'search_logs';
+            const collectionId = import.meta.env.VITE_FIREBASE_SEARCH_LOGS_COLLECTION_ID || import.meta.env.VITE_APPWRITE_SEARCH_LOGS_COLLECTION_ID || 'search_logs';
             return await this.databases.createDocument(
-                conf.appwriteDatabaseId,
+                conf.firebaseDatabaseId,
                 collectionId,
                 ID.unique(),
                 payload
             );
         } catch (error) {
-            console.warn("Appwrite search logs collection unavailable. Storing locally.", error.message);
+            console.warn("Firebase search logs collection unavailable. Storing locally.", error.message);
             const logs = JSON.parse(localStorage.getItem('search_logs')) || [];
             logs.push(payload);
             localStorage.setItem('search_logs', JSON.stringify(logs));

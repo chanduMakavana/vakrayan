@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -26,12 +26,12 @@ export class ReviewsService {
     async getReviewsByProductId(productId) {
         try {
             if (!productId) return [];
-            if (!conf.appwriteReviewsCollectionId) {
+            if (!conf.firebaseReviewsCollectionId) {
                 return this.getLocalReviews(productId);
             }
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteReviewsCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseReviewsCollectionId,
                 [
                     Query.equal("productId", productId),
                     Query.orderDesc("$createdAt")
@@ -70,7 +70,7 @@ export class ReviewsService {
 
             return merged;
         } catch (error) {
-            console.warn("⚠️ Appwrite Reviews unavailable. Reading reviews locally.", error.message);
+            console.warn("⚠️ Firebase Reviews unavailable. Reading reviews locally.", error.message);
             return this.getLocalReviews(productId);
         }
     }
@@ -104,27 +104,27 @@ export class ReviewsService {
         };
 
         try {
-            if (!conf.appwriteReviewsCollectionId) {
-                throw new Error("appwriteReviewsCollectionId is missing.");
+            if (!conf.firebaseReviewsCollectionId) {
+                throw new Error("firebaseReviewsCollectionId is missing.");
             }
             try {
                 return await this.databases.createDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteReviewsCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseReviewsCollectionId,
                     ID.unique(),
                     extendedPayload
                 );
             } catch (err) {
                 console.warn("Direct attributes missing from schema, writing to basic payload:", err.message);
                 return await this.databases.createDocument(
-                    conf.appwriteDatabaseId,
-                    conf.appwriteReviewsCollectionId,
+                    conf.firebaseDatabaseId,
+                    conf.firebaseReviewsCollectionId,
                     ID.unique(),
                     payload
                 );
             }
         } catch (error) {
-            console.warn("⚠️ Appwrite Reviews offline. Saving review in local sandbox.", error.message);
+            console.warn("⚠️ Firebase Reviews offline. Saving review in local sandbox.", error.message);
             const mockDoc = {
                 $id: 'rev-' + Date.now(),
                 $createdAt: new Date().toISOString(),

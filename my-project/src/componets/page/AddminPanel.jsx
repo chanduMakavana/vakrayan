@@ -2,18 +2,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import productsService from '../../appwrite/products';
-import ordersService from '../../appwrite/orders';
-import campaignService from '../../appwrite/campaign';
+import productsService from '../../services/products';
+import ordersService from '../../services/orders';
+import campaignService from '../../services/campaign';
 import { useToast } from '../../context/ToastContext';
-import restockService from '../../appwrite/restock';
-import couponUsageService from '../../appwrite/couponUsage';
-import cartService from '../../appwrite/cart';
-import storageService from '../../appwrite/storage';
-import slidesService from '../../appwrite/slides';
-import offersService from '../../appwrite/offers';
-import walletService from '../../appwrite/wallet';
-import categoryService from '../../appwrite/category';
+import restockService from '../../services/restock';
+import couponUsageService from '../../services/couponUsage';
+import cartService from '../../services/cart';
+import storageService from '../../services/storage';
+import slidesService from '../../services/slides';
+import offersService from '../../services/offers';
+import walletService from '../../services/wallet';
+import categoryService from '../../services/category';
 import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders } from 'react-icons/fi';
 
 
@@ -207,7 +207,7 @@ function AdminPanel() {
       }
     } catch (err) {
       console.error("Category image upload failed:", err);
-      showToast("Appwrite Storage upload failed.", "error");
+      showToast("Firebase Storage upload failed.", "error");
     } finally {
       setCategoryUploading(prev => ({ ...prev, [catValue]: false }));
     }
@@ -308,7 +308,7 @@ function AdminPanel() {
         showToast(`✓ Category cleared from products! Success: ${successCount}, Failed: ${errorCount}`, "success");
       }
 
-      // Clear cover image override from Appwrite and set isDeleted = true
+      // Clear cover image override from Firebase and set isDeleted = true
       await categoryService.deleteCategory(targetSlug);
 
       if (categoryImages[targetSlug]) {
@@ -490,7 +490,7 @@ function AdminPanel() {
       }
     } catch (err) {
       console.error("Slide image upload failed:", err);
-      showToast("Appwrite Storage upload failed.", "error");
+      showToast("Firebase Storage upload failed.", "error");
     } finally {
       setSlideUploading(false);
     }
@@ -546,13 +546,13 @@ function AdminPanel() {
       if (response?.$id) {
         const fileUrl = storageService.getFileView(response.$id);
         setValue(fieldName, fileUrl);
-        showToast("✓ Image uploaded successfully to Appwrite Storage!", "success");
+        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image upload failed:", err);
-      showToast("Appwrite Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
     } finally {
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
     }
@@ -576,18 +576,18 @@ function AdminPanel() {
     }
   };
 
-  // Load product catalog from Appwrite
+  // Load product catalog from Firebase
   const loadProductCatalog = async () => {
     try {
       const response = await productsService.getProducts();
       const structuredData = response?.documents || response || [];
       setProducts(structuredData);
     } catch (err) {
-      console.error("Failed to fetch products from Appwrite:", err.message);
+      console.error("Failed to fetch products from Firebase:", err.message);
     }
   };
 
-  // Load customer orders from Appwrite
+  // Load customer orders from Firebase
   const loadCustomerOrders = async () => {
     try {
       const response = await ordersService.getOrders();
@@ -778,8 +778,8 @@ function AdminPanel() {
         showToast('⚡ Fresh Vakrayan Drop Deployed Globally!', 'success');
       }
     } catch (cloudError) {
-      console.error("Appwrite product write failed:", cloudError.message);
-      showToast("Failed to save product. Check Appwrite connection.", "error");
+      console.error("Firebase product write failed:", cloudError.message);
+      showToast("Failed to save product. Check Firebase connection.", "error");
     } finally {
       // Clear form
       reset();
@@ -932,10 +932,10 @@ function AdminPanel() {
     setIsSweepProductModalOpen(false);
     try {
       await productsService.deleteProduct(sweepTargetProductId);
-      showToast('🗑️ Live Drop Revoked From Appwrite Repository Pool!', 'success');
+      showToast('🗑️ Live Drop Revoked From Firebase Repository Pool!', 'success');
     } catch (err) {
       console.error("Failed to delete product:", err.message);
-      showToast("Failed to delete product. Check Appwrite connection.", "error");
+      showToast("Failed to delete product. Check Firebase connection.", "error");
     } finally {
       setSweepTargetProductId(null);
       await loadProductCatalog();
@@ -950,7 +950,7 @@ function AdminPanel() {
       await loadProductCatalog();
     } catch (err) {
       console.error("Failed to toggle live status:", err);
-      showToast("Failed to update status. Check Appwrite connection.", "error");
+      showToast("Failed to update status. Check Firebase connection.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -971,7 +971,7 @@ function AdminPanel() {
       showToast('🗑️ Order records purged from database!', 'success');
     } catch (err) {
       console.error("Failed to delete order:", err.message);
-      showToast("Failed to delete order. Check Appwrite connection.", "error");
+      showToast("Failed to delete order. Check Firebase connection.", "error");
     } finally {
       setDeleteTargetOrder(null);
       setActionLoading(false);
@@ -1450,7 +1450,7 @@ function AdminPanel() {
       await loadProductCatalog(); // Update active catalog stock display
     } catch (err) {
       console.error("Status update failed:", err.message);
-      showToast(`Failed to update order status. Check Appwrite connection.`, "error");
+      showToast(`Failed to update order status. Check Firebase connection.`, "error");
     } finally {
       setActionLoading(false);
       loadCustomerOrders();

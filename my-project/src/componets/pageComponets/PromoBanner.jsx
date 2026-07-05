@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import campaignService from '../../appwrite/campaign'
+import campaignService from '../../services/campaign'
 
 const containerVariants = {
   hidden: { opacity: 0 },

@@ -3,9 +3,9 @@ import { useForm } from 'react-hook-form'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginAction } from '../../features/login'
-import authService from '../../appwrite/auth'
+import authService from '../../services/auth'
 import { setCartItems } from '../../features/addToCart'
-import cartService from '../../appwrite/cart'
+import cartService from '../../services/cart'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 import { mergeLocalCartToDb } from '../../utils/cartMergeHelper'
 
@@ -29,7 +29,7 @@ function SignUp() {
     setServerError("")
     setLoading(true)
     try {
-      // 1. Create account (which automatically logs the user in on Appwrite)
+      // 1. Create account (which automatically logs the user in on Firebase)
       const session = await authService.createAccount({
         email: data.email.trim(),
         password: data.password.trim(),

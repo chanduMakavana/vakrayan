@@ -69,7 +69,7 @@ export class Account {
                         const prefs = data.prefs || {};
 
                         // ✅ FIX: Build labels array from Firestore prefs.role field.
-                        // Firebase doesn't have Appwrite-style user.labels, so we
+                        // Firebase doesn't have Firebase-style user.labels, so we
                         // derive them from the Firestore user document.
                         // To make someone admin: Firebase Console → Firestore → users
                         //   → [uid] → prefs → role: "admin"
@@ -174,6 +174,7 @@ export class Account {
             });
         }
     }
+
 
     async createRecovery(email, url) {
         return await sendPasswordResetEmail(auth, email, { url: url || window.location.origin });

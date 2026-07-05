@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
-import wishlistService from '../../appwrite/wishlist'
+import wishlistService from '../../services/wishlist'
 import ProductCardSkeleton from './ProductCardSkeleton'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import { scatterProducts } from '../../utils/colorHelper'

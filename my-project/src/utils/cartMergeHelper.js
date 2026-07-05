@@ -1,9 +1,9 @@
-import cartService from '../appwrite/cart';
+import cartService from '../services/cart';
 import { setCartItems } from '../features/addToCart';
 import { clearGuestCart, loadGuestCartItems } from './guestCartHelper';
 
 /**
- * Merges guest cart items from localStorage into the Appwrite database for a logged-in user.
+ * Merges guest cart items from localStorage into the Firebase database for a logged-in user.
  * Combines identical product+size matches to prevent duplication and sums up their quantities.
  * Clears localStorage upon completion.
  */

@@ -11,7 +11,7 @@
 
 /**
  * Generates a unique temporary ID for a guest cart item.
- * Prefixed with "guest_" to distinguish from real Appwrite document IDs.
+ * Prefixed with "guest_" to distinguish from real Firebase document IDs.
  */
 export const generateGuestCartId = () =>
   `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

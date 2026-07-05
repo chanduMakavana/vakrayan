@@ -1,4 +1,4 @@
-import { ID, Databases, Query } from "appwrite";
+import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
 
@@ -12,7 +12,7 @@ export class AddressService {
     // ✅ SECURITY FIX: Removed localStorage helpers for address data.
     // Customer PII (name, address, phone, pincode) must NEVER be cached in localStorage
     // as it is accessible to any JS on the page including third-party scripts.
-    // Addresses are always fetched from Appwrite DB on demand.
+    // Addresses are always fetched from Firebase DB on demand.
 
     /** @deprecated — localStorage address caching removed for security */
     getLocalAddress(_userId) { return null; }
@@ -38,7 +38,7 @@ export class AddressService {
             }
             return null;
         } catch (error) {
-            console.warn("⚠️ Appwrite Addresses unavailable.", error.message);
+            console.warn("⚠️ Firebase Addresses unavailable.", error.message);
             return null;
         }
     }
@@ -47,13 +47,13 @@ export class AddressService {
     async getUserAddresses(userId) {
         try {
             if (!userId) return [];
-            if (!conf.appwriteAddressesCollectionId) {
+            if (!conf.firebaseAddressesCollectionId) {
                 return this.getLocalAddresses(userId);
             }
             
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteAddressesCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseAddressesCollectionId,
                 [
                     Query.equal("userId", userId),
                     Query.limit(50)
@@ -65,7 +65,7 @@ export class AddressService {
             }
             return this.getLocalAddresses(userId);
         } catch (error) {
-            console.warn("⚠️ Appwrite Addresses unavailable. Reading addresses locally.", error.message);
+            console.warn("⚠️ Firebase Addresses unavailable. Reading addresses locally.", error.message);
             return this.getLocalAddresses(userId);
         }
     }
@@ -94,7 +94,7 @@ export class AddressService {
             is_default: isDefault
         };
 
-        // Extended payload — tries to write is_default if Appwrite schema has it
+        // Extended payload — tries to write is_default if Firebase schema has it
         const extendedPayload = {
             ...payload
         };
@@ -102,7 +102,7 @@ export class AddressService {
         const docId = addressData.$id || addressData.id;
 
         try {
-            if (!conf.appwriteAddressesCollectionId) {
+            if (!conf.firebaseAddressesCollectionId) {
                 const local = this.getLocalAddresses(userId);
                 let savedDoc;
                 if (docId) {
@@ -139,16 +139,16 @@ export class AddressService {
                 // Update specific address
                 try {
                     result = await this.databases.updateDocument(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteAddressesCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseAddressesCollectionId,
                         docId,
                         extendedPayload
                     );
                 } catch (err) {
                     console.warn("Schema missing state/country/is_default — retrying update with base fields only:", err.message);
                     result = await this.databases.updateDocument(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteAddressesCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseAddressesCollectionId,
                         docId,
                         payload
                     );
@@ -157,16 +157,16 @@ export class AddressService {
                 // Create a new address document
                 try {
                     result = await this.databases.createDocument(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteAddressesCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseAddressesCollectionId,
                         ID.unique(),
                         extendedPayload
                     );
                 } catch (err) {
                     console.warn("Schema missing state/country/is_default — retrying create with base fields only:", err.message);
                     result = await this.databases.createDocument(
-                        conf.appwriteDatabaseId,
-                        conf.appwriteAddressesCollectionId,
+                        conf.firebaseDatabaseId,
+                        conf.firebaseAddressesCollectionId,
                         ID.unique(),
                         payload
                     );
@@ -180,7 +180,7 @@ export class AddressService {
 
             return result;
         } catch (error) {
-            console.warn("⚠️ Appwrite saveAddress error. Saving locally.", error.message);
+            console.warn("⚠️ Firebase saveAddress error. Saving locally.", error.message);
             // Fallback to local
             const mockData = docId ? addressData : { $id: 'addr-' + Date.now(), ...extendedPayload };
             const local = this.getLocalAddresses(userId);
@@ -198,14 +198,14 @@ export class AddressService {
     // ➡️ 4. Delete an address
     async deleteAddress(userId, addressId) {
         try {
-            if (!conf.appwriteAddressesCollectionId || addressId.startsWith('addr-')) {
+            if (!conf.firebaseAddressesCollectionId || addressId.startsWith('addr-')) {
                 const local = this.getLocalAddresses(userId).filter(a => a.$id !== addressId && a.id !== addressId);
                 this.saveLocalAddresses(userId, local);
                 return true;
             }
             await this.databases.deleteDocument(
-                conf.appwriteDatabaseId,
-                conf.appwriteAddressesCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseAddressesCollectionId,
                 addressId
             );
             return true;
@@ -217,13 +217,13 @@ export class AddressService {
         }
     }
 
-    // Helper: Sync defaults on Appwrite DB by clearing is_default on other nodes
+    // Helper: Sync defaults on Firebase DB by clearing is_default on other nodes
     async syncDefaultAddress(userId, defaultId) {
         try {
-            if (!conf.appwriteAddressesCollectionId) return;
+            if (!conf.firebaseAddressesCollectionId) return;
             const response = await this.databases.listDocuments(
-                conf.appwriteDatabaseId,
-                conf.appwriteAddressesCollectionId,
+                conf.firebaseDatabaseId,
+                conf.firebaseAddressesCollectionId,
                 [
                     Query.equal("userId", userId),
                     Query.limit(100)
@@ -233,8 +233,8 @@ export class AddressService {
                 if (doc.$id !== defaultId) {
                     try {
                         await this.databases.updateDocument(
-                            conf.appwriteDatabaseId,
-                            conf.appwriteAddressesCollectionId,
+                            conf.firebaseDatabaseId,
+                            conf.firebaseAddressesCollectionId,
                             doc.$id,
                             { is_default: false }
                         );

@@ -4,18 +4,18 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
-import authService from '../../appwrite/auth';
-import addressService from '../../appwrite/address';
-import ordersService from '../../appwrite/orders';
-import reviewsService from '../../appwrite/reviews';
-import productsService from '../../appwrite/products';
+import authService from '../../services/auth';
+import addressService from '../../services/address';
+import ordersService from '../../services/orders';
+import reviewsService from '../../services/reviews';
+import productsService from '../../services/products';
 import { setProducts } from '../../features/productsSlice';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
 import { FaStar, FaWallet } from 'react-icons/fa';
-import storageService, { compressImage } from '../../appwrite/storage';
+import storageService, { compressImage } from '../../services/storage';
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal';
-import walletService from '../../appwrite/wallet';
+import walletService from '../../services/wallet';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -272,13 +272,13 @@ function UserProfile() {
           ? `${currentImages.trim()}, ${fileUrl}` 
           : fileUrl;
         setImagesValue(newUrlList);
-        showToast("✓ Image uploaded successfully to Appwrite Storage!", "success");
+        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Image upload failed:", err);
-      showToast("Appwrite Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
     } finally {
       setUploadingImage(false);
     }

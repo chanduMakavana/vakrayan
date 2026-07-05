@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import productsService from '../../appwrite/products'
-import wishlistService from '../../appwrite/wishlist'
+import productsService from '../../services/products'
+import wishlistService from '../../services/wishlist'
 import Footer from '../pageComponets/Footer'
 import ProductCardSkeleton from '../pageComponets/ProductCardSkeleton'
 import { setProducts } from '../../features/productsSlice'
@@ -626,7 +626,7 @@ function Shop() {
                                try {
                                  await wishlistService.removeFromWishlist(user.$id, parentId);
                                } catch (err) {
-                                 console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
+                                 console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
                                }
                              }
                            } else {
@@ -638,7 +638,7 @@ function Shop() {
                                try {
                                  await wishlistService.addToWishlist(user.$id, parentId);
                                } catch (err) {
-                                 console.warn("⚠️ Appwrite wishlist cloud sync failed:", err.message);
+                                 console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
                                }
                              }
                            }

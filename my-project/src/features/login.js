@@ -6,7 +6,7 @@ import { createSlice } from "@reduxjs/toolkit";
 const storedAdminMode = localStorage.getItem('adminMode') === 'true';
 
 const initialState = {
-    user: null,             // Appwrite user object populated on successful authentication
+    user: null,             // Firebase user object populated on successful authentication
     isAuthenticated: false, // Tracking auth state for protected routes and conditional rendering
     loading: true,          // Controls loading state to prevent flash of unauthenticated UI on mount
     adminMode: storedAdminMode, // Persisted admin mode toggle — read once on startup
