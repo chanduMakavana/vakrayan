@@ -125,8 +125,8 @@ function Checkout() {
   const isRemote = isRemoteRoute(watchedPin, watchedState)
   const remoteSurcharge = isRemote ? 80 : 0
 
-  // Calculate Shipping Expenses & COD Fees
-  const baseShippingCharge = cartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
+  // Calculate Shipping Expenses & COD Fees (based on subtotal before coupon discount)
+  const baseShippingCharge = cartItems.length === 0 ? 0 : (cartTotalAmount >= 999 ? 0 : 99);
   const codFee = selectedPayment === 'COD' ? 30 : 0;
   const shippingCharge = baseShippingCharge + codFee + remoteSurcharge;
 
@@ -1303,7 +1303,7 @@ function Checkout() {
                 </div>
                 {baseShippingCharge > 0 && (
                   <div className="text-[9px] text-[var(--color-danger)] font-mono font-bold text-left uppercase tracking-wider mt-1">
-                    Add ₹{(999 - discountedAmount).toLocaleString('en-IN')} more to unlock FREE SHIPPING!
+                    Add ₹{(999 - cartTotalAmount).toLocaleString('en-IN')} more to unlock FREE SHIPPING!
                   </div>
                 )}
 

@@ -86,7 +86,7 @@ const DrawerWrapper = ({ open, onClose, children }) => (
           key="backdrop"
           variants={backdropVariants}
           initial="hidden" animate="visible" exit="exit"
-          className="absolute inset-0 bg-black/30 backdrop-blur-xs"
+          className="absolute inset-0 bg-black/30 backdrop-blur-sm"
           onClick={onClose}
         />
         <motion.div
@@ -604,8 +604,8 @@ function Navbar() {
                       className="absolute left-0 mt-3 w-52 p-2 rounded-2xl z-50 flex flex-col gap-0.5"
                       style={{
                         background: 'var(--glass-bg-heavy)',
-                        backdropFilter: 'blur(20px) saturate(180%)',
-                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        backdropFilter: 'blur(28px) saturate(190%)',
+                        WebkitBackdropFilter: 'blur(28px) saturate(190%)',
                         border: '1px solid var(--glass-border-green)',
                         boxShadow: 'var(--shadow-lg)'
                       }}
@@ -732,8 +732,8 @@ function Navbar() {
                       className="absolute right-0 mt-3 w-64 rounded-2xl overflow-hidden z-50"
                       style={{ 
                         background: 'var(--glass-bg-heavy)',
-                        backdropFilter: 'blur(20px) saturate(180%)',
-                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        backdropFilter: 'blur(28px) saturate(190%)',
+                        WebkitBackdropFilter: 'blur(28px) saturate(190%)',
                         border: '1px solid var(--glass-border-green)',
                         boxShadow: 'var(--shadow-lg)'
                       }}

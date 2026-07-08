@@ -23,11 +23,20 @@ function AddToCartPage() {
   const products = useSelector(state => state.products.items || [])
   const { user } = useSelector(state => state.auth)
   const [loading, setLoading] = useState(true)
+  const [updatingItemIds, setUpdatingItemIds] = useState([])
 
   // Dynamic Coupon State
   const [promoInput, setPromoInput] = useState('')
   const [couponApplied, setCouponApplied] = useState('')
   const [discountPercent, setDiscountPercent] = useState(0)
+
+  // Helpers to mutate updatingItemIds list dynamically
+  const startUpdating = (id) => {
+    setUpdatingItemIds(prev => [...prev, id]);
+  };
+  const stopUpdating = (id) => {
+    setUpdatingItemIds(prev => prev.filter(x => x !== id));
+  };
 
   // Selection Checkboxes State (store deselected items to automatically select new items)
   const [deselectedItemIds, setDeselectedItemIds] = useState(() => {
@@ -211,7 +220,7 @@ function AddToCartPage() {
 
   const discountAmount = cartTotalAmount * (discountPercent / 100);
   const finalAmount = cartTotalAmount - discountAmount;
-  const baseShippingFee = selectedCartItems.length === 0 ? 0 : (finalAmount >= 999 ? 0 : 99);
+  const baseShippingFee = selectedCartItems.length === 0 ? 0 : (cartTotalAmount >= 999 ? 0 : 99);
   const grandTotal = selectedCartItems.length === 0 ? 0 : (finalAmount + baseShippingFee);
 
   // ➡️ 1. INITIAL FETCH: use Redux user directly — no redundant API call
@@ -238,6 +247,7 @@ function AddToCartPage() {
 
   // ➡️ 2. QUANTITY OPERATORS: Real-time Cloud updates triggers
   const handleQuantityShift = async (item, operation) => {
+    startUpdating(item.$id);
     try {
       let targetQuantity = item.quantity
       if (operation === 'increase') {
@@ -306,11 +316,14 @@ function AddToCartPage() {
     } catch (error) {
       console.error("Failed to alter quantity matrix:", error)
       fetchCartStage() // Fallback rollback fetch on error breaks
+    } finally {
+      stopUpdating(item.$id);
     }
   }
 
   // ➡️ 3. REMOVE PRODUCT TRACKING ACTION
   const handleRemove = async (documentId) => {
+    startUpdating(documentId);
     try {
       // Optimistic slice filter out
       dispatch(removeCartItemState(documentId))
@@ -324,12 +337,15 @@ function AddToCartPage() {
     } catch (error) {
       console.error("Failed to extract item execution drop:", error)
       fetchCartStage()
+    } finally {
+      stopUpdating(documentId);
     }
   }
 
   // ➡️ 3.5 UPDATE PRODUCT SIZE ACTION
   const handleSizeChange = async (item, newSize) => {
     if (!newSize || newSize === item.size) return;
+    startUpdating(item.$id);
     try {
       // Check if item with the same product ID and newSize already exists
       const existing = cartItems.find(
@@ -382,6 +398,8 @@ function AddToCartPage() {
     } catch (err) {
       console.error("Size update failure:", err);
       showToast("Failed to update item size.", "error");
+    } finally {
+      stopUpdating(item.$id);
     }
   };
 
@@ -493,6 +511,12 @@ function AddToCartPage() {
                     isSelected ? 'border-[var(--color-accent)]/60 shadow-2xs' : 'border-[var(--color-border)]'
                   }`}
                 >
+                  {/* Inline Loader Backdrop Overlay */}
+                  {updatingItemIds.includes(uniqueId) && (
+                    <div className="absolute inset-0 bg-[var(--color-bg)]/60 backdrop-blur-[1px] rounded-xl flex items-center justify-center z-30 animate-fade-in">
+                      <div className="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
                   {/* Item Checkbox */}
                   <div className="flex items-center justify-center shrink-0">
                     <input
@@ -644,7 +668,7 @@ function AddToCartPage() {
               </div>
               {baseShippingFee > 0 && (
                 <div className="text-[10px] text-indigo-600 font-semibold text-right">
-                  Add ₹{(999 - finalAmount).toLocaleString('en-IN')} more to unlock FREE SHIPPING!
+                  Add ₹{(999 - cartTotalAmount).toLocaleString('en-IN')} more to unlock FREE SHIPPING!
                 </div>
               )}
               <div className="flex justify-between">

@@ -212,16 +212,20 @@ function Footer() {
             © 2026 Vakrayan Co. All rights reserved.
           </span>
           <div className="flex gap-6">
-            {['Privacy Policy', 'Terms of Service'].map(t => (
-              <a
-                key={t}
-                href="#"
-                style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}
-                className="hover:text-white transition-colors duration-200 cursor-pointer"
-              >
-                {t}
-              </a>
-            ))}
+            <Link
+              to="/privacy"
+              style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}
+              className="hover:text-white transition-colors duration-200"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              to="/terms"
+              style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}
+              className="hover:text-white transition-colors duration-200"
+            >
+              Terms of Service
+            </Link>
           </div>
         </div>
       </div>

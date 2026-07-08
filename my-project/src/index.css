@@ -38,7 +38,7 @@
 
     /* ── Glassmorphism Surfaces ─────────────────────────────── */
     --glass-bg:       rgba(255,255,255,0.72);
-    --glass-bg-heavy: rgba(255,255,255,0.88);
+    --glass-bg-heavy: rgba(255,255,255,0.96);
     --glass-bg-light: rgba(255,255,255,0.50);
     --glass-border:   rgba(255,255,255,0.60);
     --glass-border-green: rgba(5,150,105,0.18);

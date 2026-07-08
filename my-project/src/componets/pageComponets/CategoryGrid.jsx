@@ -98,83 +98,75 @@ function CategoryGrid() {
           </h2>
         </div>
 
-        {/* Equal-size category grid */}
+        {/* Equal-size category flex/grid wrapper - centered for odd counts */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: '-80px' }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"
+          className="flex flex-wrap justify-center gap-3 md:gap-4"
         >
-          {visibleCategories.map((c) => {
+          {visibleCategories.map((c, idx) => {
             const img = getCategoryImage(c.value)
             return (
-              <motion.div key={c.value} variants={cardVariants}>
+              <motion.div 
+                key={c.value} 
+                variants={cardVariants}
+                className="w-[calc(50%-6px)] md:w-[calc(25%-12px)] min-w-[140px] max-w-[280px]"
+              >
                 <Link
                   to={`/category/${c.value}`}
-                  className="group block relative overflow-hidden cursor-pointer"
+                  className="group block relative overflow-hidden cursor-pointer shadow-lg"
                   style={{
                     borderRadius: 16,
-                    height: 'clamp(160px, 28vw, 260px)',
-                    border: '1px solid var(--glass-border-green)',
-                    boxShadow: 'var(--shadow-sm)'
+                    height: 'clamp(240px, 32vw, 360px)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.05)',
                   }}
                 >
                   {/* Image */}
                   <img
                     src={img}
                     alt={c.label}
-                    className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-108"
+                    className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
                   />
 
-                  {/* Gradient overlay */}
+                  {/* Gradient overlay - dark & smooth */}
                   <div
                     className="absolute inset-0"
                     style={{
-                      background: 'linear-gradient(to top, rgba(5,26,14,0.70) 0%, rgba(5,26,14,0.10) 60%, transparent 100%)',
+                      background: 'linear-gradient(to top, rgba(13,26,20,0.92) 0%, rgba(13,26,20,0.30) 50%, transparent 100%)',
                     }}
                   />
 
-                  {/* Hover tint */}
+                  {/* Subtle hover tint */}
                   <div
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ background: 'rgba(5,150,105,0.10)' }}
+                    style={{ background: 'rgba(5,150,105,0.06)' }}
                   />
 
-                  {/* Label bottom */}
-                  <div className="absolute bottom-0 left-0 right-0 px-3 pb-3">
-                    <div
-                      className="flex items-center justify-between gap-2"
+                  {/* Luxury Editorial Label Details */}
+                  <div className="absolute inset-0 p-5 flex flex-col justify-end select-none">
+                    <span 
+                      className="text-[9px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block translate-y-2 opacity-80 transition-all duration-300 group-hover:translate-y-0"
+                    >
+                      COLLECTION 0{idx + 1}
+                    </span>
+                    <h3 
                       style={{
-                        background: 'rgba(10,30,20,0.55)',
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        borderRadius: 10,
-                        padding: '8px 10px'
+                        fontFamily: "'Barlow Condensed', 'Jost', sans-serif",
+                        fontWeight: 900,
+                        fontSize: 'clamp(14px, 1.8vw, 18px)',
+                        color: '#fff',
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        lineHeight: 1.1
                       }}
                     >
-                      <span
-                        style={{
-                          color: '#fff',
-                          fontFamily: "'Jost', sans-serif",
-                          fontWeight: 600,
-                          fontSize: 12,
-                          letterSpacing: '0.02em',
-                          lineHeight: 1.2
-                        }}
-                      >
-                        {c.label}
-                      </span>
-                      <div
-                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5"
-                        style={{ background: '#059669', borderRadius: 6 }}
-                      >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 12h14M12 5l7 7-7 7"/>
-                        </svg>
-                      </div>
-                    </div>
+                      {c.label}
+                    </h3>
+                    
+                    {/* Expanding animated underline */}
+                    <div className="w-6 h-[2px] bg-[#34D399] mt-2.5 transition-all duration-500 ease-out group-hover:w-16" />
                   </div>
                 </Link>
               </motion.div>

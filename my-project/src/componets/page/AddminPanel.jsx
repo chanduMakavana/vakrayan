@@ -101,6 +101,10 @@ function AdminPanel() {
   const [campaignHistory, setCampaignHistory] = useState([]);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [broadcastingProgress, setBroadcastingProgress] = useState(0);
+  // Category-wise targeting
+  const [broadcastTarget, setBroadcastTarget] = useState('subscribers'); // 'subscribers' | 'customers' | 'manual'
+  const [selectedEmails, setSelectedEmails] = useState(new Set());
+  const [emailSearch, setEmailSearch] = useState('');
 
   const isEmailJSConfigured = Boolean(
     (import.meta.env.VITE_EMAILJS_SERVICE_ID || "").trim() &&
@@ -1665,10 +1669,28 @@ function AdminPanel() {
       return;
     }
 
-    const subs = await campaignService.getNewsletterSubscribers();
-    const total = subs.length;
+    // Determine recipients based on broadcastTarget
+    let recipientList = [];
+    if (broadcastTarget === 'subscribers') {
+      const subs = await campaignService.getNewsletterSubscribers();
+      recipientList = subs.map(s => ({ email: s.email, name: s.name || s.email }));
+    } else if (broadcastTarget === 'customers') {
+      // Unique emails from orders
+      const seen = new Set();
+      orders.forEach(o => {
+        const email = o.userEmail || o.email || o.user?.email;
+        if (email && !seen.has(email)) { seen.add(email); recipientList.push({ email, name: o.userName || o.name || email }); }
+      });
+      // Also include subscribers in customers mode
+      const subs = await campaignService.getNewsletterSubscribers();
+      subs.forEach(s => { if (!seen.has(s.email)) { seen.add(s.email); recipientList.push({ email: s.email, name: s.name || s.email }); } });
+    } else if (broadcastTarget === 'manual') {
+      recipientList = Array.from(selectedEmails).map(email => ({ email, name: email }));
+    }
+
+    const total = recipientList.length;
     if (total === 0) {
-      showToast("No newsletter subscribers available to receive this campaign.", "error");
+      showToast('No recipients selected. Please select at least one email.', 'error');
       return;
     }
 
@@ -1684,8 +1706,8 @@ function AdminPanel() {
 
       // Send actual emails sequentially and update progress
       for (let i = 0; i < total; i++) {
-        const subscriber = subs[i];
-        const emailAddress = subscriber.email;
+        const recipient = recipientList[i];
+        const emailAddress = recipient.email;
         try {
           await campaignService.sendEmailViaEmailJS(emailAddress, subjectText, bodyText);
           successCount++;
@@ -3592,26 +3614,154 @@ function AdminPanel() {
                     </div>
                   </div>
 
-                  {/* Right Column: Subscribers List */}
-                  <div className="space-y-4 backdrop-blur-sm bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-5 rounded-2xl shadow-glass flex flex-col max-h-[360px] overflow-hidden">
-                    <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase border-b border-[var(--color-border)] pb-2 flex justify-between items-center">
-                      <span>SUBSCRIBERS</span>
-                      <span className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] px-2 py-0.5 rounded text-[8px] font-bold">
-                        {newsletterSubscribers.length} TOTAL
-                      </span>
-                    </h4>
+                  {/* Right Column: Audience Panel */}
+                  <div className="space-y-3 backdrop-blur-sm bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-5 rounded-2xl shadow-glass flex flex-col max-h-[520px] overflow-hidden">
                     
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-1.5 custom-scrollbar">
-                      {newsletterSubscribers.length === 0 ? (
-                        <p className="text-[9px] text-[var(--color-muted)] font-mono uppercase text-center py-8">No active subscribers</p>
-                      ) : (
-                        newsletterSubscribers.map((sub, idx) => (
-                          <div key={sub.$id || idx} className="flex items-center gap-2 p-2 bg-[var(--color-subtle)] border border-[var(--color-border)] justify-between">
-                            <span className="text-[10px] font-mono text-[var(--color-text)] font-semibold truncate">{sub.email}</span>
-                            <span className="text-[8px] font-mono text-emerald-600 font-bold bg-emerald-50 px-1 py-0.5 uppercase">Active</span>
+                    {/* Category Tabs */}
+                    <div className="grid grid-cols-3 gap-1.5 bg-black/15 p-1 rounded-xl">
+                      {[
+                        { key: 'subscribers', label: 'Subscribers', icon: '📧', count: newsletterSubscribers.length },
+                        { key: 'customers',   label: 'All Users',   icon: '👥', count: [...new Set(orders.map(o => o.userEmail || o.email || o.user?.email).filter(Boolean))].length + newsletterSubscribers.length },
+                        { key: 'manual',      label: 'Manual Pick', icon: '🎯', count: selectedEmails.size },
+                      ].map(tab => (
+                        <button key={tab.key}
+                          onClick={() => { setBroadcastTarget(tab.key); setEmailSearch(''); }}
+                          type="button"
+                          className={`flex flex-col items-center justify-center py-2 px-1.5 rounded-lg transition-all cursor-pointer border ${
+                            broadcastTarget === tab.key
+                              ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-md shadow-emerald-950/20'
+                              : 'bg-transparent border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-white/5'
+                          }`}
+                        >
+                          <span className="text-xs mb-0.5">{tab.icon}</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-center leading-none block">{tab.label}</span>
+                          <span className={`mt-1.5 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
+                            broadcastTarget === tab.key ? 'bg-white/20 text-white' : 'bg-black/25 text-[var(--color-text)]'
+                          }`}>{tab.count}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Search bar */}
+                    <input
+                      type="text"
+                      value={emailSearch}
+                      onChange={e => setEmailSearch(e.target.value)}
+                      placeholder="Search email..."
+                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-[10px] font-mono w-full outline-none focus:border-[var(--color-accent)]"
+                    />
+
+                    {/* Select All / Clear for manual */}
+                    {broadcastTarget === 'manual' && (() => {
+                      const allEmails = [
+                        ...newsletterSubscribers.map(s => ({ email: s.email, label: s.email, tag: 'Subscriber' })),
+                        ...[...new Set(orders.map(o => o.userEmail || o.email || o.user?.email).filter(Boolean))]
+                          .filter(e => !newsletterSubscribers.find(s => s.email === e))
+                          .map(e => ({ email: e, label: e, tag: 'Customer' }))
+                      ].filter(item => item.email.toLowerCase().includes(emailSearch.toLowerCase()));
+                      return (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] font-black uppercase tracking-wider text-[var(--color-muted)]">
+                              {selectedEmails.size} selected
+                            </span>
+                            <div className="flex gap-2">
+                              <button onClick={() => setSelectedEmails(new Set(allEmails.map(e => e.email)))}
+                                className="text-[8px] font-bold text-[var(--color-accent)] uppercase tracking-wider cursor-pointer hover:underline">
+                                Select All
+                              </button>
+                              <button onClick={() => setSelectedEmails(new Set())}
+                                className="text-[8px] font-bold text-rose-500 uppercase tracking-wider cursor-pointer hover:underline">
+                                Clear
+                              </button>
+                            </div>
                           </div>
-                        ))
-                      )}
+                          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                            {allEmails.map(item => (
+                              <div key={item.email}
+                                onClick={() => {
+                                  const next = new Set(selectedEmails);
+                                  if (next.has(item.email)) next.delete(item.email); else next.add(item.email);
+                                  setSelectedEmails(next);
+                                }}
+                                className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all ${
+                                  selectedEmails.has(item.email)
+                                    ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/40'
+                                    : 'bg-[var(--color-subtle)] border-[var(--color-border)] hover:border-[var(--color-accent)]/30'
+                                }`}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
+                                  selectedEmails.has(item.email) ? 'bg-[var(--color-accent)] border-[var(--color-accent)]' : 'border-[var(--color-border)]'
+                                }`}>
+                                  {selectedEmails.has(item.email) && <span className="text-white text-[8px] font-black">✓</span>}
+                                </div>
+                                <span className="text-[10px] font-mono text-[var(--color-text)] truncate flex-1">{item.email}</span>
+                                <span className={`text-[7px] font-bold px-1.5 py-0.5 rounded uppercase flex-shrink-0 ${
+                                  item.tag === 'Subscriber' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-blue-500/10 text-blue-600'
+                                }`}>{item.tag}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {/* Subscribers list */}
+                    {broadcastTarget === 'subscribers' && (
+                      <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[8px] font-black uppercase tracking-wider text-[var(--color-muted)]">{newsletterSubscribers.length} subscribers</span>
+                        </div>
+                        {newsletterSubscribers.filter(s => s.email.toLowerCase().includes(emailSearch.toLowerCase())).length === 0 ? (
+                          <p className="text-[9px] text-[var(--color-muted)] font-mono uppercase text-center py-8">No subscribers found</p>
+                        ) : (
+                          newsletterSubscribers.filter(s => s.email.toLowerCase().includes(emailSearch.toLowerCase())).map((sub, idx) => (
+                            <div key={sub.$id || idx} className="flex items-center gap-2 p-2 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-lg justify-between">
+                              <span className="text-[10px] font-mono text-[var(--color-text)] font-semibold truncate">{sub.email}</span>
+                              <span className="text-[8px] font-mono text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded uppercase flex-shrink-0">Newsletter</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* All Customers list */}
+                    {broadcastTarget === 'customers' && (() => {
+                      const customerEmails = [...new Set(orders.map(o => o.userEmail || o.email || o.user?.email).filter(Boolean))];
+                      const subEmails = new Set(newsletterSubscribers.map(s => s.email));
+                      const allUnique = [
+                        ...newsletterSubscribers.map(s => ({ email: s.email, tag: 'Subscriber' })),
+                        ...customerEmails.filter(e => !subEmails.has(e)).map(e => ({ email: e, tag: 'Customer' }))
+                      ].filter(item => item.email.toLowerCase().includes(emailSearch.toLowerCase()));
+                      return (
+                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[8px] font-black uppercase tracking-wider text-[var(--color-muted)]">{allUnique.length} total recipients</span>
+                          </div>
+                          {allUnique.length === 0 ? (
+                            <p className="text-[9px] text-[var(--color-muted)] font-mono uppercase text-center py-8">No customers found</p>
+                          ) : (
+                            allUnique.map(item => (
+                              <div key={item.email} className="flex items-center gap-2 p-2 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-lg justify-between">
+                                <span className="text-[10px] font-mono text-[var(--color-text)] font-semibold truncate">{item.email}</span>
+                                <span className={`text-[7px] font-bold px-1.5 py-0.5 rounded uppercase flex-shrink-0 ${
+                                  item.tag === 'Subscriber' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-blue-500/10 text-blue-600'
+                                }`}>{item.tag}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Send target summary */}
+                    <div className="pt-2 border-t border-[var(--color-border)] flex items-center justify-between">
+                      <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wider">Will send to:</span>
+                      <span className="text-[9px] font-black text-[var(--color-accent)] uppercase tracking-wider">
+                        {broadcastTarget === 'subscribers' && `${newsletterSubscribers.length} subscribers`}
+                        {broadcastTarget === 'customers' && `${[...new Set([...newsletterSubscribers.map(s=>s.email), ...orders.map(o=>o.userEmail||o.email||o.user?.email).filter(Boolean)])].length} recipients`}
+                        {broadcastTarget === 'manual' && `${selectedEmails.size} selected`}
+                      </span>
                     </div>
                   </div>
                 </div>

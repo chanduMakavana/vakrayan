@@ -39,6 +39,7 @@ const Checkout     = lazy(() => import('./componets/page/Checkout'))
 const UserProfile  = lazy(() => import('./componets/page/UserProfile'))
 const OrderDetail  = lazy(() => import('./componets/page/OrderDetail'))
 const ProductReviews = lazy(() => import('./componets/page/ProductReviews'))
+const LegalPage = lazy(() => import('./componets/page/LegalPage'))
 
 // ✅ PERFORMANCE FIX: Module-level constant — not recreated on every render
 const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin', '/cart']
@@ -116,6 +117,8 @@ function AppRoutes() {
           <Route path='/shop'                element={<PageWrapper><Shop /></PageWrapper>} />
           <Route path='/category/:category'  element={<PageWrapper><Shop /></PageWrapper>} />
           <Route path='/cart'                element={<PageWrapper><AddToCartPage /></PageWrapper>} />
+          <Route path='/terms'               element={<PageWrapper><LegalPage /></PageWrapper>} />
+          <Route path='/privacy'             element={<PageWrapper><LegalPage /></PageWrapper>} />
           <Route path='/*'                   element={<PageWrapper><NotFound /></PageWrapper>} />
 
           {/* Protected routes */}

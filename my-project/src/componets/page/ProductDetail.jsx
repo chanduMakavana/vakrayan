@@ -1199,7 +1199,8 @@ function ProductDetail() {
   const displayDescription = rawDescription.replace(/\[RETURN_POLICY\]:\s*(.+)/, "").trim();
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20">
+    <>
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20">
 
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 space-y-8">
 
@@ -2913,8 +2914,9 @@ function ProductDetail() {
         </div>
       )}
 
+      </div>
       <Footer />
-    </div>
+    </>
   );
 }
 
