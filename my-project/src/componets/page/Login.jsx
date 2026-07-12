@@ -6,6 +6,8 @@ import { login as loginAction } from '../../features/login'
 import authService from '../../services/auth'
 import { useToast } from '../../context/ToastContext'
 import { hydrateCartFromDb } from '../../utils/cartMergeHelper'
+import Loader from '../pageComponets/Loader'
+import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 
 const EyeOpen = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -51,6 +53,8 @@ function Login() {
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [showPass,         setShowPass]         = useState(false)
   const [focused,          setFocused]          = useState(null)
+
+  const showOverlay = useDelayedLoading(loading, 1500)
 
   useEffect(() => { document.title = 'Login — Vakrayan' }, [])
 
@@ -360,27 +364,7 @@ function Login() {
       </div>
       {/* ══ FULL SCREEN BLUR LOADER OVERLAY ════════════════════ */}
       {loading && (
-        <div 
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center animate-fade-in"
-          style={{ background: 'rgba(13,26,20,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-        >
-          {/* Logo / Ring spinner */}
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="w-20 h-20 rounded-full border-2 border-emerald-500/25 border-t-emerald-400 animate-spin" />
-            <img 
-              src="/vakrayan-logo.png" 
-              alt="Vakrayan Logo" 
-              className="absolute w-10 h-10 object-contain animate-pulse"
-              style={{ filter: 'brightness(1)' }}
-            />
-          </div>
-          <h3 className="text-xs font-mono tracking-widest text-[#34D399] uppercase font-black animate-pulse">
-            SECURELY LOADING VAKRAYAN...
-          </h3>
-          <p className="text-[9px] text-neutral-400 font-mono tracking-wider mt-2 uppercase">
-            Please wait, syncing your profile modules
-          </p>
-        </div>
+        <Loader type="splash" text="SECURELY LOGGING IN..." />
       )}
     </div>
   )

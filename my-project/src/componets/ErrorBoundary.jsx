@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { sendWebhookNotification } from '../utils/webhookHelper'
 
 /**
  * ErrorBoundary — Global React crash handler.
@@ -26,8 +27,17 @@ class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // In production, pipe this to an error monitoring service (Sentry, etc.)
     console.error('ErrorBoundary caught a crash:', error, info.componentStack)
+    try {
+      sendWebhookNotification('system.error', {
+        errorMessage: error?.toString() || 'Unknown runtime error',
+        stack: info?.componentStack || 'No stack trace available',
+        url: typeof window !== 'undefined' ? window.location.href : 'Unknown URL',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown Browser'
+      })
+    } catch (e) {
+      console.warn("Failed to dispatch error webhook:", e)
+    }
   }
 
   handleReload = () => {
@@ -58,7 +68,8 @@ class ErrorBoundary extends Component {
               letterSpacing: '0.4em',
               color: '#0a0a0a',
               textTransform: 'uppercase',
-              marginBottom: '2rem'
+              marginBottom: '2rem',
+              fontFamily: "'VakrayanFont', sans-serif"
             }}
           >
             VAKRAYAN

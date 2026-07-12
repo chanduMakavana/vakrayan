@@ -112,6 +112,7 @@ function RecentlyViewedHome() {
                       }
                     }}
                     className="absolute top-3 right-3 z-30 w-9 h-9 flex items-center justify-center cursor-pointer transition-all duration-300"
+                    aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
                     style={{
                       background: isWishlisted ? 'rgba(5,150,105,0.90)' : 'rgba(255,255,255,0.85)',
                       backdropFilter: 'blur(8px)',
@@ -127,7 +128,7 @@ function RecentlyViewedHome() {
                   {/* Tag */}
                   {activeTag && (
                     <div className="absolute top-3 left-3 z-20 px-2.5 py-1" style={{ background: 'rgba(255,255,255,0.90)', backdropFilter: 'blur(8px)', border: '1px solid rgba(5,150,105,0.20)', borderRadius: 6 }}>
-                      <span style={{ color: 'var(--color-accent)', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Jost', sans-serif" }}>{activeTag}</span>
+                      <span style={{ color: 'var(--color-accent)', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Jost', sans-serif" }}>{activeTag}</span>
                     </div>
                   )}
 
@@ -147,7 +148,7 @@ function RecentlyViewedHome() {
 
                 {/* Card info */}
                 <div className="p-4">
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)', marginBottom: 4, fontFamily: "'Jost', sans-serif" }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)', marginBottom: 4, fontFamily: "'Jost', sans-serif" }}>
                     {product.category?.replace(/-/g, ' ') || 'Collection'}
                   </p>
                   <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10, fontFamily: "'Jost', sans-serif" }} className="truncate">

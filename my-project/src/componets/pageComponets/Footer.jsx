@@ -55,48 +55,49 @@ function Footer() {
       <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, #059669, #34D399, #059669, transparent)' }} />
 
       <div className="max-w-7xl mx-auto px-6 md:px-12 pt-16 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
-
-          {/* Brand */}
-          <div className="flex flex-col gap-5 md:col-span-1">
-            <div>
-              <h3
-                className="leading-none mb-1"
-                style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 36, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#FFFFFF' }}
+        
+        {/* Giant Brand Logo Title */}
+        <div className="w-full flex flex-col items-center mb-16 px-4 text-center">
+          <img 
+            src="/vakrayan-text.png"
+            alt="Vakrayan"
+            className="w-full max-w-[900px] h-auto object-contain"
+            style={{
+              filter: 'brightness(0) invert(1)',
+              opacity: 0.95
+            }}
+          />
+          <p className="mt-6 max-w-md" style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, fontFamily: "'Jost', sans-serif" }}>
+            Premium heavyweight drops crafted carefully to define contemporary street culture.
+          </p>
+          {/* Social icons — proper SVGs */}
+          <div className="flex gap-4 mt-6">
+            {[
+              { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/' },
+              { Icon: PinterestIcon, label: 'Pinterest', href: '#' },
+              { Icon: XIcon, label: 'X (Twitter)', href: '#' },
+            ].map(({ Icon, label, href }) => (
+              <a
+                key={label}
+                target='_blank'
+                href={href}
+                aria-label={label}
+                className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer"
+                style={{
+                  background: 'rgba(5,150,105,0.12)',
+                  border: '1px solid rgba(5,150,105,0.25)',
+                  color: 'rgba(255,255,255,0.60)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(5,150,105,0.28)'; e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(5,150,105,0.12)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
               >
-                Vakrayan
-              </h3>
-              <div style={{ width: 40, height: 3, background: 'linear-gradient(90deg,#059669,#34D399)', borderRadius: 99 }} />
-            </div>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, fontFamily: "'Jost', sans-serif" }}>
-              Premium heavyweight drops crafted carefully to define contemporary street culture.
-            </p>
-            {/* Social icons — proper SVGs */}
-            <div className="flex gap-3 mt-1">
-              {[
-                { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/' },
-                { Icon: PinterestIcon, label: 'Pinterest', href: '#' },
-                { Icon: XIcon, label: 'X (Twitter)', href: '#' },
-              ].map(({ Icon, label, href }) => (
-                <a
-                  key={label}
-                  target='_blank'
-                  href={href}
-                  aria-label={label}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer"
-                  style={{
-                    background: 'rgba(5,150,105,0.12)',
-                    border: '1px solid rgba(5,150,105,0.25)',
-                    color: 'rgba(255,255,255,0.60)',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(5,150,105,0.28)'; e.currentTarget.style.color = '#fff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(5,150,105,0.12)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
-                >
-                  <Icon />
-                </a>
-              ))}
-            </div>
+                <Icon />
+              </a>
+            ))}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
 
           {/* Navigation */}
           <div className="flex flex-col gap-4">
@@ -125,14 +126,20 @@ function Footer() {
             <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               FOLLOW US
             </h4>
-            {['Instagram ↗', 'Pinterest ↗', 'Twitter / X ↗'].map(s => (
+            {[
+              { label: 'Instagram ↗', href: 'https://www.instagram.com/vakrayan_official/' },
+              { label: 'Pinterest ↗', href: 'https://www.pinterest.com/' },
+              { label: 'Twitter / X ↗', href: 'https://x.com/' },
+            ].map(({ label, href }) => (
               <a
-                key={s}
-                href="#"
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{ color: 'rgba(255,255,255,0.50)', fontSize: 14, fontFamily: "'Jost', sans-serif", fontWeight: 500 }}
                 className="transition-colors duration-200 hover:text-white w-fit cursor-pointer"
               >
-                {s}
+                {label}
               </a>
             ))}
           </div>

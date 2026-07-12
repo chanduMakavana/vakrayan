@@ -156,6 +156,12 @@ export const sendWebhookNotification = async (event, payload) => {
                `<b>Type:</b> ${escapeHtml(payload.type)} (Return or Exchange)\n` +
                `<b>Reason:</b> ${escapeHtml(payload.reason)}\n` +
                `<b>Customer Email:</b> ${escapeHtml(payload.email)}`;
+      } else if (event === 'system.error') {
+        text = `<b>🚨 CRITICAL WEBSITE ERROR CAUGHT! 🚨</b>\n\n` +
+               `<b>Error Message:</b> <code>${escapeHtml(payload.errorMessage)}</code>\n` +
+               `<b>Location URL:</b> ${escapeHtml(payload.url)}\n` +
+               `<b>User Agent:</b> <i>${escapeHtml(payload.userAgent)}</i>\n\n` +
+               `<b>Component Stack Trace:</b>\n<pre>${escapeHtml(payload.stack.substring(0, 1500))}</pre>`;
       } else {
         text = `<b>🔔 WEBSITE EVENT: ${event.toUpperCase()} 🔔</b>\n\n` +
                `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;

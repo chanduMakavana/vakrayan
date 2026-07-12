@@ -16,6 +16,11 @@ import { loadGuestCartItems } from './utils/guestCartHelper'
 import ProtectedRoute from './componets/ProtectedRoute'
 import AdminRoute from './componets/AdminRoute'
 import Navbar from './componets/pageComponets/Navbar'
+import Loader from './componets/pageComponets/Loader'
+import PageSkeleton from './componets/pageComponets/PageSkeleton'
+import MobileBottomNav from './componets/pageComponets/MobileBottomNav'
+import { useDelayedLoading } from './hooks/useDelayedLoading'
+import { useToast } from './context/ToastContext'
 
 /**
  * ✅ PERFORMANCE FIX: All page-level components are now code-split using React.lazy().
@@ -42,7 +47,7 @@ const ProductReviews = lazy(() => import('./componets/page/ProductReviews'))
 const LegalPage = lazy(() => import('./componets/page/LegalPage'))
 
 // ✅ PERFORMANCE FIX: Module-level constant — not recreated on every render
-const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin', '/cart']
+const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin']
 
 // Elegant Vertical Lift page transition variants
 const pageVariants = {
@@ -76,27 +81,9 @@ function ScrollToTop() {
  * Matches the app's minimal aesthetic without a full splash screen.
  */
 function PageLoader() {
-  return (
-    <div className="w-full min-h-[60vh] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div
-          className="w-20 h-[2px] rounded-full overflow-hidden relative"
-          style={{ background: 'var(--color-border)' }}
-        >
-          <div
-            className="absolute inset-0 w-1/2 rounded-full"
-            style={{
-              background: 'var(--color-accent)',
-              animation: 'loading 0.9s infinite linear',
-            }}
-          />
-        </div>
-        <p style={{ color: 'var(--color-muted)', fontSize: 11, letterSpacing: '0.15em', fontFamily: "'Jost', sans-serif" }}>
-          LOADING
-        </p>
-      </div>
-    </div>
-  )
+  const showSkeleton = useDelayedLoading(true, 1500)
+  if (!showSkeleton) return null
+  return <PageSkeleton />
 }
 
 function AppRoutes() {
@@ -144,6 +131,7 @@ function AppRoutes() {
 
 function AppContent() {
   const dispatch = useDispatch()
+  const { showToast } = useToast()
   const { loading: authLoading, adminMode } = useSelector((state) => state.auth)
   const productsFetched = useSelector((state) => state.products.fetched)
   const location = useLocation()
@@ -160,6 +148,26 @@ function AppContent() {
   // Previously, a slow Firebase products fetch blocked the ENTIRE app for 3-10 seconds.
 
   useEffect(() => {
+    // Check if Google login session has expired (1 hour limit)
+    const googleSessionExpiry = localStorage.getItem('google_session_expiry');
+    if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
+      console.warn('Google session expired (1 hour limit reached). Logging out.');
+      localStorage.removeItem('google_session_expiry');
+      localStorage.removeItem('remember_me');
+      sessionStorage.removeItem('session_active');
+      authService.logout()
+        .then(() => {
+          dispatch(logoutAction());
+          const guestItems = loadGuestCartItems();
+          dispatch(setCartItems(guestItems));
+          showToast('Google session expired. Please log in again.', 'warning');
+        })
+        .finally(() => {
+          dispatch(setLoading(false));
+        });
+      return;
+    }
+
     // ── AUTH: Restore session ─────────────────────────────────────────────────
     authService.getCurrentUser()
       .then(async (userData) => {
@@ -242,7 +250,25 @@ function AppContent() {
         console.error('Failed to preload offers:', offersError)
         dispatch(setOffers([]))
       })
-  }, [dispatch])
+  }, [dispatch, showToast])
+
+  // Enforce Google session expiration check on navigation/route changes
+  useEffect(() => {
+    const googleSessionExpiry = localStorage.getItem('google_session_expiry');
+    if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
+      console.warn('Google session expired on page navigation. Logging out.');
+      localStorage.removeItem('google_session_expiry');
+      localStorage.removeItem('remember_me');
+      sessionStorage.removeItem('session_active');
+      authService.logout()
+        .then(() => {
+          dispatch(logoutAction());
+          const guestItems = loadGuestCartItems();
+          dispatch(setCartItems(guestItems));
+          showToast('Google session expired. Please log in again.', 'warning');
+        });
+    }
+  }, [location.pathname, dispatch, showToast]);
 
   // ✅ FIX: Re-filter products when adminMode changes (replaces the localStorage read inside reducer)
   useEffect(() => {
@@ -262,41 +288,7 @@ function AppContent() {
 
   // Premium loading splash screen — shown only while auth resolves
   if (loading) {
-    return (
-      <div className="w-full min-h-screen flex flex-col items-center justify-center bg-[var(--color-bg)] text-[var(--color-text)]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col items-center gap-6"
-        >
-          <div className="flex flex-col items-center gap-1">
-            <h1
-              className="text-2xl md:text-3xl font-black tracking-[0.35em] text-[var(--color-text)] uppercase"
-              style={{ fontFamily: 'Outfit, sans-serif' }}
-            >
-              VAKRAYAN
-            </h1>
-            <p
-              className="text-[9px] font-bold tracking-[0.3em] uppercase"
-              style={{ color: 'var(--color-muted)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-            >
-              Premium Apparel
-            </p>
-          </div>
-
-          <div className="w-32 h-[2px] bg-[var(--color-border)] rounded-full overflow-hidden relative">
-            <div
-              className="absolute inset-0 w-1/2 rounded-full"
-              style={{
-                background: 'var(--color-accent)',
-                animation: 'loading 1s infinite linear',
-              }}
-            />
-          </div>
-        </motion.div>
-      </div>
-    )
+    return <Loader type="splash" />
   }
 
   // ✅ PERFORMANCE FIX: Moved HIDE_NAVBAR_ON outside the component (module level)
@@ -308,6 +300,7 @@ function AppContent() {
       <ScrollToTop />
       {shouldShowNavbar && <Navbar />}
       <AppRoutes />
+      <MobileBottomNav />
     </div>
   )
 }
@@ -317,3 +310,4 @@ function App() {
 }
 
 export default App
+

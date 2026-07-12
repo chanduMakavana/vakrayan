@@ -147,7 +147,7 @@ function CategoryGrid() {
                   {/* Luxury Editorial Label Details */}
                   <div className="absolute inset-0 p-5 flex flex-col justify-end select-none">
                     <span 
-                      className="text-[9px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block translate-y-2 opacity-80 transition-all duration-300 group-hover:translate-y-0"
+                      className="text-[11px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block translate-y-2 opacity-80 transition-all duration-300 group-hover:translate-y-0"
                     >
                       COLLECTION 0{idx + 1}
                     </span>

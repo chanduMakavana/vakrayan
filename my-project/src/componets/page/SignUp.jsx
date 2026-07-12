@@ -7,7 +7,8 @@ import authService from '../../services/auth'
 import { setCartItems } from '../../features/addToCart'
 import cartService from '../../services/cart'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
-import { mergeLocalCartToDb } from '../../utils/cartMergeHelper'
+import { hydrateCartFromDb } from '../../utils/cartMergeHelper'
+import Loader from '../pageComponets/Loader'
 
 const EyeOpen = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -65,7 +66,7 @@ function SignUp() {
         if (userData) {
           dispatch(loginAction({ user: userData }))
           try {
-            await mergeLocalCartToDb(userData.$id)
+            await hydrateCartFromDb(userData.$id)
             const cartItems = await cartService.getCartItems(userData.$id)
             dispatch(setCartItems(cartItems))
           } catch (err) { console.error('Cart merge on signup failed:', err); dispatch(setCartItems([])) }
@@ -144,7 +145,7 @@ function SignUp() {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 5L12 19L21 5" stroke="#34D399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.14em', textTransform: 'uppercase', lineHeight: 1 }}>Vakrayan</div>
+              <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.14em', textTransform: 'uppercase', lineHeight: 1, fontFamily: "'VakrayanFont', sans-serif" }}>Vakrayan</div>
               <div style={{ fontSize: 9, color: 'rgba(52,211,153,0.80)', letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 600 }}>Premium Apparel</div>
             </div>
           </div>
@@ -155,7 +156,7 @@ function SignUp() {
             <h1 style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 'clamp(2.6rem, 4.5vw, 4rem)', fontWeight: 900, color: '#fff', lineHeight: 1.0, textTransform: 'uppercase', letterSpacing: '-0.01em', marginBottom: 20 }}>
               Dress Bold.<br />
               Live<br />
-              <span style={{ color: '#34D399' }}>Vakrayan.</span>
+              <span style={{ color: '#34D399', fontFamily: "'VakrayanFont', sans-serif" }}>Vakrayan.</span>
             </h1>
             <div style={{ width: 40, height: 3, background: 'linear-gradient(90deg, #34D399, #059669)', borderRadius: 99, marginBottom: 20 }} />
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 1.70, maxWidth: 300 }}>
@@ -358,27 +359,7 @@ function SignUp() {
       )}
       {/* ══ FULL SCREEN BLUR LOADER OVERLAY ════════════════════ */}
       {loading && (
-        <div 
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center animate-fade-in"
-          style={{ background: 'rgba(13,26,20,0.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-        >
-          {/* Logo / Ring spinner */}
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="w-20 h-20 rounded-full border-2 border-emerald-500/25 border-t-emerald-400 animate-spin" />
-            <img 
-              src="/vakrayan-logo.png" 
-              alt="Vakrayan Logo" 
-              className="absolute w-10 h-10 object-contain animate-pulse"
-              style={{ filter: 'brightness(1)' }}
-            />
-          </div>
-          <h3 className="text-xs font-mono tracking-widest text-[#34D399] uppercase font-black animate-pulse">
-            CREATING YOUR PROFILE...
-          </h3>
-          <p className="text-[9px] text-neutral-400 font-mono tracking-wider mt-2 uppercase">
-            Please wait, configuring your secure credentials
-          </p>
-        </div>
+        <Loader type="splash" text="CREATING YOUR PROFILE..." />
       )}
     </div>
   )

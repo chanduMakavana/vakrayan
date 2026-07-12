@@ -517,39 +517,42 @@ function OrderDetail() {
   const foundIdx = statusSteps.findIndex(s => s.key === order.status);
   const currentStepIdx = foundIdx !== -1 ? foundIdx : 0;
 
-
   return (
     <>
+      <div 
+        className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 pt-4"
+        style={{
+          backgroundImage: 'radial-gradient(var(--color-border) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      >
+        <div className="absolute inset-0 bg-[var(--color-bg)]/80 backdrop-blur-xs z-10" />
 
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/90 backdrop-blur-sm z-10" />
-
-
-        <div className="max-w-6xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-8 relative z-20 space-y-6">
           
           {/* Header Action */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]/40">
-            <Link to="/profile" className="inline-flex items-center gap-2 text-xs font-black tracking-widest text-[var(--color-muted)] hover:text-neutral-950 transition-colors uppercase group">
-              <FiArrowLeft className="text-sm group-hover:-translate-x-1 transition-transform" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
+            <Link to="/profile" className="inline-flex items-center gap-2 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase group">
+              <FiArrowLeft className="text-xs group-hover:-translate-x-1 transition-transform" />
               Back to Profile
             </Link>
-            <div className="text-[9px] tracking-[0.3em] font-mono text-[var(--color-muted)] uppercase">
-              ORDER INFORMATION
+            <div className="text-[10px] tracking-[0.25em] font-mono text-[var(--color-muted)] uppercase font-bold">
+              // ORDER SUMMARY LOG
             </div>
           </div>
 
           {/* Core Invoice Summary Card */}
-          <div className="bg-[var(--color-surface)] p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-8">
+          <div className="backdrop-blur-md bg-[var(--glass-bg)] p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] shadow-md space-y-8">
             
-            {/* ID & Date */}
+            {/* ID & Date Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[var(--color-border)]">
-              <div className="space-y-2">
-                <span className="text-[9px] font-mono font-bold tracking-widest text-[var(--color-muted)] block uppercase">
+              <div className="space-y-2.5">
+                <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-[var(--color-muted)] block uppercase">
                   ORDER IDENTIFICATION
                 </span>
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 bg-[var(--color-subtle)] border border-[var(--color-border)] px-3.5 py-1.5 rounded-lg">
-                    <h1 className="text-xl md:text-2xl font-black tracking-wider text-neutral-950 font-display uppercase select-all">
+                  <div className="flex items-center gap-2 bg-[var(--color-subtle)] border border-[var(--color-border)] px-3 py-1.5 rounded-xl">
+                    <h1 className="text-lg md:text-xl font-mono font-black tracking-wider text-[var(--color-text)] uppercase select-all">
                       {metadata.order_number}
                     </h1>
                     <button
@@ -557,7 +560,7 @@ function OrderDetail() {
                         navigator.clipboard.writeText(metadata.order_number);
                         showToast("Order Number copied to clipboard!", "success");
                       }}
-                      className="text-[var(--color-muted)] hover:text-neutral-950 transition-colors p-1 rounded hover:bg-neutral-100 cursor-pointer"
+                      className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors p-1 rounded-md cursor-pointer"
                       title="Copy Order ID"
                     >
                       <FiCopy className="text-xs" />
@@ -567,7 +570,7 @@ function OrderDetail() {
                   {(order.status === 'PENDING' || order.status === 'PROCESSING') && (
                     <button
                       onClick={handleCancelOrder}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[10px] tracking-wider uppercase px-4 py-2.5 rounded-lg transition-colors cursor-pointer"
+                      className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-bold text-[10px] tracking-widest uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer"
                     >
                       Cancel Order
                     </button>
@@ -575,20 +578,20 @@ function OrderDetail() {
                   {order.status === 'DELIVERED' && (
                     <button
                       onClick={handlePrintInvoice}
-                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-250 font-bold text-[10px] tracking-wider uppercase px-4 py-2.5 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-[10px] tracking-widest uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
                     >
                       <FiFileText className="text-xs" /> Download Invoice
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-[9px] font-mono text-[var(--color-muted)] uppercase">
-                  <span>DB Reference ID: {order.$id || order.id}</span>
+                <div className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider flex items-center gap-1.5 mt-2">
+                  <span>Ref: {order.$id || order.id}</span>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(order.$id || order.id);
                       showToast("Database ID copied to clipboard!", "success");
                     }}
-                    className="hover:text-neutral-950 transition-colors p-0.5 rounded cursor-pointer"
+                    className="hover:text-[var(--color-text)] transition-colors p-0.5 rounded cursor-pointer"
                     title="Copy Database ID"
                   >
                     <FiCopy className="text-[10px]" />
@@ -596,496 +599,489 @@ function OrderDetail() {
                 </div>
               </div>
               <div className="text-left md:text-right space-y-1">
-                <span className="text-[9px] font-mono font-bold tracking-widest text-[var(--color-muted)] block uppercase">
+                <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-[var(--color-muted)] block uppercase">
                   TRANSACTION TIMESTAMP
                 </span>
-                <span className="text-[11px] font-mono font-black text-neutral-950 block uppercase bg-[var(--color-subtle)] md:bg-transparent border md:border-0 border-[var(--color-border)] px-3 py-1.5 md:p-0 rounded-lg">
+                <span className="text-[11px] font-mono font-black text-[var(--color-text)] block uppercase bg-[var(--color-subtle)] md:bg-transparent border md:border-0 border-[var(--color-border)] px-3 py-1.5 md:p-0 rounded-lg">
                   {orderDate}
                 </span>
               </div>
             </div>
 
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-              {/* Left Column */}
-              <div className="lg:col-span-7 space-y-8">
-            
-            {/* Industrial Fulfillment Status Track / Cancellation Alert */}
-            {order.status === 'CANCELLED' ? (
-              <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 space-y-3">
-                <div className="space-y-1">
-                  <h3 className="text-xs font-black tracking-widest text-rose-700 uppercase flex items-center gap-2">
-                    <span>{isAdminCancelled ? "🚫 ORDER CANCELLED BY STORE" : "🚫 ORDER CANCELLED"}</span>
-                  </h3>
-                  <p className="text-[11px] text-rose-600 font-medium leading-relaxed uppercase">
-                    {isAdminCancelled ? (
-                      order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
-                        ? "This order was cancelled by the store. We apologize for the inconvenience. Your payment has been refunded to your Store Wallet."
-                        : "This order was cancelled by the store. We apologize for the inconvenience."
-                    ) : (
-                      order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
-                        ? "This order was cancelled successfully. Your payment has been refunded to your Store Wallet."
-                        : "This order was cancelled successfully."
-                    )}
-                  </p>
-                </div>
-                {metadata.cancel_reason && (
-                  <div className="border-t border-rose-200/50 pt-2.5">
-                    <span className="text-[8px] font-mono text-rose-450 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
-                    <span className="text-xs font-mono font-bold text-rose-800 block mt-0.5 uppercase">
-                      &ldquo;{metadata.cancel_reason}&rdquo;
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : order.status === 'CANCELLATION_REQUESTED' ? (
-              <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 space-y-3">
-                <div className="space-y-1">
-                  <h3 className="text-xs font-black tracking-widest text-amber-700 uppercase flex items-center gap-2">
-                    <span>⏳ CANCELLATION AWAITING APPROVAL</span>
-                  </h3>
-                  <p className="text-[11px] text-amber-600 font-medium leading-relaxed uppercase">
-                    Your request to cancel this order is pending admin approval. Once approved, any online or wallet payment will be refunded to your Store Wallet.
-                  </p>
-                </div>
-                {metadata.cancel_reason && (
-                  <div className="border-t border-amber-200/50 pt-2.5">
-                    <span className="text-[8px] font-mono text-amber-500 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
-                    <span className="text-xs font-mono font-bold text-amber-800 block mt-0.5 uppercase">
-                      &ldquo;{metadata.cancel_reason}&rdquo;
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-[var(--color-subtle)]/40 p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] space-y-6 shadow-xs">
-                {(order.status === 'RETURNED' || order.status === 'EXCHANGED') && (() => {
-                  const req = Array.isArray(metadata.return_requests) ? metadata.return_requests.find(r => r.status === 'APPROVED') : null;
-                  return (
-                    <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 space-y-3 mb-2 animate-fade-in shadow-xs">
-                      <div className="space-y-1">
-                        <h3 className="text-[11px] font-black tracking-widest text-emerald-800 uppercase flex items-center gap-1.5">
-                          <span>{order.status === 'RETURNED' ? '↩️ RETURN APPROVED & REFUNDED' : '🔄 EXCHANGE APPROVED & INITIATED'}</span>
-                        </h3>
-                        <p className="text-[10px] text-emerald-700 font-bold leading-relaxed uppercase">
-                          {order.status === 'RETURNED' 
-                            ? `Your return has been approved and processed. A refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.` 
-                            : 'Your exchange request has been approved. Your replacement item is being prepared for dispatch.'}
-                        </p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column (Fulfillment & Items) */}
+              <div className="lg:col-span-7 space-y-6">
+                
+                {/* Cancellation Alert / Returned Alerts */}
+                {order.status === 'CANCELLED' ? (
+                  <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/20 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-black tracking-widest text-rose-500 uppercase flex items-center gap-2">
+                        <span>{isAdminCancelled ? "🚫 ORDER CANCELLED BY STORE" : "🚫 ORDER CANCELLED"}</span>
+                      </h3>
+                      <p className="text-[11px] text-[var(--color-text)] font-semibold leading-relaxed uppercase">
+                        {isAdminCancelled ? (
+                          order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                            ? "This order was cancelled by the store. We apologize for the inconvenience. Your payment has been refunded to your Store Wallet."
+                            : "This order was cancelled by the store. We apologize for the inconvenience."
+                        ) : (
+                          order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                            ? "This order was cancelled successfully. Your payment has been refunded to your Store Wallet."
+                            : "This order was cancelled successfully."
+                        )}
+                      </p>
+                    </div>
+                    {metadata.cancel_reason && (
+                      <div className="border-t border-rose-500/10 pt-2.5">
+                        <span className="text-[8px] font-mono text-rose-500/70 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
+                        <span className="text-xs font-mono font-bold text-rose-500 block mt-0.5 uppercase">
+                          &ldquo;{metadata.cancel_reason}&rdquo;
+                        </span>
                       </div>
-                      {req?.adminComment && (
-                        <div className="bg-emerald-100/50 p-3 rounded-lg border border-emerald-200/50">
-                          <span className="text-[8px] font-black tracking-widest text-emerald-600 uppercase block mb-1">💬 MESSAGE FROM ADMIN</span>
-                          <p className="text-[11px] text-emerald-900 font-semibold leading-relaxed">
-                            "{req.adminComment}"
+                    )}
+                  </div>
+                ) : order.status === 'CANCELLATION_REQUESTED' ? (
+                  <div className="bg-amber-500/10 p-5 rounded-2xl border border-amber-500/20 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-black tracking-widest text-amber-500 uppercase flex items-center gap-2">
+                        <span>⏳ CANCELLATION AWAITING APPROVAL</span>
+                      </h3>
+                      <p className="text-[11px] text-[var(--color-text)] font-semibold leading-relaxed uppercase">
+                        Your request to cancel this order is pending admin approval. Once approved, any online or wallet payment will be refunded to your Store Wallet.
+                      </p>
+                    </div>
+                    {metadata.cancel_reason && (
+                      <div className="border-t border-amber-500/10 pt-2.5">
+                        <span className="text-[8px] font-mono text-amber-500/70 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
+                        <span className="text-xs font-mono font-bold text-amber-500 block mt-0.5 uppercase">
+                          &ldquo;{metadata.cancel_reason}&rdquo;
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-[var(--color-subtle)]/30 p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] space-y-6 shadow-2xs">
+                    {(order.status === 'RETURNED' || order.status === 'EXCHANGED') && (() => {
+                      const req = Array.isArray(metadata.return_requests) ? metadata.return_requests.find(r => r.status === 'APPROVED') : null;
+                      return (
+                        <div className="bg-emerald-500/10 p-5 rounded-2xl border border-emerald-500/20 space-y-3 mb-2 animate-fade-in">
+                          <div className="space-y-1">
+                            <h3 className="text-[11px] font-black tracking-widest text-emerald-500 uppercase flex items-center gap-1.5">
+                              <span>{order.status === 'RETURNED' ? '↩️ RETURN APPROVED & REFUNDED' : '🔄 EXCHANGE APPROVED & INITIATED'}</span>
+                            </h3>
+                            <p className="text-[10px] text-[var(--color-text)] font-bold leading-relaxed uppercase">
+                              {order.status === 'RETURNED' 
+                                ? `Your return has been approved and processed. A refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.` 
+                                : 'Your exchange request has been approved. Your replacement item is being prepared for dispatch.'}
+                            </p>
+                          </div>
+                          {req?.adminComment && (
+                            <div className="bg-[var(--color-subtle)] p-3 rounded-lg border border-[var(--color-border)]">
+                              <span className="text-[8px] font-black tracking-widest text-[var(--color-accent)] uppercase block mb-1">💬 MESSAGE FROM ADMIN</span>
+                              <p className="text-[11px] text-[var(--color-text)] font-semibold leading-relaxed">
+                                "{req.adminComment}"
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Conditional Cancellation Warning Notice */}
+                    {['PENDING', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT'].includes(order.status) && (
+                      <div className={`p-4 rounded-xl border flex gap-3 items-start animate-fade-in ${
+                        (order.status === 'PENDING' || order.status === 'PROCESSING')
+                          ? 'bg-rose-500/5 dark:bg-rose-950/5 border-rose-500/20 text-rose-500'
+                          : 'bg-[var(--color-subtle)] border-[var(--color-border)] text-[var(--color-muted)]'
+                      }`}>
+                        <span className="text-xs mt-0.5">⚠️</span>
+                        <div className="space-y-0.5">
+                          <h4 className={`text-[9px] font-black tracking-widest uppercase ${(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'text-rose-500' : 'text-[var(--color-text)]'}`}>
+                            {(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'Cancellation Policy' : 'Cancellation Locked'}
+                          </h4>
+                          <p className="text-[9px] font-mono leading-relaxed uppercase">
+                            {(order.status === 'PENDING' || order.status === 'PROCESSING')
+                              ? 'This order can be cancelled while it is in "Pending" or "Processing" status. Once shipped, cancellation is disabled.'
+                              : 'This order has been shipped and cannot be cancelled anymore.'
+                            }
                           </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] inline-block"></span>
+                      Fulfillment Timeline
+                    </h3>
+                    
+                    <div className="relative pl-6 space-y-8">
+                      {/* Vertical Line */}
+                      <div className="absolute left-[38px] top-4 bottom-4 w-0.5 bg-[var(--color-border)] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-[var(--color-accent)] transition-all duration-1000 ease-out" 
+                          style={{ height: `${(currentStepIdx / (statusSteps.length - 1)) * 100}%` }}
+                        />
+                      </div>
+
+                      {statusSteps.map((step, idx) => {
+                        const isActive = idx <= currentStepIdx;
+                        const isCurrent = idx === currentStepIdx;
+                        const isFinalStep = step.key === 'DELIVERED' || step.key === 'RETURNED' || step.key === 'EXCHANGED';
+                        return (
+                          <div key={step.key} className="flex gap-6 items-start relative z-10">
+                            {/* Checkpoint Dot */}
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
+                              isCurrent 
+                              ? `bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-sm scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
+                              : isActive 
+                              ? 'bg-[var(--color-accent-dark)] border-[var(--color-accent-dark)] text-white' 
+                              : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-muted)]'
+                            }`}>
+                              {step.icon === 'check' ? (
+                                <FiCheckCircle className="text-sm" />
+                              ) : step.icon === 'truck' ? (
+                                <FiTruck className="text-sm" />
+                              ) : (
+                                <FiFileText className="text-sm" />
+                              )}
+                            </div>
+
+                            {/* Content block */}
+                            <div className="space-y-1 pt-1">
+                              <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-[var(--color-text)] font-black' : 'text-[var(--color-muted)]'}`}>
+                                {step.label}
+                              </h4>
+                              <p className="text-[10px] text-[var(--color-muted)] max-w-lg leading-relaxed normal-case font-medium">
+                                {step.desc}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tracking Details */}
+                {(order.tracking_number || metadata.tracking_number) && (
+                  <div className="bg-[var(--color-subtle)]/40 border border-[var(--color-border)] p-6 rounded-2xl space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <FiTruck className="text-[var(--color-accent)] text-lg" />
+                      <h3 className="text-xs font-black tracking-widest text-[var(--color-text)] uppercase">
+                        SHIPMENT DISPATCH METRICS
+                      </h3>
+                    </div>
+                    <div className="text-xs font-mono uppercase text-[var(--color-text)] space-y-2">
+                      <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
+                        <span className="text-[var(--color-muted)]">Tracking Number:</span>
+                        <strong className="font-black select-all text-[var(--color-text)]">{order.tracking_number || metadata.tracking_number}</strong>
+                      </div>
+                      <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
+                        <span className="text-[var(--color-muted)]">Carrier Channel:</span>
+                        <span className="font-bold text-[var(--color-text)]">Delhivery/DTDC Express</span>
+                      </div>
+                      {(order.tracking_url || metadata.tracking_url) && (
+                        <div className="pt-2">
+                          <a 
+                            href={order.tracking_url || metadata.tracking_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-block w-full text-center bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-black text-[10px] tracking-widest uppercase py-3.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                          >
+                            Track Package Live &rarr;
+                          </a>
                         </div>
                       )}
                     </div>
-                  );
-                })()}
-
-                {/* Conditional Cancellation Warning Notice */}
-                {['PENDING', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT'].includes(order.status) && (
-                  <div className={`p-4 rounded-xl border flex gap-3 items-start animate-fade-in ${
-                    (order.status === 'PENDING' || order.status === 'PROCESSING')
-                      ? 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-200/60 text-rose-800'
-                      : 'bg-neutral-50 dark:bg-neutral-900/40 border-neutral-200/60 text-neutral-600'
-                  }`}>
-                    <span className="text-sm mt-0.5">⚠️</span>
-                    <div className="space-y-0.5">
-                      <h4 className={`text-[9px] font-black tracking-widest uppercase ${(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'text-rose-600' : 'text-neutral-500'}`}>
-                        {(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'Cancellation Policy' : 'Cancellation Locked'}
-                      </h4>
-                      <p className="text-[9px] font-mono leading-relaxed uppercase">
-                        {(order.status === 'PENDING' || order.status === 'PROCESSING')
-                          ? 'This order can be cancelled while it is in "Pending" or "Processing" status. Once shipped, cancellation is disabled.'
-                          : 'This order has been shipped and cannot be cancelled anymore.'
-                        }
-                      </p>
-                    </div>
                   </div>
                 )}
-                
-                <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] inline-block"></span>
-                  Fulfillment Timeline
-                </h3>
-                
-                <div className="relative pl-6 space-y-8 select-none">
-                  {/* Vertical Line — mathematically centered at 40px (pl-6 = 24px + w-8/2 = 16px) */}
-                  <div className="absolute left-[38px] top-4 bottom-4 w-1 bg-neutral-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[var(--color-accent)] transition-all duration-1000 ease-out" 
-                      style={{ height: `${(currentStepIdx / (statusSteps.length - 1)) * 100}%` }}
-                    />
-                  </div>
 
-                  {statusSteps.map((step, idx) => {
-                    const isActive = idx <= currentStepIdx;
-                    const isCurrent = idx === currentStepIdx;
-                    const isFinalStep = step.key === 'DELIVERED' || step.key === 'RETURNED' || step.key === 'EXCHANGED';
-                    return (
-                      <div key={step.key} className="flex gap-6 items-start relative z-10">
-                        {/* Checkpoint Dot */}
-                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
-                          isCurrent 
-                          ? `bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-md scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
-                          : isActive 
-                          ? 'bg-[var(--color-accent-dark)] border-[var(--color-accent-dark)] text-white' 
-                          : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-muted)]'
-                        }`}>
-                          {step.icon === 'check' ? (
-                            <FiCheckCircle className="text-sm" />
-                          ) : step.icon === 'truck' ? (
-                            <FiTruck className="text-sm" />
-                          ) : (
-                            <FiFileText className="text-sm" />
-                          )}
-                        </div>
-
-                        {/* Content block */}
-                        <div className="space-y-1 pt-1">
-                          <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-neutral-950 font-black' : 'text-[var(--color-muted)]'}`}>
-                            {step.label}
-                          </h4>
-                          <p className="text-[10px] text-[var(--color-muted)] max-w-lg leading-relaxed normal-case font-medium">
-                            {step.desc}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Tracking details */}
-            {(order.tracking_number || metadata.tracking_number) && (
-              <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-6 rounded-2xl space-y-4 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <FiTruck className="text-[var(--color-accent)] text-lg" />
-                  <h3 className="text-xs font-black tracking-widest text-[var(--color-accent-dark)] uppercase">
-                    SHIPMENT DISPATCH METRICS
+                {/* Itemized Garments Specification List */}
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
+                    // CLAIMED GARMENTS SPECIFICATION
                   </h3>
-                </div>
-                <div className="text-xs font-mono uppercase text-[var(--color-text)] space-y-2">
-                  <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
-                    <span className="text-[var(--color-muted)]">Tracking Number:</span>
-                    <strong className="font-black select-all text-neutral-950">{order.tracking_number || metadata.tracking_number}</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
-                    <span className="text-[var(--color-muted)]">Carrier Channel:</span>
-                    <span className="font-bold text-neutral-950">Delhivery/DTDC Express</span>
-                  </div>
-                  {(order.tracking_url || metadata.tracking_url) && (
-                    <div className="pt-2">
-                      <a 
-                        href={order.tracking_url || metadata.tracking_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-block w-full text-center bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-black text-[10px] tracking-widest uppercase py-3 rounded-lg transition-all cursor-pointer"
-                      >
-                        Track Package Live &rarr;
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
+                  <div className="divide-y divide-[var(--color-border)] border border-[var(--color-border)] rounded-2xl overflow-hidden bg-[var(--color-subtle)]/20 p-4 space-y-4">
+                    {parsedItems.map((item, idx) => {
+                      const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
+                      const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
 
-            {/* Itemized Garments Specification List */}
-            <div className="space-y-4">
-              <h3 className="text-[9px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
-                Claimed Garments specification
-              </h3>
+                      return (
+                        <div key={idx} className="flex justify-between items-center py-4 text-xs first:pt-0 last:pb-0">
+                          <div className="flex gap-4 items-center min-w-0">
+                            {img ? (
+                              <Link 
+                                to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}
+                                className="shrink-0 hover:opacity-85 transition-opacity"
+                              >
+                                <img 
+                                  src={img} 
+                                  alt={item.name} 
+                                  className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
+                                />
+                              </Link>
+                            ) : (
+                              <div className="w-12 h-16 bg-[var(--color-subtle)] border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)] rounded-lg">
+                                NO IMG
+                              </div>
+                            )}
+                            <div className="space-y-1 min-w-0">
+                              <h4 className="font-black text-[var(--color-text)] uppercase tracking-wide truncate max-w-[200px] sm:max-w-xs hover:text-[var(--color-accent)] transition-colors">
+                                <Link to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}>
+                                  {item.name}
+                                </Link>
+                              </h4>
+                              <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                                Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
+                              </p>
+                               {order.status === 'DELIVERED' && (() => {
+                                let productId = item.product_id;
+                                if (!productId) {
+                                  productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
+                                }
+                                
+                                const itemPolicy = matchingProd?.return_policy || "7 Day Return";
+                                const existingRequest = Array.isArray(metadata.return_requests)
+                                  ? metadata.return_requests.find(r => r.itemIndex === idx)
+                                  : null;
+                                const eligible = isReturnExchangeEligible();
+                                const daysLeft = getReturnExchangeDaysLeft();
 
-              <div className="divide-y divide-neutral-100 border border-[var(--color-border)] rounded-2xl overflow-hidden bg-[var(--color-subtle)]/40 p-4 space-y-4">
-                {parsedItems.map((item, idx) => {
-                  const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
-                  const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
+                                return (
+                                  <div className="space-y-2 pt-1.5">
+                                    <div className="flex flex-wrap gap-2 items-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (productId) {
+                                            setReviewModalItem({ name: item.name, productId });
+                                            setModalRating(5);
+                                            setModalComment('');
+                                            setModalFit('true');
+                                            setModalComfort(5);
+                                            setModalQuality(5);
+                                            setModalBreathable(5);
+                                          } else {
+                                            showToast("Failed to locate product in current catalog.", "error");
+                                          }
+                                        }}
+                                        className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-bold text-[9px] tracking-widest px-3 py-2 rounded-lg uppercase transition-all duration-200 cursor-pointer border border-neutral-950 hover:border-[var(--color-accent)] shadow-xs"
+                                      >
+                                        Write Review
+                                      </button>
 
-                  return (
-                    <div key={idx} className="flex justify-between items-center py-4 text-xs first:pt-0 last:pb-0">
-                      <div className="flex gap-4 items-center min-w-0">
-                        {img ? (
-                          <Link 
-                            to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}
-                            className="shrink-0 hover:opacity-85 transition-opacity"
-                          >
-                            <img 
-                              src={img} 
-                              alt={item.name} 
-                              className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-xs bg-[var(--color-surface)]"
-                            />
-                          </Link>
-                        ) : (
-                          <div className="w-12 h-16 bg-neutral-100 border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)] rounded-xs">
-                            NO IMG
-                          </div>
-                        )}
-                        <div className="space-y-1 min-w-0">
-                          <h4 className="font-black text-neutral-950 uppercase tracking-wide truncate max-w-[200px] sm:max-w-xs hover:text-[var(--color-accent)] transition-colors">
-                            <Link to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}>
-                              {item.name}
-                            </Link>
-                          </h4>
-                          <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
-                            Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
-                          </p>
-                           {order.status === 'DELIVERED' && (() => {
-                            let productId = item.product_id;
-                            if (!productId) {
-                              productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
-                            }
-                            
-                            const itemPolicy = matchingProd?.return_policy || "7 Day Return";
-                            const existingRequest = Array.isArray(metadata.return_requests)
-                              ? metadata.return_requests.find(r => r.itemIndex === idx)
-                              : null;
-                            const eligible = isReturnExchangeEligible();
-                            const daysLeft = getReturnExchangeDaysLeft();
-
-                            return (
-                              <div className="space-y-2 pt-1.5">
-                                <div className="flex flex-wrap gap-2.5 items-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (productId) {
-                                        setReviewModalItem({ name: item.name, productId });
-                                        setModalRating(5);
-                                        setModalComment('');
-                                        setModalFit('true');
-                                        setModalComfort(5);
-                                        setModalQuality(5);
-                                        setModalBreathable(5);
-                                      } else {
-                                        showToast("Failed to locate product in current catalog.", "error");
-                                      }
-                                    }}
-                                    className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-bold text-[9px] tracking-widest px-4 py-2.5 rounded-[4px] uppercase transition-all duration-200 cursor-pointer border border-neutral-950 hover:border-[var(--color-accent)] shadow-xs"
-                                  >
-                                    Write Review
-                                  </button>
-
-                                  {!existingRequest && eligible && (
-                                    <>
-                                      {(itemPolicy === "7 Day Return" || itemPolicy === "default") && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setRequestItem({ ...item, index: idx, type: 'RETURN', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
-                                            setRequestReason("Wrong size received");
-                                            setCustomRequestText("");
-                                            setExchangeTargetSize("");
-                                            setRequestFrontImage("");
-                                            setRequestBackImage("");
-                                            setIsRequestModalOpen(true);
-                                          }}
-                                          className="inline-flex items-center gap-1.5 bg-transparent hover:bg-rose-50 text-neutral-950 border border-neutral-900 hover:border-rose-600 hover:text-rose-600 font-sans font-bold text-[9px] tracking-widest px-4 py-2.5 rounded-[4px] uppercase transition-all duration-200 cursor-pointer"
-                                        >
-                                          Request Return
-                                        </button>
+                                      {!existingRequest && eligible && (
+                                        <>
+                                          {(itemPolicy === "7 Day Return" || itemPolicy === "default") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setRequestItem({ ...item, index: idx, type: 'RETURN', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
+                                                setRequestReason("Wrong size received");
+                                                setCustomRequestText("");
+                                                setExchangeTargetSize("");
+                                                setRequestFrontImage("");
+                                                setRequestBackImage("");
+                                                setIsRequestModalOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1.5 bg-transparent hover:bg-rose-500/10 text-[var(--color-text)] border border-[var(--color-border)] hover:border-rose-500 hover:text-rose-500 font-sans font-bold text-[9px] tracking-widest px-3 py-2 rounded-lg uppercase transition-all duration-200 cursor-pointer"
+                                            >
+                                              Request Return
+                                            </button>
+                                          )}
+                                          {(itemPolicy === "7 Day Return" || itemPolicy === "default" || itemPolicy === "Exchange Only") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setRequestItem({ ...item, index: idx, type: 'EXCHANGE', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
+                                                setRequestReason("Wrong size received");
+                                                setCustomRequestText("");
+                                                setExchangeTargetSize("");
+                                                setRequestFrontImage("");
+                                                setRequestBackImage("");
+                                                setIsRequestModalOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1.5 bg-transparent hover:bg-amber-500/10 text-[var(--color-text)] border border-[var(--color-border)] hover:border-amber-500 hover:text-amber-500 font-sans font-bold text-[9px] tracking-widest px-3 py-2 rounded-lg uppercase transition-all duration-200 cursor-pointer"
+                                            >
+                                              Request Exchange
+                                            </button>
+                                          )}
+                                        </>
                                       )}
-                                      {(itemPolicy === "7 Day Return" || itemPolicy === "default" || itemPolicy === "Exchange Only") && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setRequestItem({ ...item, index: idx, type: 'EXCHANGE', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
-                                            setRequestReason("Wrong size received");
-                                            setCustomRequestText("");
-                                            setExchangeTargetSize("");
-                                            setRequestFrontImage("");
-                                            setRequestBackImage("");
-                                            setIsRequestModalOpen(true);
-                                          }}
-                                          className="inline-flex items-center gap-1.5 bg-transparent hover:bg-amber-50 text-neutral-950 border border-neutral-900 hover:border-amber-600 hover:text-amber-600 font-sans font-bold text-[9px] tracking-widest px-4 py-2.5 rounded-[4px] uppercase transition-all duration-200 cursor-pointer"
-                                        >
-                                          Request Exchange
-                                        </button>
-                                      )}
-                                    </>
-                                  )}
+                                    </div>
 
+                                    {existingRequest && (
+                                      <div className="pt-1.5">
+                                        <span className={`inline-block font-mono text-[9px] font-bold px-2 py-0.5 border ${
+                                          existingRequest.status === 'PENDING'
+                                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                          : existingRequest.status === 'APPROVED'
+                                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                          : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                        } uppercase rounded-lg`}>
+                                          {existingRequest.type === 'RETURN' ? 'Return' : 'Exchange'} Request - {existingRequest.status}
+                                          {existingRequest.exchangeTargetSize && ` to Size ${existingRequest.exchangeTargetSize}`}
+                                        </span>
+                                        {existingRequest.adminComment && (
+                                          <p className="text-[9px] font-sans text-[var(--color-muted)] mt-1 font-semibold normal-case">
+                                            Admin note: {existingRequest.adminComment}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
 
-                                </div>
+                                    {!existingRequest && !eligible && (
+                                      <div className="pt-1">
+                                        {itemPolicy === "No Return" ? (
+                                          <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">🔒 Non-Returnable Item</span>
+                                        ) : (
+                                          <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">Return window expired</span>
+                                        )}
+                                      </div>
+                                    )}
 
-                                {existingRequest && (
-                                  <div className="pt-1.5">
-                                    <span className={`inline-block font-mono text-[9px] font-bold px-2 py-0.5 border ${
-                                      existingRequest.status === 'PENDING'
-                                      ? 'bg-amber-50 text-amber-600 border-amber-200'
-                                      : existingRequest.status === 'APPROVED'
-                                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                      : 'bg-rose-50 text-rose-600 border-rose-200'
-                                    } uppercase`}>
-                                      {existingRequest.type === 'RETURN' ? 'Return' : 'Exchange'} Request - {existingRequest.status}
-                                      {existingRequest.exchangeTargetSize && ` to Size ${existingRequest.exchangeTargetSize}`}
-                                    </span>
-                                    {existingRequest.adminComment && (
-                                      <p className="text-[9px] font-sans text-[var(--color-muted)] mt-1 font-semibold normal-case">
-                                        Admin note: {existingRequest.adminComment}
+                                    {!existingRequest && eligible && itemPolicy !== "No Return" && (
+                                      <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">
+                                        Window active (ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'})
                                       </p>
                                     )}
                                   </div>
-                                )}
-
-                                {!existingRequest && !eligible && (
-                                  <div className="pt-1">
-                                    {itemPolicy === "No Return" ? (
-                                      <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">🔒 Non-Returnable Item</span>
-                                    ) : (
-                                      <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">Return window expired</span>
-                                    )}
-                                  </div>
-                                )}
-
-                                {!existingRequest && eligible && itemPolicy !== "No Return" && (
-                                  <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">
-                                    Window active (ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'})
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })()}
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          <span className="font-mono font-black text-[var(--color-text)] text-sm shrink-0">
+                            ₹{Number(item.price * item.quantity).toLocaleString('en-IN')}
+                          </span>
                         </div>
-                      </div>
-                      <span className="font-mono font-black text-neutral-950 text-sm shrink-0">
-                        ₹{Number(item.price * item.quantity).toLocaleString('en-IN')}
+                      );
+                    })}
+                  </div>
+                </div>
+              </div> {/* End Left Column */}
+
+              {/* Right Column */}
+              <div className="lg:col-span-5 space-y-6">
+
+                {/* Calculations & Total Invoice */}
+                <div className="bg-[var(--color-subtle)]/30 p-6 rounded-2xl border border-[var(--color-border)] space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] shadow-2xs">
+                  <div className="flex justify-between">
+                    <span>Gross catalog Value ({totalItemsCount} items)</span>
+                    <span className="text-[var(--color-text)] font-bold">
+                      ₹{Number(metadata.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  {order.couponApplied !== 'NONE' && (
+                    <div className="flex justify-between text-emerald-500 font-bold">
+                      <span>PROMO SAVINGS ({metadata.coupon_code})</span>
+                      <span className="font-black">
+                        - ₹{Number(order.discountAmount || order.discount_amount || 0).toLocaleString('en-IN')}
                       </span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            </div> {/* End Left Column */}
+                  )}
 
-            {/* Right Column */}
-            <div className="lg:col-span-5 space-y-8">
+                  <div className="flex justify-between">
+                    <span>SHIPPING & DELIVERY</span>
+                    {baseShippingCharge > 0 ? (
+                      <span className="text-[var(--color-text)] font-bold font-mono">
+                        ₹{baseShippingCharge}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-500 font-black tracking-wider text-[9px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        FREE SHIPPING
+                      </span>
+                    )}
+                  </div>
+                  {remoteSurcharge > 0 && (
+                    <div className="flex justify-between">
+                      <span>REMOTE ROUTE SURCHARGE</span>
+                      <span className="text-[var(--color-text)] font-bold font-mono">
+                        ₹{remoteSurcharge}
+                      </span>
+                    </div>
+                  )}
+                  {isCod && (
+                    <div className="flex justify-between">
+                      <span>COD HANDLING FEE</span>
+                      <span className="text-[var(--color-text)] font-bold font-mono">
+                        ₹{codFee}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>PAYMENT METHOD</span>
+                    <span className="text-[var(--color-text)] font-bold tracking-wide">
+                      {order.paymentMethod || (order.address?.includes('[Payment: ONLINE]') ? 'ONLINE' : 'COD')}
+                    </span>
+                  </div>
+                  {order.paymentProvider && order.paymentProvider !== 'NONE' && (
+                    <div className="flex justify-between">
+                      <span>PAYMENT PROVIDER</span>
+                      <span className="text-emerald-500 font-black tracking-wide bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px]">
+                        {order.paymentProvider}
+                      </span>
+                    </div>
+                  )}
+                  {order.paymentStatus && (
+                    <div className="flex justify-between">
+                      <span>PAYMENT STATUS</span>
+                      <span className={`font-black tracking-wider text-[10px] px-1.5 py-0.5 rounded border ${
+                        order.paymentStatus === 'PAID' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20'
+                      }`}>
+                        {order.paymentStatus}
+                      </span>
+                    </div>
+                  )}
+                  {order.razorpayPaymentId && (
+                    <div className="flex justify-between">
+                      <span>TRANSACTION ID</span>
+                      <span className="text-[var(--color-muted)] font-mono text-[10px]">
+                        {order.razorpayPaymentId}
+                      </span>
+                    </div>
+                  )}
+                  <hr className="border-[var(--color-border)]" />
+                  <div className="flex justify-between items-baseline pt-2">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-[var(--color-text)] uppercase tracking-wide">Net deposited amount</span>
+                      <span className="text-[9px] text-[var(--color-muted)] font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
+                        (incl. of all taxes)
+                      </span>
+                    </div>
+                    <span className="text-2xl font-black text-[var(--color-text)] tracking-tight font-mono">
+                      ₹{Number(order.total || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
 
-            {/* Calculations & Total Invoice */}
-            <div className="bg-[var(--color-subtle)]/70 p-6 rounded-2xl border border-[var(--color-border)] space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] select-none shadow-xs">
-              <div className="flex justify-between">
-                <span>Gross catalog Value ({totalItemsCount} items)</span>
-                <span className="text-neutral-950 font-bold">
-                  ₹{Number(metadata.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0)).toLocaleString('en-IN')}
-                </span>
-              </div>
-              {order.couponApplied !== 'NONE' && (
-                <div className="flex justify-between text-emerald-600 font-bold">
-                  <span>PROMO SAVINGS ({metadata.coupon_code})</span>
-                  <span className="font-black">
-                    - ₹{Number(order.discountAmount || order.discount_amount || 0).toLocaleString('en-IN')}
-                  </span>
+                {/* Shipping Logistics Coordinates */}
+                <div className="bg-[var(--color-subtle)]/30 p-6 rounded-2xl border border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide shadow-2xs">
+                  <div className="space-y-1.5">
+                    <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CUSTOMER DETAILS</span>
+                    <span className="text-[var(--color-text)] font-bold block mt-1">{order.customerName}</span>
+                    <span className="text-[var(--color-muted)] font-mono text-[10px] block mt-0.5">{order.phone}</span>
+                    <span className="text-[var(--color-muted)] font-mono text-[10px] block lowercase mt-0.5">{order.email}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">SHIPPING ADDRESS</span>
+                    <span className="text-[var(--color-text)] font-bold block mt-1 leading-relaxed">
+                      {addressText}
+                    </span>
+                  </div>
                 </div>
-              )}
 
-              <div className="flex justify-between">
-                <span>SHIPPING & DELIVERY</span>
-                {baseShippingCharge > 0 ? (
-                  <span className="text-neutral-950 font-bold font-mono">
-                    ₹{baseShippingCharge}
-                  </span>
-                ) : (
-                  <span className="text-[var(--color-accent-dark)] font-black tracking-wider text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50 animate-scale-up">
-                    FREE SHIPPING
-                  </span>
-                )}
-              </div>
-              {remoteSurcharge > 0 && (
-                <div className="flex justify-between">
-                  <span>REMOTE ROUTE SURCHARGE</span>
-                  <span className="text-neutral-950 font-bold font-mono">
-                    ₹{remoteSurcharge}
-                  </span>
+                {/* Security Shield */}
+                <div className="flex items-center gap-3 text-[8px] font-mono text-[var(--color-muted)] border border-[var(--color-border)] bg-[var(--color-subtle)]/30 p-4 rounded-xl leading-normal uppercase shadow-2xs">
+                  <FiShield className="text-base text-[var(--color-text)] shrink-0" />
+                  <div>
+                    <span className="font-bold text-[var(--color-text)] block mb-0.5">🔒 SECURE TRANSACTION DETAILS</span>
+                    Order details verified and safely stored in our database.
+                  </div>
                 </div>
-              )}
-              {isCod && (
-                <div className="flex justify-between">
-                  <span>COD HANDLING FEE</span>
-                  <span className="text-neutral-950 font-bold font-mono">
-                    ₹{codFee}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span>PAYMENT METHOD</span>
-                <span className="text-neutral-950 font-bold tracking-wide">
-                  {order.paymentMethod || (order.address?.includes('[Payment: ONLINE]') ? 'ONLINE' : 'COD')}
-                </span>
               </div>
-              {order.paymentProvider && order.paymentProvider !== 'NONE' && (
-                <div className="flex justify-between">
-                  <span>PAYMENT PROVIDER</span>
-                  <span className="text-[var(--color-accent-dark)] font-black tracking-wide bg-emerald-50 border border-emerald-100/50 px-1.5 py-0.5 rounded text-[10px]">
-                    {order.paymentProvider}
-                  </span>
-                </div>
-              )}
-              {order.paymentStatus && (
-                <div className="flex justify-between">
-                  <span>PAYMENT STATUS</span>
-                  <span className={`font-black tracking-wider text-[10px] px-1.5 py-0.5 rounded ${
-                    order.paymentStatus === 'PAID' ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : 'text-rose-600 bg-rose-50 border border-rose-150'
-                  }`}>
-                    {order.paymentStatus}
-                  </span>
-                </div>
-              )}
-              {order.razorpayPaymentId && (
-                <div className="flex justify-between">
-                  <span>TRANSACTION ID</span>
-                  <span className="text-[var(--color-muted)] font-mono text-[10px]">
-                    {order.razorpayPaymentId}
-                  </span>
-                </div>
-              )}
-              <hr className="border-[var(--color-border)]" />
-              <div className="flex justify-between items-baseline pt-2">
-                <div className="flex flex-col">
-                  <span className="text-sm font-black text-neutral-950 uppercase tracking-wide">Net deposited amount</span>
-                  <span className="text-[9px] text-[var(--color-muted)] font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
-                    (incl. of all taxes)
-                  </span>
-                </div>
-                <span className="text-2xl font-black text-neutral-950 tracking-tight font-mono">
-                  ₹{Number(order.total || 0).toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
-
-            {/* Shipping Logistics Coordinates */}
-            <div className="bg-[var(--color-subtle)]/70 p-6 rounded-2xl border border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide">
-              <div>
-                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CUSTOMER DETAILS</span>
-                <span className="text-neutral-950 font-bold block mt-1">{order.customerName}</span>
-                <span className="text-[var(--color-muted)] font-mono text-[10px] block mt-0.5">{order.phone}</span>
-                <span className="text-[var(--color-muted)] font-mono text-[10px] block lowercase mt-0.5">{order.email}</span>
-              </div>
-              <div>
-                <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">SHIPPING ADDRESS</span>
-                <span className="text-neutral-950 font-bold block mt-1 leading-relaxed">
-                  {addressText}
-                </span>
-              </div>
-            </div>
-
-            {/* Security Shield */}
-            <div className="flex items-center gap-3 text-[8px] font-mono text-[var(--color-muted)] border border-[var(--color-border)] bg-[var(--color-subtle)]/50 p-4 rounded-xl leading-normal uppercase">
-              <FiShield className="text-base text-[var(--color-text)] shrink-0" />
-              <div>
-                <span className="font-bold text-[var(--color-text)] block mb-0.5">🔒 SECURE TRANSACTION DETAILS</span>
-                Order details verified and safely stored in our database.
-              </div>
-            </div>
-
-            </div>
-            
-            </div> {/* End Right Column */}
             </div> {/* End Main Grid */}
+          </div>
         </div>
       </div>
 
@@ -1332,26 +1328,29 @@ function OrderDetail() {
 
       {/* Return / Exchange Request Modal */}
       {isRequestModalOpen && requestItem && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fade-in">
-          <div className="bg-[var(--color-surface)] w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-4 animate-scale-up text-[var(--color-text)] max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[var(--color-surface)] w-full max-w-md rounded-2xl border border-[var(--color-border)] shadow-2xl p-6 sm:p-8 relative space-y-5 animate-scale-up text-[var(--color-text)] max-h-[90vh] overflow-y-auto scrollbar-none">
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setIsRequestModalOpen(false)}
-              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-rose-500 font-bold text-sm p-1 cursor-pointer transition-colors"
             >
               ✕
             </button>
 
             {/* Header */}
             <div>
-              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
-                {requestItem.type} REQUEST PANEL
+              <span className="text-[8px] font-mono text-[var(--color-accent)] block uppercase tracking-widest font-black">
+                // {requestItem.type} REQUEST LOG
               </span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
-                {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'} {requestItem.name}
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1.5 leading-snug">
+                {requestItem.type === 'RETURN' ? 'Request Return' : 'Request Exchange'}
               </h2>
-              <span className="text-xs font-mono text-[var(--color-muted)] uppercase block mt-0.5">
+              <p className="text-xs font-bold text-[var(--color-text)] mt-1 uppercase tracking-wide">
+                {requestItem.name}
+              </p>
+              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase block mt-1">
                 Current Size: {requestItem.size} · Price: ₹{requestItem.price}
               </span>
             </div>
@@ -1363,15 +1362,15 @@ function OrderDetail() {
                 e.preventDefault();
                 submitReturnExchangeRequest();
               }}
-              className="space-y-4 font-sans text-[var(--color-text)]"
+              className="space-y-4 font-sans"
             >
               {/* Reason Selector */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Reason for {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'}</span>
+                <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide">Reason for {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'}</span>
                 <select
                   value={requestReason}
                   onChange={(e) => setRequestReason(e.target.value)}
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden font-medium"
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden font-medium cursor-pointer transition-colors"
                 >
                   <option value="Wrong size received">Wrong size received</option>
                   <option value="Defective / Damaged product">Defective / Damaged product</option>
@@ -1384,12 +1383,12 @@ function OrderDetail() {
               {/* Target Size (For Exchange Only) */}
               {requestItem.type === 'EXCHANGE' && (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Select Desired Size</span>
+                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide">Select Desired Size</span>
                   <select
                     value={exchangeTargetSize}
                     onChange={(e) => setExchangeTargetSize(e.target.value)}
                     required
-                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden font-medium"
+                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden font-medium cursor-pointer transition-colors"
                   >
                     <option value="">-- Choose New Size --</option>
                     {requestItem.sizes && requestItem.sizes
@@ -1407,35 +1406,53 @@ function OrderDetail() {
 
               {/* Detailed Notes */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Additional Comments (Optional)</span>
+                <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide">Additional Comments (Optional)</span>
                 <textarea
                   value={customRequestText}
                   onChange={(e) => setCustomRequestText(e.target.value)}
                   placeholder="Explain any details here..."
-                  rows={3}
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors"
+                  rows={2}
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors"
                 />
               </div>
 
-              {/* Product Photos Upload Verification (Required) */}
-              <div className="space-y-4">
-                <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase block">
+              {/* Product Photos Upload Verification */}
+              <div className="space-y-3.5">
+                <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide block">
                   Upload Product Photos <span className="text-rose-500 font-sans font-bold">*</span> (Required)
                 </span>
                 
-                {/* Front Image Upload */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Front View Photo</span>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={requestFrontImage}
-                      readOnly
-                      placeholder={uploadingFront ? "Uploading front view..." : "No front photo selected"}
-                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden truncate"
-                    />
-                    <label className="shrink-0 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
-                      {uploadingFront ? 'Uploading...' : 'Choose Photo'}
+                <div className="grid grid-cols-2 gap-3.5">
+                  {/* Front Image Upload */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Front View</span>
+                    <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-3 cursor-pointer transition-all text-center h-28 relative ${
+                      requestFrontImage ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[var(--color-border)] hover:border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    }`}>
+                      {uploadingFront ? (
+                        <span className="text-[9px] font-mono text-[var(--color-muted)] animate-pulse">UPLOADING...</span>
+                      ) : requestFrontImage ? (
+                        <div className="relative w-full h-full">
+                          <img src={requestFrontImage} className="w-full h-full object-cover rounded-lg border border-[var(--color-border)]" alt="Front proof" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setRequestFrontImage("");
+                            }}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[9px] font-bold shadow-sm transition-colors"
+                            title="Remove image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono font-black text-[var(--color-accent)] block">+ UPLOAD</span>
+                          <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">FRONT PHOTO</p>
+                        </div>
+                      )}
                       <input
                         type="file"
                         accept="image/*"
@@ -1445,38 +1462,37 @@ function OrderDetail() {
                       />
                     </label>
                   </div>
-                  {requestFrontImage && (
-                    <div className="relative group w-12 h-16 mt-1">
-                      <img 
-                        src={requestFrontImage} 
-                        alt="Front verification proof" 
-                        className="w-full h-full object-cover border border-[var(--color-border)]" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setRequestFrontImage("")}
-                        className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors shadow-sm"
-                        title="Remove image"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
 
-                {/* Back Image Upload */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase">Back View Photo</span>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={requestBackImage}
-                      readOnly
-                      placeholder={uploadingBack ? "Uploading back view..." : "No back photo selected"}
-                      className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden truncate"
-                    />
-                    <label className="shrink-0 bg-neutral-950 hover:bg-neutral-800 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-2.5 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none">
-                      {uploadingBack ? 'Uploading...' : 'Choose Photo'}
+                  {/* Back Image Upload */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Back View</span>
+                    <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-3 cursor-pointer transition-all text-center h-28 relative ${
+                      requestBackImage ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[var(--color-border)] hover:border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    }`}>
+                      {uploadingBack ? (
+                        <span className="text-[9px] font-mono text-[var(--color-muted)] animate-pulse">UPLOADING...</span>
+                      ) : requestBackImage ? (
+                        <div className="relative w-full h-full">
+                          <img src={requestBackImage} className="w-full h-full object-cover rounded-lg border border-[var(--color-border)]" alt="Back proof" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setRequestBackImage("");
+                            }}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[9px] font-bold shadow-sm transition-colors"
+                            title="Remove image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono font-black text-[var(--color-accent)] block">+ UPLOAD</span>
+                          <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">BACK PHOTO</p>
+                        </div>
+                      )}
                       <input
                         type="file"
                         accept="image/*"
@@ -1486,43 +1502,26 @@ function OrderDetail() {
                       />
                     </label>
                   </div>
-                  {requestBackImage && (
-                    <div className="relative group w-12 h-16 mt-1">
-                      <img 
-                        src={requestBackImage} 
-                        alt="Back verification proof" 
-                        className="w-full h-full object-cover border border-[var(--color-border)]" 
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setRequestBackImage("")}
-                        className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold cursor-pointer transition-colors shadow-sm"
-                        title="Remove image"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                <p className="text-[9px] text-neutral-455 font-medium">
-                  Select from Camera or Gallery. Photos will be compressed automatically. Both front and back views are required.
+                <p className="text-[8px] font-mono text-[var(--color-muted)] leading-relaxed uppercase">
+                  Select from Camera or Gallery. Photos are compressed automatically. Both front and back views are required.
                 </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2.5 pt-3">
                 <button
                   type="submit"
                   disabled={submittingRequest}
-                  className="flex-1 bg-neutral-950 hover:bg-neutral-800 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer text-center py-2.5 shadow-md"
+                  className="flex-1 bg-neutral-950 hover:bg-neutral-800 text-white font-sans font-bold text-[10px] tracking-widest py-3 rounded-xl uppercase transition-all duration-200 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submittingRequest ? 'Submitting...' : 'Submit Request'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsRequestModalOpen(false)}
-                  className="px-4 border border-neutral-250 hover:bg-[var(--color-surface)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer py-2.5"
+                  className="px-4 bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900 border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] font-sans font-bold text-[10px] tracking-widest py-3 rounded-xl uppercase transition-all duration-200 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1597,7 +1596,7 @@ function OrderDetail() {
                 {/* Header */}
                 <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
                   <div>
-                    <div className="text-xl md:text-2xl font-black tracking-wider uppercase leading-none">VAKRAYAN</div>
+                    <div className="text-xl md:text-2xl font-black tracking-wider uppercase leading-none font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
                     <div className="text-[9px] text-neutral-500 font-bold mt-1 uppercase">Premium Drop & Boutique</div>
                   </div>
                   <div className="text-right">
@@ -1610,7 +1609,7 @@ function OrderDetail() {
                 <div className="grid grid-cols-3 gap-4 mb-8">
                   <div>
                     <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Sold By</div>
-                    <div className="font-extrabold text-black uppercase">VAKRAYAN</div>
+                    <div className="font-extrabold text-black uppercase font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
                     <div className="text-neutral-700">Surat, Gujarat, India</div>
                     <div className="text-neutral-700">Pincode: 395006</div>
                     <div className="text-neutral-700">GSTIN: 24VAKRAYAN1234F1Z0</div>

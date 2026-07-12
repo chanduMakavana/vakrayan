@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../services/products';
 import reviewsService from '../../services/reviews';
@@ -81,7 +81,12 @@ function ProductDetail() {
   const [activeImage, setActiveImage] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
+  const [quantity, setQuantity] = useState(1);
   const [activeVariant, setActiveVariant] = useState(null);
+
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedSize, selectedColor, idOrSlug]);
   const [groupProducts, setGroupProducts] = useState([]);
   const [activeReviewImage, setActiveReviewImage] = useState(null);
 
@@ -807,10 +812,21 @@ function ProductDetail() {
                 const existingCartItem = cartItems.find(
                   item => item.product_id === targetProductId && item.size === targetSize
                 );
+                
+                const pendingQty = Number(pending.quantity) || 1;
 
                 let response;
                 if (existingCartItem) {
-                  response = existingCartItem;
+                  response = await cartService.addToCart({
+                    name: product.name,
+                    size: targetSize,
+                    price: product.price,
+                    product_id: targetProductId,
+                    product_Image: product.front_image_link || product.image_url || product.image,
+                    userId: user.$id,
+                    existingCartItem,
+                    quantity: pendingQty
+                  });
                 } else {
                   response = await cartService.addToCart({
                     name: product.name,
@@ -819,7 +835,8 @@ function ProductDetail() {
                     product_id: targetProductId,
                     product_Image: product.front_image_link || product.image_url || product.image,
                     userId: user.$id,
-                    existingCartItem: null
+                    existingCartItem: null,
+                    quantity: pendingQty
                   });
                   if (response) {
                     dispatch(addCartItemState(response));
@@ -851,7 +868,8 @@ function ProductDetail() {
       sessionStorage.setItem('buy_now_pending', JSON.stringify({
         productId: product.$id || product.id,
         size: selectedSize || product.sizes?.[0] || 'M',
-        color: selectedColor || ''
+        color: selectedColor || '',
+        quantity: quantity
       }));
       showToast("Please sign in to complete your checkout.", "info");
       navigate('/login', { state: { from: location } });
@@ -873,7 +891,16 @@ function ProductDetail() {
 
       let response;
       if (existingCartItem) {
-        response = existingCartItem;
+        response = await cartService.addToCart({
+          name: product.name,
+          size: targetSize,
+          price: product.price,
+          product_id: targetProductId,
+          product_Image: product.front_image_link || product.image_url || product.image,
+          userId: user.$id,
+          existingCartItem,
+          quantity: quantity
+        });
       } else {
         response = await cartService.addToCart({
           name: product.name,
@@ -882,7 +909,8 @@ function ProductDetail() {
           product_id: targetProductId,
           product_Image: product.front_image_link || product.image_url || product.image,
           userId: user.$id,
-          existingCartItem: null
+          existingCartItem: null,
+          quantity: quantity
         });
         
         if (response) {
@@ -1624,6 +1652,54 @@ function ProductDetail() {
               );
             })()}
 
+             {/* Quantity Selector Section */}
+             {!adminMode && !loading && product && (
+               <div className="space-y-3 mt-4 pt-4 border-t border-[var(--color-border)]">
+                 <span className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase block">
+                   Select Quantity
+                 </span>
+                 <div className="flex items-center gap-4">
+                   <div className="flex items-center border border-[var(--color-border)] bg-[var(--color-surface)]">
+                     <button
+                       type="button"
+                       disabled={quantity <= 1}
+                       onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                       className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-subtle)] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer select-none transition-colors text-[var(--color-text)] border-r border-[var(--color-border)]"
+                     >
+                       <FiMinus size={12} />
+                     </button>
+                     <span className="w-10 text-center font-mono font-bold text-xs select-none text-[var(--color-text)]">
+                       {quantity}
+                     </span>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const baseSizeVal = selectedSize || product.sizes?.[0] || 'M';
+                         const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                         if (quantity >= availableStock) {
+                           showToast(`Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "warning");
+                           return;
+                         }
+                         setQuantity(prev => prev + 1);
+                       }}
+                       className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-subtle)] cursor-pointer select-none transition-colors text-[var(--color-text)] border-l border-[var(--color-border)]"
+                     >
+                       <FiPlus size={12} />
+                     </button>
+                   </div>
+                   {selectedSize && (() => {
+                     const baseSizeVal = selectedSize || 'M';
+                     const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                     return (
+                       <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
+                         {availableStock} items left
+                       </span>
+                     );
+                   })()}
+                 </div>
+               </div>
+             )}
+
 
             {/* Extra bottom padding on mobile so content isn't hidden behind sticky bar */}
             <div className="h-24 lg:hidden" aria-hidden="true" />
@@ -1637,6 +1713,7 @@ function ProductDetail() {
                         product={product}
                         selectedSize={selectedSize}
                         selectedColor={selectedColor}
+                        quantity={quantity}
                       />
                     </div>
                     
@@ -2724,6 +2801,7 @@ function ProductDetail() {
               product={product}
               selectedSize={selectedSize}
               selectedColor={selectedColor}
+              quantity={quantity}
             />
           </div>
 

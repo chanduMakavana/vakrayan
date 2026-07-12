@@ -88,8 +88,15 @@ export class Account {
                             phone: data.phone || '',
                         });
                     } catch (error) {
-                        console.error("Firestore get user error:", error);
-                        reject(error);
+                        console.warn("Firestore get user error, falling back to auth info:", error);
+                        resolve({
+                            $id: user.uid,
+                            email: user.email,
+                            name: user.displayName || 'User',
+                            prefs: {},
+                            labels: [],
+                            phone: '',
+                        });
                     }
                 } else {
                     reject({ message: 'Not logged in' });
@@ -160,11 +167,14 @@ export class Account {
                                     activeSessions: arrayUnion(sessionId)
                                 });
                             }
+                            localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
                             if (success) window.location.href = success;
                             resolve();
                         } catch (err) {
-                            console.error('Firestore Error during Google Auth:', err);
-                            reject(err);
+                            console.warn('Firestore offline or blocked during Google Auth, proceeding:', err);
+                            localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
+                            if (success) window.location.href = success;
+                            resolve();
                         }
                     })
                     .catch((error) => {

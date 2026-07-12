@@ -15,6 +15,7 @@ import offersService from '../../services/offers';
 import walletService from '../../services/wallet';
 import categoryService from '../../services/category';
 import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders } from 'react-icons/fi';
+import AdminAnalytics from '../pageComponets/AdminAnalytics';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -28,7 +29,7 @@ const DEFAULT_CATEGORIES = [
 ];
 
 function AdminPanel() {
-  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm();
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm();
   const location = useLocation();
   const { showToast } = useToast();
   const [editingId, setEditingId] = useState(null);
@@ -37,7 +38,7 @@ function AdminPanel() {
   const [isCustomCategory, setIsCustomCategory] = useState(false);
 
   // Tab Manager State
-  const [activeTab, setActiveTab] = useState('products'); // products | orders | campaigns
+  const [activeTab, setActiveTab] = useState('analytics'); // analytics | products | orders | campaigns
 
   // Orders State (Fulfillment)
   const [orders, setOrders] = useState([]);
@@ -538,6 +539,153 @@ function AdminPanel() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+
+
+  const [dragOverFields, setDragOverFields] = useState({});
+
+  const handleDragOver = (e, fieldName) => {
+    e.preventDefault();
+    setDragOverFields(prev => ({ ...prev, [fieldName]: true }));
+  };
+
+  const handleDragLeave = (e, fieldName) => {
+    e.preventDefault();
+    setDragOverFields(prev => ({ ...prev, [fieldName]: false }));
+  };
+
+  const handleDrop = async (e, fieldName) => {
+    e.preventDefault();
+    setDragOverFields(prev => ({ ...prev, [fieldName]: false }));
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
+    try {
+      const response = await storageService.uploadFile(file);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        setValue(fieldName, fileUrl);
+        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Product image drop upload failed:", err);
+      showToast("Firebase Storage upload failed.", "error");
+    } finally {
+      setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
+    }
+  };
+
+  const renderImageUploader = (fieldName, labelText, requiredRule) => {
+    const imgUrl = watch(fieldName);
+    const isDragOver = dragOverFields[fieldName];
+    const isUploading = uploadingFields[fieldName];
+
+    return (
+      <div className="flex flex-col gap-1.5 w-full">
+        <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">
+          {labelText}
+        </label>
+        
+        <div
+          onDragOver={(e) => handleDragOver(e, fieldName)}
+          onDragLeave={(e) => handleDragLeave(e, fieldName)}
+          onDrop={(e) => handleDrop(e, fieldName)}
+          onClick={() => {
+            if (!imgUrl && !isUploading) {
+              document.getElementById(`file-input-${fieldName}`).click();
+            }
+          }}
+          className={`relative border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all min-h-[140px] text-center select-none ${
+            imgUrl 
+              ? 'border-emerald-500/40 bg-emerald-500/[0.02]' 
+              : isDragOver
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent-light)]/20 scale-[0.99]'
+                : 'border-[var(--color-border)] hover:border-neutral-450 bg-[var(--color-subtle)]/50 cursor-pointer'
+          }`}
+        >
+          {isUploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
+              <span className="text-[10px] font-mono tracking-wider text-[var(--color-muted)] uppercase animate-pulse">Uploading...</span>
+            </div>
+          ) : imgUrl ? (
+            <div className="relative w-full flex flex-col items-center gap-3">
+              <div className="relative group w-20 h-24 rounded-lg overflow-hidden border border-[var(--color-border)] shadow-xs">
+                <img src={imgUrl} alt="Product view" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setValue(fieldName, '');
+                  }}
+                  className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200 cursor-pointer"
+                  title="Remove Image"
+                >
+                  <FiTrash2 className="text-sm" />
+                </button>
+              </div>
+              <div className="w-full max-w-[240px] space-y-1">
+                <p className="text-[9px] font-mono text-slate-400 truncate text-center px-2 bg-neutral-900/5 py-1 rounded">
+                  {imgUrl}
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    document.getElementById(`file-input-${fieldName}`).click();
+                  }}
+                  className="text-[9px] font-mono text-[var(--color-accent)] hover:underline block mx-auto uppercase tracking-wider font-bold"
+                >
+                  Change Image
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2 cursor-pointer">
+              <FiImage className="text-2xl text-[var(--color-muted)] animate-pulse" />
+              <div className="space-y-0.5">
+                <p className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">
+                  Drag & Drop Image here
+                </p>
+                <p className="text-[9px] text-[var(--color-muted)] uppercase font-medium">
+                  or click to browse local files
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <input
+            id={`file-input-${fieldName}`}
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleProductImageUpload(e, fieldName)}
+            disabled={actionLoading || isUploading}
+            className="hidden"
+          />
+        </div>
+
+        {/* Text input fallback so they can still paste direct URLs */}
+        <div className="mt-1 flex items-center gap-1.5 bg-neutral-900/[0.02] p-1.5 rounded-lg border border-[var(--color-border)]/40">
+          <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wider pl-1.5">Or paste link:</span>
+          <input
+            type="text"
+            disabled={actionLoading || isUploading}
+            placeholder="PASTE IMAGE URL ADDRESS"
+            className="flex-1 bg-transparent text-[11px] font-mono text-[var(--color-text)] outline-none"
+            {...register(fieldName, requiredRule)}
+          />
+        </div>
+        {errors[fieldName] && (
+          <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider mt-1 block">
+            {errors[fieldName].message}
+          </span>
+        )}
+      </div>
+    );
   };
 
   const handleProductImageUpload = async (e, fieldName) => {
@@ -1913,6 +2061,17 @@ function AdminPanel() {
               {/* Navigation Menu */}
               <nav className="flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-visible pb-3 lg:pb-0 scrollbar-none -mx-4 px-4 lg:mx-0 lg:px-0">
                 <button 
+                  onClick={() => { setActiveTab('analytics'); }}
+                  className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
+                    activeTab === 'analytics' 
+                      ? 'bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/20' 
+                      : 'text-[var(--color-muted)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <FiTrendingUp className="text-xs" />
+                  <span>Analytics Overview</span>
+                </button>
+                <button 
                   onClick={() => { setActiveTab('products'); }}
                   className={`flex items-center gap-2.5 text-[10px] font-mono font-black tracking-[0.15em] uppercase px-4 py-3 rounded-xl transition-all cursor-pointer shrink-0 w-fit lg:w-full ${
                     activeTab === 'products' 
@@ -2009,6 +2168,7 @@ function AdminPanel() {
               <div>
                 <h4 className="text-[10px] tracking-[0.3em] text-[var(--color-muted)] font-black uppercase mb-1">HQ Operations Console</h4>
                 <h1 className="text-2xl font-black tracking-widest uppercase text-[var(--color-text)]">
+                  {activeTab === 'analytics' && 'Analytics Overview'}
                   {activeTab === 'products' && 'Drops Manager'}
                   {activeTab === 'orders' && 'Fulfillment Engine'}
                   {activeTab === 'campaigns' && 'Campaigns & Coupons'}
@@ -2025,6 +2185,13 @@ function AdminPanel() {
                 </span>
               </div>
             </div>
+
+          {/* ==========================================
+              TAB 0: ANALYTICS OVERVIEW
+              ========================================== */}
+          {activeTab === 'analytics' && (
+            <AdminAnalytics orders={orders} products={products} />
+          )}
 
           {/* ==========================================
               TAB 1: DROPS CATALOG & LAUNCH DROP
@@ -2202,75 +2369,38 @@ function AdminPanel() {
                       <h3 className="text-xs font-black tracking-widest uppercase text-[var(--color-text)]">Media & Image Views</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Front Image Link */}
-              <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Front Image Link</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    disabled={actionLoading}
-                    placeholder="PASTE FRONT IMAGE LINK"
-                    className={`flex-1 bg-[var(--color-subtle)] border ${errors.front_image_link ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)]'} rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium disabled:opacity-50`}
-                    {...register('front_image_link', { required: 'Front image link is required' })}
-                  />
-                  <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-border)] text-center select-none disabled:opacity-50">
-                    {uploadingFields['front_image_link'] ? 'Uploading...' : 'Upload'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleProductImageUpload(e, 'front_image_link')}
-                      disabled={actionLoading || uploadingFields['front_image_link']}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-                {errors.front_image_link && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.front_image_link.message}</span>}
-              </div>
-
-              {/* Gallery Images */}
-              <div className="flex flex-col gap-3 md:col-span-2">
-                <div className="flex justify-between items-center pb-1">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">
-                    Back Image Links ({backImageCount} Views)
-                  </label>
-                  {backImageCount < 8 && (
-                    <button
-                      type="button"
-                      onClick={() => setBackImageCount(prev => prev + 1)}
-                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-[9px] px-3 py-1.5 rounded-lg uppercase tracking-widest transition-all cursor-pointer inline-flex items-center gap-1 border border-[var(--color-border)]/10"
-                    >
-                      <FiPlus className="text-xs" /> Add Image
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Array.from({ length: backImageCount }).map((_, index) => {
-                    const fieldName = `back_image_link_${index + 1}`;
-                    return (
-                      <div key={fieldName} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          disabled={actionLoading}
-                          placeholder={`BACK IMAGE LINK ${index + 1}`}
-                          className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium disabled:opacity-50"
-                          {...register(fieldName, index === 0 ? { required: 'At least one back view link is required.' } : undefined)}
-                        />
-                        <label className="shrink-0 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-xs px-4 py-3.5 rounded-xl uppercase transition-all cursor-pointer border border-[var(--color-border)] text-center select-none disabled:opacity-50">
-                          {uploadingFields[fieldName] ? 'Uploading...' : 'Upload'}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleProductImageUpload(e, fieldName)}
-                            disabled={actionLoading || uploadingFields[fieldName]}
-                            className="hidden"
-                          />
-                        </label>
+                      {/* Front Image Link */}
+                      <div className="md:col-span-2">
+                        {renderImageUploader('front_image_link', 'Front Image Link (Primary View)', { required: 'Front image link is required' })}
                       </div>
-                    );
-                  })}
-                </div>
-                {errors.back_image_link_1 && <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider">{errors.back_image_link_1.message}</span>}
-              </div>
+
+                      {/* Gallery Images */}
+                      <div className="flex flex-col gap-3 md:col-span-2 border-t border-[var(--color-border)]/40 pt-4 mt-2">
+                        <div className="flex justify-between items-center pb-1">
+                          <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">
+                            Back Image Links ({backImageCount} Views)
+                          </label>
+                          {backImageCount < 8 && (
+                            <button
+                              type="button"
+                              onClick={() => setBackImageCount(prev => prev + 1)}
+                              className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-bold text-[9px] px-3 py-1.5 rounded-lg uppercase tracking-widest transition-all cursor-pointer inline-flex items-center gap-1 border border-[var(--color-border)]/10"
+                            >
+                              <FiPlus className="text-xs" /> Add View
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {Array.from({ length: backImageCount }).map((_, index) => {
+                            const fieldName = `back_image_link_${index + 1}`;
+                            return (
+                              <div key={fieldName} className="w-full">
+                                {renderImageUploader(fieldName, `Back Image View ${index + 1}`, index === 0 ? { required: 'At least one back view link is required.' } : undefined)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
 
                     </div>
                   </div>
@@ -2885,12 +3015,17 @@ function AdminPanel() {
                     <button
                       key={filterVal}
                       onClick={() => setOrderFilter(filterVal)}
-                      className={`px-3.5 py-2 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg border cursor-pointer ${
+                      className={`px-3.5 py-2 text-[9px] font-black uppercase tracking-wider transition-all rounded-lg border cursor-pointer relative ${
                         orderFilter === filterVal
                           ? 'bg-[var(--color-accent)] text-white border-[var(--color-border)] shadow-xs'
                           : 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-neutral-450'
                       }`}
                     >
+                      {count > 0 && (
+                        <span className={`absolute -top-1 right-1 w-2.5 h-2.5 rounded-full border-2 border-white shadow-xs animate-pulse ${
+                          orderFilter === filterVal ? 'bg-amber-400' : 'bg-[var(--color-accent)]'
+                        }`} />
+                      )}
                       {filterVal} ({count})
                     </button>
                   );
@@ -3238,7 +3373,7 @@ function AdminPanel() {
                               <button
                                 disabled={actionLoading}
                                 onClick={() => handleOrderStatusShift(order, 'PENDING')}
-                                className="bg-[var(--color-subtle)] hover:bg-slate-800 text-[var(--color-text)] font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50"
+                                className="bg-[var(--color-subtle)] hover:bg-slate-200 text-[var(--color-text)] font-black text-[9px] tracking-wider uppercase px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50"
                               >
                                 Reset to Pending
                               </button>

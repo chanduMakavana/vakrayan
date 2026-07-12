@@ -8,7 +8,7 @@ import { playZip } from '../../utils/sensoryHelper'
 import { useToast } from '../../context/ToastContext'
 import { generateGuestCartId, loadGuestCartItems, saveGuestCartItems } from '../../utils/guestCartHelper'
 
-function AddToCartButton({ product, selectedSize, selectedColor, variant = "default" }) {
+function AddToCartButton({ product, selectedSize, selectedColor, quantity = 1, variant = "default" }) {
     const dispatch = useDispatch()
     const { showToast } = useToast()
 
@@ -48,6 +48,8 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
         
         if (!product) return
 
+        const qtyNum = Number(quantity);
+
         if (!isAuthenticated || !user) {
             try {
                 setStatus('loading')
@@ -66,7 +68,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
 
                 const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
                 const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
-                if (currentQuantityInCart + 1 > availableStock) {
+                if (currentQuantityInCart + qtyNum > availableStock) {
                     showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "error");
                     setStatus('idle');
                     return;
@@ -74,7 +76,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
 
                 let response;
                 if (existingCartItem) {
-                    existingCartItem.quantity += 1;
+                    existingCartItem.quantity += qtyNum;
                     existingCartItem.subtotal = Number(existingCartItem.price) * existingCartItem.quantity;
                     response = existingCartItem;
                 } else {
@@ -85,8 +87,8 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
                         userId: 'guest',
                         size: targetSize,
                         price: itemPrice,
-                        quantity: 1,
-                        subtotal: itemPrice,
+                        quantity: qtyNum,
+                        subtotal: itemPrice * qtyNum,
                         product_id: targetProductId,
                         product_Image: product.front_image_link || product.image_url || product.image
                     };
@@ -125,7 +127,7 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
             // Stock Validation check
             const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
             const currentQuantityInCart = existingCartItem ? Number(existingCartItem.quantity) : 0;
-            if (currentQuantityInCart + 1 > availableStock) {
+            if (currentQuantityInCart + qtyNum > availableStock) {
                 showToast(`Insufficient stock. Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "error");
                 setStatus('idle');
                 return;
@@ -138,7 +140,8 @@ function AddToCartButton({ product, selectedSize, selectedColor, variant = "defa
                 product_id: targetProductId,
                 product_Image: product.front_image_link || product.image_url || product.image,
                 userId: user.$id,
-                existingCartItem
+                existingCartItem,
+                quantity: qtyNum
             })
 
             if (response) {

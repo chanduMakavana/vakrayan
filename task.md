@@ -1,0 +1,4 @@
+- [x] Modify `src/firebase/adapter.js` to set `google_session_expiry` during Google Auth
+- [x] Modify `src/App.jsx` to enforce Google session expiration on mount and page navigation with Toast notification
+- [x] Modify `src/componets/pageComponets/Navbar.jsx` to clear `google_session_expiry` on manual sign out
+- [x] Verify build compilation

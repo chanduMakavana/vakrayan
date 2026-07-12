@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import { motion, AnimatePresence } from 'framer-motion'
 import productsService from '../../services/products'
 import wishlistService from '../../services/wishlist'
 import Footer from '../pageComponets/Footer'
 import ProductCardSkeleton from '../pageComponets/ProductCardSkeleton'
+import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 import { setProducts } from '../../features/productsSlice'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import Fuse from 'fuse.js'
@@ -35,20 +37,22 @@ function Shop() {
 
   
   const [loading, setLoading] = useState(!reduxFetched)
+  const showSkeletons = useDelayedLoading(loading, 1500)
   const [searchQuery, setSearchQuery] = useState('')
   const [tempSearch, setTempSearch] = useState('')
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(urlCategory || 'all')
   const [selectedTag, setSelectedTag] = useState(tagParam || 'all')
   const [sortBy, setSortBy] = useState('newest') // newest | price-low | price-high
 
-  // Dynamic Filtering, Sorting & Layout Toggles
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [minPriceFilter, setMinPriceFilter] = useState(0)
   const [maxPriceFilter, setMaxPriceFilter] = useState(3000)
   const [selectedSizes, setSelectedSizes] = useState([])
   const [inStockOnly, setInStockOnly] = useState(false)
-  const [cols, setCols] = useState(4) // 2 | 3 | 4 columns on desktop
+  const [cols, setCols] = useState(3) // 2 | 3 | 4 columns on desktop
   const [mobileSortOpen, setMobileSortOpen] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(12) // Pagination: show 12 at a time
 
   const maxPriceLimit = products.length > 0 ? Math.ceil(Math.max(...products.map(p => Number(p.price || 0))) / 500) * 500 : 3000
 
@@ -114,6 +118,61 @@ function Shop() {
     setSearchQuery(searchParam)
     setTempSearch(searchParam)
   }, [searchParam])
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('#shop-search-container')) {
+        setSuggestionsOpen(false)
+      }
+    }
+    if (suggestionsOpen) {
+      document.addEventListener('mousedown', handler)
+    }
+    return () => document.removeEventListener('mousedown', handler)
+  }, [suggestionsOpen])
+
+  // Search suggestions (keywords and products matching tempSearch)
+  const searchSuggestions = useMemo(() => {
+    if (tempSearch.trim().length < 2) return { keywords: [], products: [] };
+    const q = tempSearch.toLowerCase().trim();
+
+    // 1. Filter products matching by name, category, tags, tag, or fit
+    const matchedProducts = products.filter(p => {
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const categoryMatch = p.category?.toLowerCase().includes(q);
+      const tagsMatch = Array.isArray(p.tags) && p.tags.some(t => t?.toLowerCase().includes(q));
+      const singleTagMatch = p.tag?.toLowerCase().includes(q);
+      const fitMatch = p.fit_type?.toLowerCase().includes(q);
+      return nameMatch || categoryMatch || tagsMatch || singleTagMatch || fitMatch;
+    });
+
+    // 2. Extract unique matching keywords/tags/categories
+    const keywordsSet = new Set();
+    products.forEach(p => {
+      if (p.category && p.category.toLowerCase().includes(q)) {
+        keywordsSet.add(p.category.replace(/-/g, ' '));
+      }
+      if (Array.isArray(p.tags)) {
+        p.tags.forEach(t => {
+          if (t && t.toLowerCase().includes(q)) {
+            keywordsSet.add(t);
+          }
+        });
+      }
+      if (p.tag && p.tag.toLowerCase().includes(q)) {
+        keywordsSet.add(p.tag);
+      }
+      if (p.fit_type && p.fit_type.toLowerCase().includes(q)) {
+        keywordsSet.add(p.fit_type);
+      }
+    });
+
+    return {
+      keywords: Array.from(keywordsSet).slice(0, 4),
+      products: matchedProducts.slice(0, 6)
+    };
+  }, [tempSearch, products]);
 
   // ✅ PERFORMANCE FIX: Wrapped entire filter + search + sort pipeline in useMemo.
   // Previously ran on EVERY render (e.g. when filterDrawerOpen or mobileSortOpen changed).
@@ -228,6 +287,17 @@ function Shop() {
     maxPriceFilter < maxPriceLimit || 
     selectedSizes.length > 0 || 
     inStockOnly
+
+  // Count active filters for badge
+  const activeFilterCount = [
+    selectedCategory !== 'all',
+    selectedTag !== 'all',
+    searchQuery.trim() !== '',
+    minPriceFilter > 0,
+    maxPriceFilter < maxPriceLimit,
+    ...selectedSizes.map(() => true),
+    inStockOnly
+  ].filter(Boolean).length
 
   const gridClass = `grid grid-cols-2 gap-x-2 gap-y-4 sm:gap-x-4 sm:gap-y-8 ${
     cols === 2 
@@ -380,36 +450,122 @@ function Shop() {
             <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-end gap-5 pt-2">
               {/* Minimal Underline Search Input & Filter Toggle */}
               <div className="flex items-end gap-4 flex-1 max-w-xl">
-                <div className="relative flex-1 flex items-center">
-                  <input
-                    type="text"
-                    placeholder="SEARCH THE ARCHIVE..."
-                    value={tempSearch}
-                    onChange={(e) => setTempSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        setSearchQuery(tempSearch);
-                      }
-                    }}
-                    className="w-full bg-transparent border-b border-[var(--color-border)] focus:border-[var(--color-accent)] py-2.5 pr-8 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)]/50 outline-hidden tracking-widest font-mono uppercase transition-colors"
-                  />
-                  <button
-                    onClick={() => setSearchQuery(tempSearch)}
-                    className="absolute right-0 bottom-2.5 text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                    </svg>
-                  </button>
+                <div id="shop-search-container" className="relative flex-1">
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      placeholder="SEARCH THE ARCHIVE..."
+                      value={tempSearch}
+                      onChange={(e) => {
+                        setTempSearch(e.target.value)
+                        setSuggestionsOpen(true)
+                      }}
+                      onFocus={() => setSuggestionsOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setSearchQuery(tempSearch)
+                          setSuggestionsOpen(false)
+                        }
+                      }}
+                      className="w-full bg-transparent border-b border-[var(--color-border)] focus:border-[var(--color-accent)] py-2.5 pr-8 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)]/50 outline-hidden tracking-widest font-mono uppercase transition-colors"
+                    />
+                    <button
+                      onClick={() => {
+                        setSearchQuery(tempSearch)
+                        setSuggestionsOpen(false)
+                      }}
+                      className="absolute right-0 bottom-2.5 text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Suggestions Dropdown */}
+                  <AnimatePresence>
+                    {suggestionsOpen && (searchSuggestions.keywords.length > 0 || searchSuggestions.products.length > 0) && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute top-full left-0 right-0 border border-[var(--color-border)] rounded-2xl overflow-hidden z-[100] mt-2 p-4 space-y-4 shadow-xl"
+                        style={{
+                          background: 'var(--glass-bg-heavy)',
+                          backdropFilter: 'blur(24px) saturate(180%)',
+                          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                        }}
+                      >
+                        {/* Suggested Keywords / Tags Section */}
+                        {searchSuggestions.keywords.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                              🏷️ Suggested Searches
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {searchSuggestions.keywords.map(keyword => (
+                                <button
+                                  key={keyword}
+                                  type="button"
+                                  onClick={() => {
+                                    setTempSearch(keyword)
+                                    setSearchQuery(keyword)
+                                    setSuggestionsOpen(false)
+                                  }}
+                                  className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-sans font-bold text-[10px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors border border-[var(--color-border)]"
+                                >
+                                  {keyword}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Matching Products Section */}
+                        {searchSuggestions.products.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                              👕 Matching Products
+                            </span>
+                            <div className="divide-y divide-[var(--color-border)]/50">
+                              {searchSuggestions.products.map(p => {
+                                const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/80x100'
+                                return (
+                                  <button
+                                    key={p.$id || p.id}
+                                    type="button"
+                                    onClick={() => {
+                                      navigate(`/product/${p.slug || p.$id || p.id}`)
+                                      setSuggestionsOpen(false)
+                                    }}
+                                    className="w-full flex items-center gap-3 py-2.5 hover:bg-[var(--color-bg)] transition-all text-left border-b border-zinc-50/10 last:border-0 first:pt-0"
+                                  >
+                                    <img src={img} alt={p.name} className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[11px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
+                                      <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">{p.category?.replace(/-/g, ' ')}</p>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-[var(--color-text)] shrink-0">
+                                      ₹{Number(p.price).toLocaleString('en-IN')}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
                 <button
                   onClick={() => setFilterDrawerOpen(true)}
-                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono text-[10px] tracking-widest uppercase px-4.5 py-2.5 flex items-center gap-1.5 transition-all select-none cursor-pointer rounded-xl shadow-xs"
+                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono text-[10px] tracking-widest uppercase px-4.5 py-2.5 flex items-center gap-1.5 transition-all select-none cursor-pointer rounded-xl shadow-xs relative"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
-                  <span>FILTERS</span>
+                  <span>FILTERS{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
                 </button>
               </div>
 
@@ -547,12 +703,12 @@ function Shop() {
 
           {/* Catalog Count Indicator */}
           <div id="shop-products-grid" className="flex justify-between items-center text-[10px] font-mono tracking-widest text-[var(--color-muted)] uppercase">
-            <span>SHOWING {filteredProducts.length} FITS</span>
+            <span>SHOWING {Math.min(visibleCount, filteredProducts.length)} OF {filteredProducts.length} FITS</span>
             <span>CATALOG VOL. I</span>
           </div>
 
           {/* Page Loading State */}
-          {loading && (
+          {showSkeletons && (
             <div className={gridClass}>
               {Array.from({ length: 8 }).map((_, index) => (
                 <ProductCardSkeleton key={index} />
@@ -577,179 +733,212 @@ function Shop() {
 
           {/* Catalog Products Matrix Grid */}
           {(() => {
-            const displayProducts = (sortBy !== 'price-low' && sortBy !== 'price-high')
+            const allDisplayProducts = (sortBy !== 'price-low' && sortBy !== 'price-high')
               ? scatterProducts(filteredProducts)
               : filteredProducts;
+            const displayProducts = allDisplayProducts.slice(0, visibleCount);
+            const hasMore = visibleCount < allDisplayProducts.length;
 
-            return !loading && displayProducts.length > 0 && (
-              <div className={gridClass}>
-                {displayProducts.map((product) => {
-                  const parentId = product.$id || product.id;
-                  const uniqueId = parentId;
-                  const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View';
-                  const backView = product.back_image_links?.[0] || product.back_image_link || frontView;
-                  const clickPath = `/product/${product.slug || parentId}`;
-                  const activeTag = product.tag || (product.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
-                  let stocks = {};
-                  try {
-                    stocks = JSON.parse(product?.sizes_stock || '{}');
-                  } catch {
-                    stocks = {};
-                  }
-                  let isAllOutOfStock = false;
-                  if (product && product.sizes && product.sizes.length > 0) {
-                    const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
-                    isAllOutOfStock = totalStock === 0;
-                  }
+            return !loading && allDisplayProducts.length > 0 && (
+              <>
+                <div className={gridClass}>
+                  {displayProducts.map((product) => {
+                    const parentId = product.$id || product.id;
+                    const uniqueId = parentId;
+                    const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Front+View';
+                    const backView = product.back_image_links?.[0] || product.back_image_link || frontView;
+                    const clickPath = `/product/${product.slug || parentId}`;
+                    const activeTag = product.tag || (product.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
+                    let stocks = {};
+                    try {
+                      stocks = JSON.parse(product?.sizes_stock || '{}');
+                    } catch {
+                      stocks = {};
+                    }
+                    let isAllOutOfStock = false;
+                    if (product && product.sizes && product.sizes.length > 0) {
+                      const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0);
+                      isAllOutOfStock = totalStock === 0;
+                    }
 
-                 return (
-                   <div 
-                     key={uniqueId} 
-                     onClick={() => navigate(clickPath)} 
-                     className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-300 ease-out pb-4 border-b border-transparent hover:border-[var(--color-border)] rounded-xl hover:shadow-lg"
-                   >
-                     {/* Image Aspect Ratio Canvas */}
-                     <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-[var(--color-subtle)] relative transition-transform duration-700 ease-out">
-                       
-                       {/* Floating Heart Button */}
-                       <button
-                         onClick={async (e) => {
-                           e.stopPropagation();
-                           const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
-                           let updated;
-                           if (exists) {
-                             dispatch(removeWishlistItemState(parentId));
-                             const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                             updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
-                             localStorage.setItem('wishlist', JSON.stringify(updated));
-                             if (isAuthenticated && user) {
-                               try {
-                                 await wishlistService.removeFromWishlist(user.$id, parentId);
-                               } catch (err) {
-                                 console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
-                               }
-                             }
-                           } else {
-                              dispatch(addWishlistItemState(product));
-                              const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                              updated = [...saved, product];
-                             localStorage.setItem('wishlist', JSON.stringify(updated));
-                             if (isAuthenticated && user) {
-                               try {
-                                 await wishlistService.addToWishlist(user.$id, parentId);
-                               } catch (err) {
-                                 console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
-                               }
-                             }
-                           }
-                         }}
-                         className="absolute top-4 right-4 z-30 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
-                       >
-                         {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
-                           <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
-                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                           </svg>
-                         ) : (
-                           <svg className="w-3.5 h-3.5 text-[var(--color-muted)] group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
-                             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                           </svg>
-                         )}
-                       </button>
- 
-                       {/* Edit Button for Admin Mode */}
-                       {adminMode && (
-                         <button
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             navigate('/admin', { state: { editProductId: parentId } });
-                           }}
-                           className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
-                         >
-                           ✏️ EDIT
-                         </button>
-                       )}
- 
-                        {activeTag && (
-                          <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
-                            <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
-                              {activeTag}
-                            </span>
-                          </div>
-                        )}
- 
-                       {/* Out of Stock Overlay */}
-                       {isAllOutOfStock && (
-                         <div className="absolute inset-0 bg-[var(--color-surface)]/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
-                           <span className="bg-[var(--color-surface)]/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
-                             SOLD OUT
-                           </span>
-                         </div>
-                       )}
- 
-                       {/* Image Flip */}
-                       <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
-                         <img
-                           src={frontView}
-                           alt={product.name}
-                           loading="lazy"
-                           decoding="async"
-                           className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
-                         />
-                         <img  
-                           src={backView}
-                           alt={`${product.name} alternate frame`}
-                           loading="lazy"
-                           decoding="async"
-                           className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
-                         />
-                       </div>
-                     </div>
- 
-                     {/* Metadata Content */}
-                     <div className="mt-3 px-1 flex flex-col justify-between grow">
-                       <div>
-                         <div className="flex items-center justify-between gap-2 mb-1">
-                           <span className="text-[8px] font-mono text-[var(--color-muted)] tracking-wider uppercase">
-                             {product.category?.replace('-', ' ') || "HQ MERCH"}
-                           </span>
-                         </div>
+                   return (
+                     <div 
+                       key={uniqueId} 
+                       onClick={() => navigate(clickPath)} 
+                       className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-300 ease-out pb-4 border-b border-transparent hover:border-[var(--color-border)] rounded-xl hover:shadow-lg"
+                     >
+                       {/* Image Aspect Ratio Canvas */}
+                       <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-[var(--color-subtle)] relative transition-transform duration-700 ease-out">
                          
-                         <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
-                           {product.name}
-                         </h3>
-                       </div>
-                      
-                      <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
-                            ₹{Number(product.price).toLocaleString('en-IN')}
-                          </span>
-                          {(() => {
-                            const priceNum = Number(product.price || 0);
-                            const compareNum = Number(product.compare_at_price || 0);
-                            const showCompare = compareNum > priceNum;
-                            const compareDisplay = showCompare
-                              ? compareNum
-                              : (product.discount_percent > 0
-                                  ? Math.round(priceNum / (1 - product.discount_percent / 100))
-                                  : null);
-                            return compareDisplay ? (
-                              <span className="text-[9px] font-mono text-[var(--color-muted)] line-through">
-                                ₹{compareDisplay.toLocaleString('en-IN')}
+                         {/* Floating Heart Button */}
+                         <button
+                           onClick={async (e) => {
+                             e.stopPropagation();
+                             const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
+                             let updated;
+                             if (exists) {
+                               dispatch(removeWishlistItemState(parentId));
+                               const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                               updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
+                               localStorage.setItem('wishlist', JSON.stringify(updated));
+                               if (isAuthenticated && user) {
+                                 try {
+                                   await wishlistService.removeFromWishlist(user.$id, parentId);
+                                 } catch (err) {
+                                   console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
+                                 }
+                               }
+                             } else {
+                                dispatch(addWishlistItemState(product));
+                                const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                                updated = [...saved, product];
+                               localStorage.setItem('wishlist', JSON.stringify(updated));
+                               if (isAuthenticated && user) {
+                                 try {
+                                   await wishlistService.addToWishlist(user.$id, parentId);
+                                 } catch (err) {
+                                   console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
+                                 }
+                               }
+                             }
+                           }}
+                           aria-label={wishlist.some(item => item.$id === parentId || item.id === parentId) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+                           className="absolute top-4 right-4 z-30 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
+                         >
+                           {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
+                             <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
+                               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                             </svg>
+                           ) : (
+                             <svg className="w-3.5 h-3.5 text-[var(--color-muted)] group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
+                               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                             </svg>
+                           )}
+                         </button>
+ 
+                         {/* Edit Button for Admin Mode */}
+                         {adminMode && (
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               navigate('/admin', { state: { editProductId: parentId } });
+                             }}
+                             className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
+                           >
+                             ✏️ EDIT
+                           </button>
+                         )}
+ 
+                          {activeTag && (
+                            <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
+                              <span className="text-neutral-900 font-sans text-[11px] tracking-widest uppercase font-bold">
+                                {activeTag}
                               </span>
-                            ) : null;
-                          })()}
+                            </div>
+                          )}
+ 
+                         {/* Out of Stock Overlay */}
+                         {isAllOutOfStock && (
+                           <div className="absolute inset-0 bg-[var(--color-surface)]/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
+                             <span className="bg-[var(--color-surface)]/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
+                               SOLD OUT
+                             </span>
+                           </div>
+                         )}
+ 
+                         {/* Image Flip */}
+                         <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
+                           <img
+                             src={frontView}
+                             alt={product.name}
+                             loading="lazy"
+                             decoding="async"
+                             className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
+                           />
+                           <img  
+                             src={backView}
+                             alt={`${product.name} alternate frame`}
+                             loading="lazy"
+                             decoding="async"
+                             className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
+                           />
+                         </div>
+                       </div>
+ 
+                       {/* Metadata Content */}
+                       <div className="mt-3 px-1 flex flex-col justify-between grow">
+                         <div>
+                           <div className="flex items-center justify-between gap-2 mb-1">
+                             <span className="text-[11px] font-mono text-[var(--color-muted)] tracking-wider uppercase">
+                               {product.category?.replace('-', ' ') || "HQ MERCH"}
+                             </span>
+                           </div>
+                           
+                           <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
+                             {product.name}
+                           </h3>
+                         </div>
+                        
+                        <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
+                              ₹{Number(product.price).toLocaleString('en-IN')}
+                            </span>
+                            {(() => {
+                              const priceNum = Number(product.price || 0);
+                              const compareNum = Number(product.compare_at_price || 0);
+                              const showCompare = compareNum > priceNum;
+                              const compareDisplay = showCompare
+                                ? compareNum
+                                : (product.discount_percent > 0
+                                    ? Math.round(priceNum / (1 - product.discount_percent / 100))
+                                    : null);
+                              return compareDisplay ? (
+                                <span className="text-[9px] font-mono text-[var(--color-muted)] line-through">
+                                  ₹{compareDisplay.toLocaleString('en-IN')}
+                                </span>
+                              ) : null;
+                            })()}
+                          </div>
+                          <span className="text-[8px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
+                            incl. taxes
+                          </span>
                         </div>
-                        <span className="text-[8px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
-                          incl. taxes
-                        </span>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )})()}
+                  )
+                })}
+              </div>
+
+              {/* ── Load More Button ── */}
+              {hasMore && (
+                <div className="flex flex-col items-center gap-3 pt-8 pb-4">
+                  <p className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-widest">
+                    Showing {displayProducts.length} of {allDisplayProducts.length} products
+                  </p>
+                  <button
+                    onClick={() => setVisibleCount(prev => prev + 12)}
+                    className="flex items-center gap-2 px-8 py-3.5 font-mono text-[11px] font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer rounded-xl"
+                    style={{
+                      background: 'var(--color-accent)',
+                      color: '#fff',
+                      border: '1.5px solid var(--color-accent)',
+                      boxShadow: '0 4px 16px rgba(5,150,105,0.25)',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 5v14M5 12l7 7 7-7"/>
+                    </svg>
+                    Load More ({allDisplayProducts.length - displayProducts.length} remaining)
+                  </button>
+                </div>
+              )}
+              </>
+            );
+          })()}
+
 
         </div>
       </div>

@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
 import wishlistService from '../../services/wishlist'
 import ProductCardSkeleton from './ProductCardSkeleton'
+import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import { scatterProducts } from '../../utils/colorHelper'
 
@@ -24,6 +25,7 @@ function BestSellers() {
   const wishlist = useSelector(state => state.wishlist || [])
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
   const loading = !fetched && products.length === 0
+  const showSkeletons = useDelayedLoading(loading, 1500)
 
   const isOutOfStock = (product) => {
     let stocks = {}
@@ -60,17 +62,10 @@ function BestSellers() {
               Heavyweight Drops
             </h2>
           </div>
-          <button
-            onClick={() => navigate('/shop')}
-            className="btn-ghost cursor-pointer w-fit"
-            style={{ fontSize: 13 }}
-          >
-            View All &rarr;
-          </button>
         </div>
 
         {/* Loading skeletons */}
-        {loading && (
+        {showSkeletons && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
@@ -141,6 +136,7 @@ function BestSellers() {
                         }
                       }
                     }}
+                    aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
                     className="absolute top-3 right-3 z-30 w-9 h-9 flex items-center justify-center cursor-pointer transition-all duration-300"
                     style={{
                       background: isWishlisted ? 'rgba(5,150,105,0.90)' : 'rgba(255,255,255,0.85)',
@@ -180,7 +176,7 @@ function BestSellers() {
                         borderRadius: 6
                       }}
                     >
-                      <span style={{ color: 'var(--color-accent)', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Jost', sans-serif" }}>
+                      <span style={{ color: 'var(--color-accent)', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Jost', sans-serif" }}>
                         {activeTag}
                       </span>
                     </div>
@@ -220,7 +216,7 @@ function BestSellers() {
 
                 {/* Card info */}
                 <div className="p-4">
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)', marginBottom: 4, fontFamily: "'Jost', sans-serif" }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)', marginBottom: 4, fontFamily: "'Jost', sans-serif" }}>
                     {product.category?.replace(/-/g, ' ') || 'Premium'}
                   </p>
                   <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10, fontFamily: "'Jost', sans-serif" }} className="truncate">
@@ -249,6 +245,23 @@ function BestSellers() {
             )
           })}
         </motion.div>
+
+        {/* Centered CTA button at the bottom of the grid */}
+        <div className="mt-14 flex justify-center">
+          <button
+            onClick={() => navigate('/shop')}
+            className="group relative px-10 py-4.5 overflow-hidden rounded-xl bg-transparent border border-[var(--color-border-hard)] hover:border-[var(--color-accent)] cursor-pointer transition-all duration-300 select-none active:scale-98"
+          >
+            <div className="absolute inset-0 w-0 bg-[var(--color-accent)] transition-all duration-300 ease-out group-hover:w-full" style={{ zIndex: 0 }} />
+            <span className="relative z-10 flex items-center justify-center gap-3 text-xs font-black font-mono tracking-widest uppercase text-[var(--color-text)] group-hover:text-white transition-colors duration-300">
+              EXPLORE ALL PRODUCTS
+              <svg className="w-4 h-4 fill-none stroke-current stroke-2 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </span>
+          </button>
+        </div>
+
       </div>
     </section>
   )

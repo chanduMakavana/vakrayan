@@ -127,6 +127,36 @@ function Navbar() {
   const [accountOpen,       setAccountOpen]       = useState(false);
   const [searchOpen,        setSearchOpen]        = useState(false);
   const [searchVal,         setSearchVal]         = useState('');
+  const [recentSearches,    setRecentSearches]    = useState([]);
+
+  // Load recent searches when search drawer opens
+  useEffect(() => {
+    if (searchOpen) {
+      const saved = JSON.parse(localStorage.getItem('recent_searches')) || [];
+      setRecentSearches(saved);
+    }
+  }, [searchOpen]);
+
+  // Clear recent searches history
+  const clearRecentSearches = () => {
+    localStorage.removeItem('recent_searches');
+    setRecentSearches([]);
+  };
+
+  // Perform search and save keyword history
+  const handleKeywordSearch = (keyword) => {
+    const trimmed = keyword.trim();
+    if (!trimmed) return;
+    
+    let recent = JSON.parse(localStorage.getItem('recent_searches')) || [];
+    recent = [trimmed, ...recent.filter(s => s !== trimmed)].slice(0, 5);
+    localStorage.setItem('recent_searches', JSON.stringify(recent));
+    setRecentSearches(recent);
+    
+    navigate(`/shop?search=${encodeURIComponent(trimmed)}`);
+    setSearchOpen(false);
+    setSearchVal('');
+  };
   const [cartDrawerOpen,    setCartDrawerOpen]    = useState(false);
   const [wishlistDrawerOpen,setWishlistDrawerOpen]= useState(false);
   const [animateCart,       setAnimateCart]       = useState(false);
@@ -290,6 +320,7 @@ function Navbar() {
     }
     finally {
       localStorage.removeItem('remember_me');
+      localStorage.removeItem('google_session_expiry');
       sessionStorage.removeItem('session_active');
       dispatch(logoutAction());
       dispatch(filterProductsForMode(false));
@@ -825,9 +856,7 @@ function Navbar() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (searchVal.trim()) {
-                      navigate(`/shop?search=${encodeURIComponent(searchVal.trim())}`);
-                      setSearchOpen(false);
-                      setSearchVal('');
+                      handleKeywordSearch(searchVal);
                     }
                   }}
                   className="flex items-center gap-3"
@@ -849,77 +878,122 @@ function Navbar() {
                   )}
                 </form>
 
-                {/* Suggestions */}
+                {/* Suggestions / Recent History */}
                 <AnimatePresence>
-                  {(searchSuggestions.keywords.length > 0 || searchSuggestions.products.length > 0) && (
+                  {searchOpen && (
                     <motion.div
                       variants={dropdownVariants}
                       initial="hidden" animate="visible" exit="exit"
-                      className="absolute top-full left-4 right-4 sm:left-6 sm:right-6 md:left-10 md:right-10 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] overflow-hidden z-50 mt-1 p-4 space-y-4"
-                      style={{ boxShadow: 'var(--shadow-lg)' }}
+                      className="absolute top-full left-4 right-4 sm:left-6 sm:right-6 md:left-10 md:right-10 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] overflow-hidden z-50 mt-1 p-4 space-y-4 shadow-xl"
                     >
-                      {/* Suggested Keywords / Tags Section */}
-                      {searchSuggestions.keywords.length > 0 && (
-                        <div className="space-y-2">
-                          <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
-                            🏷️ Suggested Searches
-                          </span>
-                          <div className="flex flex-wrap gap-2">
-                            {searchSuggestions.keywords.map(keyword => (
-                              <button
-                                key={keyword}
-                                type="button"
-                                onClick={() => {
-                                  navigate(`/shop?search=${encodeURIComponent(keyword)}`);
-                                  setSearchOpen(false);
-                                  setSearchVal('');
-                                }}
-                                className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-sans font-bold text-[10px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors border border-[var(--color-border)]"
-                              >
-                                {keyword}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {searchVal.trim().length >= 2 ? (
+                        <>
+                          {/* Suggested Keywords / Tags Section */}
+                          {searchSuggestions.keywords.length > 0 && (
+                            <div className="space-y-2">
+                              <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                                🏷️ Suggested Searches
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {searchSuggestions.keywords.map(keyword => (
+                                  <button
+                                    key={keyword}
+                                    type="button"
+                                    onClick={() => handleKeywordSearch(keyword)}
+                                    className="bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] font-sans font-bold text-[10px] tracking-wider uppercase px-2.5 py-1 rounded-md cursor-pointer transition-colors border border-[var(--color-border)]"
+                                  >
+                                    {keyword}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-                      {/* Matching Products Section */}
-                      {searchSuggestions.products.length > 0 && (
-                        <div className="space-y-2">
-                          <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
-                            👕 Matching Products
-                          </span>
-                          <div className="divide-y divide-[var(--color-border)]/50">
-                            {searchSuggestions.products.map(p => {
-                              const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/80x100';
-                              return (
-                                <button
-                                  key={p.$id || p.id}
-                                  type="button"
-                                  onClick={() => {
-                                    navigate(`/product/${p.slug || p.$id || p.id}`);
-                                    setSearchOpen(false);
-                                    setSearchVal('');
-                                  }}
-                                  className="w-full flex items-center gap-3 py-2.5 hover:bg-[var(--color-bg)] transition-base text-left border-b border-zinc-50/10 last:border-0 first:pt-0"
-                                >
-                                  <img src={img} alt={p.name} className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
-                                    <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">{p.category?.replace(/-/g, ' ')}</p>
-                                  </div>
-                                  <span className="text-[11px] font-bold text-[var(--color-text)] shrink-0">
-                                    ₹{Number(p.price).toLocaleString('en-IN')}
-                                  </span>
+                          {/* Matching Products Section */}
+                          {searchSuggestions.products.length > 0 && (
+                            <div className="space-y-2">
+                              <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                                👕 Matching Products
+                              </span>
+                              <div className="divide-y divide-[var(--color-border)]/50">
+                                {searchSuggestions.products.map(p => {
+                                  const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/80x100';
+                                  return (
+                                    <button
+                                      key={p.$id || p.id}
+                                      type="button"
+                                      onClick={() => {
+                                        navigate(`/product/${p.slug || p.$id || p.id}`);
+                                        setSearchOpen(false);
+                                        setSearchVal('');
+                                      }}
+                                      className="w-full flex items-center gap-3 py-2.5 hover:bg-[var(--color-bg)] transition-base text-left border-b border-zinc-50/10 last:border-0 first:pt-0"
+                                    >
+                                      <img src={img} alt={p.name} className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
+                                        <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">{p.category?.replace(/-/g, ' ')}</p>
+                                      </div>
+                                      <span className="text-[11px] font-bold text-[var(--color-text)] shrink-0">
+                                        ₹{Number(p.price).toLocaleString('en-IN')}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {searchSuggestions.keywords.length === 0 && searchSuggestions.products.length === 0 && (
+                            <div className="py-6 text-center text-[var(--color-muted)] text-[11px] font-mono tracking-wider">
+                              🔍 No matching suggestions found
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* Zero-Query suggestions: ONLY Recently Searched History */
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
+                              🕒 Recent Searches
+                            </span>
+                            {recentSearches.length > 0 && (
+                              <button 
+                                type="button" 
+                                onClick={clearRecentSearches}
+                                className="text-[9px] font-mono text-red-500 hover:underline cursor-pointer font-bold"
+                              >
+                                  Clear all
                                 </button>
-                              );
-                            })}
+                              )}
+                            </div>
+                            {recentSearches.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                {recentSearches.map(term => (
+                                  <button
+                                    key={term}
+                                    type="button"
+                                    onClick={() => handleKeywordSearch(term)}
+                                    className="flex items-center justify-between hover:bg-[var(--color-subtle)] text-[11px] font-medium text-[var(--color-text)] px-3 py-2 rounded-xl cursor-pointer transition-colors text-left"
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="text-[12px]">🔍</span>
+                                      <span className="truncate">{term}</span>
+                                    </div>
+                                    <span className="text-[9px] text-[var(--color-muted)] font-mono">search</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-[var(--color-muted)] font-mono py-6 text-center border border-dashed border-[var(--color-border)] rounded-2xl bg-[var(--color-subtle)]/30">
+                                No recent search history
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
               </div>
             </motion.div>
           )}
