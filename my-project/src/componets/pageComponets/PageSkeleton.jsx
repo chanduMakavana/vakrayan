@@ -1,8 +1,8 @@
 import React from 'react'
 import ProductCardSkeleton from './ProductCardSkeleton'
 
-function PageSkeleton() {
-  const path = window.location.pathname
+function PageSkeleton({ path: propPath }) {
+  const path = propPath || window.location.pathname
 
   // 1. Product Detail Page Skeleton
   if (path.startsWith('/product/')) {
@@ -179,11 +179,9 @@ function PageSkeleton() {
         {/* 3. Best Sellers Section Skeleton */}
         <div className="max-w-7xl mx-auto px-4 md:px-12 py-16 border-b border-neutral-100/30">
           <div className="mb-12">
-            <div className="w-12 h-1 mb-3 rounded" style={{ background: '#34D399' }} />
-            <p className="eyebrow mb-2">In Focus</p>
-            <h2 className="section-title">
-              Heavyweight Drops
-            </h2>
+            <div className="w-12 h-1 mb-3 rounded skeleton" />
+            <div className="h-4 w-24 rounded skeleton mb-3" />
+            <div className="h-8 w-60 rounded-lg skeleton" />
           </div>
 
           {/* 4 Cards Grid */}
@@ -197,11 +195,9 @@ function PageSkeleton() {
         {/* 4. Category Grid Section Skeleton */}
         <div className="max-w-7xl mx-auto px-4 md:px-12 py-16 border-b border-neutral-100/30">
           <div className="mb-12 flex flex-col items-center text-center">
-            <div className="w-12 h-1 mb-3 rounded" style={{ background: '#34D399' }} />
-            <p className="eyebrow mb-2">Shop by Category</p>
-            <h2 className="section-title">
-              Curated Collections
-            </h2>
+            <div className="w-12 h-1 mb-3 rounded skeleton" />
+            <div className="h-4 w-32 rounded skeleton mb-3" />
+            <div className="h-8 w-64 rounded-lg skeleton" />
           </div>
 
           {/* Circular/Box Grid */}
@@ -229,14 +225,10 @@ function PageSkeleton() {
       <div className="w-full bg-[var(--color-bg)] pb-20 select-none">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
-          {/* Headline Title */}
-          <div className="text-center md:text-left space-y-2 border-b border-[var(--color-border)] pb-6">
-            <h4 className="text-xs tracking-[0.4em] text-[var(--color-accent)] font-black uppercase">
-              Vakrayan Archives // HQ
-            </h4>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight uppercase leading-none text-[var(--color-text)]">
-              Shop Collection
-            </h1>
+          {/* Headline Title Skeleton */}
+          <div className="text-center md:text-left space-y-4 border-b border-[var(--color-border)] pb-6">
+            <div className="h-3 w-40 rounded skeleton mx-auto md:mx-0" />
+            <div className="h-10 w-64 rounded-lg skeleton mx-auto md:mx-0" />
           </div>
 
           {/* Explore Categories Banner Skeleton */}

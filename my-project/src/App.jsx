@@ -21,6 +21,8 @@ import PageSkeleton from './componets/pageComponets/PageSkeleton'
 import MobileBottomNav from './componets/pageComponets/MobileBottomNav'
 import { useDelayedLoading } from './hooks/useDelayedLoading'
 import { useToast } from './context/ToastContext'
+import { requestNotificationPermission, listenForForegroundMessages } from './services/notifications'
+import NotificationPromptModal from './componets/pageComponets/NotificationPromptModal'
 
 /**
  * ✅ PERFORMANCE FIX: All page-level components are now code-split using React.lazy().
@@ -81,9 +83,10 @@ function ScrollToTop() {
  * Matches the app's minimal aesthetic without a full splash screen.
  */
 function PageLoader() {
-  const showSkeleton = useDelayedLoading(true, 1500)
-  if (!showSkeleton) return null
-  return <PageSkeleton />
+  const location = useLocation()
+  const showLoader = useDelayedLoading(true, 300)
+  if (!showLoader) return null
+  return <PageSkeleton path={location.pathname} />
 }
 
 function AppRoutes() {
@@ -137,6 +140,46 @@ function AppContent() {
   const location = useLocation()
 
   const [fontsLoaded, setFontsLoaded] = useState(false)
+  const [isNotificationModalOpen, setNotificationModalOpen] = useState(false)
+  const currentUser = useSelector((state) => state.auth.user)
+
+  const handleCloseNotificationModal = () => {
+    setNotificationModalOpen(false)
+    localStorage.setItem('notification_prompt_dismissed_until', (Date.now() + 1 * 24 * 60 * 60 * 1000).toString())
+  }
+
+  const handleAcceptNotifications = async () => {
+    setNotificationModalOpen(false)
+    if (currentUser?.$id) {
+      try {
+        const token = await requestNotificationPermission(currentUser.$id)
+        if (token) {
+          showToast("Push notifications enabled successfully!", "success")
+        } else {
+          showToast("Please allow notifications in browser address bar settings.", "warning")
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    }
+  }
+
+  // Pre-permission Modal Trigger
+  useEffect(() => {
+    if (currentUser && typeof window !== "undefined") {
+      if (Notification.permission === 'default') {
+        const dismissedUntil = localStorage.getItem('notification_prompt_dismissed_until')
+        const hasDismissed = dismissedUntil && Date.now() < Number(dismissedUntil)
+        
+        if (!hasDismissed) {
+          const timer = setTimeout(() => {
+            setNotificationModalOpen(true)
+          }, 1500)
+          return () => clearTimeout(timer)
+        }
+      }
+    }
+  }, [currentUser])
 
   // ✅ PERFORMANCE FIX: criticalImagesLoaded was removed as a loading blocker.
   // Images loading (especially slow Unsplash URLs on mobile) was blocking the entire
@@ -148,6 +191,9 @@ function AppContent() {
   // Previously, a slow Firebase products fetch blocked the ENTIRE app for 3-10 seconds.
 
   useEffect(() => {
+    // Initialize foreground push notification listener
+    listenForForegroundMessages();
+
     // Check if Google login session has expired (1 hour limit)
     const googleSessionExpiry = localStorage.getItem('google_session_expiry');
     if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
@@ -190,6 +236,10 @@ function AppContent() {
           // Mark session active for the duration of this tab/browser session
           sessionStorage.setItem('session_active', 'true');
           dispatch(loginAction({ user: userData }))
+
+          if (typeof window !== "undefined" && Notification.permission === "granted") {
+            requestNotificationPermission(userData.$id);
+          }
 
           // Check for new user signups (within 10 min) to trigger webhook
           const createdAtStr = userData.$createdAt || userData.registration
@@ -294,13 +344,19 @@ function AppContent() {
   // ✅ PERFORMANCE FIX: Moved HIDE_NAVBAR_ON outside the component (module level)
   // to prevent a new array being created on every single render of AppContent.
   const shouldShowNavbar = !HIDE_NAVBAR_ON.some(route => location.pathname.startsWith(route))
+  const shouldShowBottomNav = !['/admin', '/product', '/checkout', '/login', '/signup', '/reset-password'].some(route => location.pathname.startsWith(route))
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
       <ScrollToTop />
       {shouldShowNavbar && <Navbar />}
       <AppRoutes />
-      <MobileBottomNav />
+      {shouldShowBottomNav && <MobileBottomNav />}
+      <NotificationPromptModal 
+        isOpen={isNotificationModalOpen} 
+        onClose={handleCloseNotificationModal} 
+        onAccept={handleAcceptNotifications} 
+      />
     </div>
   )
 }

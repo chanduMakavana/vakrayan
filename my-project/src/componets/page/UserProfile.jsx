@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../services/auth';
 import addressService from '../../services/address';
@@ -16,6 +16,9 @@ import { FaStar, FaWallet } from 'react-icons/fa';
 import storageService, { compressImage } from '../../services/storage';
 import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal';
 import walletService from '../../services/wallet';
+import PageSkeleton from '../pageComponets/PageSkeleton';
+import { useDelayedLoading } from '../../hooks/useDelayedLoading';
+import { requestNotificationPermission } from '../../services/notifications';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -46,6 +49,56 @@ function UserProfile() {
   const switchTab = (tab) => {
     setActiveProfileTab(tab);
     navigate('/profile' + (tab !== 'overview' ? `?tab=${tab}` : ''), { replace: true });
+  };
+
+  const [notificationStatus, setNotificationStatus] = useState(
+    typeof window !== 'undefined' ? Notification.permission : 'default'
+  );
+  const [notificationLoading, setNotificationLoading] = useState(false);
+
+  const handleEnableNotifications = async () => {
+    setNotificationLoading(true);
+    try {
+      const token = await requestNotificationPermission(user?.$id);
+      if (token) {
+        showToast("Push notifications enabled successfully!", "success");
+      } else {
+        showToast("Could not enable notifications. Please check browser settings.", "warning");
+      }
+      setNotificationStatus(Notification.permission);
+    } catch (err) {
+      console.error(err);
+      showToast("An error occurred.", "error");
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+  const handleSendTestNotification = () => {
+    if (Notification.permission === "granted") {
+      const title = "Vakrayan Official";
+      const options = {
+        body: "🔥 Live drop restock! Grab your heavyweight fits before they sell out.",
+        icon: "/vakrayan-favicon.png",
+        badge: "/vakrayan-favicon.png"
+      };
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, options);
+          showToast("Test notification sent!", "success");
+        }).catch((err) => {
+          console.error("Service worker not ready:", err);
+          new Notification(title, options);
+          showToast("Test notification sent!", "success");
+        });
+      } else {
+        new Notification(title, options);
+        showToast("Test notification sent!", "success");
+      }
+    } else {
+      showToast("Please enable notifications first.", "warning");
+    }
   };
 
   // Sync tab when URL changes (e.g. navigating from Track Order)
@@ -406,21 +459,19 @@ function UserProfile() {
     async function loadProfileData() {
       try {
         setLoading(true);
-        // Load User Saved Address Profiles
-        const list = await addressService.getUserAddresses(user.$id);
+        // Parallel fetches for high performance
+        const [list, userOrdersList, bal, txs] = await Promise.all([
+          addressService.getUserAddresses(user.$id),
+          ordersService.getUserOrders(user.$id),
+          walletService.getUserWalletBalance(user.$id),
+          walletService.getUserWalletTransactions(user.$id)
+        ]);
+
         setAddresses(list || []);
-
-        // Load User Orders
-        const userOrdersList = await ordersService.getUserOrders(user.$id);
         setOrders(userOrdersList || []);
-
-        // Load User Wallet Balance
-        const bal = await walletService.getUserWalletBalance(user.$id);
         setWalletBalance(bal);
 
-        // Load User Wallet Transactions
-        const txs = await walletService.getUserWalletTransactions(user.$id);
-        const mappedTxs = txs.map(t => ({
+        const mappedTxs = (txs || []).map(t => ({
           id: t.$id || t.id,
           title: t.title,
           date: new Date(t.$createdAt || t.date || new Date()),
@@ -515,15 +566,10 @@ function UserProfile() {
     }
   };
 
+  const showSkeleton = useDelayedLoading(loading, 300);
+
   if (loading) {
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4">
-        <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
-        <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-black uppercase">
-          Loading your account...
-        </div>
-      </div>
-    );
+    return showSkeleton ? <PageSkeleton /> : null;
   }
 
   return (
@@ -1301,6 +1347,58 @@ function UserProfile() {
                         <FiLogOut className="text-xs shrink-0" />
                         Logout from All Devices
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Push Notifications */}
+                  <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 space-y-4">
+                    <h3 className="text-[10px] font-black text-[var(--color-text)] tracking-wider uppercase border-b border-[var(--color-border)] pb-2 flex items-center gap-2">
+                      <FiBell className="text-xs text-[var(--color-accent)]" /> Push Notifications
+                    </h3>
+                    <p className="text-[11px] text-[var(--color-muted)] font-medium leading-relaxed max-w-xl">
+                      Get real-time updates for your orders, wallet top-ups, transaction receipts, and exclusive early product drop announcements.
+                    </p>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-[var(--color-border)]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)]">Status:</span>
+                        {notificationStatus === 'granted' ? (
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded-md uppercase tracking-wider">
+                            Active
+                          </span>
+                        ) : notificationStatus === 'denied' ? (
+                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-[9px] font-black rounded-md uppercase tracking-wider">
+                            Blocked
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-neutral-200 text-neutral-800 text-[9px] font-black rounded-md uppercase tracking-wider">
+                            Disabled
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        {notificationStatus !== 'granted' && (
+                          <button
+                            type="button"
+                            disabled={notificationLoading || notificationStatus === 'denied'}
+                            onClick={handleEnableNotifications}
+                            className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] font-mono font-black text-[10px] tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                          >
+                            {notificationLoading ? 'ENABLING...' : 'ENABLE NOTIFICATIONS'}
+                          </button>
+                        )}
+
+                        {notificationStatus === 'granted' && (
+                          <button
+                            type="button"
+                            onClick={handleSendTestNotification}
+                            className="px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 font-mono font-black text-[10px] tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer shadow-md"
+                          >
+                            SEND TEST PUSH
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

@@ -79,6 +79,7 @@ function ProductDetail() {
 
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
+  const [imageLoaded, setImageLoaded] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -93,6 +94,7 @@ function ProductDetail() {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [lightboxOffset, setLightboxOffset] = useState({ x: 0, y: 0 });
+  const touchStartRef = useRef(null);
 
   const [mainPhotoZoom, setMainPhotoZoom] = useState(1);
   const [mainPhotoOffset, setMainPhotoOffset] = useState({ x: 0, y: 0 });
@@ -1258,13 +1260,14 @@ function ProductDetail() {
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:col-span-7">
 
-            {galleryImages.length > 1 && (
+             {galleryImages.length > 1 && (
               <div className="md:col-span-2 order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
                 {galleryImages.map((imgUrl, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => {
+                      setImageLoaded(false);
                       setActiveImage(imgUrl);
                       mainPhotoZoomRef.current = 1;
                       mainPhotoOffsetRef.current = { x: 0, y: 0 };
@@ -1314,6 +1317,50 @@ function ProductDetail() {
                 window.addEventListener('mousemove', handleMouseMoveDrag);
                 window.addEventListener('mouseup', handleMouseUpDrag);
               }}
+              onTouchStart={(e) => {
+                touchStartRef.current = {
+                  x: e.touches[0].clientX,
+                  y: e.touches[0].clientY,
+                  time: Date.now()
+                };
+              }}
+              onTouchEnd={(e) => {
+                if (!touchStartRef.current) return;
+                const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+                const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+                const dt = Date.now() - touchStartRef.current.time;
+                
+                // Swipe detection
+                if (Math.abs(dx) > 40 && Math.abs(dy) < 40 && dt < 300) {
+                  e.preventDefault();
+                  const currentIdx = galleryImages.indexOf(activeImage);
+                  if (dx < 0) {
+                    // Swipe Left: Next Image
+                    const nextIdx = (currentIdx + 1) % galleryImages.length;
+                    setImageLoaded(false);
+                    setActiveImage(galleryImages[nextIdx]);
+                  } else {
+                    // Swipe Right: Prev Image
+                    const prevIdx = (currentIdx - 1 + galleryImages.length) % galleryImages.length;
+                    setImageLoaded(false);
+                    setActiveImage(galleryImages[prevIdx]);
+                  }
+                } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 250) {
+                  // Fast Tap: Open Lightbox instantly
+                  e.preventDefault();
+                  mainPhotoZoomRef.current = 1;
+                  mainPhotoOffsetRef.current = { x: 0, y: 0 };
+                  setMainPhotoZoom(1);
+                  setMainPhotoOffset({ x: 0, y: 0 });
+                  if (mainImageRef.current) {
+                    mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
+                  }
+                  setIsLightboxOpen(true);
+                  setLightboxZoom(1);
+                  setLightboxOffset({ x: 0, y: 0 });
+                }
+                touchStartRef.current = null;
+              }}
               onDoubleClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1355,8 +1402,41 @@ function ProductDetail() {
               className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
             >
               <div className="absolute top-4 right-4 bg-[var(--color-surface)] border border-neutral-950/15 text-[var(--color-text)] font-mono text-[9px] tracking-wider px-2 py-1 rounded-none z-10 pointer-events-none uppercase">
-                Hover to Zoom / Tap to Gallery
+                Swipe to Browse / Tap to Zoom
               </div>
+
+              {/* Mobile Navigation Chevron Buttons overlay */}
+              {galleryImages.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const currentIdx = galleryImages.indexOf(activeImage);
+                      const prevIdx = (currentIdx - 1 + galleryImages.length) % galleryImages.length;
+                      setImageLoaded(false);
+                      setActiveImage(galleryImages[prevIdx]);
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-neutral-900 border border-neutral-200/50 shadow-xs md:hidden active:scale-90 transition-transform cursor-pointer"
+                  >
+                    <FiChevronLeft className="text-base" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const currentIdx = galleryImages.indexOf(activeImage);
+                      const nextIdx = (currentIdx + 1) % galleryImages.length;
+                      setImageLoaded(false);
+                      setActiveImage(galleryImages[nextIdx]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-neutral-900 border border-neutral-200/50 shadow-xs md:hidden active:scale-90 transition-transform cursor-pointer"
+                  >
+                    <FiChevronRight className="text-base" />
+                  </button>
+                </>
+              )}
+
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
                   ref={mainImageRef}
@@ -1364,13 +1444,14 @@ function ProductDetail() {
                   alt={product.name}
                   fetchPriority="high"
                   decoding="sync"
+                  onLoad={() => setImageLoaded(true)}
                   style={{
                     transformOrigin: mainPhotoZoom > 1 ? 'center center' : zoomStyle.transformOrigin,
                     transform: mainPhotoZoom > 1 
                       ? `translate(${mainPhotoOffset.x}px, ${mainPhotoOffset.y}px) scale(${mainPhotoZoom})`
                       : `scale(${zoomStyle.scale})`
                   }}
-                  className="w-full h-full object-cover object-center transition-transform duration-150 ease-out"
+                  className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-40 scale-[0.98]'}`}
                 />
               </div>
             </div>

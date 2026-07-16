@@ -43,3 +43,12 @@ if (typeof window !== "undefined") {
 
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Safe Messaging Initialization Helper
+import { getMessaging, isSupported } from "firebase/messaging";
+export const getMessagingInstance = async () => {
+  if (typeof window !== "undefined" && await isSupported()) {
+    return getMessaging(app);
+  }
+  return null;
+};

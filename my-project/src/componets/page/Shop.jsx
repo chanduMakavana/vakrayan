@@ -7,6 +7,7 @@ import wishlistService from '../../services/wishlist'
 import Footer from '../pageComponets/Footer'
 import ProductCardSkeleton from '../pageComponets/ProductCardSkeleton'
 import { useDelayedLoading } from '../../hooks/useDelayedLoading'
+import PageSkeleton from '../pageComponets/PageSkeleton'
 import { setProducts } from '../../features/productsSlice'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import Fuse from 'fuse.js'
@@ -37,7 +38,7 @@ function Shop() {
 
   
   const [loading, setLoading] = useState(!reduxFetched)
-  const showSkeletons = useDelayedLoading(loading, 1500)
+  const showSkeletons = useDelayedLoading(loading, 300)
   const [searchQuery, setSearchQuery] = useState('')
   const [tempSearch, setTempSearch] = useState('')
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
@@ -344,6 +345,10 @@ function Shop() {
       categoriesList.push({ value, label })
     }
   })
+
+  if (loading) {
+    return showSkeletons ? <PageSkeleton /> : null
+  }
 
   return (
     <>
@@ -700,6 +705,44 @@ function Shop() {
               </button>
             </div>
           )}
+
+          {/* Mobile Sticky Action Bar */}
+          <div className="sticky top-[58px] left-0 right-0 z-30 bg-[var(--color-bg)] border-y border-[var(--color-border)] lg:hidden shadow-[0_4px_12px_rgba(0,0,0,0.02)] mb-4">
+            <div className="flex h-12 relative items-center">
+              <button 
+                onClick={() => setMobileSortOpen(true)}
+                className="flex-1 flex items-center justify-center gap-2 active:bg-[var(--color-subtle)] transition-colors cursor-pointer py-1"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <svg className="w-4 h-4 text-[var(--color-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+                  </div>
+                  <div className="flex flex-col items-start leading-none mt-0.5">
+                    <span className="font-bold text-[12px] text-[var(--color-text)] uppercase tracking-wider">Sort</span>
+                    <span className="text-[9px] text-[var(--color-muted)]">{sortBy === 'newest' ? 'Newest' : sortBy === 'popularity' ? 'Popularity' : sortBy === 'price-low' ? 'Price: Low' : 'Price: High'}</span>
+                  </div>
+                </div>
+              </button>
+              
+              <div className="w-[1px] h-6 bg-[var(--color-border)] absolute left-1/2 top-1/2 -translate-y-1/2" />
+
+              <button 
+                onClick={() => setFilterDrawerOpen(true)}
+                className="flex-1 flex items-center justify-center gap-2 active:bg-[var(--color-subtle)] transition-colors cursor-pointer py-1"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]"></span>
+                    <svg className="w-4 h-4 text-[var(--color-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                  </div>
+                  <div className="flex flex-col items-start leading-none mt-0.5">
+                    <span className="font-bold text-[12px] text-[var(--color-text)] uppercase tracking-wider">Filter</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
 
           {/* Catalog Count Indicator */}
           <div id="shop-products-grid" className="flex justify-between items-center text-[10px] font-mono tracking-widest text-[var(--color-muted)] uppercase">
@@ -1129,43 +1172,7 @@ function Shop() {
         </div>
       </div>
 
-      {/* Mobile Sticky Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-200 lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-safe">
-        <div className="flex h-14 relative">
-          <button 
-            onClick={() => setMobileSortOpen(true)}
-            className="flex-1 flex items-center justify-center gap-2 active:bg-neutral-50 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                <svg className="w-5 h-5 text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
-              </div>
-              <div className="flex flex-col items-start leading-none mt-0.5">
-                <span className="font-bold text-[13px] text-neutral-900">Sort</span>
-                <span className="text-[9px] text-neutral-500">{sortBy === 'newest' ? 'Newest' : sortBy === 'popularity' ? 'Popularity' : sortBy === 'price-low' ? 'Price: Low' : 'Price: High'}</span>
-              </div>
-            </div>
-          </button>
-          
-          <div className="w-[1px] h-8 bg-neutral-200 absolute left-1/2 top-1/2 -translate-y-1/2" />
 
-          <button 
-            onClick={() => setFilterDrawerOpen(true)}
-            className="flex-1 flex items-center justify-center gap-2 active:bg-neutral-50 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-neutral-300"></span>
-                <svg className="w-5 h-5 text-neutral-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-              </div>
-              <div className="flex flex-col items-start leading-none mt-0.5">
-                <span className="font-bold text-[13px] text-neutral-900">Filter</span>
-              </div>
-            </div>
-          </button>
-        </div>
-      </div>
 
       {/* Mobile Sort Bottom Sheet Modal */}
       {mobileSortOpen && (

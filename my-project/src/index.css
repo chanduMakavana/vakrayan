@@ -1410,11 +1410,11 @@ display: none !important;
 }
 
 /* ============================================================
-   MOBILE BOTTOM NAV — body safe area
+   MOBILE BOTTOM NAV — footer safe area
    ============================================================ */
-/* Add padding to body on mobile so content isn't hidden behind bottom nav */
+/* Add padding inside the footer on mobile so copyright text is not hidden behind bottom nav, and the dark background extends to the bottom */
 @media (max-width: 767px) {
-  body {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  footer {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 8px)) !important;
   }
 }

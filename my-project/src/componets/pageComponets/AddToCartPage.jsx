@@ -11,6 +11,8 @@ import { setCartItems as setCartItemsAction, removeCartItemState, updateCartItem
 import { useToast } from '../../context/ToastContext'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
 import { loadGuestCartItems } from '../../utils/guestCartHelper'
+import PageSkeleton from './PageSkeleton'
+import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 
 
 function AddToCartPage() {
@@ -403,16 +405,11 @@ function AddToCartPage() {
     }
   };
 
+  const showSkeleton = useDelayedLoading(loading, 300)
+
   // Page Loading Viewport State
   if (loading) {
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4">
-        <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
-        <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-black uppercase">
-          Loading your cart...
-        </div>
-      </div>
-    )
+    return showSkeleton ? <PageSkeleton /> : null
   }
 
   // Empty cart state
