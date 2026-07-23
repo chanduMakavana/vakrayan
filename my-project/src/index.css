@@ -1418,3 +1418,17 @@ display: none !important;
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 8px)) !important;
   }
 }
+
+/* ── Category Card Underline Draw Animation ── */
+.category-underline {
+  width: 64px;
+  height: 2px;
+  background-color: #34D399;
+  transform: scaleX(0.375);
+  transform-origin: left;
+  transition: transform 550ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+.group:hover .category-underline {
+  transform: scaleX(1);
+}

@@ -163,6 +163,7 @@ function Navbar() {
   const [animateWishlist,   setAnimateWishlist]   = useState(false);
   const [removingIds,       setRemovingIds]       = useState(new Set());
   const [collectionsOpen,   setCollectionsOpen]   = useState(false);
+  const [aboutModalOpen,     setAboutModalOpen]     = useState(false);
   const [recentlyViewed,    setRecentlyViewed]    = useState([]);
 
 
@@ -588,17 +589,17 @@ function Navbar() {
             {/* Brand */}
             <Link
               to="/"
-              className="flex-shrink-0 flex  items-center group"
+              className="flex-shrink-0 flex items-center gap-0 group"
             >
               <img
                 src="/vakrayan-logo.png"
                 alt="Vakrayan Logo"
-                className="h-13 w-13 object-contain drop-shadow-md"
+                className="h-14 w-14 md:h-16 md:w-16 object-contain -mr-1 md:-mr-1.5 drop-shadow-xs transition-transform duration-300 group-hover:scale-105"
               />
               <img
                 src="/vakrayan-text.png"
                 alt="Vakrayan"
-                className="h-7 w-25 md:h-8  object-contain drop-shadow-xs transition-all duration-200 group-hover:opacity-80"
+                className="h-7 w-25 md:h-8 object-contain drop-shadow-xs transition-all duration-200 group-hover:opacity-80"
               />
             </Link>
 
@@ -614,40 +615,14 @@ function Navbar() {
                   Shop
                 </NavLink>
               </li>
-              <li 
-                className="relative"
-                onMouseEnter={() => setCollectionsOpen(true)}
-                onMouseLeave={() => setCollectionsOpen(false)}
-              >
-                <button className="link-underline text-[11px] font-semibold tracking-[0.12em] uppercase transition-base text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center gap-1 cursor-pointer">
-                  Collections
-                  <svg className={`w-3 h-3 transition-transform ${collectionsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.3} d="M19 9l-7 7-7-7" />
-                  </svg>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setAboutModalOpen(true)}
+                  className={navLink({ isActive: aboutModalOpen })}
+                >
+                  About Us
                 </button>
-                <AnimatePresence>
-                  {collectionsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.97 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      className="absolute left-0 mt-3 w-52 p-2 rounded-2xl z-50 flex flex-col gap-0.5"
-                      style={{
-                        background: 'var(--glass-bg-heavy)',
-                        backdropFilter: 'blur(28px) saturate(190%)',
-                        WebkitBackdropFilter: 'blur(28px) saturate(190%)',
-                        border: '1px solid var(--glass-border-green)',
-                        boxShadow: 'var(--shadow-lg)'
-                      }}
-                    >
-                      <Link to="/category/oversized-tshirt" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Oversized T-Shirts</Link>
-                      <Link to="/category/printed-tshirt" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Printed T-Shirts</Link>
-                      <Link to="/category/shirts" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Shirts</Link>
-                      <Link to="/category/hoodies" className="px-3 py-2.5 text-[12px] font-semibold rounded-xl text-left text-[var(--color-text)] hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-all duration-150">Hoodies</Link>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </li>
               <li>
                 <NavLink to="/profile?tab=orders" className={navLink}>
@@ -1032,15 +1007,21 @@ function Navbar() {
                   Track Order
                 </NavLink>
                 
-                <div className="px-3 py-2 space-y-2">
-                  <span className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Collections</span>
-                  <div className="grid grid-cols-2 gap-2 pl-2">
-                    <Link to="/category/oversized-tshirt" onClick={() => setIsOpen(false)} className="text-[12px] font-semibold text-[var(--color-text)] hover:text-[var(--color-text)]">Oversized</Link>
-                    <Link to="/category/printed-tshirt" onClick={() => setIsOpen(false)} className="text-[12px] font-semibold text-[var(--color-text)] hover:text-[var(--color-text)]">Printed</Link>
-                    <Link to="/category/shirts" onClick={() => setIsOpen(false)} className="text-[12px] font-semibold text-[var(--color-text)] hover:text-[var(--color-text)]">Shirts</Link>
-                    <Link to="/category/hoodies" onClick={() => setIsOpen(false)} className="text-[12px] font-semibold text-[var(--color-text)] hover:text-[var(--color-text)]">Hoodies</Link>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setAboutModalOpen(true);
+                  }}
+                  className="w-full text-left flex items-center gap-2.5 px-3 py-3 rounded-xl text-[13px] font-semibold text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)] transition-base cursor-pointer"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                  About Us
+                </button>
 
 
 
@@ -1595,6 +1576,90 @@ function Navbar() {
           )}
         </div>
       </DrawerWrapper>
+
+      {/* Premium Glassmorphic About Us Modal */}
+      <AnimatePresence>
+        {aboutModalOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-lg bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 md:p-8 shadow-2xl overflow-hidden space-y-6 text-center"
+            >
+              {/* Ambient Glow */}
+              <div className="absolute -top-12 -right-12 w-44 h-44 bg-[var(--color-accent)]/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-12 -left-12 w-44 h-44 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              {/* Close Button */}
+              <button
+                onClick={() => setAboutModalOpen(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center justify-center transition-all cursor-pointer font-bold text-xs"
+              >
+                ✕
+              </button>
+
+              {/* Brand Emblem Header */}
+              <div className="flex flex-col items-center gap-3 pt-1">
+                <img
+                  src="/vakrayan-logo.png"
+                  alt="Vakrayan Golden Cobra Logo"
+                  className="w-16 h-16 object-contain drop-shadow-md"
+                />
+                <h2 className="text-2xl font-black uppercase tracking-[0.25em] text-[var(--color-text)]" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>
+                  VAKRAYAN
+                </h2>
+                <span className="text-[9.5px] font-mono font-bold tracking-[0.25em] uppercase text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-3.5 py-1 rounded-full border border-[var(--color-accent)]/20">
+                  HERITAGE & CRAFTSMANSHIP // EST. 2026
+                </span>
+              </div>
+
+              {/* Brand Ethos Story */}
+              <div className="space-y-3 text-xs text-[var(--color-muted)] leading-relaxed font-sans px-2">
+                <p className="font-bold text-[var(--color-text)] text-sm">
+                  Contemporary Heavyweight Streetwear — Crafted Carefully in India.
+                </p>
+                <p>
+                  At <strong className="text-[var(--color-text)]">VAKRAYAN</strong>, we build heavyweight streetwear drops designed for those who value individuality, durability, and raw street culture aesthetics.
+                </p>
+                <p>
+                  Every garment is constructed from <strong>240+ GSM premium cotton</strong>, precision tailored with relaxed oversized fits, and finished with signature high-density artwork.
+                </p>
+              </div>
+
+              {/* Key Brand Pillars */}
+              <div className="grid grid-cols-3 gap-3 pt-2 border-t border-[var(--color-border)] text-center">
+                <div className="p-3 rounded-2xl bg-[var(--color-subtle)]/50 border border-[var(--color-border)]">
+                  <span className="text-base block mb-1">🧵</span>
+                  <span className="text-[9.5px] font-mono font-bold text-[var(--color-text)] uppercase block">240+ GSM</span>
+                  <span className="text-[8px] text-[var(--color-muted)] uppercase">Heavy Cotton</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[var(--color-subtle)]/50 border border-[var(--color-border)]">
+                  <span className="text-base block mb-1">⚡</span>
+                  <span className="text-[9.5px] font-mono font-bold text-[var(--color-text)] uppercase block">EXPRESS</span>
+                  <span className="text-[8px] text-[var(--color-muted)] uppercase">Pan-India Delivery</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[var(--color-subtle)]/50 border border-[var(--color-border)]">
+                  <span className="text-base block mb-1">🛡️</span>
+                  <span className="text-[9.5px] font-mono font-bold text-[var(--color-text)] uppercase block">7-DAY</span>
+                  <span className="text-[8px] text-[var(--color-muted)] uppercase">Easy Returns</span>
+                </div>
+              </div>
+
+              {/* CTA Button */}
+              <button
+                onClick={() => {
+                  setAboutModalOpen(false);
+                  navigate('/shop');
+                }}
+                className="w-full py-3.5 rounded-2xl bg-[var(--color-accent)] hover:opacity-90 text-white font-mono font-black text-xs uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-[var(--color-accent)]/20"
+              >
+                EXPLORE THE ARCHIVES →
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

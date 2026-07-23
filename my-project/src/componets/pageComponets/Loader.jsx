@@ -12,6 +12,11 @@ function Loader({ type = 'inline', text }) {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center gap-6"
           >
+            <img 
+              src="/vakrayan-logo.png" 
+              alt="Vakrayan Logo" 
+              className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-md" 
+            />
             <div className="flex flex-col items-center gap-1">
               <h1
                 className="text-2xl md:text-3xl font-brand font-black tracking-[0.35em] text-[var(--color-text)] uppercase"

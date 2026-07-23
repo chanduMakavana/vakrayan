@@ -116,23 +116,23 @@ function CategoryGrid() {
               >
                 <Link
                   to={`/category/${c.value}`}
-                  className="group block relative overflow-hidden cursor-pointer shadow-lg"
+                  className="group block relative overflow-hidden cursor-pointer shadow-lg transition-[box-shadow,border-color] duration-500 ease-[0.16,1,0.3,1] hover:shadow-2xl hover:border-emerald-500/30"
                   style={{
                     borderRadius: 16,
                     height: 'clamp(240px, 32vw, 360px)',
                     border: '1.5px solid rgba(255, 255, 255, 0.05)',
                   }}
                 >
-                  {/* Image */}
+                  {/* Image - smooth scale */}
                   <img
                     src={img}
                     alt={c.label}
-                    className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
+                    className="w-full h-full object-cover object-center transition-transform duration-700 ease-[0.16,1,0.3,1] group-hover:scale-106"
                   />
 
                   {/* Gradient overlay - dark & smooth */}
                   <div
-                    className="absolute inset-0"
+                    className="absolute inset-0 transition-opacity duration-500 ease-out"
                     style={{
                       background: 'linear-gradient(to top, rgba(13,26,20,0.92) 0%, rgba(13,26,20,0.30) 50%, transparent 100%)',
                     }}
@@ -140,14 +140,14 @@ function CategoryGrid() {
 
                   {/* Subtle hover tint */}
                   <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ background: 'rgba(5,150,105,0.06)' }}
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out pointer-events-none"
+                    style={{ background: 'rgba(5,150,105,0.08)' }}
                   />
 
                   {/* Luxury Editorial Label Details */}
                   <div className="absolute inset-0 p-5 flex flex-col justify-end select-none">
                     <span 
-                      className="text-[11px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block translate-y-2 opacity-80 transition-all duration-300 group-hover:translate-y-0"
+                      className="text-[11px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block opacity-85 transition-opacity duration-500 ease-[0.16,1,0.3,1] group-hover:opacity-100"
                     >
                       COLLECTION 0{idx + 1}
                     </span>
@@ -166,7 +166,7 @@ function CategoryGrid() {
                     </h3>
                     
                     {/* Expanding animated underline */}
-                    <div className="w-6 h-[2px] bg-[#34D399] mt-2.5 transition-all duration-500 ease-out group-hover:w-16" />
+                    <div className="category-underline mt-2.5" />
                   </div>
                 </Link>
               </motion.div>

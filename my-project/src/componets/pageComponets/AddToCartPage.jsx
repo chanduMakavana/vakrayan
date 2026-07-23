@@ -579,19 +579,19 @@ function AddToCartPage() {
 
                     {/* Quantity Controls & Subtotal */}
                     <div className="flex items-center justify-between gap-4 mt-4 flex-wrap pt-2 border-t border-[var(--color-border)]">
-                      <div className="flex items-center border border-[var(--color-border)] bg-[var(--color-subtle)] rounded-lg p-0.5">
+                      <div className="inline-flex items-center border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl overflow-hidden shadow-2xs">
                         <button 
                           onClick={() => handleQuantityShift(item, 'decrease')}
-                          className="p-1 hover:text-[var(--color-text)] transition-colors cursor-pointer text-[var(--color-muted)]"
+                          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-muted)] border-r border-[var(--color-border)]"
                         >
                           <HiMinus className="text-xs" />
                         </button>
-                        <span className="px-2.5 font-semibold text-xs text-[var(--color-text)] min-w-5 text-center">
+                        <span className="w-9 text-center font-mono font-bold text-xs text-[var(--color-text)] border-r border-[var(--color-border)] py-1">
                           {item.quantity}
                         </span>
                         <button 
                           onClick={() => handleQuantityShift(item, 'increase')}
-                          className="p-1 hover:text-[var(--color-text)] transition-colors cursor-pointer text-[var(--color-muted)]"
+                          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-muted)]"
                         >
                           <HiPlus className="text-xs" />
                         </button>

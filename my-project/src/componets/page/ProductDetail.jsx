@@ -1740,34 +1740,34 @@ function ProductDetail() {
                    Select Quantity
                  </span>
                  <div className="flex items-center gap-4">
-                   <div className="flex items-center border border-[var(--color-border)] bg-[var(--color-surface)]">
-                     <button
-                       type="button"
-                       disabled={quantity <= 1}
-                       onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                       className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-subtle)] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer select-none transition-colors text-[var(--color-text)] border-r border-[var(--color-border)]"
-                     >
-                       <FiMinus size={12} />
-                     </button>
-                     <span className="w-10 text-center font-mono font-bold text-xs select-none text-[var(--color-text)]">
-                       {quantity}
-                     </span>
-                     <button
-                       type="button"
-                       onClick={() => {
-                         const baseSizeVal = selectedSize || product.sizes?.[0] || 'M';
-                         const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
-                         if (quantity >= availableStock) {
-                           showToast(`Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "warning");
-                           return;
-                         }
-                         setQuantity(prev => prev + 1);
-                       }}
-                       className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-subtle)] cursor-pointer select-none transition-colors text-[var(--color-text)] border-l border-[var(--color-border)]"
-                     >
-                       <FiPlus size={12} />
-                     </button>
-                   </div>
+                    <div className="inline-flex items-center border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl overflow-hidden shadow-2xs">
+                      <button
+                        type="button"
+                        disabled={quantity <= 1}
+                        onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                        className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer select-none transition-colors text-[var(--color-text)] border-r border-[var(--color-border)]"
+                      >
+                        <FiMinus size={13} strokeWidth={2.5} />
+                      </button>
+                      <span className="w-12 text-center font-mono font-black text-xs select-none text-[var(--color-text)] border-r border-[var(--color-border)] py-2">
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const baseSizeVal = selectedSize || product.sizes?.[0] || 'M';
+                          const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                          if (quantity >= availableStock) {
+                            showToast(`Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "warning");
+                            return;
+                          }
+                          setQuantity(prev => prev + 1);
+                        }}
+                        className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] cursor-pointer select-none transition-colors text-[var(--color-text)]"
+                      >
+                        <FiPlus size={13} strokeWidth={2.5} />
+                      </button>
+                    </div>
                    {selectedSize && (() => {
                      const baseSizeVal = selectedSize || 'M';
                      const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;

@@ -52,7 +52,7 @@ function UserProfile() {
   };
 
   const [notificationStatus, setNotificationStatus] = useState(
-    typeof window !== 'undefined' ? Notification.permission : 'default'
+    typeof window !== 'undefined' && window.Notification ? window.Notification.permission : 'default'
   );
   const [notificationLoading, setNotificationLoading] = useState(false);
 
@@ -65,7 +65,7 @@ function UserProfile() {
       } else {
         showToast("Could not enable notifications. Please check browser settings.", "warning");
       }
-      setNotificationStatus(Notification.permission);
+      setNotificationStatus(window.Notification ? window.Notification.permission : 'default');
     } catch (err) {
       console.error(err);
       showToast("An error occurred.", "error");
@@ -75,7 +75,7 @@ function UserProfile() {
   };
 
   const handleSendTestNotification = () => {
-    if (Notification.permission === "granted") {
+    if (window.Notification && window.Notification.permission === "granted") {
       const title = "Vakrayan Official";
       const options = {
         body: "🔥 Live drop restock! Grab your heavyweight fits before they sell out.",

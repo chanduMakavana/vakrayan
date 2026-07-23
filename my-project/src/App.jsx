@@ -166,8 +166,8 @@ function AppContent() {
 
   // Pre-permission Modal Trigger
   useEffect(() => {
-    if (currentUser && typeof window !== "undefined") {
-      if (Notification.permission === 'default') {
+    if (currentUser && typeof window !== "undefined" && window.Notification) {
+      if (window.Notification.permission === 'default') {
         const dismissedUntil = localStorage.getItem('notification_prompt_dismissed_until')
         const hasDismissed = dismissedUntil && Date.now() < Number(dismissedUntil)
         

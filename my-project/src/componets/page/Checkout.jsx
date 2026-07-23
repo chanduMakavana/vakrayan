@@ -21,6 +21,8 @@ import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
 import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelper'
 
+
+
 const generateMockRazorpayOrderId = () => `rzp_order_${Date.now()}`;
 
 const generateOrderNumber = () => {
@@ -83,6 +85,8 @@ function Checkout() {
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
   const [walletBalance, setWalletBalance] = useState(0);
+
+
 
   useEffect(() => {
     if (user?.$id) {
@@ -392,8 +396,9 @@ function Checkout() {
     // A ref is used (not state) to avoid triggering a re-render when setting the flag.
     if (isSubmittingRef.current) return;
 
-
     isSubmittingRef.current = true;
+
+
 
     // 0. Live Pincode Deliverability Check
     const pin = (data.pincode || '').trim();
@@ -983,6 +988,8 @@ function Checkout() {
                   {errors.phone && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.phone.message}</span>}
                 </div>
 
+
+
                 {/* Street address */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
                   <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Street Address</label>
@@ -1357,6 +1364,9 @@ function Checkout() {
             processFinalizeOrder(submittedFormData, 'ONLINE', 'PAID', generatedPayId, mockOrderId);
           }}
         />
+
+
+
 
       </div>
     </div>

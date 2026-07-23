@@ -50,19 +50,102 @@ function Shop() {
   const [minPriceFilter, setMinPriceFilter] = useState(0)
   const [maxPriceFilter, setMaxPriceFilter] = useState(3000)
   const [selectedSizes, setSelectedSizes] = useState([])
+  const [selectedColors, setSelectedColors] = useState([])
   const [inStockOnly, setInStockOnly] = useState(false)
-  const [cols, setCols] = useState(3) // 2 | 3 | 4 columns on desktop
+  const [cols, setCols] = useState(4) // 2 | 3 | 4 columns on desktop
   const [mobileSortOpen, setMobileSortOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(12) // Pagination: show 12 at a time
 
+  // Drawer Draft Filter States (Committed only when user clicks "Apply Filters")
+  const [draftCategory, setDraftCategory] = useState(selectedCategory)
+  const [draftTag, setDraftTag] = useState(selectedTag)
+  const [draftMinPrice, setDraftMinPrice] = useState(minPriceFilter)
+  const [draftMaxPrice, setDraftMaxPrice] = useState(maxPriceFilter)
+  const [draftSizes, setDraftSizes] = useState(selectedSizes)
+  const [draftColors, setDraftColors] = useState(selectedColors)
+  const [draftInStock, setDraftInStock] = useState(inStockOnly)
+
+  const openFilterDrawer = () => {
+    setDraftCategory(selectedCategory)
+    setDraftTag(selectedTag)
+    setDraftMinPrice(minPriceFilter)
+    setDraftMaxPrice(maxPriceFilter)
+    setDraftSizes([...selectedSizes])
+    setDraftColors([...selectedColors])
+    setDraftInStock(inStockOnly)
+    setFilterDrawerOpen(true)
+  }
+
+  const handleApplyDrawerFilters = () => {
+    setSelectedCategory(draftCategory)
+    setSelectedTag(draftTag)
+    setMinPriceFilter(draftMinPrice)
+    setMaxPriceFilter(draftMaxPrice)
+    setSelectedSizes(draftSizes)
+    setSelectedColors(draftColors)
+    setInStockOnly(draftInStock)
+    setFilterDrawerOpen(false)
+  }
+
+  const handleResetDrawerDrafts = () => {
+    setDraftCategory('all')
+    setDraftTag('all')
+    setDraftMinPrice(0)
+    setDraftMaxPrice(maxPriceLimit)
+    setDraftSizes([])
+    setDraftColors([])
+    setDraftInStock(false)
+  }
+
   const maxPriceLimit = products.length > 0 ? Math.ceil(Math.max(...products.map(p => Number(p.price || 0))) / 500) * 500 : 3000
+
+  const availableColors = [
+    { name: 'Black', hex: '#121212', darkText: false },
+    { name: 'White', hex: '#FFFFFF', border: true, darkText: true },
+    { name: 'Beige', hex: '#F5E6D3', border: true, darkText: true },
+    { name: 'Cream', hex: '#FFFDD0', border: true, darkText: true },
+    { name: 'Navy', hex: '#0F172A', darkText: false },
+    { name: 'Blue', hex: '#2563EB', darkText: false },
+    { name: 'Grey', hex: '#64748B', darkText: false },
+    { name: 'Green', hex: '#059669', darkText: false },
+    { name: 'Olive', hex: '#4B5320', darkText: false },
+    { name: 'Brown', hex: '#5C3A21', darkText: false },
+    { name: 'Maroon', hex: '#6B1D2F', darkText: false },
+    { name: 'Red', hex: '#DC2626', darkText: false },
+    { name: 'Purple', hex: '#7C3AED', darkText: false },
+    { name: 'Lavender', hex: '#D8B4FE', darkText: true },
+    { name: 'Pink', hex: '#F472B6', darkText: false },
+    { name: 'Yellow', hex: '#FACC15', darkText: true }
+  ]
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (selectedCategory !== 'all') count++
+    if (selectedTag !== 'all') count++
+    if (minPriceFilter > 0 || (maxPriceLimit > 0 && maxPriceFilter < maxPriceLimit)) count++
+    if (selectedSizes.length > 0) count += selectedSizes.length
+    if (selectedColors.length > 0) count += selectedColors.length
+    if (inStockOnly) count++
+    if (searchQuery.trim()) count++
+    return count
+  }, [selectedCategory, selectedTag, minPriceFilter, maxPriceFilter, maxPriceLimit, selectedSizes, selectedColors, inStockOnly, searchQuery])
+
+  const handleResetAllFilters = () => {
+    setSelectedCategory('all')
+    setSelectedTag('all')
+    setSearchQuery('')
+    setTempSearch('')
+    setMinPriceFilter(0)
+    setMaxPriceFilter(maxPriceLimit)
+    setSelectedSizes([])
+    setSelectedColors([])
+    setInStockOnly(false)
+  }
 
   // Sync maxPriceFilter when products are loaded
   useEffect(() => {
     if (products.length > 0) {
       const highest = Math.max(...products.map(p => Number(p.price || 0)))
-      // ✅ Fixed: setTimeout(() => setState, 0) is an anti-pattern in React 18.
-      // React 18 automatic batching handles this without setTimeout.
       if (highest > 0) setMaxPriceFilter(Math.ceil(highest / 500) * 500)
     }
   }, [products])
@@ -216,7 +299,37 @@ function Shop() {
       }
       const matchesStock = !inStockOnly || !isAllOutOfStock;
 
-      return matchesCategory && matchesTag && matchesPrice && matchesSize && matchesStock
+      const colorSynonyms = {
+        'black': ['black', 'dark', 'nero'],
+        'white': ['white', 'snow'],
+        'cream': ['cream', 'off-white', 'offwhite', 'ivory', 'bone'],
+        'beige': ['beige', 'tan', 'sand'],
+        'navy': ['navy', 'dark blue'],
+        'blue': ['blue', 'denim', 'sky', 'royal', 'cyan', 'indigo'],
+        'grey': ['grey', 'gray', 'charcoal', 'slate', 'ash'],
+        'green': ['green', 'emerald', 'sage', 'mint'],
+        'olive': ['olive', 'khaki', 'army'],
+        'brown': ['brown', 'chocolate', 'coffee'],
+        'maroon': ['maroon', 'burgundy', 'wine'],
+        'red': ['red', 'crimson', 'scarlet'],
+        'purple': ['purple', 'violet'],
+        'lavender': ['lavender', 'lilac'],
+        'pink': ['pink', 'rose', 'magenta'],
+        'yellow': ['yellow', 'mustard', 'gold'],
+      }
+
+      const matchesColor = selectedColors.length === 0 || selectedColors.some(colorName => {
+        const cKey = colorName.toLowerCase();
+        const targets = colorSynonyms[cKey] || [cKey];
+        return targets.some(target => {
+          return (product.color && product.color.toLowerCase().includes(target)) ||
+                 (product.name && product.name.toLowerCase().includes(target)) ||
+                 (Array.isArray(product.tags) && product.tags.some(t => t && t.toLowerCase().includes(target))) ||
+                 (product.description && product.description.toLowerCase().includes(target));
+        });
+      });
+
+      return matchesCategory && matchesTag && matchesPrice && matchesSize && matchesColor && matchesStock
     })
 
     // 2. Apply Fuzzy Search using Fuse.js
@@ -280,25 +393,85 @@ function Shop() {
     })
   }, [products, selectedCategory, selectedTag, offers, minPriceFilter, maxPriceFilter, selectedSizes, inStockOnly, searchQuery, sortBy])
 
+  const drawerPreviewCount = useMemo(() => {
+    if (!filterDrawerOpen) return filteredProducts.length
+    return products.filter(product => {
+      const matchesCategory = draftCategory === 'all' || product.category === draftCategory
+
+      const activeOfferMatch = offers.find(o =>
+        (o.tag && draftTag && o.tag.toLowerCase() === draftTag.toLowerCase()) ||
+        (o.$id && draftTag && o.$id.toLowerCase() === draftTag.toLowerCase()) ||
+        (o.id && draftTag && o.id.toLowerCase() === draftTag.toLowerCase())
+      )
+      let matchesTag = draftTag === 'all' ||
+        (product.tag && product.tag.toUpperCase() === draftTag.toUpperCase()) ||
+        (Array.isArray(product.tags) && product.tags.some(t => t && t.toUpperCase() === draftTag.toUpperCase()))
+      if (activeOfferMatch) {
+        const matchesId = Array.isArray(activeOfferMatch.productIds) && activeOfferMatch.productIds.includes(product.$id || product.id)
+        const matchesCat = activeOfferMatch.category && product.category && product.category.toLowerCase() === activeOfferMatch.category.toLowerCase()
+        const matchesOfferTag = activeOfferMatch.tag && Array.isArray(product.tags) && product.tags.some(t => t && t.toLowerCase() === activeOfferMatch.tag.toLowerCase())
+        matchesTag = matchesId || matchesCat || matchesOfferTag
+      }
+
+      const priceNum = Number(product.price || 0)
+      const matchesPrice = priceNum >= draftMinPrice && priceNum <= draftMaxPrice
+
+      let stocks = {}
+      try { stocks = JSON.parse(product?.sizes_stock || '{}') } catch { stocks = {} }
+      const matchesSize = draftSizes.length === 0 || draftSizes.some(sz => Number(stocks[sz] || 0) > 0)
+
+      let isAllOutOfStock
+      if (product.sizes && product.sizes.length > 0) {
+        const totalStock = product.sizes.reduce((acc, size) => acc + (stocks[size] !== undefined ? Number(stocks[size]) : 0), 0)
+        isAllOutOfStock = totalStock === 0
+      } else {
+        isAllOutOfStock = true
+      }
+      const matchesStock = !draftInStock || !isAllOutOfStock
+
+      const colorSynonyms = {
+        'black': ['black', 'dark', 'nero'],
+        'white': ['white', 'snow'],
+        'cream': ['cream', 'off-white', 'offwhite', 'ivory', 'bone'],
+        'beige': ['beige', 'tan', 'sand'],
+        'navy': ['navy', 'dark blue'],
+        'blue': ['blue', 'denim', 'sky', 'royal', 'cyan', 'indigo'],
+        'grey': ['grey', 'gray', 'charcoal', 'slate', 'ash'],
+        'green': ['green', 'emerald', 'sage', 'mint'],
+        'olive': ['olive', 'khaki', 'army'],
+        'brown': ['brown', 'chocolate', 'coffee'],
+        'maroon': ['maroon', 'burgundy', 'wine'],
+        'red': ['red', 'crimson', 'scarlet'],
+        'purple': ['purple', 'violet'],
+        'lavender': ['lavender', 'lilac'],
+        'pink': ['pink', 'rose', 'magenta'],
+        'yellow': ['yellow', 'mustard', 'gold'],
+      }
+
+      const matchesColor = draftColors.length === 0 || draftColors.some(colorName => {
+        const cKey = colorName.toLowerCase()
+        const targets = colorSynonyms[cKey] || [cKey]
+        return targets.some(target => {
+          return (product.color && product.color.toLowerCase().includes(target)) ||
+                 (product.name && product.name.toLowerCase().includes(target)) ||
+                 (Array.isArray(product.tags) && product.tags.some(t => t && t.toLowerCase().includes(target))) ||
+                 (product.description && product.description.toLowerCase().includes(target))
+        })
+      })
+
+      return matchesCategory && matchesTag && matchesPrice && matchesSize && matchesColor && matchesStock
+    }).length
+  }, [filterDrawerOpen, products, offers, draftCategory, draftTag, draftMinPrice, draftMaxPrice, draftSizes, draftColors, draftInStock, filteredProducts.length])
+
   const hasActiveFilters = 
     selectedCategory !== 'all' || 
     selectedTag !== 'all' || 
     searchQuery.trim() !== '' || 
     minPriceFilter > 0 || 
-    maxPriceFilter < maxPriceLimit || 
+    (maxPriceLimit > 0 && maxPriceFilter < maxPriceLimit) || 
     selectedSizes.length > 0 || 
+    selectedColors.length > 0 || 
     inStockOnly
-
-  // Count active filters for badge
-  const activeFilterCount = [
-    selectedCategory !== 'all',
-    selectedTag !== 'all',
-    searchQuery.trim() !== '',
-    minPriceFilter > 0,
-    maxPriceFilter < maxPriceLimit,
-    ...selectedSizes.map(() => true),
-    inStockOnly
-  ].filter(Boolean).length
 
   const gridClass = `grid grid-cols-2 gap-x-2 gap-y-4 sm:gap-x-4 sm:gap-y-8 ${
     cols === 2 
@@ -397,65 +570,67 @@ function Shop() {
           </div>
 
           {/* Mobile Quick Filters (Horizontal Scroll) */}
-          <div className="flex lg:hidden overflow-x-auto gap-3 pb-2 pt-1 scrollbar-none snap-x items-center w-full">
+          <div className="flex lg:hidden overflow-x-auto gap-2.5 pb-2 pt-1 scrollbar-none snap-x items-center w-full">
             {[
-              { value: 'all', label: 'All' },
-              { value: 'BEST SELLER', label: 'Top Rated' },
-              { value: 'PLUS SIZE', label: 'Plus Size' },
-              { value: 'NEW DROP', label: 'New' }
-            ].map((t) => (
+              { value: 'all', label: 'All Fits' },
+              { value: 'oversized-tshirt', label: 'Oversized' },
+              { value: 'printed-tshirt', label: 'Printed' },
+              { value: 'shirts', label: 'Shirts' },
+              { value: 'hoodies', label: 'Hoodies' }
+            ].map((cat) => (
               <button
-                key={t.value}
-                onClick={() => setSelectedTag(t.value)}
-                className={`snap-start shrink-0 text-sm font-sans px-5 py-2 border transition-colors rounded-lg shadow-xs ${
-                  selectedTag === t.value
-                    ? 'bg-neutral-900 text-white border-neutral-900 font-bold'
-                    : 'bg-white text-neutral-600 border-neutral-300 font-medium'
+                key={cat.value}
+                onClick={() => setSelectedCategory(cat.value)}
+                className={`snap-start shrink-0 text-xs font-mono px-4 py-2 border transition-all rounded-xl shadow-xs font-bold uppercase cursor-pointer ${
+                  selectedCategory === cat.value
+                    ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)]'
+                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)]'
                 }`}
               >
-                {t.label}
+                {cat.label}
               </button>
             ))}
             <button
-               onClick={() => setFilterDrawerOpen(true)}
-               className="snap-start shrink-0 text-sm font-sans px-5 py-2 border rounded-lg bg-white text-neutral-600 border-neutral-300 flex items-center gap-1.5 font-medium shadow-xs"
+               onClick={openFilterDrawer}
+               className="snap-start shrink-0 text-xs font-mono px-4 py-2 border rounded-xl bg-[var(--color-accent)]/10 text-[var(--color-accent)] border-[var(--color-accent)]/30 flex items-center gap-1.5 font-bold uppercase shadow-xs cursor-pointer"
             >
-               Color <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+               Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''} ⚙️
             </button>
           </div>
 
           {/* Filtering Controller Unit (Desktop) */}
-          <div className="hidden lg:flex bg-[var(--color-surface)]/40 backdrop-blur-md border border-white/20 p-6 rounded-2xl flex-col gap-6 shadow-xs">
-
-
-            {/* Tags Select Pills */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                { value: 'all', label: 'ALL TAGS' },
-                { value: 'NEW DROP', label: 'NEW DROPS' },
-                { value: 'BEST SELLER', label: 'BEST SELLERS' },
-                { value: 'FEW LEFT', label: 'FEW LEFT' },
-                { value: 'LIMITED ITEM', label: 'LIMITED ITEMS' }
-              ].map((t) => (
-                <button
-                  key={t.value}
-                  onClick={() => setSelectedTag(t.value)}
-                  className={`text-[9px] font-mono tracking-wider uppercase px-3.5 py-1.5 border transition-all duration-200 cursor-pointer rounded-lg ${
-                    selectedTag === t.value
-                      ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
-                      : 'bg-[var(--color-surface)]/40 text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+          <div className="hidden lg:flex bg-[var(--color-surface)]/40 backdrop-blur-md border border-[var(--color-border)] p-6 rounded-2xl flex-col gap-5 shadow-xs relative z-40">
+            {/* Tags Select Pills Row */}
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest shrink-0 font-bold">DROPS:</span>
+              <div className="flex flex-wrap gap-2 flex-1">
+                {[
+                  { value: 'all', label: 'ALL DROPS' },
+                  { value: 'NEW DROP', label: 'NEW DROPS' },
+                  { value: 'BEST SELLER', label: 'BEST SELLERS' },
+                  { value: 'FEW LEFT', label: 'FEW LEFT' },
+                  { value: 'LIMITED ITEM', label: 'LIMITED ITEMS' }
+                ].map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => setSelectedTag(t.value)}
+                    className={`text-[9px] font-mono tracking-wider uppercase px-3.5 py-1.5 border transition-all duration-200 cursor-pointer rounded-lg ${
+                      selectedTag === t.value
+                        ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs font-bold'
+                        : 'bg-[var(--color-surface)]/40 text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Search & Sort Controls Row */}
             <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-end gap-5 pt-2">
               {/* Minimal Underline Search Input & Filter Toggle */}
               <div className="flex items-end gap-4 flex-1 max-w-xl">
-                <div id="shop-search-container" className="relative flex-1">
+                <div id="shop-search-container" className="relative flex-1 z-50">
                   <div className="relative flex items-center">
                     <input
                       type="text"
@@ -564,7 +739,7 @@ function Shop() {
                   </AnimatePresence>
                 </div>
                 <button
-                  onClick={() => setFilterDrawerOpen(true)}
+                  onClick={openFilterDrawer}
                   className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono text-[10px] tracking-widest uppercase px-4.5 py-2.5 flex items-center gap-1.5 transition-all select-none cursor-pointer rounded-xl shadow-xs relative"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -577,15 +752,15 @@ function Shop() {
               {/* Sort & Grid Layout Controls */}
               <div className="flex flex-wrap items-center gap-6">
                 {/* Grid Column Selector (Desktop Only) */}
-                <div className="hidden lg:flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-widest">VIEW:</span>
-                  <div className="flex border border-[var(--color-border)] bg-[var(--color-surface)]/40 backdrop-blur-xs rounded-lg overflow-hidden">
+                <div className="hidden lg:flex items-center gap-2.5">
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">VIEW:</span>
+                  <div className="flex border border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-xs rounded-xl overflow-hidden p-0.5 gap-0.5">
                     {[2, 3, 4].map((n) => (
                       <button
                         key={n}
                         onClick={() => setCols(n)}
-                        className={`text-[9px] font-mono font-bold px-3 py-1.5 border-r last:border-r-0 border-[var(--color-border)] hover:bg-[var(--color-subtle)] cursor-pointer transition-colors ${
-                          cols === n ? 'bg-[var(--color-accent)] text-white border-none' : 'text-[var(--color-muted)] bg-transparent'
+                        className={`text-[9.5px] font-mono font-bold px-3 py-1 rounded-lg cursor-pointer transition-all ${
+                          cols === n ? 'bg-[var(--color-accent)] text-white shadow-xs' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] bg-transparent'
                         }`}
                       >
                         {n} COL
@@ -645,7 +820,7 @@ function Shop() {
                 <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>SEARCH: "{searchQuery}"</span>
                   <button 
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => { setSearchQuery(''); setTempSearch(''); }}
                     className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
                   >
                     ✕
@@ -653,7 +828,7 @@ function Shop() {
                 </div>
               )}
 
-              {(minPriceFilter > 0 || maxPriceFilter < maxPriceLimit) && (
+              {(minPriceFilter > 0 || (maxPriceLimit > 0 && maxPriceFilter < maxPriceLimit)) && (
                 <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>PRICE: ₹{minPriceFilter} - ₹{maxPriceFilter}</span>
                   <button 
@@ -677,6 +852,18 @@ function Shop() {
                 </div>
               ))}
 
+              {selectedColors.map(color => (
+                <div key={color} className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
+                  <span>COLOR: {color}</span>
+                  <button 
+                    onClick={() => setSelectedColors(selectedColors.filter(c => c !== color))}
+                    className="hover:text-rose-600 cursor-pointer font-black ml-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
               {inStockOnly && (
                 <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">
                   <span>IN STOCK</span>
@@ -690,15 +877,7 @@ function Shop() {
               )}
 
               <button
-                onClick={() => {
-                  setSelectedCategory('all');
-                  setSelectedTag('all');
-                  setSearchQuery('');
-                  setMinPriceFilter(0);
-                  setMaxPriceFilter(maxPriceLimit);
-                  setSelectedSizes([]);
-                  setInStockOnly(false);
-                }}
+                onClick={handleResetAllFilters}
                 className="text-[9px] font-mono font-bold text-rose-600 hover:text-rose-800 uppercase tracking-widest ml-3 border-b border-rose-200 hover:border-rose-800 cursor-pointer"
               >
                 Clear All
@@ -728,7 +907,7 @@ function Shop() {
               <div className="w-[1px] h-6 bg-[var(--color-border)] absolute left-1/2 top-1/2 -translate-y-1/2" />
 
               <button 
-                onClick={() => setFilterDrawerOpen(true)}
+                onClick={openFilterDrawer}
                 className="flex-1 flex items-center justify-center gap-2 active:bg-[var(--color-subtle)] transition-colors cursor-pointer py-1"
               >
                 <div className="flex items-center justify-center gap-2">
@@ -766,7 +945,7 @@ function Shop() {
                 NO VAKRAYAN FIT MATCHES YOUR SEARCH CRITERIA.
               </p>
               <button 
-                onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setSelectedTag('all'); }} 
+                onClick={handleResetAllFilters} 
                 className="mt-4 text-[10px] font-mono font-bold tracking-widest bg-neutral-950 hover:bg-neutral-800 text-white px-5 py-3 rounded-none uppercase transition-all cursor-pointer"
               >
                 RESET SEARCH FILTERS
@@ -992,15 +1171,22 @@ function Shop() {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setFilterDrawerOpen(false)}></div>
         
         {/* Drawer Content */}
-        <div className={`absolute top-0 left-0 h-full w-full sm:w-[380px] bg-[rgba(250,247,242,0.78)] backdrop-blur-2xl border-r border-[rgba(40,32,28,0.08)] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${filterDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`absolute top-0 left-0 h-full w-full sm:w-[380px] bg-[var(--color-bg)]/95 backdrop-blur-2xl border-r border-[var(--color-border)] shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${filterDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {/* Header */}
-          <div className="p-6 border-b border-[var(--color-border)] flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[var(--color-text)] font-mono">
-              ⚙️ FILTERS
-            </h3>
+          <div className="p-6 border-b border-[var(--color-border)] bg-[var(--color-surface)]/60 backdrop-blur-md flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-sm font-mono font-black uppercase tracking-[0.2em] text-[var(--color-text)]">
+                ⚙️ FILTERS
+              </h3>
+              {activeFilterCount > 0 && (
+                <span className="bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/30 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full">
+                  {activeFilterCount} Active
+                </span>
+              )}
+            </div>
             <button 
               onClick={() => setFilterDrawerOpen(false)}
-              className="text-[var(--color-muted)] hover:text-[var(--color-text)] p-2 transition-colors cursor-pointer text-sm font-bold uppercase font-mono"
+              className="text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] px-3 py-1.5 rounded-xl transition-all cursor-pointer text-xs font-mono font-bold uppercase"
             >
               ✕ CLOSE
             </button>
@@ -1008,26 +1194,140 @@ function Shop() {
 
           {/* Drawer Body (Scrollable filters) */}
           <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* Category Filter */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
+                CATEGORY
+              </label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {[
+                  { value: 'all', label: 'All Categories' },
+                  { value: 'oversized-tshirt', label: 'Oversized Tees' },
+                  { value: 'printed-tshirt', label: 'Printed Tees' },
+                  { value: 'shirts', label: 'Shirts' },
+                  { value: 'hoodies', label: 'Hoodies' }
+                ].map(cat => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setDraftCategory(cat.value)}
+                    className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer rounded-xl uppercase ${
+                      draftCategory === cat.value
+                        ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-accent)]/60'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Color Swatch Filter */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
+                  FILTER BY COLOR
+                </label>
+                {draftColors.length > 0 && (
+                  <button 
+                    onClick={() => setDraftColors([])} 
+                    className="text-[9px] font-mono text-rose-600 font-bold hover:underline uppercase cursor-pointer"
+                  >
+                    Clear ({draftColors.length})
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                {availableColors.map((col) => {
+                  const isSelected = draftColors.includes(col.name);
+                  return (
+                    <button
+                      key={col.name}
+                      onClick={() => {
+                        if (isSelected) {
+                          setDraftColors(draftColors.filter(c => c !== col.name));
+                        } else {
+                          setDraftColors([...draftColors, col.name]);
+                        }
+                      }}
+                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/12 text-[var(--color-accent)] shadow-xs font-bold'
+                          : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-accent)]/50'
+                      }`}
+                    >
+                      <span
+                        className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-transform ${
+                          col.border ? 'border border-neutral-400/60' : 'border border-black/15 shadow-2xs'
+                        } ${isSelected ? 'scale-110' : ''}`}
+                        style={{ backgroundColor: col.hex }}
+                      >
+                        {isSelected && (
+                          <svg className={`w-3 h-3 ${col.darkText ? 'text-black' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={`text-[10px] font-mono uppercase tracking-wider truncate flex-1 text-left ${isSelected ? 'text-[var(--color-accent)] font-bold' : 'text-[var(--color-text)] font-semibold'}`}>
+                        {col.name}
+                      </span>
+                      {isSelected && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Price Range Filter */}
             <div className="space-y-4">
               <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
                 PRICE RANGE
               </label>
+
+              {/* Quick Presets */}
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                {[
+                  { label: 'All Prices', min: 0, max: maxPriceLimit },
+                  { label: 'Under ₹999', min: 0, max: 999 },
+                  { label: '₹1000 - ₹1999', min: 1000, max: 1999 },
+                  { label: '₹2000+', min: 2000, max: maxPriceLimit }
+                ].map(preset => {
+                  const isActive = draftMinPrice === preset.min && draftMaxPrice === preset.max;
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        setDraftMinPrice(preset.min);
+                        setDraftMaxPrice(preset.max);
+                      }}
+                      className={`text-[9px] font-mono font-bold px-2.5 py-1.5 border transition-all rounded-lg cursor-pointer ${
+                        isActive
+                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
+                          : 'bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-accent)]/60'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
               
               {/* Display Range & Input Boxes */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 pt-1">
                 <div className="flex-1 space-y-1">
-                  <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">MIN PRICE</span>
-                  <div className="flex items-center border border-[var(--color-border)] px-2.5 py-1 bg-[var(--color-surface)]/40 backdrop-blur-xs rounded-lg">
+                  <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase font-bold">MIN PRICE</span>
+                  <div className="flex items-center border border-[var(--color-border)] px-2.5 py-1.5 bg-[var(--color-surface)] rounded-xl focus-within:border-[var(--color-accent)]">
                     <span className="text-xs font-mono font-bold text-[var(--color-muted)] mr-1">₹</span>
                     <input
                       type="number"
                       min="0"
                       max={maxPriceLimit}
-                      value={minPriceFilter}
+                      value={draftMinPrice}
                       onChange={(e) => {
-                        const val = Math.min(Number(e.target.value || 0), maxPriceFilter);
-                        setMinPriceFilter(val);
+                        const val = Math.min(Number(e.target.value || 0), draftMaxPrice);
+                        setDraftMinPrice(val);
                       }}
                       className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-[var(--color-text)] border-none p-0"
                     />
@@ -1037,17 +1337,17 @@ function Shop() {
                 <div className="text-[var(--color-muted)] font-bold self-end pb-2.5 font-mono text-xs">TO</div>
 
                 <div className="flex-1 space-y-1">
-                  <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase">MAX PRICE</span>
-                  <div className="flex items-center border border-[var(--color-border)] px-2.5 py-1 bg-[var(--color-surface)]/40 backdrop-blur-xs rounded-lg">
+                  <span className="text-[9px] font-mono text-[var(--color-muted)] block uppercase font-bold">MAX PRICE</span>
+                  <div className="flex items-center border border-[var(--color-border)] px-2.5 py-1.5 bg-[var(--color-surface)] rounded-xl focus-within:border-[var(--color-accent)]">
                     <span className="text-xs font-mono font-bold text-[var(--color-muted)] mr-1">₹</span>
                     <input
                       type="number"
                       min="0"
                       max={maxPriceLimit}
-                      value={maxPriceFilter}
+                      value={draftMaxPrice}
                       onChange={(e) => {
-                        const val = Math.max(Number(e.target.value || 0), minPriceFilter);
-                        setMaxPriceFilter(val);
+                        const val = Math.max(Number(e.target.value || 0), draftMinPrice);
+                        setDraftMaxPrice(val);
                       }}
                       className="w-full bg-transparent outline-hidden text-xs font-mono font-bold text-[var(--color-text)] border-none p-0"
                     />
@@ -1059,19 +1359,19 @@ function Shop() {
               <div className="space-y-3 pt-1">
                 {/* Min Slider */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                  <div className="flex justify-between text-[9px] font-mono text-[var(--color-muted)] uppercase font-bold">
                     <span>Min Limit</span>
-                    <span className="font-bold text-[var(--color-text)]">₹{minPriceFilter}</span>
+                    <span className="text-[var(--color-text)]">₹{draftMinPrice}</span>
                   </div>
                   <input
                     type="range"
                     min="0"
                     max={maxPriceLimit}
                     step="50"
-                    value={minPriceFilter}
+                    value={draftMinPrice}
                     onChange={(e) => {
-                      const val = Math.min(Number(e.target.value), maxPriceFilter);
-                      setMinPriceFilter(val);
+                      const val = Math.min(Number(e.target.value), draftMaxPrice);
+                      setDraftMinPrice(val);
                     }}
                     className="w-full accent-[var(--color-accent)] cursor-pointer h-1.5 bg-[var(--color-subtle)] appearance-none rounded-lg"
                   />
@@ -1079,19 +1379,19 @@ function Shop() {
 
                 {/* Max Slider */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                  <div className="flex justify-between text-[9px] font-mono text-[var(--color-muted)] uppercase font-bold">
                     <span>Max Limit</span>
-                    <span className="font-bold text-[var(--color-text)]">₹{maxPriceFilter}</span>
+                    <span className="text-[var(--color-text)]">₹{draftMaxPrice}</span>
                   </div>
                   <input
                     type="range"
                     min="0"
                     max={maxPriceLimit}
                     step="50"
-                    value={maxPriceFilter}
+                    value={draftMaxPrice}
                     onChange={(e) => {
-                      const val = Math.max(Number(e.target.value), minPriceFilter);
-                      setMaxPriceFilter(val);
+                      const val = Math.max(Number(e.target.value), draftMinPrice);
+                      setDraftMaxPrice(val);
                     }}
                     className="w-full accent-[var(--color-accent)] cursor-pointer h-1.5 bg-[var(--color-subtle)] appearance-none rounded-lg"
                   />
@@ -1106,21 +1406,21 @@ function Shop() {
               </label>
               <div className="flex flex-wrap gap-2 pt-1">
                 {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((size) => {
-                  const isSelected = selectedSizes.includes(size);
+                  const isSelected = draftSizes.includes(size);
                   return (
                     <button
                       key={size}
                       onClick={() => {
                         if (isSelected) {
-                          setSelectedSizes(selectedSizes.filter(s => s !== size));
+                          setDraftSizes(draftSizes.filter(s => s !== size));
                         } else {
-                          setSelectedSizes([...selectedSizes, size]);
+                          setDraftSizes([...draftSizes, size]);
                         }
                       }}
-                      className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer rounded-lg ${
+                      className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer rounded-xl ${
                         isSelected
                           ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
-                          : 'bg-[var(--color-surface)]/40 text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
+                          : 'bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-accent)]/60'
                       }`}
                     >
                       {size}
@@ -1135,36 +1435,35 @@ function Shop() {
               <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-widest block font-mono">
                 AVAILABILITY
               </label>
-              <label className="flex items-center gap-3 cursor-pointer select-none py-1">
-                <input
-                  type="checkbox"
-                  checked={inStockOnly}
-                  onChange={(e) => setInStockOnly(e.target.checked)}
-                  className="w-4 h-4 rounded-md accent-[var(--color-accent)] cursor-pointer border-[var(--color-border)] bg-[var(--color-surface)]/40"
-                />
-                <span className="text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase">
-                  SHOW IN-STOCK ONLY
-                </span>
-              </label>
+              <button
+                type="button"
+                onClick={() => setDraftInStock(!draftInStock)}
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]/50 transition-all cursor-pointer select-none"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2 h-2 rounded-full ${draftInStock ? 'bg-[var(--color-accent)] animate-pulse' : 'bg-neutral-400'}`} />
+                  <span className="text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase">
+                    SHOW IN-STOCK ONLY
+                  </span>
+                </div>
+                <div className={`w-11 h-6 rounded-full transition-colors p-0.5 relative ${draftInStock ? 'bg-[var(--color-accent)]' : 'bg-neutral-300 dark:bg-neutral-700'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${draftInStock ? 'translate-x-5' : 'translate-x-0'}`} />
+                </div>
+              </button>
             </div>
           </div>
 
           {/* Drawer Footer (Sticky Actions) */}
-          <div className="p-6 border-t border-[var(--color-border)] bg-[var(--color-surface)]/40 backdrop-blur-md space-y-3">
+          <div className="p-6 border-t border-[var(--color-border)] bg-[var(--color-surface)]/80 backdrop-blur-xl shadow-lg space-y-3">
             <button
-              onClick={() => setFilterDrawerOpen(false)}
-              className="w-full py-3.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-mono font-bold uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-xs"
+              onClick={handleApplyDrawerFilters}
+              className="w-full py-3.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[11px] font-mono font-bold uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-md active:scale-[0.99]"
             >
-              Apply Filters
+              Apply Filters ({drawerPreviewCount} Results)
             </button>
             <button
-              onClick={() => {
-                setMinPriceFilter(0);
-                setMaxPriceFilter(maxPriceLimit);
-                setSelectedSizes([]);
-                setInStockOnly(false);
-              }}
-              className="w-full py-3 bg-[var(--color-surface)]/40 border border-[var(--color-border)] hover:bg-[var(--color-surface)]/60 text-[10px] font-mono font-bold uppercase tracking-[0.15em] text-[var(--color-text)] rounded-xl text-center transition-all cursor-pointer"
+              onClick={handleResetDrawerDrafts}
+              className="w-full py-3 bg-[var(--color-surface)] border border-[var(--color-border)] hover:bg-[var(--color-subtle)] text-[10px] font-mono font-bold uppercase tracking-[0.15em] text-[var(--color-text)] rounded-xl text-center transition-all cursor-pointer"
             >
               Reset Filters
             </button>
