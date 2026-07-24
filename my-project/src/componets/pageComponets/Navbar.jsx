@@ -589,17 +589,12 @@ function Navbar() {
             {/* Brand */}
             <Link
               to="/"
-              className="flex-shrink-0 flex items-center gap-0 group"
+              className="flex-shrink-0 flex items-center group py-1"
             >
               <img
-                src="/vakrayan-logo.png"
-                alt="Vakrayan Logo"
-                className="h-14 w-14 md:h-16 md:w-16 object-contain -mr-1 md:-mr-1.5 drop-shadow-xs transition-transform duration-300 group-hover:scale-105"
-              />
-              <img
-                src="/vakrayan-text.png"
+                src="/vakrayan-merged-logo.png"
                 alt="Vakrayan"
-                className="h-7 w-25 md:h-8 object-contain drop-shadow-xs transition-all duration-200 group-hover:opacity-80"
+                className="h-11 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105"
               />
             </Link>
 

@@ -19,10 +19,17 @@ export class CampaignService {
     }
 
     // Helper: Local Coupons Fallback hydration
-    // ✅ SECURITY FIX: Removed hardcoded STREET50/CREW10 coupons that were a revenue leak
-    // if Firebase DB went offline. Now returns an empty array — no free discounts on DB failure.
     getLocalCoupons() {
-        return [];
+        return [
+            {
+                $id: 'new10-local',
+                code: 'NEW10',
+                discount: 10,
+                min_order_value: 0,
+                description: 'Extra 10% off on your first purchase, on styles up to 40% off.*T&C',
+                isExpired: false
+            }
+        ];
     }
 
     // Helper: Local Promo Announcement Fallback hydration
@@ -42,13 +49,46 @@ export class CampaignService {
                 [Query.orderDesc("$createdAt")]
             );
             
+            let coupons = [];
             if (response.documents && response.documents.length > 0) {
-                return response.documents.map(doc => ({
+                coupons = response.documents.map(doc => ({
                     ...doc,
                     isExpired: this.checkIsExpired(doc.valid_until)
                 }));
             }
-            return this.getLocalCoupons();
+
+            // Ensure NEW10 exists in database documents
+            const hasNew10 = coupons.some(c => String(c.code || '').toUpperCase() === 'NEW10');
+            if (!hasNew10) {
+                try {
+                    const new10Payload = {
+                        code: 'NEW10',
+                        discount: 10,
+                        min_order_value: 0,
+                        valid_until: '',
+                        coupon_usage: JSON.stringify({ min_order_value: 0, valid_until: '' })
+                    };
+                    const doc = await this.databases.createDocument(
+                        conf.firebaseDatabaseId,
+                        conf.firebaseCouponsCollectionId,
+                        ID.unique(),
+                        new10Payload
+                    );
+                    coupons.unshift({ ...doc, isExpired: false });
+                } catch (seedErr) {
+                    console.warn("Auto-seeding NEW10 to Firebase DB fallback:", seedErr.message);
+                    coupons.unshift({
+                        $id: 'new10-default',
+                        code: 'NEW10',
+                        discount: 10,
+                        min_order_value: 0,
+                        description: 'Extra 10% off on your first purchase, on styles up to 40% off.*T&C',
+                        isExpired: false
+                    });
+                }
+            }
+
+            return coupons.length > 0 ? coupons : this.getLocalCoupons();
         } catch (error) {
             console.warn("⚠️ Firebase Coupons DB unavailable. Falling back to local storage.", error.message);
             return this.getLocalCoupons();

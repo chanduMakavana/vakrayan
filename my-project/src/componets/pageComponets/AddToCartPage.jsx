@@ -13,6 +13,7 @@ import { calculateOffersDiscount } from '../../utils/discountCalculator'
 import { loadGuestCartItems } from '../../utils/guestCartHelper'
 import PageSkeleton from './PageSkeleton'
 import { useDelayedLoading } from '../../hooks/useDelayedLoading'
+import CouponSelector from './CouponSelector'
 
 
 function AddToCartPage() {
@@ -684,44 +685,26 @@ function AddToCartPage() {
             </div>
 
             {/* Apply Coupon */}
-            <div className="space-y-2 pt-2 border-t border-[var(--color-border)]">
-              <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase block">
-                Apply Coupon Code
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={promoInput}
-                  onChange={(e) => setPromoInput(e.target.value)}
-                  placeholder="ENTER COUPON CODE"
-                  className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-lg px-3 py-2 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden uppercase font-semibold transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyPromo}
-                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-bold text-[10px] tracking-wider uppercase px-4 py-2 rounded-lg transition-all cursor-pointer"
-                >
-                  APPLY
-                </button>
-              </div>
-              {couponApplied && (
-                <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider font-mono bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 mt-2 animate-scale-in">
-                  <span>🎟️ {couponApplied} ACTIVE ({discountPercent}% OFF)</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCouponApplied('');
-                      setDiscountPercent(0);
-                      sessionStorage.removeItem('checkout_coupon');
-                      sessionStorage.removeItem('checkout_discount');
-                      showToast("Coupon code removed.", "info");
-                    }}
-                    className="text-rose-600 hover:text-rose-800 font-black ml-2 cursor-pointer transition-colors uppercase text-[9px]"
-                  >
-                    ✕ Remove
-                  </button>
-                </div>
-              )}
+            <div className="pt-2 border-t border-[var(--color-border)]">
+              <CouponSelector
+                cartTotalAmount={cartTotalAmount}
+                couponApplied={couponApplied}
+                discountPercent={discountPercent}
+                onApplyCoupon={(code, disc) => {
+                  setCouponApplied(code);
+                  setDiscountPercent(disc);
+                  sessionStorage.setItem('checkout_coupon', code);
+                  sessionStorage.setItem('checkout_discount', String(disc));
+                }}
+                onRemoveCoupon={() => {
+                  setCouponApplied('');
+                  setDiscountPercent(0);
+                  sessionStorage.removeItem('checkout_coupon');
+                  sessionStorage.removeItem('checkout_discount');
+                  showToast("Coupon code removed.", "info");
+                }}
+                user={user}
+              />
             </div>
 
             {/* Checkout CTA */}

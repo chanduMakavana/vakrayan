@@ -33,20 +33,37 @@ import NotificationPromptModal from './componets/pageComponets/NotificationPromp
  *   Before: ~5-8 MB initial bundle (includes AdminPanel 273 KB + ProductDetail 151 KB eagerly)
  *   After:  ~200-400 KB initial bundle (only Home + router + Navbar are eager)
  */
-const Home         = lazy(() => import('./componets/page/Home'))
-const SignUp       = lazy(() => import('./componets/page/SignUp'))
-const Login        = lazy(() => import('./componets/page/Login'))
-const ResetPassword = lazy(() => import('./componets/page/ResetPassword'))
-const AdminPanel   = lazy(() => import('./componets/page/AddminPanel'))
-const ProductDetail = lazy(() => import('./componets/page/ProductDetail'))
-const NotFound     = lazy(() => import('./componets/page/NotFound'))
-const AddToCartPage = lazy(() => import('./componets/pageComponets/AddToCartPage'))
-const Shop         = lazy(() => import('./componets/page/Shop'))
-const Checkout     = lazy(() => import('./componets/page/Checkout'))
-const UserProfile  = lazy(() => import('./componets/page/UserProfile'))
-const OrderDetail  = lazy(() => import('./componets/page/OrderDetail'))
-const ProductReviews = lazy(() => import('./componets/page/ProductReviews'))
-const LegalPage = lazy(() => import('./componets/page/LegalPage'))
+// Helper to auto-retry dynamic imports if Vite HMR or dev server chunk cache is stale
+const lazyWithRetry = (importFn) =>
+  lazy(async () => {
+    try {
+      const component = await importFn();
+      sessionStorage.removeItem('vite_chunk_reload');
+      return component;
+    } catch (error) {
+      const reloaded = sessionStorage.getItem('vite_chunk_reload');
+      if (!reloaded) {
+        sessionStorage.setItem('vite_chunk_reload', 'true');
+        window.location.reload();
+      }
+      throw error;
+    }
+  });
+
+const Home          = lazyWithRetry(() => import('./componets/page/Home'))
+const SignUp        = lazyWithRetry(() => import('./componets/page/SignUp'))
+const Login         = lazyWithRetry(() => import('./componets/page/Login'))
+const ResetPassword = lazyWithRetry(() => import('./componets/page/ResetPassword'))
+const AdminPanel    = lazyWithRetry(() => import('./componets/page/AddminPanel'))
+const ProductDetail = lazyWithRetry(() => import('./componets/page/ProductDetail'))
+const NotFound      = lazyWithRetry(() => import('./componets/page/NotFound'))
+const AddToCartPage = lazyWithRetry(() => import('./componets/pageComponets/AddToCartPage'))
+const Shop          = lazyWithRetry(() => import('./componets/page/Shop'))
+const Checkout      = lazyWithRetry(() => import('./componets/page/Checkout'))
+const UserProfile   = lazyWithRetry(() => import('./componets/page/UserProfile'))
+const OrderDetail   = lazyWithRetry(() => import('./componets/page/OrderDetail'))
+const ProductReviews = lazyWithRetry(() => import('./componets/page/ProductReviews'))
+const LegalPage     = lazyWithRetry(() => import('./componets/page/LegalPage'))
 
 // ✅ PERFORMANCE FIX: Module-level constant — not recreated on every render
 const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin']

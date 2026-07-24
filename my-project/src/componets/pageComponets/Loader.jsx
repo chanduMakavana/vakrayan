@@ -13,7 +13,7 @@ function Loader({ type = 'inline', text }) {
             className="flex flex-col items-center gap-6"
           >
             <img 
-              src="/vakrayan-logo.png" 
+              src="/vakrayan-logo-icon.png" 
               alt="Vakrayan Logo" 
               className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-md" 
             />

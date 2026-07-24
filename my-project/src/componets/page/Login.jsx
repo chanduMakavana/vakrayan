@@ -170,9 +170,9 @@ function Login() {
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <img
-              src="/vakrayan-logo.png"
+              src="/vakrayan-merged-logo-white.png"
               alt="Vakrayan Logo"
-              style={{ height: 52, width: 'auto', objectFit: 'contain' }}
+              style={{ height: 44, width: 'auto', objectFit: 'contain' }}
             />
           </div>
 

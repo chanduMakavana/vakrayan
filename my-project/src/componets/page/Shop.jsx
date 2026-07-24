@@ -886,7 +886,7 @@ function Shop() {
           )}
 
           {/* Mobile Sticky Action Bar */}
-          <div className="sticky top-[58px] left-0 right-0 z-30 bg-[var(--color-bg)] border-y border-[var(--color-border)] lg:hidden shadow-[0_4px_12px_rgba(0,0,0,0.02)] mb-4">
+          <div className="sticky top-[80px] left-0 right-0 z-40 bg-[var(--color-bg)] border-y border-[var(--color-border)] lg:hidden shadow-[0_4px_12px_rgba(0,0,0,0.06)] mb-4">
             <div className="flex h-12 relative items-center">
               <button 
                 onClick={() => setMobileSortOpen(true)}
@@ -1025,7 +1025,7 @@ function Shop() {
                              }
                            }}
                            aria-label={wishlist.some(item => item.$id === parentId || item.id === parentId) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
-                           className="absolute top-4 right-4 z-30 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
+                           className="absolute top-4 right-4 z-20 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
                          >
                            {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
                              <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
@@ -1045,7 +1045,7 @@ function Shop() {
                                e.stopPropagation();
                                navigate('/admin', { state: { editProductId: parentId } });
                              }}
-                             className="absolute bottom-4 left-4 z-30 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
+                             className="absolute bottom-4 left-4 z-20 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
                            >
                              ✏️ EDIT
                            </button>
