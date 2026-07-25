@@ -526,15 +526,15 @@ function Shop() {
   return (
     <>
       
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-16">
+        <div className="max-w-7xl mx-auto px-4 md:px-12 py-5 md:py-10 relative z-20 space-y-4 md:space-y-8">
           
           {/* Headline Title */}
-          <div className="text-center md:text-left space-y-2 border-b border-[var(--color-border)] pb-6">
-            <h4 className="text-xs tracking-[0.4em] text-[var(--color-accent)] font-black uppercase">
+          <div className="text-center md:text-left space-y-1 border-b border-[var(--color-border)] pb-3 md:pb-5">
+            <h4 className="text-[10px] md:text-xs tracking-[0.4em] text-[var(--color-accent)] font-black uppercase">
               Vakrayan Archives // HQ
             </h4>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight uppercase leading-none text-[var(--color-text)]">
+            <h1 className="text-3xl md:text-6xl font-black tracking-tight uppercase leading-none text-[var(--color-text)]">
               Shop Collection
             </h1>
           </div>
@@ -789,8 +789,8 @@ function Shop() {
 
           {/* Active Filter Badges */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 bg-[var(--color-surface)]/30 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xs">
-              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest mr-1.5">ACTIVE:</span>
+            <div className="flex flex-wrap items-center gap-1.5 md:gap-2 bg-[var(--color-surface)]/30 backdrop-blur-md p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-white/20 shadow-xs">
+              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest mr-1">ACTIVE:</span>
               
               {selectedCategory !== 'all' && (
                 <div className="flex items-center gap-1 bg-[var(--color-surface)]/80 backdrop-blur-xs px-2.5 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] rounded-lg shadow-2xs">

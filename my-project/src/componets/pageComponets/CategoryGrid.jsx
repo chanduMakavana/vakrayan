@@ -130,11 +130,11 @@ function CategoryGrid() {
                     className="w-full h-full object-cover object-center transition-transform duration-700 ease-[0.16,1,0.3,1] group-hover:scale-106"
                   />
 
-                  {/* Gradient overlay - dark & smooth */}
+                  {/* Gradient overlay - dark ONLY at bottom, top 55% crystal clear */}
                   <div
                     className="absolute inset-0 transition-opacity duration-500 ease-out"
                     style={{
-                      background: 'linear-gradient(to top, rgba(13,26,20,0.92) 0%, rgba(13,26,20,0.30) 50%, transparent 100%)',
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 22%, rgba(0,0,0,0.10) 38%, transparent 55%)',
                     }}
                   />
 

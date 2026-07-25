@@ -136,9 +136,9 @@ font-weight: 400;
 h1, h2, h3, h4, h5, h6 {
 font-family: var(--font-display);
 line-height: 1.1;
-font-weight: 800; /* Barlow Condensed needs explicit heavy weight */
+font-weight: 700;
 letter-spacing: 0.01em;
-text-transform: uppercase; /* Barlow Condensed reads best uppercase */
+text-transform: uppercase;
 color: var(--color-text);
 }
 
@@ -252,7 +252,7 @@ color: var(--color-accent);
 .display-title {
 font-family: var(--font-display);
 font-size: clamp(2.5rem, 6vw, 5rem);
-font-weight: 900;
+font-weight: 700;
 line-height: 1.0;
 text-transform: uppercase;
 letter-spacing: -0.01em;
@@ -262,7 +262,7 @@ color: var(--color-text);
 .section-title {
 font-family: var(--font-display);
 font-size: clamp(1.8rem, 4vw, 3rem);
-font-weight: 800;
+font-weight: 700;
 line-height: 1.05;
 text-transform: uppercase;
 letter-spacing: 0.01em;
@@ -280,9 +280,15 @@ color: var(--color-text);
 
 .label-font {
 font-family: var(--font-sans);
-font-weight: 900;
+font-weight: 700;
 letter-spacing: 0.08em;
 text-transform: uppercase;
+}
+
+/* Global cap: ensure font-black and font-extrabold never exceed max 700 (bold) */
+.font-black,
+.font-extrabold {
+  font-weight: 700 !important;
 }
 
 

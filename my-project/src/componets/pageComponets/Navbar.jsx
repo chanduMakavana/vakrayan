@@ -975,15 +975,17 @@ function Navbar() {
             <motion.div
               variants={mobileMenuVariants}
               initial="hidden" animate="visible" exit="exit"
-              className="lg:hidden border-t max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-thin"
+              className="lg:hidden border-t max-h-[calc(100dvh-130px)] sm:max-h-[calc(100vh-130px)] overflow-y-auto scrollbar-thin touch-pan-y"
               style={{ 
-                background: 'rgba(244,250,247,0.97)',
+                background: 'rgba(244,250,247,0.98)',
                 borderColor: 'rgba(5,150,105,0.10)',
                 backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)'
+                WebkitBackdropFilter: 'blur(20px)',
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain'
               }}
             >
-              <div className="content-shell py-6 space-y-1">
+              <div className="content-shell py-6 pb-28 space-y-1">
                 <NavLink to="/" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-3 py-3 rounded-xl text-[13px] font-semibold transition-base ${isActive ? 'bg-[var(--color-subtle)] text-[var(--color-text)]' : 'text-[var(--color-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]'}`} end>
                   Home
                 </NavLink>

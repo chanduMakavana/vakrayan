@@ -23,6 +23,7 @@ import { useDelayedLoading } from './hooks/useDelayedLoading'
 import { useToast } from './context/ToastContext'
 import { requestNotificationPermission, listenForForegroundMessages } from './services/notifications'
 import NotificationPromptModal from './componets/pageComponets/NotificationPromptModal'
+import PhonePromptModal from './componets/pageComponets/PhonePromptModal'
 
 /**
  * ✅ PERFORMANCE FIX: All page-level components are now code-split using React.lazy().
@@ -161,6 +162,7 @@ function AppContent() {
 
   const [fontsLoaded, setFontsLoaded] = useState(false)
   const [isNotificationModalOpen, setNotificationModalOpen] = useState(false)
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false)
   const currentUser = useSelector((state) => state.auth.user)
 
   const handleCloseNotificationModal = () => {
@@ -184,6 +186,27 @@ function AppContent() {
     }
   }
 
+  const handleClosePhoneModal = () => {
+    setIsPhoneModalOpen(false)
+    sessionStorage.setItem('dismissed_phone_prompt', 'true')
+  }
+
+  const handleSubmitPhone = async (phoneNumber) => {
+    try {
+      const updatedUser = await authService.updatePhone(phoneNumber)
+      if (updatedUser) {
+        dispatch(loginAction({ user: updatedUser }))
+      } else if (currentUser) {
+        dispatch(loginAction({ user: { ...currentUser, phone: phoneNumber } }))
+      }
+      showToast("📱 Mobile number updated successfully!", "success")
+      setIsPhoneModalOpen(false)
+    } catch (err) {
+      console.error("Failed to update phone:", err)
+      showToast("Failed to update mobile number. Please try again.", "error")
+    }
+  }
+
   // Pre-permission Modal Trigger
   useEffect(() => {
     if (currentUser && typeof window !== "undefined" && window.Notification) {
@@ -197,6 +220,22 @@ function AppContent() {
           }, 1500)
           return () => clearTimeout(timer)
         }
+      }
+    }
+  }, [currentUser])
+
+  // Phone Completion Prompt Modal Trigger (For Google / Logged-in Users without Phone Number)
+  useEffect(() => {
+    if (currentUser) {
+      const userPhone = currentUser.phone || currentUser.prefs?.phone || ''
+      const hasPhone = String(userPhone).trim().length >= 10
+      const hasDismissed = sessionStorage.getItem('dismissed_phone_prompt') === 'true'
+
+      if (!hasPhone && !hasDismissed) {
+        const timer = setTimeout(() => {
+          setIsPhoneModalOpen(true)
+        }, 800)
+        return () => clearTimeout(timer)
       }
     }
   }, [currentUser])
@@ -322,22 +361,30 @@ function AppContent() {
       })
   }, [dispatch, showToast])
 
-  // Enforce Google session expiration check on navigation/route changes
+  // Enforce Google session expiration check (runs on route change AND periodically every 10s)
   useEffect(() => {
-    const googleSessionExpiry = localStorage.getItem('google_session_expiry');
-    if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
-      console.warn('Google session expired on page navigation. Logging out.');
-      localStorage.removeItem('google_session_expiry');
-      localStorage.removeItem('remember_me');
-      sessionStorage.removeItem('session_active');
-      authService.logout()
-        .then(() => {
-          dispatch(logoutAction());
-          const guestItems = loadGuestCartItems();
-          dispatch(setCartItems(guestItems));
-          showToast('Google session expired. Please log in again.', 'warning');
-        });
-    }
+    const checkExpiry = () => {
+      const googleSessionExpiry = localStorage.getItem('google_session_expiry');
+      if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
+        console.warn('Google session expired (1 hour limit). Logging out.');
+        localStorage.removeItem('google_session_expiry');
+        localStorage.removeItem('remember_me');
+        sessionStorage.removeItem('session_active');
+        localStorage.removeItem('current_session_id');
+        authService.logout()
+          .then(() => {
+            dispatch(logoutAction());
+            const guestItems = loadGuestCartItems();
+            dispatch(setCartItems(guestItems));
+            showToast('Google session expired (1 hour limit). Please log in again.', 'warning');
+          })
+          .catch(err => console.error('Failed to log out expired Google session:', err));
+      }
+    };
+
+    checkExpiry();
+    const intervalId = setInterval(checkExpiry, 10000);
+    return () => clearInterval(intervalId);
   }, [location.pathname, dispatch, showToast]);
 
   // ✅ FIX: Re-filter products when adminMode changes (replaces the localStorage read inside reducer)
@@ -354,16 +401,49 @@ function AppContent() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Fonts: wait for Google Fonts to be ready (fast — only blocks for ~100-300ms)
+  // Fonts: wait for Google Fonts with a strict 500ms safety timeout
   useEffect(() => {
-    if (document.fonts) {
+    let mounted = true
+    const timeout = setTimeout(() => {
+      if (mounted) setFontsLoaded(true)
+    }, 500)
+
+    if (typeof document !== 'undefined' && document.fonts) {
       document.fonts.ready
-        .then(() => setFontsLoaded(true))
-        .catch(() => setFontsLoaded(true))
+        .then(() => { if (mounted) setFontsLoaded(true) })
+        .catch(() => { if (mounted) setFontsLoaded(true) })
+        .finally(() => clearTimeout(timeout))
     } else {
       setFontsLoaded(true)
+      clearTimeout(timeout)
+    }
+
+    return () => {
+      mounted = false
+      clearTimeout(timeout)
     }
   }, [])
+
+  // Handle Chrome tab background/visibility restore — ensures splash screen unmounts when returning to app
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setFontsLoaded(true)
+        dispatch(setLoading(false))
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [dispatch])
+
+  // Global Fail-Safe Timeout: Force dismiss splash loader after max 2 seconds no matter what
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFontsLoaded(true)
+      dispatch(setLoading(false))
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [dispatch])
 
   // Premium loading splash screen — shown only while auth resolves
   if (loading) {
@@ -385,6 +465,10 @@ function AppContent() {
         isOpen={isNotificationModalOpen} 
         onClose={handleCloseNotificationModal} 
         onAccept={handleAcceptNotifications} 
+      />
+      <PhonePromptModal
+        isOpen={isPhoneModalOpen}
+        onSubmitPhone={handleSubmitPhone}
       />
     </div>
   )

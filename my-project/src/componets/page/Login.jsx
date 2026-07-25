@@ -108,6 +108,7 @@ function Login() {
       if (rememberChecked) localStorage.setItem('remember_me', 'true')
       else localStorage.removeItem('remember_me')
       sessionStorage.setItem('session_active', 'true')
+      sessionStorage.removeItem('dismissed_phone_prompt')
       await authService.loginWithGoogle()
     } catch (error) {
       let msg = error?.message || 'Google authentication failed.'

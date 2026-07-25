@@ -941,12 +941,12 @@ function Checkout() {
                 
                 {/* Full name */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Full Name</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Full Name</label>
                   <input
                     type="text"
                     defaultValue={user?.name || ''}
                     placeholder="ENTER YOUR NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('name', { required: 'Name is required' })}
                   />
                   {errors.name && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -954,12 +954,12 @@ function Checkout() {
 
                 {/* Email address */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Email Address</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Email Address</label>
                   <input
                     type="text"
                     defaultValue={user?.email || ''}
                     placeholder="YOU@EXAMPLE.COM"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('email', { 
                       required: 'Email is required',
                       pattern: {
@@ -973,11 +973,11 @@ function Checkout() {
 
                 {/* Mobile number */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Contact Phone</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Contact Phone</label>
                   <input
                     type="tel"
                     placeholder="9876543210"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.phone ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.phone ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('phone', { 
                       required: 'Phone is required',
                       pattern: {
@@ -989,15 +989,13 @@ function Checkout() {
                   {errors.phone && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.phone.message}</span>}
                 </div>
 
-
-
                 {/* Street address */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Street Address</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Street Address</label>
                   <input
                     type="text"
                     placeholder="HOUSE NO, APARTMENT, STREET NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('address', { required: 'Street address is required' })}
                   />
                   {errors.address && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.address.message}</span>}
@@ -1005,11 +1003,11 @@ function Checkout() {
 
                 {/* City */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">City</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">City</label>
                   <input
                     type="text"
                     placeholder="MUMBAI"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('city', { required: 'City is required' })}
                   />
                   {errors.city && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.city.message}</span>}
@@ -1017,11 +1015,11 @@ function Checkout() {
 
                 {/* Pin Code */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">PIN Code</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">PIN Code</label>
                   <input
                     type="text"
                     placeholder="400001"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.pincode ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.pincode ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('pincode', { 
                       required: 'Pin code is required',
                       pattern: {
@@ -1036,11 +1034,11 @@ function Checkout() {
 
                 {/* State */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">State</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">State</label>
                   <input
                     type="text"
                     placeholder="MAHARASHTRA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('state', { required: 'State is required' })}
                   />
                   {errors.state && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.state.message}</span>}
@@ -1048,12 +1046,12 @@ function Checkout() {
 
                 {/* Country */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Country</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Country</label>
                   <input
                     type="text"
                     placeholder="INDIA"
                     defaultValue="INDIA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-black`}
+                    className={`w-full bg-[var(--color-subtle)] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
                     {...register('country', { required: 'Country is required' })}
                   />
                   {errors.country && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.country.message}</span>}
@@ -1061,7 +1059,7 @@ function Checkout() {
 
                 {/* Premium Payment Method Selector */}
                 <div className="w-full md:col-span-2 flex flex-col gap-2 mt-2">
-                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Payment Option</label>
+                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Payment Option</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     
                     {/* COD Option */}
@@ -1082,7 +1080,7 @@ function Checkout() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-black uppercase tracking-wider ${!codAvailable ? 'text-[var(--color-muted)]' : 'text-[var(--color-text)] font-black'}`}>
+                        <span className={`text-xs font-bold uppercase tracking-wider ${!codAvailable ? 'text-[var(--color-muted)]' : 'text-[var(--color-text)]'}`}>
                           Cash on Delivery (COD) {!codAvailable && '(NOT AVAILABLE)'}
                         </span>
                         {codAvailable && (
@@ -1110,7 +1108,7 @@ function Checkout() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black uppercase tracking-wider text-[var(--color-text)] font-black">Online Payment (Razorpay)</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text)]">Online Payment (Razorpay)</span>
                         <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
                           selectedPayment === 'ONLINE' ? 'border-[var(--color-accent)] bg-[var(--color-accent)]' : 'border-[var(--color-border)]'
                         }`}>
@@ -1207,14 +1205,14 @@ function Checkout() {
                         className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-lg shrink-0" 
                       />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-black uppercase text-[var(--color-text)] truncate tracking-wide">
+                        <h4 className="text-xs font-bold uppercase text-[var(--color-text)] truncate tracking-wide">
                           {item.name}
                         </h4>
-                        <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                        <p className="text-[10px] font-mono text-[var(--color-muted)] uppercase mt-0.5">
                           Size: {item.size || 'M'} · Qty: {item.quantity}
                         </p>
                       </div>
-                      <span className="text-xs font-mono font-black text-[var(--color-text)]">
+                      <span className="text-xs font-mono font-bold text-[var(--color-text)]">
                         ₹{item.subtotal?.toLocaleString('en-IN')}
                       </span>
                     </div>
@@ -1277,7 +1275,7 @@ function Checkout() {
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-emerald-600 font-bold">
                     <span>COUPON SAVINGS ({couponApplied})</span>
-                    <span className="font-mono font-black">
+                    <span className="font-mono font-bold">
                       - ₹{discountAmount.toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -1317,12 +1315,12 @@ function Checkout() {
 
                 <div className="flex justify-between items-baseline pt-2">
                   <div className="flex flex-col">
-                    <span className="text-sm font-black text-[var(--color-text)]">NET AMOUNT</span>
+                    <span className="text-sm font-bold text-[var(--color-text)]">NET AMOUNT</span>
                     <span className="text-[9px] text-[var(--color-muted)] font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
                       (incl. of all taxes)
                     </span>
                   </div>
-                  <span className="text-2xl font-mono font-black text-[var(--color-text)] tracking-tight">
+                  <span className="text-2xl font-mono font-bold text-[var(--color-text)] tracking-tight">
                     ₹{Math.round(finalAmount).toLocaleString('en-IN')}
                   </span>
                 </div>

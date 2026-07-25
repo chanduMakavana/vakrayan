@@ -28,8 +28,14 @@ function Hero() {
   const navigate = useNavigate()
   const [slides, setSlides] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isMobile, setIsMobile] = useState(false) // ✅ Fixed: no direct window access during render
+  const [isMobile, setIsMobile] = useState(false)
   const [imagesLoaded, setImagesLoaded] = useState(false)
+
+  // Touch Swipe coordinates (Mobile)
+  const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 })
+  
+  // Mouse Drag coordinates (Desktop/Laptop — direct slide switch without physical image dragging)
+  const [mouseDownX, setMouseDownX] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -61,36 +67,98 @@ function Hero() {
   }, [])
 
   useEffect(() => {
-    // ✅ Fixed: window.innerWidth read after mount, not during render
     const handleResize = () => setIsMobile(window.innerWidth < 768)
-    setIsMobile(window.innerWidth < 768) // Set correct value after hydration
+    setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Auto-play timer resets to full 5 seconds whenever currentIndex changes
   useEffect(() => {
     if (slides.length <= 1) return
-    const interval = setInterval(() => setCurrentIndex(prev => (prev + 1) % slides.length), 5000)
-    return () => clearInterval(interval)
-  }, [slides])
+    const timer = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % slides.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [currentIndex, slides.length])
 
-  const nextSlide = (e) => { e.stopPropagation(); setCurrentIndex(prev => (prev + 1) % slides.length) }
-  const prevSlide = (e) => { e.stopPropagation(); setCurrentIndex(prev => (prev - 1 + slides.length) % slides.length) }
+  const nextSlide = (e) => {
+    if (e) e.stopPropagation()
+    setCurrentIndex(prev => (prev + 1) % slides.length)
+  }
+
+  const prevSlide = (e) => {
+    if (e) e.stopPropagation()
+    setCurrentIndex(prev => (prev - 1 + slides.length) % slides.length)
+  }
+
+  // Mobile Touch Handlers
+  const handleTouchStart = (e) => {
+    if (e.targetTouches.length === 1) {
+      setTouchStartPos({
+        x: e.targetTouches[0].clientX,
+        y: e.targetTouches[0].clientY
+      })
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartPos.x || !touchStartPos.y) return
+    const touchEnd = e.changedTouches[0]
+    if (!touchEnd) return
+
+    const diffX = touchStartPos.x - touchEnd.clientX
+    const diffY = touchStartPos.y - touchEnd.clientY
+
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        nextSlide()
+      } else {
+        prevSlide()
+      }
+    }
+    setTouchStartPos({ x: 0, y: 0 })
+  }
+
+  // Laptop Mouse Drag Gesture Handlers (Direct slide switch without dragging image position)
+  const handleMouseDown = (e) => {
+    setMouseDownX(e.clientX)
+  }
+
+  const handleMouseUp = (e) => {
+    if (!mouseDownX) return
+    const diffX = mouseDownX - e.clientX
+    const threshold = 40
+
+    if (diffX > threshold) {
+      // Mouse dragged Left -> DIRECTLY switch to next slide
+      nextSlide()
+    } else if (diffX < -threshold) {
+      // Mouse dragged Right -> DIRECTLY switch to prev slide
+      prevSlide()
+    } else if (Math.abs(diffX) < 5) {
+      // Simple click without drag -> open slide link
+      const activeSlide = slides[currentIndex] || DEFAULT_SLIDES[0]
+      if (activeSlide.link) {
+        navigate(activeSlide.link)
+      }
+    }
+    setMouseDownX(0)
+  }
+
   const activeSlide = slides[currentIndex] || DEFAULT_SLIDES[0]
 
   const slideVariants = {
-    enter: { scale: 1.06, opacity: 0 },
-    center: { scale: 1, opacity: 1, transition: { scale: { type: 'tween', ease: 'easeOut', duration: 1.1 }, opacity: { duration: 0.55 } } },
-    exit: { scale: 0.96, opacity: 0, transition: { scale: { type: 'tween', ease: 'easeIn', duration: 0.7 }, opacity: { duration: 0.45 } } }
+    enter: { opacity: 0, scale: 1.04 },
+    center: { opacity: 1, scale: 1, transition: { opacity: { duration: 0.45 }, scale: { type: 'tween', ease: 'easeOut', duration: 0.8 } } },
+    exit: { opacity: 0, scale: 0.97, transition: { opacity: { duration: 0.35 }, scale: { type: 'tween', ease: 'easeIn', duration: 0.5 } } }
   }
 
   if (!imagesLoaded) {
     return (
-      <div className="w-full relative overflow-hidden" style={{ height: 'clamp(300px, 70vh, 90vh)', background: 'linear-gradient(135deg, #0D1A14 0%, #071A10 100%)' }}>
-        {/* Skeleton blobs */}
+      <div className="w-full relative overflow-hidden select-none" style={{ height: 'clamp(300px, 70vh, 90vh)', background: 'linear-gradient(135deg, #0D1A14 0%, #071A10 100%)' }}>
         <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full animate-blob" style={{ background: '#059669', filter: 'blur(80px)', opacity: 0.08 }} />
         <div className="absolute bottom-1/3 right-1/4 w-48 h-48 rounded-full animate-blob stagger-3" style={{ background: '#34D399', filter: 'blur(60px)', opacity: 0.06 }} />
-        {/* Skeleton dots */}
         <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="w-2 h-2 rounded-full skeleton" style={{ opacity: 0.4 }} />
@@ -101,9 +169,15 @@ function Hero() {
   }
 
   return (
-    <div className="w-full relative overflow-hidden" style={{ height: 'clamp(300px, 70vh, 90vh)' }}>
-
-      {/* Slide images */}
+    <div 
+      className="w-full relative overflow-hidden select-none touch-pan-y" 
+      style={{ height: 'clamp(300px, 70vh, 90vh)' }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+    >
+      {/* Slide images container */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <AnimatePresence initial={false}>
           <motion.div
@@ -113,24 +187,26 @@ function Hero() {
             animate="center"
             exit="exit"
             className="absolute inset-0 cursor-pointer"
-            onClick={() => { if (activeSlide.link) navigate(activeSlide.link) }}
           >
             <img
               src={isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image}
               alt="Vakrayan Banner"
-              className="w-full h-full object-cover select-none"
+              className="w-full h-full object-cover select-none pointer-events-none"
+              draggable={false}
             />
             {/* Gradient overlay - bottom to top */}
-            <div className="absolute inset-0 pointer-events-none" style={{
-              background: 'linear-gradient(to top, rgba(5,26,14,0.55) 0%, rgba(5,26,14,0.10) 50%, rgba(0,0,0,0.08) 100%)'
-            }} />
+            <div 
+              className="absolute inset-0 pointer-events-none" 
+              style={{
+                background: 'linear-gradient(to top, rgba(5,26,14,0.60) 0%, rgba(5,26,14,0.10) 45%, rgba(0,0,0,0.05) 100%)'
+              }} 
+            />
           </motion.div>
         </AnimatePresence>
       </div>
 
-
       {/* Bottom hero content overlay */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-10 md:pb-14">
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-10 md:pb-14 pointer-events-none">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -138,37 +214,39 @@ function Hero() {
         >
           {/* Brand badge */}
           <div
-            className="inline-flex items-center gap-3 px-4 py-2.5"
+            className="inline-flex items-center gap-3 px-4 py-2.5 pointer-events-auto cursor-pointer"
+            onClick={() => { if (activeSlide.link) navigate(activeSlide.link) }}
             style={{
-              background: 'rgba(244,250,247,0.12)',
+              background: 'rgba(244,250,247,0.14)',
               backdropFilter: 'blur(16px)',
               WebkitBackdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255,255,255,0.18)',
+              border: '1px solid rgba(255,255,255,0.22)',
               borderRadius: 12
             }}
           >
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399' }} />
-            <span className="font-brand" style={{ color: '#fff', fontFamily: "'VakrayanFont', 'Barlow Condensed', 'Impact', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span className="font-brand" style={{ color: '#fff', fontFamily: "'VakrayanFont', 'Barlow Condensed', 'Impact', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Vakrayan
             </span>
-            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontFamily: "'Jost', sans-serif", fontWeight: 500, letterSpacing: '0.1em' }}>
+            <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: "'Jost', sans-serif", fontWeight: 500, letterSpacing: '0.1em' }}>
               Premium Apparel
             </span>
           </div>
         </motion.div>
       </div>
 
-      {/* Slide controls */}
+      {/* Slide controls (Desktop & Tablet Navigation Arrows) */}
       {slides.length > 1 && (
         <>
           <button
+            type="button"
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200 hover:scale-105"
             style={{
-              background: 'rgba(244,250,247,0.15)',
+              background: 'rgba(244,250,247,0.18)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.20)',
+              border: '1px solid rgba(255,255,255,0.25)',
               borderRadius: 12,
               color: '#fff',
               padding: '12px',
@@ -176,21 +254,22 @@ function Hero() {
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(5,150,105,0.30)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,250,247,0.15)'}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(5,150,105,0.40)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,250,247,0.18)'}
             aria-label="Previous slide"
           >
             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
           </button>
 
           <button
+            type="button"
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200 hover:scale-105"
             style={{
-              background: 'rgba(244,250,247,0.15)',
+              background: 'rgba(244,250,247,0.18)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.20)',
+              border: '1px solid rgba(255,255,255,0.25)',
               borderRadius: 12,
               color: '#fff',
               padding: '12px',
@@ -198,8 +277,8 @@ function Hero() {
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(5,150,105,0.30)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,250,247,0.15)'}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(5,150,105,0.40)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,250,247,0.18)'}
             aria-label="Next slide"
           >
             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
@@ -210,6 +289,7 @@ function Hero() {
             {slides.map((_, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={e => { e.stopPropagation(); setCurrentIndex(idx) }}
                 className="cursor-pointer transition-all duration-300"
                 style={{

@@ -192,7 +192,7 @@ export default function CouponSelector({
                   </div>
                   <div className="space-y-0.5 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-black text-[var(--color-text)] uppercase tracking-wider font-mono">
+                      <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider font-mono">
                         {coupon.code}
                       </h4>
                       <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full uppercase">

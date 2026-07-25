@@ -25,6 +25,7 @@ export class Account {
         await updateProfile(userCredential.user, { displayName: name });
         const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
         localStorage.setItem('current_session_id', sessionId);
+        localStorage.removeItem('google_session_expiry');
         // Store preferences in a user document
         await setDoc(doc(firestore, 'users', userCredential.user.uid), { name, email, prefs: {}, activeSessions: [sessionId] });
         return { $id: userCredential.user.uid, email, name, prefs: {} };
@@ -34,6 +35,7 @@ export class Account {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
         localStorage.setItem('current_session_id', sessionId);
+        localStorage.removeItem('google_session_expiry');
         const userDocRef = doc(firestore, 'users', cred.user.uid);
         await updateDoc(userDocRef, {
             activeSessions: arrayUnion(sessionId)
@@ -49,6 +51,19 @@ export class Account {
                 unsubscribe();
                 if (user) {
                     try {
+                        // Check if Google OAuth 1-Hour Session Limit has expired (only for sessions created via Google)
+                        const googleSessionExpiry = localStorage.getItem('google_session_expiry');
+                        if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
+                            console.warn('Google session expired (1 hour limit reached). Logging out.');
+                            localStorage.removeItem('google_session_expiry');
+                            localStorage.removeItem('remember_me');
+                            sessionStorage.removeItem('session_active');
+                            localStorage.removeItem('current_session_id');
+                            await signOut(auth);
+                            reject({ message: 'Google session expired' });
+                            return;
+                        }
+
                         const docSnap = await getDoc(doc(firestore, 'users', user.uid));
                         const data = docSnap.exists() ? docSnap.data() : { prefs: {} };
                         
@@ -85,7 +100,7 @@ export class Account {
                             name: user.displayName || data.name || 'User',
                             prefs,
                             labels, // Populated from Firestore — used by AdminRoute
-                            phone: data.phone || '',
+                            phone: data.phone || prefs.phone || '',
                         });
                     } catch (error) {
                         console.warn("Firestore get user error, falling back to auth info:", error);
@@ -144,44 +159,54 @@ export class Account {
         return await this.get();
     }
 
+    async updatePhone(phone) {
+        if (!auth.currentUser) throw new Error('Not logged in');
+        const userDocRef = doc(firestore, 'users', auth.currentUser.uid);
+        await updateDoc(userDocRef, { 
+            phone,
+            'prefs.phone': phone 
+        }).catch(async () => {
+            await setDoc(userDocRef, { phone, prefs: { phone } }, { merge: true });
+        });
+        return await this.get();
+    }
+
     async updatePassword(password, oldPassword) {
         return true;
     }
 
     createOAuth2Session(provider, success, failure) {
         if (provider === 'google') {
-            return new Promise((resolve, reject) => {
-                signInWithPopup(auth, googleProvider)
-                    .then(async (result) => {
-                        const user = result.user;
-                        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-                        localStorage.setItem('current_session_id', sessionId);
-                        
-                        const docRef = doc(firestore, 'users', user.uid);
-                        try {
-                            const docSnap = await getDoc(docRef);
-                            if (!docSnap.exists()) {
-                                await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {}, activeSessions: [sessionId] });
-                            } else {
-                                await updateDoc(docRef, {
-                                    activeSessions: arrayUnion(sessionId)
-                                });
-                            }
-                            localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
-                            if (success) window.location.href = success;
-                            resolve();
-                        } catch (err) {
-                            console.warn('Firestore offline or blocked during Google Auth, proceeding:', err);
-                            localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
-                            if (success) window.location.href = success;
-                            resolve();
+            // Call signInWithPopup synchronously in event callstack for instant popup launch
+            return signInWithPopup(auth, googleProvider)
+                .then(async (result) => {
+                    const user = result.user;
+                    const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                    localStorage.setItem('current_session_id', sessionId);
+                    localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
+
+                    const docRef = doc(firestore, 'users', user.uid);
+                    try {
+                        const docSnap = await getDoc(docRef);
+                        if (!docSnap.exists()) {
+                            await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {}, activeSessions: [sessionId] });
+                        } else {
+                            await updateDoc(docRef, { activeSessions: arrayUnion(sessionId) });
                         }
-                    })
-                    .catch((error) => {
-                        console.error('OAuth error:', error);
-                        reject(error);
-                    });
-            });
+                    } catch (err) {
+                        console.warn('Firestore doc update warning:', err);
+                    }
+
+                    if (success && typeof window !== 'undefined') {
+                        window.location.href = success;
+                    }
+                    return result;
+                })
+                .catch((error) => {
+                    localStorage.removeItem('google_session_expiry');
+                    console.error('OAuth error:', error);
+                    throw error;
+                });
         }
     }
 

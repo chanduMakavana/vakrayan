@@ -95,6 +95,16 @@ export class AuthService {
         }
     }
 
+    // Update current user's phone number
+    async updatePhone(phone) {
+        try {
+            return await this.account.updatePhone(phone);
+        } catch (error) {
+            console.error("Firebase service :: updatePhone :: error", error.message);
+            throw error;
+        }
+    }
+
     // Create recovery link for forgotten password
     async createRecovery(email, url) {
         try {
@@ -116,7 +126,7 @@ export class AuthService {
     }
 
     // Initiate Google OAuth2 login session
-    async loginWithGoogle() {
+    loginWithGoogle() {
         try {
             const successUrl = `${window.location.origin}/`;
             const failureUrl = `${window.location.origin}/login`;

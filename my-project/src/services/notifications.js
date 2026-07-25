@@ -1,6 +1,6 @@
 import { getToken, onMessage } from "firebase/messaging";
 import { getMessagingInstance, db } from "../firebase/config";
-import { doc, setDoc, arrayUnion } from "firebase/firestore";
+import { doc, setDoc, getDoc, arrayUnion } from "firebase/firestore";
 
 /**
  * Requests browser permission for notifications, registers the Service Worker,
@@ -34,7 +34,6 @@ export const requestNotificationPermission = async (userId) => {
     });
 
     if (token) {
-      console.log("FCM Token obtained:", token);
       if (userId) {
         await saveTokenToFirestore(userId, token);
       }
@@ -51,16 +50,36 @@ export const requestNotificationPermission = async (userId) => {
 
 /**
  * Saves the FCM token to Firestore under the user's document inside an fcmTokens array.
+ * Deduplicates and caches tokens to avoid redundant Firestore network writes on every load.
  */
 const saveTokenToFirestore = async (userId, token) => {
+  if (!userId || !token) return;
+
+  const cacheKey = `fcm_saved_${userId}_${token.slice(-12)}`;
+  if (localStorage.getItem(cacheKey) === 'true') {
+    return; // Token is already saved in Firestore for this user
+  }
+
   try {
     const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      const existingTokens = Array.isArray(data.fcmTokens) ? data.fcmTokens : [];
+      if (existingTokens.includes(token)) {
+        localStorage.setItem(cacheKey, 'true');
+        return;
+      }
+    }
+
     await setDoc(userRef, {
       fcmTokens: arrayUnion(token),
       notificationsEnabled: true,
       updatedAt: new Date().toISOString()
     }, { merge: true });
-    console.log("FCM Token successfully saved to Firestore for user:", userId);
+
+    localStorage.setItem(cacheKey, 'true');
   } catch (error) {
     console.error("Failed to save FCM token to Firestore:", error);
   }

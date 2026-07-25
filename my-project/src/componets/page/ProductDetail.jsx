@@ -1733,53 +1733,53 @@ function ProductDetail() {
               );
             })()}
 
-             {/* Quantity Selector Section */}
-             {!adminMode && !loading && product && (
-               <div className="space-y-3 mt-4 pt-4 border-t border-[var(--color-border)]">
-                 <span className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase block">
-                   Select Quantity
-                 </span>
-                 <div className="flex items-center gap-4">
-                    <div className="inline-flex items-center border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl overflow-hidden shadow-2xs">
-                      <button
-                        type="button"
-                        disabled={quantity <= 1}
-                        onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                        className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer select-none transition-colors text-[var(--color-text)] border-r border-[var(--color-border)]"
-                      >
-                        <FiMinus size={13} strokeWidth={2.5} />
-                      </button>
-                      <span className="w-12 text-center font-mono font-black text-xs select-none text-[var(--color-text)] border-r border-[var(--color-border)] py-2">
-                        {quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const baseSizeVal = selectedSize || product.sizes?.[0] || 'M';
-                          const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
-                          if (quantity >= availableStock) {
-                            showToast(`Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "warning");
-                            return;
-                          }
-                          setQuantity(prev => prev + 1);
-                        }}
-                        className="w-10 h-10 flex items-center justify-center font-bold text-sm hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] cursor-pointer select-none transition-colors text-[var(--color-text)]"
-                      >
-                        <FiPlus size={13} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                   {selectedSize && (() => {
-                     const baseSizeVal = selectedSize || 'M';
-                     const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
-                     return (
-                       <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
-                         {availableStock} items left
-                       </span>
-                     );
-                   })()}
+             {/* Quantity Selector Section — Always Visible */}
+             <div className="space-y-2 mt-4 pt-4 border-t border-[var(--color-border)]">
+               <div className="flex justify-between items-center">
+                 <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">
+                   Quantity
+                 </h4>
+                 {selectedSize && (() => {
+                   const baseSizeVal = selectedSize || 'M';
+                   const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                   return (
+                     <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wider">
+                       {availableStock} items left in size {baseSizeVal}
+                     </span>
+                   );
+                 })()}
+               </div>
+               <div className="flex items-center gap-3">
+                 <div className="inline-flex items-center border border-[var(--color-border)] bg-[var(--color-surface)] rounded-none overflow-hidden shadow-2xs">
+                   <button
+                     type="button"
+                     disabled={quantity <= 1}
+                     onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                     className="w-9 h-9 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 disabled:opacity-30 cursor-pointer select-none transition-colors text-neutral-950 border-r border-[var(--color-border)]"
+                   >
+                     <FiMinus size={13} strokeWidth={2.5} />
+                   </button>
+                   <span className="w-12 text-center font-mono font-bold text-sm select-none text-neutral-950 border-r border-[var(--color-border)] py-1.5">
+                     {quantity}
+                   </span>
+                   <button
+                     type="button"
+                     onClick={() => {
+                       const baseSizeVal = selectedSize || product.sizes?.[0] || 'M';
+                       const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                       if (quantity >= availableStock) {
+                         showToast(`Only ${availableStock} items left in stock for size ${baseSizeVal}.`, "warning");
+                         return;
+                       }
+                       setQuantity(prev => prev + 1);
+                     }}
+                     className="w-9 h-9 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 cursor-pointer select-none transition-colors text-neutral-950"
+                   >
+                     <FiPlus size={13} strokeWidth={2.5} />
+                   </button>
                  </div>
                </div>
-             )}
+             </div>
 
 
             {/* Extra bottom padding on mobile so content isn't hidden behind sticky bar */}
@@ -3080,3 +3080,4 @@ function ProductDetail() {
 }
 
 export default ProductDetail;
+                                                                                                                                                                                                                            
