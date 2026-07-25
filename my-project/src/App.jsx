@@ -50,15 +50,18 @@ const lazyWithRetry = (importFn) =>
     }
   });
 
+const shopImporter = () => import('./componets/page/Shop')
+const productDetailImporter = () => import('./componets/page/ProductDetail')
+
 const Home          = lazyWithRetry(() => import('./componets/page/Home'))
 const SignUp        = lazyWithRetry(() => import('./componets/page/SignUp'))
 const Login         = lazyWithRetry(() => import('./componets/page/Login'))
 const ResetPassword = lazyWithRetry(() => import('./componets/page/ResetPassword'))
 const AdminPanel    = lazyWithRetry(() => import('./componets/page/AddminPanel'))
-const ProductDetail = lazyWithRetry(() => import('./componets/page/ProductDetail'))
+const ProductDetail = lazyWithRetry(productDetailImporter)
 const NotFound      = lazyWithRetry(() => import('./componets/page/NotFound'))
 const AddToCartPage = lazyWithRetry(() => import('./componets/pageComponets/AddToCartPage'))
-const Shop          = lazyWithRetry(() => import('./componets/page/Shop'))
+const Shop          = lazyWithRetry(shopImporter)
 const Checkout      = lazyWithRetry(() => import('./componets/page/Checkout'))
 const UserProfile   = lazyWithRetry(() => import('./componets/page/UserProfile'))
 const OrderDetail   = lazyWithRetry(() => import('./componets/page/OrderDetail'))
@@ -341,6 +344,15 @@ function AppContent() {
   useEffect(() => {
     dispatch(filterProductsForMode(adminMode))
   }, [adminMode, dispatch])
+
+  // Background preloading of critical route chunks after initial page mount (idle time)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      shopImporter()
+      productDetailImporter()
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Fonts: wait for Google Fonts to be ready (fast — only blocks for ~100-300ms)
   useEffect(() => {

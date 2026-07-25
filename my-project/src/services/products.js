@@ -25,23 +25,36 @@ export class ProductsService {
         }
     }
 
+    _getProductsPromise = null;
+
     // Retrieve all available products (max 100 — add cursor pagination when catalog exceeds this)
     async getProducts() {
-        try {
-            const response = await this.databases.listDocuments(
-                conf.firebaseDatabaseId,
-                conf.firebaseProductsCollectionId,
-                [
-                    Query.orderDesc("$createdAt"),
-                    Query.limit(500) // Raised from 100 to prevent silent catalog truncation
-                ]
-            );
-            return response.documents;
+        if (this._getProductsPromise) {
+            return this._getProductsPromise;
         }
-        catch (error) {
-            console.error("Firebase service :: getProducts :: error", error.message);
-            throw error;
-        }
+
+        this._getProductsPromise = (async () => {
+            try {
+                const response = await this.databases.listDocuments(
+                    conf.firebaseDatabaseId,
+                    conf.firebaseProductsCollectionId,
+                    [
+                        Query.orderDesc("$createdAt"),
+                        Query.limit(500) // Raised from 100 to prevent silent catalog truncation
+                    ]
+                );
+                return response.documents;
+            }
+            catch (error) {
+                console.error("Firebase service :: getProducts :: error", error.message);
+                throw error;
+            }
+            finally {
+                this._getProductsPromise = null;
+            }
+        })();
+
+        return this._getProductsPromise;
     }
 
     // Update an existing product document
