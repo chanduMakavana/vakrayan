@@ -361,7 +361,7 @@ export class Storage {
     constructor(client) { this.client = client; }
 
     async createFile(bucketId, fileId, file) {
-        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL;
+        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://b2-upload-gateway.chandumakavana61.workers.dev/";
         
         // If Backblaze/Cloudflare Worker is configured, route uploads there!
         if (workerUrl) {
