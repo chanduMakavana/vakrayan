@@ -1,0 +1,60 @@
+import cartService from '../services/cart';
+import { setCartItems } from '../features/addToCart';
+import { clearGuestCart, loadGuestCartItems } from './guestCartHelper';
+
+/**
+ * Merges guest cart items from localStorage into the Firebase database for a logged-in user.
+ * Combines identical product+size matches to prevent duplication and sums up their quantities.
+ * Clears localStorage upon completion.
+ */
+export const mergeLocalCartToDb = async (userId) => {
+  try {
+    const localItems = loadGuestCartItems();
+    if (!Array.isArray(localItems) || localItems.length === 0) return;
+
+    // Fetch user's existing DB cart items to check for duplicates
+    const dbItems = await cartService.getCartItems(userId);
+
+    // Loop and merge each local item into DB
+    for (const localItem of localItems) {
+      const existingCartItem = dbItems.find(
+        dbItem => dbItem.product_id === localItem.product_id && dbItem.size === localItem.size
+      );
+
+      await cartService.addToCart({
+        name: localItem.name,
+        size: localItem.size,
+        price: localItem.price,
+        quantity: localItem.quantity,
+        product_id: localItem.product_id,
+        product_Image: localItem.product_Image,
+        userId: userId,
+        existingCartItem: existingCartItem,
+      });
+    }
+
+    clearGuestCart();
+  } catch (error) {
+    console.error('Error merging guest cart to database:', error);
+  }
+};
+
+/**
+ * After login or session restore: merge guest cart then hydrate Redux store
+ * from the user's DB cart. Returns the fetched cart items.
+ *
+ * Usage (eliminates the duplicate pattern in App.jsx + Login.jsx):
+ *   const items = await hydrateCartFromDb(userId);
+ *   dispatch(setCartItems(items));
+ */
+export const hydrateCartFromDb = async (userId, dispatch) => {
+  try {
+    await mergeLocalCartToDb(userId);
+    const cartItems = await cartService.getCartItems(userId);
+    if (dispatch) dispatch(setCartItems(cartItems));
+    return cartItems;
+  } catch (err) {
+    console.error('Cart retrieval or merge failed:', err);
+    return [];
+  }
+};

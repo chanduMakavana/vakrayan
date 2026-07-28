@@ -1,0 +1,2 @@
+- [x] Update `PageSkeleton.jsx` to render high-fidelity static headers, categories banner, filter controls, and grid layouts for `/shop` and `/category` paths
+- [x] Verify build compilation

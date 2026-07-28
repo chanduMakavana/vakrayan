@@ -1,0 +1,34 @@
+name: Daily Firebase Backup to Backblaze B2
+
+on:
+  schedule:
+    # Runs every day at 12:00 PM Indian Standard Time (which is 6:30 AM UTC)
+    - cron: '30 6 * * *'
+  workflow_dispatch: # Allows manual trigger of the backup from the GitHub interface
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          npm install firebase-admin @aws-sdk/client-s3
+
+      - name: Run Backup Script
+        run: node scripts/backup-to-backblaze.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          B2_APPLICATION_KEY_ID: ${{ secrets.B2_APPLICATION_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}

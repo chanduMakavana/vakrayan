@@ -1,0 +1,1709 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy } from 'react-icons/fi';
+import ordersService from '../../services/orders';
+import reviewsService from '../../services/reviews';
+import { useToast } from '../../context/ToastContext';
+import Footer from '../pageComponets/Footer';
+import { FaStar } from 'react-icons/fa';
+import storageService, { compressImage } from '../../services/storage';
+import { sendWebhookNotification } from '../../utils/webhookHelper';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+
+function OrderDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const products = useSelector(state => state.products.allItems || []);
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Review submission state for the order details write-review modal
+  const [reviewModalItem, setReviewModalItem] = useState(null); // stores { name: '...', productId: '...' }
+  const [modalRating, setModalRating] = useState(5);
+  const [modalComment, setModalComment] = useState('');
+  const [modalSubmitting, setModalSubmitting] = useState(false);
+  const [modalSuccessMsg, setModalSuccessMsg] = useState('');
+
+  // Fit & characteristic rating modal states
+  const [modalFit, setModalFit] = useState('true'); // 'tight', 'true', or 'loose'
+  const [modalComfort, setModalComfort] = useState(5);
+  const [modalQuality, setModalQuality] = useState(5);
+  const [modalBreathable, setModalBreathable] = useState(5);
+
+  const [modalImages, setModalImages] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e, setImagesValue, currentImages) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      // Compress reviews images to save storage and improve loading speed
+      const compressedFile = await compressImage(file, 800, 800, 0.7);
+
+      const response = await storageService.uploadFile(compressedFile);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        const newUrlList = currentImages.trim() 
+          ? `${currentImages.trim()}, ${fileUrl}` 
+          : fileUrl;
+        setImagesValue(newUrlList);
+        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Cancellation reasons modal states
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancellationReasonOption, setCancellationReasonOption] = useState("Ordered wrong size / color details");
+  const [customCancellationText, setCustomCancellationText] = useState("");
+  const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Return / Exchange modal states
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestItem, setRequestItem] = useState(null);
+  const [requestReason, setRequestReason] = useState("Wrong size received");
+  const [customRequestText, setCustomRequestText] = useState("");
+  const [exchangeTargetSize, setExchangeTargetSize] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestFrontImage, setRequestFrontImage] = useState('');
+  const [requestBackImage, setRequestBackImage] = useState('');
+  const [uploadingFront, setUploadingFront] = useState(false);
+  const [uploadingBack, setUploadingBack] = useState(false);
+
+  const handleRequestImageUpload = async (e, type) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'front') setUploadingFront(true);
+    else setUploadingBack(true);
+
+    try {
+      const compressedFile = await compressImage(file, 850, 850, 0.7);
+      const response = await storageService.uploadFile(compressedFile);
+      if (response?.$id) {
+        const fileUrl = storageService.getFileView(response.$id);
+        if (type === 'front') {
+          setRequestFrontImage(fileUrl);
+          showToast("✓ Front product image uploaded successfully!", "success");
+        } else {
+          setRequestBackImage(fileUrl);
+          showToast("✓ Back product image uploaded successfully!", "success");
+        }
+      } else {
+        throw new Error("Failed to upload image file");
+      }
+    } catch (err) {
+      console.error("Return image upload failed:", err);
+      showToast("Firebase Storage upload failed.", "error");
+    } finally {
+      if (type === 'front') setUploadingFront(false);
+      else setUploadingBack(false);
+    }
+  };
+
+  const handleModalReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAuthenticated || !user) {
+      showToast("Please login to secure a review placement.", "error");
+      return;
+    }
+    if (!reviewModalItem || !reviewModalItem.productId) {
+      showToast("Error resolving product mapping registry.", "error");
+      return;
+    }
+    if (!modalComment.trim()) {
+      showToast("Please write a review comment.", "error");
+      return;
+    }
+
+    const imageLinks = modalImages.split(',')
+      .map(url => url.trim())
+      .filter(url => url.startsWith('http://') || url.startsWith('https://'));
+
+    setModalSubmitting(true);
+    try {
+      await reviewsService.createReview({
+        productId: reviewModalItem.productId,
+        userId: user.$id,
+        userName: user.name || 'Anonymous',
+        rating: String(modalRating),
+        comment: modalComment,
+        images: imageLinks,
+        is_verified_purchase: true,
+        fit: '',
+        comfort: 0,
+        quality: 0,
+        breathable: 0
+      });
+
+      setModalSuccessMsg("Review posted successfully! Thank you for the feedback.");
+      showToast("Review submitted successfully!", "success");
+      setModalComment('');
+      setModalImages('');
+      setModalRating(5);
+      setTimeout(() => {
+        setReviewModalItem(null);
+        setModalSuccessMsg('');
+      }, 2000);
+    } catch (err) {
+      console.error("Review submission error:", err.message);
+      showToast("Failed to submit review. Try again.", "error");
+    } finally {
+      setModalSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    async function loadOrderSpec() {
+      try {
+        setLoading(true);
+        const orderData = await ordersService.getOrderById(id);
+        if (orderData) {
+          // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
+          const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+          const hasAdminRole = user?.prefs?.role === 'admin';
+          const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
+          const hasAdminEmail = adminEmail && user?.email === adminEmail;
+          const isOwner = orderData.userId && user?.$id && orderData.userId === user.$id;
+          const isAdmin = hasAdminRole || hasAdminLabel || hasAdminEmail;
+
+
+          if (!isOwner && !isAdmin) {
+            showToast("Security Clearance Required. Access Aborted.", "error");
+            navigate('/profile');
+            return;
+          }
+          setOrder(orderData);
+        } else {
+          showToast("Order details not found.", "error");
+          navigate('/profile');
+        }
+      } catch (err) {
+        console.error("Failed to load order details:", err);
+        navigate('/profile');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (id && user) {
+      loadOrderSpec();
+    }
+  }, [id, user, isAuthenticated, navigate, showToast]);
+
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4">
+        <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+        <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-black uppercase">
+          LOADING ORDER DETAILS...
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) return null;
+
+  const orderDate = new Date(order.$createdAt || order.createdAt || '1970-01-01').toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  let parsedItems;
+  try {
+    parsedItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
+  } catch {
+    parsedItems = [];
+  }
+
+  // Parse order number, state, tax, etc.
+  const parseOrderAddressAndMetadata = (ord) => {
+    let addressText = ord.address || '';
+    let metadata = {
+      order_number: ord.order_number || `ORD-${new Date(ord.$createdAt || '2026-01-01').getFullYear()}-${ord.$id?.substring(0, 6).toUpperCase() || 'UNKNOWN'}`,
+      tracking_number: ord.tracking_number || '',
+      tracking_url: ord.tracking_url || '',
+      subtotal: ord.subtotal || ord.total,
+      tax_amount: ord.tax_amount || 0,
+      shipping_charge: ord.shipping_charge || 0,
+      coupon_code: ord.coupon_code || ord.couponApplied || 'NONE'
+    };
+
+    try {
+      const parsed = JSON.parse(ord.address);
+      if (parsed && typeof parsed === 'object' && 'customerAddress' in parsed) {
+        let rawAddr = parsed.customerAddress;
+        // Handle if customerAddress is itself a JSON string (old nested format)
+        if (typeof rawAddr === 'string' && rawAddr.trim().startsWith('{')) {
+          try {
+            const innerParsed = JSON.parse(rawAddr);
+            if (innerParsed && typeof innerParsed === 'object') {
+              const line = innerParsed.line || '';
+              const city = innerParsed.city || '';
+              const state = innerParsed.state || '';
+              const pincode = innerParsed.pincode || '';
+              const country = innerParsed.country || 'India';
+              rawAddr = [line, city, state, pincode, country].filter(Boolean).join(', ');
+            }
+          } catch (innerErr) {
+            console.warn("Could not parse nested customer address:", innerErr.message);
+          }
+        }
+        addressText = rawAddr;
+        if (parsed.metadata) {
+          metadata = { ...metadata, ...parsed.metadata };
+        }
+      }
+    } catch (outerErr) {
+      console.warn("Could not parse order address or metadata JSON:", outerErr.message);
+    }
+
+    if (typeof addressText === 'string') {
+      addressText = addressText.replace(/\[Payment:\s*\w+\]/i, '').trim();
+      if (addressText.endsWith(',')) {
+        addressText = addressText.slice(0, -1).trim();
+      }
+    }
+
+    return { addressText, metadata };
+  };
+
+  const { addressText, metadata } = parseOrderAddressAndMetadata(order);
+
+  // Check if order was cancelled by the admin / store
+  const isAdminCancelled = 
+    metadata.cancelled_by === 'admin' || 
+    metadata.cancelled_by === 'store' ||
+    (metadata.cancel_reason && (
+      metadata.cancel_reason.toLowerCase().includes('stock') ||
+      metadata.cancel_reason.toLowerCase().includes('inventory') ||
+      metadata.cancel_reason.toLowerCase().includes('fraud') ||
+      metadata.cancel_reason.toLowerCase().includes('incorrect pricing') ||
+      metadata.cancel_reason.toLowerCase().includes('admin') ||
+      metadata.cancel_reason.toLowerCase().includes('store')
+    ));
+
+  // Extract base shipping, remote route surcharge, and COD handling fee from the stored total shipping charge
+  const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
+  const isCod = order.paymentMethod === 'COD';
+  const codFee = isCod ? 30 : 0;
+  const remainingShipping = Math.max(0, totalShipping - codFee);
+  const remoteSurcharge = (remainingShipping === 80 || remainingShipping === 179) ? 80 : 0;
+  const baseShippingCharge = Math.max(0, remainingShipping - remoteSurcharge);
+  const subtotal = Number(metadata.subtotal || order.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0));
+  const discountVal = Number(order.discountAmount || order.discount_amount || metadata.discount || 0);
+
+  const isReturnExchangeEligible = () => {
+    if (order.status !== 'DELIVERED') return false;
+    const updateTime = order.$updatedAt || order.$createdAt || order.createdAt;
+    if (!updateTime) return false;
+    const deliveryDate = new Date(updateTime);
+    const currentDate = new Date();
+    const diffTime = Math.abs(currentDate - deliveryDate);
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays <= 7;
+  };
+
+  const getReturnExchangeDaysLeft = () => {
+    const updateTime = order.$updatedAt || order.$createdAt || order.createdAt;
+    if (!updateTime) return 0;
+    const deliveryDate = new Date(updateTime);
+    const currentDate = new Date();
+    const diffTime = currentDate - deliveryDate;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const daysLeft = Math.max(0, Math.ceil(7 - diffDays));
+    return daysLeft;
+  };
+
+  const submitReturnExchangeRequest = async () => {
+    if (!requestItem) return;
+    if (requestItem.type === 'EXCHANGE' && !exchangeTargetSize) {
+      showToast("Please select a target size for exchange.", "error");
+      return;
+    }
+    if (!requestFrontImage.trim() || !requestBackImage.trim()) {
+      showToast("Please upload both front and back photos to verify item condition.", "error");
+      return;
+    }
+    
+    let finalReason = requestReason;
+    if (requestReason === "Other (Explain in box below)") {
+      finalReason = customRequestText.trim() || "Other reason unspecified";
+    } else if (customRequestText.trim()) {
+      finalReason = `${requestReason} - ${customRequestText.trim()}`;
+    }
+    
+    setSubmittingRequest(true);
+    try {
+      let currentRequests = [];
+      if (metadata.return_requests) {
+        currentRequests = Array.isArray(metadata.return_requests) 
+          ? [...metadata.return_requests] 
+          : [];
+      }
+      
+      currentRequests = currentRequests.filter(r => r.itemIndex !== requestItem.index);
+      
+      const newRequest = {
+        itemIndex: requestItem.index,
+        productId: requestItem.product_id,
+        productName: requestItem.name,
+        originalSize: requestItem.size,
+        type: requestItem.type,
+        reason: finalReason,
+        exchangeTargetSize: requestItem.type === 'EXCHANGE' ? exchangeTargetSize : "",
+        images: [requestFrontImage.trim(), requestBackImage.trim()].filter(Boolean),
+        status: 'PENDING',
+        createdAt: new Date().toISOString()
+      };
+      
+      currentRequests.push(newRequest);
+      const targetStatus = requestItem.type === 'RETURN' ? 'RETURN_REQUESTED' : 'EXCHANGE_REQUESTED';
+      const response = await ordersService.updateOrderStatus(order.$id || order.id, targetStatus, {
+        return_requests: currentRequests
+      });
+      
+      if (response) {
+        showToast(`${requestItem.type === 'RETURN' ? 'Return' : 'Exchange'} request submitted successfully!`, 'success');
+        
+        // Dispatch return.requested webhook notification
+        sendWebhookNotification('return.requested', {
+          orderId: order.$id || order.id,
+          orderNumber: metadata.order_number,
+          type: requestItem.type,
+          reason: finalReason,
+          email: user?.email || order.email || ''
+        });
+
+        setIsRequestModalOpen(false);
+        const orderData = await ordersService.getOrderById(id);
+        if (orderData) {
+          setOrder(orderData);
+        }
+      }
+    } catch (err) {
+      console.error("Return/Exchange request failed:", err);
+      showToast("Failed to submit request. Please try again.", "error");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  const handleCancelOrder = () => {
+    setIsCancelModalOpen(true);
+  };
+
+  const handlePrintInvoice = () => {
+    setIsInvoicePreviewOpen(true);
+  };
+
+  const handleDownloadPdf = async () => {
+    const element = document.getElementById('invoice-print-area');
+    if (!element) return;
+    
+    setIsGeneratingPdf(true);
+    showToast("Generating PDF Invoice, please wait...", "info");
+    
+    try {
+      // Wait for all custom web fonts to be fully loaded first
+      await document.fonts.ready;
+
+      const canvas = await html2canvas(element, {
+        scale: 2.5, // Balanced scale for high sharpness and fast performance
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png'); // Standard PNG
+      
+      // Calculate A4 dimensions (595.28 x 841.89 points)
+      const pdf = new jsPDF('p', 'pt', 'a4');
+      const imgWidth = 595.28;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Use 'FAST' compression to optimize generation speed and reduce PDF file size
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+      pdf.save(`invoice-${metadata.order_number || order.$id || 'order'}.pdf`);
+      showToast("✓ Invoice PDF downloaded successfully!", "success");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      showToast("Failed to generate and download PDF.", "error");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const submitCancelOrder = async () => {
+    if (order.status !== 'PENDING' && order.status !== 'PROCESSING') {
+      showToast("Orders cannot be cancelled once they have been shipped.", "error");
+      setIsCancelModalOpen(false);
+      return;
+    }
+
+    let finalReason = cancellationReasonOption;
+    if (cancellationReasonOption === "Other (Explain in box below)") {
+      finalReason = customCancellationText.trim() || "Other reason unspecified";
+    } else if (customCancellationText.trim()) {
+      finalReason = `${cancellationReasonOption} - ${customCancellationText.trim()}`;
+    }
+
+    try {
+      setIsCancelModalOpen(false);
+      // 1. Update order status to CANCELLATION_REQUESTED in Firebase with metadata reason
+      const updatedOrder = await ordersService.updateOrderStatus(order.$id || order.id, 'CANCELLATION_REQUESTED', { cancel_reason: finalReason });
+      if (updatedOrder) {
+        setOrder(updatedOrder);
+        showToast("Cancellation request submitted successfully. Awaiting admin approval.", "success");
+      }
+    } catch (err) {
+      console.error("Order cancellation request failed:", err);
+      showToast("Failed to request order cancellation. Please try again.", "error");
+    }
+  };
+
+  // Calculate order metrics
+  const totalItemsCount = parsedItems.reduce((acc, i) => acc + Number(i.quantity || 1), 0);
+
+  // Status index for visual track
+  let statusSteps = [
+    { key: 'PENDING', label: 'Order Confirmed', desc: 'Order placed successfully.', icon: 'file' },
+    { key: 'PROCESSING', label: 'Processed & Packed', desc: 'Packed and ready for dispatch.', icon: 'file' },
+    { key: 'SHIPPED', label: 'Shipped & Outward', desc: 'Order handed over to courier partner.', icon: 'truck' },
+    { key: 'IN_TRANSIT', label: 'In Transit', desc: 'In transit to delivery address.', icon: 'truck' },
+    { key: 'DELIVERED', label: 'Delivered Fits', desc: 'Order delivered successfully.', icon: 'check' }
+  ];
+
+  if (order.status === 'RETURN_REQUESTED' || order.status === 'RETURNED') {
+    statusSteps = [
+      { key: 'DELIVERED', label: 'Fits Delivered', desc: 'Order delivered successfully.', icon: 'check' },
+      { key: 'RETURN_REQUESTED', label: 'Return Requested', desc: 'Return request submitted with condition photos.', icon: 'file' },
+      { key: 'RETURNED', label: 'Return Approved & Refunded', desc: 'Admin approved the return. Refund has been credited to your Store Wallet.', icon: 'check' }
+    ];
+  } else if (order.status === 'EXCHANGE_REQUESTED' || order.status === 'EXCHANGED') {
+    statusSteps = [
+      { key: 'DELIVERED', label: 'Fits Delivered', desc: 'Order delivered successfully.', icon: 'check' },
+      { key: 'EXCHANGE_REQUESTED', label: 'Exchange Requested', desc: 'Exchange request submitted for desired size.', icon: 'file' },
+      { key: 'EXCHANGED', label: 'Exchange Approved', desc: 'Admin approved the exchange. Exchange product dispatched.', icon: 'truck' }
+    ];
+  }
+
+  const foundIdx = statusSteps.findIndex(s => s.key === order.status);
+  const currentStepIdx = foundIdx !== -1 ? foundIdx : 0;
+
+  return (
+    <>
+      <div 
+        className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 pt-4"
+        style={{
+          backgroundImage: 'radial-gradient(var(--color-border) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      >
+        <div className="absolute inset-0 bg-[var(--color-bg)]/80 backdrop-blur-xs z-10" />
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-8 relative z-20 space-y-6">
+          
+          {/* Header Action */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
+            <Link to="/profile" className="inline-flex items-center gap-2 text-[10px] font-mono font-black tracking-widest text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase group">
+              <FiArrowLeft className="text-xs group-hover:-translate-x-1 transition-transform" />
+              Back to Profile
+            </Link>
+            <div className="text-[10px] tracking-[0.25em] font-mono text-[var(--color-muted)] uppercase font-bold">
+              // ORDER SUMMARY LOG
+            </div>
+          </div>
+
+          {/* Core Invoice Summary Card */}
+          <div className="backdrop-blur-md bg-[var(--glass-bg)] p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] shadow-md space-y-8">
+            
+            {/* ID & Date Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[var(--color-border)]">
+              <div className="space-y-2.5">
+                <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-[var(--color-muted)] block uppercase">
+                  ORDER IDENTIFICATION
+                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 bg-[var(--color-subtle)] border border-[var(--color-border)] px-3 py-1.5 rounded-xl">
+                    <h1 className="text-lg md:text-xl font-mono font-black tracking-wider text-[var(--color-text)] uppercase select-all">
+                      {metadata.order_number}
+                    </h1>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(metadata.order_number);
+                        showToast("Order Number copied to clipboard!", "success");
+                      }}
+                      className="text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors p-1 rounded-md cursor-pointer"
+                      title="Copy Order ID"
+                    >
+                      <FiCopy className="text-xs" />
+                    </button>
+                  </div>
+
+                  {(order.status === 'PENDING' || order.status === 'PROCESSING') && (
+                    <button
+                      onClick={handleCancelOrder}
+                      className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-bold text-[10px] tracking-widest uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+                  {order.status === 'DELIVERED' && (
+                    <button
+                      onClick={handlePrintInvoice}
+                      className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-[10px] tracking-widest uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                    >
+                      <FiFileText className="text-xs" /> Download Invoice
+                    </button>
+                  )}
+                </div>
+                <div className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider flex items-center gap-1.5 mt-2">
+                  <span>Ref: {order.$id || order.id}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(order.$id || order.id);
+                      showToast("Database ID copied to clipboard!", "success");
+                    }}
+                    className="hover:text-[var(--color-text)] transition-colors p-0.5 rounded cursor-pointer"
+                    title="Copy Database ID"
+                  >
+                    <FiCopy className="text-[10px]" />
+                  </button>
+                </div>
+              </div>
+              <div className="text-left md:text-right space-y-1">
+                <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-[var(--color-muted)] block uppercase">
+                  TRANSACTION TIMESTAMP
+                </span>
+                <span className="text-[11px] font-mono font-black text-[var(--color-text)] block uppercase bg-[var(--color-subtle)] md:bg-transparent border md:border-0 border-[var(--color-border)] px-3 py-1.5 md:p-0 rounded-lg">
+                  {orderDate}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column (Fulfillment & Items) */}
+              <div className="lg:col-span-7 space-y-6">
+                
+                {/* Cancellation Alert / Returned Alerts */}
+                {order.status === 'CANCELLED' ? (
+                  <div className="bg-rose-500/10 p-5 rounded-2xl border border-rose-500/20 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-black tracking-widest text-rose-500 uppercase flex items-center gap-2">
+                        <span>{isAdminCancelled ? "🚫 ORDER CANCELLED BY STORE" : "🚫 ORDER CANCELLED"}</span>
+                      </h3>
+                      <p className="text-[11px] text-[var(--color-text)] font-semibold leading-relaxed uppercase">
+                        {isAdminCancelled ? (
+                          order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                            ? "This order was cancelled by the store. We apologize for the inconvenience. Your payment has been refunded to your Store Wallet."
+                            : "This order was cancelled by the store. We apologize for the inconvenience."
+                        ) : (
+                          order.paymentMethod === 'ONLINE' || order.paymentMethod === 'WALLET'
+                            ? "This order was cancelled successfully. Your payment has been refunded to your Store Wallet."
+                            : "This order was cancelled successfully."
+                        )}
+                      </p>
+                    </div>
+                    {metadata.cancel_reason && (
+                      <div className="border-t border-rose-500/10 pt-2.5">
+                        <span className="text-[8px] font-mono text-rose-500/70 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
+                        <span className="text-xs font-mono font-bold text-rose-500 block mt-0.5 uppercase">
+                          &ldquo;{metadata.cancel_reason}&rdquo;
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : order.status === 'CANCELLATION_REQUESTED' ? (
+                  <div className="bg-amber-500/10 p-5 rounded-2xl border border-amber-500/20 space-y-3">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-black tracking-widest text-amber-500 uppercase flex items-center gap-2">
+                        <span>⏳ CANCELLATION AWAITING APPROVAL</span>
+                      </h3>
+                      <p className="text-[11px] text-[var(--color-text)] font-semibold leading-relaxed uppercase">
+                        Your request to cancel this order is pending admin approval. Once approved, any online or wallet payment will be refunded to your Store Wallet.
+                      </p>
+                    </div>
+                    {metadata.cancel_reason && (
+                      <div className="border-t border-amber-500/10 pt-2.5">
+                        <span className="text-[8px] font-mono text-amber-500/70 block uppercase tracking-wider">REASON FOR CANCELLATION</span>
+                        <span className="text-xs font-mono font-bold text-amber-500 block mt-0.5 uppercase">
+                          &ldquo;{metadata.cancel_reason}&rdquo;
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-[var(--color-subtle)]/30 p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] space-y-6 shadow-2xs">
+                    {(order.status === 'RETURNED' || order.status === 'EXCHANGED') && (() => {
+                      const req = Array.isArray(metadata.return_requests) ? metadata.return_requests.find(r => r.status === 'APPROVED') : null;
+                      return (
+                        <div className="bg-emerald-500/10 p-5 rounded-2xl border border-emerald-500/20 space-y-3 mb-2 animate-fade-in">
+                          <div className="space-y-1">
+                            <h3 className="text-[11px] font-black tracking-widest text-emerald-500 uppercase flex items-center gap-1.5">
+                              <span>{order.status === 'RETURNED' ? '↩️ RETURN APPROVED & REFUNDED' : '🔄 EXCHANGE APPROVED & INITIATED'}</span>
+                            </h3>
+                            <p className="text-[10px] text-[var(--color-text)] font-bold leading-relaxed uppercase">
+                              {order.status === 'RETURNED' 
+                                ? `Your return has been approved and processed. A refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} has been successfully credited to your Store Wallet.` 
+                                : 'Your exchange request has been approved. Your replacement item is being prepared for dispatch.'}
+                            </p>
+                          </div>
+                          {req?.adminComment && (
+                            <div className="bg-[var(--color-subtle)] p-3 rounded-lg border border-[var(--color-border)]">
+                              <span className="text-[8px] font-black tracking-widest text-[var(--color-accent)] uppercase block mb-1">💬 MESSAGE FROM ADMIN</span>
+                              <p className="text-[11px] text-[var(--color-text)] font-semibold leading-relaxed">
+                                "{req.adminComment}"
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Conditional Cancellation Warning Notice */}
+                    {['PENDING', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT'].includes(order.status) && (
+                      <div className={`p-4 rounded-xl border flex gap-3 items-start animate-fade-in ${
+                        (order.status === 'PENDING' || order.status === 'PROCESSING')
+                          ? 'bg-rose-500/5 dark:bg-rose-950/5 border-rose-500/20 text-rose-500'
+                          : 'bg-[var(--color-subtle)] border-[var(--color-border)] text-[var(--color-muted)]'
+                      }`}>
+                        <span className="text-xs mt-0.5">⚠️</span>
+                        <div className="space-y-0.5">
+                          <h4 className={`text-[9px] font-black tracking-widest uppercase ${(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'text-rose-500' : 'text-[var(--color-text)]'}`}>
+                            {(order.status === 'PENDING' || order.status === 'PROCESSING') ? 'Cancellation Policy' : 'Cancellation Locked'}
+                          </h4>
+                          <p className="text-[9px] font-mono leading-relaxed uppercase">
+                            {(order.status === 'PENDING' || order.status === 'PROCESSING')
+                              ? 'This order can be cancelled while it is in "Pending" or "Processing" status. Once shipped, cancellation is disabled.'
+                              : 'This order has been shipped and cannot be cancelled anymore.'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] inline-block"></span>
+                      Fulfillment Timeline
+                    </h3>
+                    
+                    <div className="relative pl-6 space-y-8">
+                      {/* Vertical Line */}
+                      <div className="absolute left-[38px] top-4 bottom-4 w-0.5 bg-[var(--color-border)] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-[var(--color-accent)] transition-all duration-1000 ease-out" 
+                          style={{ height: `${(currentStepIdx / (statusSteps.length - 1)) * 100}%` }}
+                        />
+                      </div>
+
+                      {statusSteps.map((step, idx) => {
+                        const isActive = idx <= currentStepIdx;
+                        const isCurrent = idx === currentStepIdx;
+                        const isFinalStep = step.key === 'DELIVERED' || step.key === 'RETURNED' || step.key === 'EXCHANGED';
+                        return (
+                          <div key={step.key} className="flex gap-6 items-start relative z-10">
+                            {/* Checkpoint Dot */}
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-500 ${
+                              isCurrent 
+                              ? `bg-[var(--color-accent)] border-[var(--color-accent)] text-white shadow-sm scale-110 ${isFinalStep ? '' : 'animate-pulse'}` 
+                              : isActive 
+                              ? 'bg-[var(--color-accent-dark)] border-[var(--color-accent-dark)] text-white' 
+                              : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-muted)]'
+                            }`}>
+                              {step.icon === 'check' ? (
+                                <FiCheckCircle className="text-sm" />
+                              ) : step.icon === 'truck' ? (
+                                <FiTruck className="text-sm" />
+                              ) : (
+                                <FiFileText className="text-sm" />
+                              )}
+                            </div>
+
+                            {/* Content block */}
+                            <div className="space-y-1 pt-1">
+                              <h4 className={`text-xs font-black uppercase tracking-wide ${isActive ? 'text-[var(--color-text)] font-black' : 'text-[var(--color-muted)]'}`}>
+                                {step.label}
+                              </h4>
+                              <p className="text-[10px] text-[var(--color-muted)] max-w-lg leading-relaxed normal-case font-medium">
+                                {step.desc}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tracking Details */}
+                {(order.tracking_number || metadata.tracking_number) && (
+                  <div className="bg-[var(--color-subtle)]/40 border border-[var(--color-border)] p-6 rounded-2xl space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <FiTruck className="text-[var(--color-accent)] text-lg" />
+                      <h3 className="text-xs font-black tracking-widest text-[var(--color-text)] uppercase">
+                        SHIPMENT DISPATCH METRICS
+                      </h3>
+                    </div>
+                    <div className="text-xs font-mono uppercase text-[var(--color-text)] space-y-2">
+                      <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
+                        <span className="text-[var(--color-muted)]">Tracking Number:</span>
+                        <strong className="font-black select-all text-[var(--color-text)]">{order.tracking_number || metadata.tracking_number}</strong>
+                      </div>
+                      <div className="flex justify-between border-b border-[var(--color-border)] pb-2">
+                        <span className="text-[var(--color-muted)]">Carrier Channel:</span>
+                        <span className="font-bold text-[var(--color-text)]">Delhivery/DTDC Express</span>
+                      </div>
+                      {(order.tracking_url || metadata.tracking_url) && (
+                        <div className="pt-2">
+                          <a 
+                            href={order.tracking_url || metadata.tracking_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-block w-full text-center bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-black text-[10px] tracking-widest uppercase py-3.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                          >
+                            Track Package Live &rarr;
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Itemized Garments Specification List */}
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black tracking-[0.25em] text-[var(--color-muted)] uppercase">
+                    // CLAIMED GARMENTS SPECIFICATION
+                  </h3>
+
+                  <div className="divide-y divide-[var(--color-border)] border border-[var(--color-border)] rounded-2xl overflow-hidden bg-[var(--color-subtle)]/20 p-4 space-y-4">
+                    {parsedItems.map((item, idx) => {
+                      const matchingProd = products.find(p => p.$id === item.product_id || p.id === item.product_id || p.name.trim().toUpperCase() === item.name.trim().toUpperCase());
+                      const img = item.product_Image || item.product_image || item.image || matchingProd?.front_image_link || matchingProd?.image_url || matchingProd?.image;
+
+                      return (
+                        <div key={idx} className="flex justify-between items-center py-4 text-xs first:pt-0 last:pb-0">
+                          <div className="flex gap-4 items-center min-w-0">
+                            {img ? (
+                              <Link 
+                                to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}
+                                className="shrink-0 hover:opacity-85 transition-opacity"
+                              >
+                                <img 
+                                  src={img} 
+                                  alt={item.name} 
+                                  className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
+                                />
+                              </Link>
+                            ) : (
+                              <div className="w-12 h-16 bg-[var(--color-subtle)] border border-[var(--color-border)] shrink-0 flex items-center justify-center text-[8px] font-bold text-[var(--color-muted)] rounded-lg">
+                                NO IMG
+                              </div>
+                            )}
+                            <div className="space-y-1 min-w-0">
+                              <h4 className="font-black text-[var(--color-text)] uppercase tracking-wide truncate max-w-[200px] sm:max-w-xs hover:text-[var(--color-accent)] transition-colors">
+                                <Link to={`/product/${matchingProd?.$id || matchingProd?.id || item.product_id}`}>
+                                  {item.name}
+                                </Link>
+                              </h4>
+                              <p className="text-[9px] font-mono text-[var(--color-muted)] uppercase">
+                                Size: {item.size || 'M'} · Quantity: {item.quantity} · Price: ₹{item.price}
+                              </p>
+                               {order.status === 'DELIVERED' && (() => {
+                                let productId = item.product_id;
+                                if (!productId) {
+                                  productId = matchingProd ? (matchingProd.$id || matchingProd.id) : null;
+                                }
+                                
+                                const itemPolicy = matchingProd?.return_policy || "7 Day Return";
+                                const existingRequest = Array.isArray(metadata.return_requests)
+                                  ? metadata.return_requests.find(r => r.itemIndex === idx)
+                                  : null;
+                                const eligible = isReturnExchangeEligible();
+                                const daysLeft = getReturnExchangeDaysLeft();
+
+                                return (
+                                  <div className="space-y-2 pt-1.5">
+                                    <div className="flex flex-wrap gap-2 items-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (productId) {
+                                            setReviewModalItem({ name: item.name, productId });
+                                            setModalRating(5);
+                                            setModalComment('');
+                                            setModalFit('true');
+                                            setModalComfort(5);
+                                            setModalQuality(5);
+                                            setModalBreathable(5);
+                                          } else {
+                                            showToast("Failed to locate product in current catalog.", "error");
+                                          }
+                                        }}
+                                        className="inline-flex items-center gap-1.5 bg-neutral-950 hover:bg-[var(--color-accent)] text-white font-sans font-bold text-[9px] tracking-widest px-3 py-2 rounded-lg uppercase transition-all duration-200 cursor-pointer border border-neutral-950 hover:border-[var(--color-accent)] shadow-xs"
+                                      >
+                                        Write Review
+                                      </button>
+
+                                      {!existingRequest && eligible && (
+                                        <>
+                                          {(itemPolicy === "7 Day Return" || itemPolicy === "default") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setRequestItem({ ...item, index: idx, type: 'RETURN', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
+                                                setRequestReason("Wrong size received");
+                                                setCustomRequestText("");
+                                                setExchangeTargetSize("");
+                                                setRequestFrontImage("");
+                                                setRequestBackImage("");
+                                                setIsRequestModalOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1.5 bg-transparent hover:bg-rose-500/10 text-[var(--color-text)] border border-[var(--color-border)] hover:border-rose-500 hover:text-rose-500 font-sans font-bold text-[9px] tracking-widest px-3 py-2 rounded-lg uppercase transition-all duration-200 cursor-pointer"
+                                            >
+                                              Request Return
+                                            </button>
+                                          )}
+                                          {(itemPolicy === "7 Day Return" || itemPolicy === "default" || itemPolicy === "Exchange Only") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setRequestItem({ ...item, index: idx, type: 'EXCHANGE', sizes: matchingProd?.sizes || ['S', 'M', 'L', 'XL'] });
+                                                setRequestReason("Wrong size received");
+                                                setCustomRequestText("");
+                                                setExchangeTargetSize("");
+                                                setRequestFrontImage("");
+                                                setRequestBackImage("");
+                                                setIsRequestModalOpen(true);
+                                              }}
+                                              className="inline-flex items-center gap-1.5 bg-transparent hover:bg-amber-500/10 text-[var(--color-text)] border border-[var(--color-border)] hover:border-amber-500 hover:text-amber-500 font-sans font-bold text-[9px] tracking-widest px-3 py-2 rounded-lg uppercase transition-all duration-200 cursor-pointer"
+                                            >
+                                              Request Exchange
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {existingRequest && (
+                                      <div className="pt-1.5">
+                                        <span className={`inline-block font-mono text-[9px] font-bold px-2 py-0.5 border ${
+                                          existingRequest.status === 'PENDING'
+                                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                          : existingRequest.status === 'APPROVED'
+                                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                          : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                        } uppercase rounded-lg`}>
+                                          {existingRequest.type === 'RETURN' ? 'Return' : 'Exchange'} Request - {existingRequest.status}
+                                          {existingRequest.exchangeTargetSize && ` to Size ${existingRequest.exchangeTargetSize}`}
+                                        </span>
+                                        {existingRequest.adminComment && (
+                                          <p className="text-[9px] font-sans text-[var(--color-muted)] mt-1 font-semibold normal-case">
+                                            Admin note: {existingRequest.adminComment}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {!existingRequest && !eligible && (
+                                      <div className="pt-1">
+                                        {itemPolicy === "No Return" ? (
+                                          <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">🔒 Non-Returnable Item</span>
+                                        ) : (
+                                          <span className="text-[9px] font-mono font-semibold text-[var(--color-muted)] uppercase">Return window expired</span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {!existingRequest && eligible && itemPolicy !== "No Return" && (
+                                      <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">
+                                        Window active (ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'})
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          <span className="font-mono font-black text-[var(--color-text)] text-sm shrink-0">
+                            ₹{Number(item.price * item.quantity).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div> {/* End Left Column */}
+
+              {/* Right Column */}
+              <div className="lg:col-span-5 space-y-6">
+
+                {/* Calculations & Total Invoice */}
+                <div className="bg-[var(--color-subtle)]/30 p-6 rounded-2xl border border-[var(--color-border)] space-y-3.5 text-xs font-mono font-medium uppercase text-[var(--color-muted)] shadow-2xs">
+                  <div className="flex justify-between">
+                    <span>Gross catalog Value ({totalItemsCount} items)</span>
+                    <span className="text-[var(--color-text)] font-bold">
+                      ₹{Number(metadata.subtotal || parsedItems.reduce((acc, i) => acc + Number(i.price * i.quantity), 0)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  {order.couponApplied !== 'NONE' && (
+                    <div className="flex justify-between text-emerald-500 font-bold">
+                      <span>PROMO SAVINGS ({metadata.coupon_code})</span>
+                      <span className="font-black">
+                        - ₹{Number(order.discountAmount || order.discount_amount || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between">
+                    <span>SHIPPING & DELIVERY</span>
+                    {baseShippingCharge > 0 ? (
+                      <span className="text-[var(--color-text)] font-bold font-mono">
+                        ₹{baseShippingCharge}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-500 font-black tracking-wider text-[9px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        FREE SHIPPING
+                      </span>
+                    )}
+                  </div>
+                  {remoteSurcharge > 0 && (
+                    <div className="flex justify-between">
+                      <span>REMOTE ROUTE SURCHARGE</span>
+                      <span className="text-[var(--color-text)] font-bold font-mono">
+                        ₹{remoteSurcharge}
+                      </span>
+                    </div>
+                  )}
+                  {isCod && (
+                    <div className="flex justify-between">
+                      <span>COD HANDLING FEE</span>
+                      <span className="text-[var(--color-text)] font-bold font-mono">
+                        ₹{codFee}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>PAYMENT METHOD</span>
+                    <span className="text-[var(--color-text)] font-bold tracking-wide">
+                      {order.paymentMethod || (order.address?.includes('[Payment: ONLINE]') ? 'ONLINE' : 'COD')}
+                    </span>
+                  </div>
+                  {order.paymentProvider && order.paymentProvider !== 'NONE' && (
+                    <div className="flex justify-between">
+                      <span>PAYMENT PROVIDER</span>
+                      <span className="text-emerald-500 font-black tracking-wide bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px]">
+                        {order.paymentProvider}
+                      </span>
+                    </div>
+                  )}
+                  {order.paymentStatus && (
+                    <div className="flex justify-between">
+                      <span>PAYMENT STATUS</span>
+                      <span className={`font-black tracking-wider text-[10px] px-1.5 py-0.5 rounded border ${
+                        order.paymentStatus === 'PAID' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20'
+                      }`}>
+                        {order.paymentStatus}
+                      </span>
+                    </div>
+                  )}
+                  {order.razorpayPaymentId && (
+                    <div className="flex justify-between">
+                      <span>TRANSACTION ID</span>
+                      <span className="text-[var(--color-muted)] font-mono text-[10px]">
+                        {order.razorpayPaymentId}
+                      </span>
+                    </div>
+                  )}
+                  <hr className="border-[var(--color-border)]" />
+                  <div className="flex justify-between items-baseline pt-2">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-[var(--color-text)] uppercase tracking-wide">Net deposited amount</span>
+                      <span className="text-[9px] text-[var(--color-muted)] font-sans tracking-wide lowercase font-semibold mt-0.5 normal-case">
+                        (incl. of all taxes)
+                      </span>
+                    </div>
+                    <span className="text-2xl font-black text-[var(--color-text)] tracking-tight font-mono">
+                      ₹{Number(order.total || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Shipping Logistics Coordinates */}
+                <div className="bg-[var(--color-subtle)]/30 p-6 rounded-2xl border border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6 text-xs uppercase tracking-wide shadow-2xs">
+                  <div className="space-y-1.5">
+                    <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CUSTOMER DETAILS</span>
+                    <span className="text-[var(--color-text)] font-bold block mt-1">{order.customerName}</span>
+                    <span className="text-[var(--color-muted)] font-mono text-[10px] block mt-0.5">{order.phone}</span>
+                    <span className="text-[var(--color-muted)] font-mono text-[10px] block lowercase mt-0.5">{order.email}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">SHIPPING ADDRESS</span>
+                    <span className="text-[var(--color-text)] font-bold block mt-1 leading-relaxed">
+                      {addressText}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Security Shield */}
+                <div className="flex items-center gap-3 text-[8px] font-mono text-[var(--color-muted)] border border-[var(--color-border)] bg-[var(--color-subtle)]/30 p-4 rounded-xl leading-normal uppercase shadow-2xs">
+                  <FiShield className="text-base text-[var(--color-text)] shrink-0" />
+                  <div>
+                    <span className="font-bold text-[var(--color-text)] block mb-0.5">🔒 SECURE TRANSACTION DETAILS</span>
+                    Order details verified and safely stored in our database.
+                  </div>
+                </div>
+              </div>
+            </div> {/* End Main Grid */}
+          </div>
+        </div>
+      </div>
+
+      {/* Cancellation Reason Modal Popup */}
+      {isCancelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop overlay */}
+          <div 
+            className="absolute inset-0 bg-neutral-950/60 backdrop-blur-xs" 
+            onClick={() => setIsCancelModalOpen(false)}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative z-50 w-full max-w-md bg-[var(--color-surface)] p-5 sm:p-8 border border-neutral-950 shadow-2xl space-y-5 sm:space-y-6 text-[var(--color-text)] animate-scale-up max-h-[90vh] overflow-y-auto scrollbar-none">
+            <div>
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">CANCEL ORDER</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Cancel Order
+              </h2>
+              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
+                Please select a reason for cancelling order {metadata.order_number || order.$id}. The stock will be returned to the store.
+              </p>
+            </div>
+            
+            {/* Options List */}
+            <div className="space-y-2.5">
+              {[
+                "Ordered wrong size / color details",
+                "Shipping and delivery window too long",
+                "Found alternative street fits elsewhere",
+                "Incorrect pricing/checkout parameters",
+                "Other (Explain in box below)"
+              ].map((opt) => (
+                <label 
+                  key={opt} 
+                  className={`flex items-start gap-3 p-3.5 border cursor-pointer transition-all ${
+                    cancellationReasonOption === opt
+                    ? 'border-neutral-950 bg-[var(--color-surface)]/50'
+                    : 'border-[var(--color-border)] hover:border-neutral-400'
+                  }`}
+                >
+                  <input 
+                    type="radio" 
+                    name="cancel_option"
+                    checked={cancellationReasonOption === opt}
+                    onChange={() => setCancellationReasonOption(opt)}
+                    className="mt-0.5 accent-neutral-950"
+                  />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text)] leading-normal select-none">
+                    {opt}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {/* Custom Explanation Textarea */}
+            <div className="space-y-2">
+              <label className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">
+                ADDITIONAL SPEC DETAIL / CUSTOM REASON
+              </label>
+              <textarea
+                value={customCancellationText}
+                onChange={(e) => setCustomCancellationText(e.target.value)}
+                placeholder="ENTER CUSTOM SPEC REASON DETAILS..."
+                rows={3}
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] hover:border-neutral-450 focus:border-[var(--color-accent)] text-xs font-semibold p-3 outline-hidden placeholder-[var(--color-muted)] font-sans tracking-wide resize-none"
+              />
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--color-border)]">
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-surface)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitCancelOrder}
+                className="w-full py-3 bg-neutral-950 hover:bg-neutral-855 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+              >
+                Cancel Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal Overlay */}
+      {reviewModalItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[var(--color-surface)] w-full max-w-md rounded-none border border-neutral-950 shadow-2xl p-6 relative space-y-6 animate-scale-up text-[var(--color-text)] max-h-[90vh] overflow-y-auto scrollbar-none">
+            
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setReviewModalItem(null)}
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-neutral-955 font-bold text-sm p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div>
+              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">PRODUCT FIT FEEDBACK</span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-neutral-950 mt-1">
+                Review {reviewModalItem.name}
+              </h2>
+            </div>
+
+            <hr className="border-[var(--color-border)]" />
+
+            {modalSuccessMsg ? (
+              <div className="py-8 text-center space-y-3 font-mono">
+                <div className="w-12 h-12 rounded-none border border-emerald-500 bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-xs font-bold uppercase tracking-wider animate-bounce">
+                  Done
+                </div>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest leading-relaxed px-4">
+                  {modalSuccessMsg}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleModalReviewSubmit} className="space-y-4 font-sans text-[var(--color-text)]">
+                {/* Star Rating Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Your Rating</span>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setModalRating(star)}
+                        className="text-2xl cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                      >
+                        <FaStar className={star <= modalRating ? 'text-amber-400' : 'text-neutral-200'} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+
+
+
+
+                {/* Review comment */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">Your Review</span>
+                  <textarea
+                    rows="3"
+                    required
+                    value={modalComment}
+                    onChange={(e) => setModalComment(e.target.value)}
+                    placeholder="Write your product experience here..."
+                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-none px-3 py-2 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors"
+                  />
+                </div>
+
+                {/* Review Image Upload Section */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                    <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
+                      {modalImages.split(',').filter(Boolean).length} / 5 Uploaded
+                    </span>
+                  </div>
+
+                  {/* Thumbnail grid */}
+                  <div className="flex flex-wrap gap-2.5 min-h-[40px] p-2 border border-dashed border-[var(--color-border)] bg-[var(--color-subtle)]/40 rounded-lg">
+                    {modalImages.split(',').map(url => url.trim()).filter(Boolean).map((url, idx) => (
+                      <div key={idx} className="relative w-16 h-16 bg-white shrink-0">
+                        <img src={url} alt="Review Preview" className="w-full h-full object-cover border border-[var(--color-border)] rounded-md" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const remaining = modalImages.split(',')
+                              .map(u => u.trim())
+                              .filter(Boolean)
+                              .filter((_, i) => i !== idx)
+                              .join(', ');
+                            setModalImages(remaining);
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center rounded-full bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold shadow-md cursor-pointer z-10 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {uploadingImage && (
+                      <div className="w-16 h-16 border border-[var(--color-border)] rounded-md flex items-center justify-center bg-white/50 animate-pulse">
+                        <div className="w-4 h-4 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {!uploadingImage && modalImages.split(',').filter(Boolean).length === 0 && (
+                      <div className="flex-1 flex items-center justify-center py-2 text-[10px] font-mono text-[var(--color-muted)] uppercase select-none">
+                        No photos attached. Click below to add.
+                      </div>
+                    )}
+                  </div>
+
+                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
+                    {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const currentCount = modalImages.split(',').filter(Boolean).length;
+                        if (currentCount >= 5) {
+                          showToast("You can upload a maximum of 5 photos.", "error");
+                          return;
+                        }
+                        handleImageUpload(e, setModalImages, modalImages);
+                      }}
+                      disabled={uploadingImage}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Submit / Cancel Buttons */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={modalSubmitting}
+                    className="flex-1 bg-neutral-950 hover:bg-neutral-800 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer text-center py-2.5 shadow-md"
+                  >
+                    {modalSubmitting ? 'Submitting...' : 'Submit Review'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewModalItem(null)}
+                    className="px-4 border border-neutral-250 hover:bg-[var(--color-surface)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer py-2.5"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Return / Exchange Request Modal */}
+      {isRequestModalOpen && requestItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[var(--color-surface)] w-full max-w-md rounded-2xl border border-[var(--color-border)] shadow-2xl p-6 sm:p-8 relative space-y-5 animate-scale-up text-[var(--color-text)] max-h-[90vh] overflow-y-auto scrollbar-none">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsRequestModalOpen(false)}
+              className="absolute top-4 right-4 text-[var(--color-muted)] hover:text-rose-500 font-bold text-sm p-1 cursor-pointer transition-colors"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div>
+              <span className="text-[8px] font-mono text-[var(--color-accent)] block uppercase tracking-widest font-black">
+                // {requestItem.type} REQUEST LOG
+              </span>
+              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1.5 leading-snug">
+                {requestItem.type === 'RETURN' ? 'Request Return' : 'Request Exchange'}
+              </h2>
+              <p className="text-xs font-bold text-[var(--color-text)] mt-1 uppercase tracking-wide">
+                {requestItem.name}
+              </p>
+              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase block mt-1">
+                Current Size: {requestItem.size} · Price: ₹{requestItem.price}
+              </span>
+            </div>
+
+            <hr className="border-[var(--color-border)]" />
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitReturnExchangeRequest();
+              }}
+              className="space-y-4 font-sans"
+            >
+              {/* Reason Selector */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide">Reason for {requestItem.type === 'RETURN' ? 'Return' : 'Exchange'}</span>
+                <select
+                  value={requestReason}
+                  onChange={(e) => setRequestReason(e.target.value)}
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden font-medium cursor-pointer transition-colors"
+                >
+                  <option value="Wrong size received">Wrong size received</option>
+                  <option value="Defective / Damaged product">Defective / Damaged product</option>
+                  <option value="Incorrect product delivered">Incorrect product delivered</option>
+                  <option value="Quality not up to standard">Quality not up to standard</option>
+                  <option value="Other (Explain in box below)">Other (Explain in box below)</option>
+                </select>
+              </div>
+
+              {/* Target Size (For Exchange Only) */}
+              {requestItem.type === 'EXCHANGE' && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide">Select Desired Size</span>
+                  <select
+                    value={exchangeTargetSize}
+                    onChange={(e) => setExchangeTargetSize(e.target.value)}
+                    required
+                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden font-medium cursor-pointer transition-colors"
+                  >
+                    <option value="">-- Choose New Size --</option>
+                    {requestItem.sizes && requestItem.sizes
+                      .filter(s => s !== requestItem.size)
+                      .map((size) => (
+                        <option key={size} value={size}>{size}</option>
+                      ))
+                    }
+                  </select>
+                  <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase">
+                    Exchange is subject to catalog inventory availability during approval.
+                  </span>
+                </div>
+              )}
+
+              {/* Detailed Notes */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide">Additional Comments (Optional)</span>
+                <textarea
+                  value={customRequestText}
+                  onChange={(e) => setCustomRequestText(e.target.value)}
+                  placeholder="Explain any details here..."
+                  rows={2}
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2.5 text-xs text-[var(--color-text)] outline-hidden resize-none transition-colors"
+                />
+              </div>
+
+              {/* Product Photos Upload Verification */}
+              <div className="space-y-3.5">
+                <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wide block">
+                  Upload Product Photos <span className="text-rose-500 font-sans font-bold">*</span> (Required)
+                </span>
+                
+                <div className="grid grid-cols-2 gap-3.5">
+                  {/* Front Image Upload */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Front View</span>
+                    <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-3 cursor-pointer transition-all text-center h-28 relative ${
+                      requestFrontImage ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[var(--color-border)] hover:border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    }`}>
+                      {uploadingFront ? (
+                        <span className="text-[9px] font-mono text-[var(--color-muted)] animate-pulse">UPLOADING...</span>
+                      ) : requestFrontImage ? (
+                        <div className="relative w-full h-full">
+                          <img src={requestFrontImage} className="w-full h-full object-cover rounded-lg border border-[var(--color-border)]" alt="Front proof" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setRequestFrontImage("");
+                            }}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[9px] font-bold shadow-sm transition-colors"
+                            title="Remove image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono font-black text-[var(--color-accent)] block">+ UPLOAD</span>
+                          <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">FRONT PHOTO</p>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleRequestImageUpload(e, 'front')}
+                        disabled={uploadingFront}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Back Image Upload */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Back View</span>
+                    <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-3 cursor-pointer transition-all text-center h-28 relative ${
+                      requestBackImage ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[var(--color-border)] hover:border-[var(--color-accent)] bg-[var(--color-subtle)]/50'
+                    }`}>
+                      {uploadingBack ? (
+                        <span className="text-[9px] font-mono text-[var(--color-muted)] animate-pulse">UPLOADING...</span>
+                      ) : requestBackImage ? (
+                        <div className="relative w-full h-full">
+                          <img src={requestBackImage} className="w-full h-full object-cover rounded-lg border border-[var(--color-border)]" alt="Back proof" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setRequestBackImage("");
+                            }}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[9px] font-bold shadow-sm transition-colors"
+                            title="Remove image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono font-black text-[var(--color-accent)] block">+ UPLOAD</span>
+                          <p className="text-[8px] font-mono text-[var(--color-muted)] uppercase">BACK PHOTO</p>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleRequestImageUpload(e, 'back')}
+                        disabled={uploadingBack}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <p className="text-[8px] font-mono text-[var(--color-muted)] leading-relaxed uppercase">
+                  Select from Camera or Gallery. Photos are compressed automatically. Both front and back views are required.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-3">
+                <button
+                  type="submit"
+                  disabled={submittingRequest}
+                  className="flex-1 bg-neutral-950 hover:bg-neutral-800 text-white font-sans font-bold text-[10px] tracking-widest py-3 rounded-xl uppercase transition-all duration-200 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingRequest ? 'Submitting...' : 'Submit Request'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="px-4 bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900 border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] font-sans font-bold text-[10px] tracking-widest py-3 rounded-xl uppercase transition-all duration-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Preview Modal */}
+      {isInvoicePreviewOpen && (
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 md:p-10 no-print animate-fade-in text-neutral-900">
+          <div className="bg-white text-neutral-950 w-full max-w-3xl rounded-none shadow-2xl relative flex flex-col max-h-[90vh]">
+            
+            {/* Modal Controls */}
+            <div className="p-4 border-b border-neutral-100 flex justify-between items-center bg-neutral-50 no-print">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-mono font-black tracking-widest text-neutral-500 uppercase">
+                  Invoice Preview
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={isGeneratingPdf}
+                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all text-[9px] font-mono font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-none cursor-pointer border border-emerald-600 disabled:opacity-50"
+                >
+                  {isGeneratingPdf ? 'Downloading...' : 'Download PDF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsInvoicePreviewOpen(false)}
+                  className="border border-neutral-300 hover:bg-neutral-100 active:scale-[0.98] transition-all text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-600 px-3 py-1.5 rounded-none cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Preview Area */}
+            <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-8 bg-neutral-100 flex justify-start sm:justify-center items-start">
+              {/* Actual Printable Invoice Card */}
+              <div 
+                id="invoice-print-area" 
+                className="bg-white p-8 md:p-12 border border-neutral-200 shadow-sm w-[680px] shrink-0 text-[11px] font-sans leading-normal text-black"
+                style={{ 
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  color: "#000000",
+                  backgroundColor: "#ffffff",
+                  WebkitFontSmoothing: "antialiased",
+                  MozOsxFontSmoothing: "grayscale",
+                  textRendering: "optimizeLegibility",
+                  // Override Tailwind v4 oklch colors with standard hex for html2canvas compatibility
+                  "--color-neutral-50": "#f9f9f9",
+                  "--color-neutral-100": "#f5f5f5",
+                  "--color-neutral-200": "#e5e5e5",
+                  "--color-neutral-300": "#d4d4d4",
+                  "--color-neutral-400": "#a3a3a3",
+                  "--color-neutral-500": "#737373",
+                  "--color-neutral-600": "#525252",
+                  "--color-neutral-700": "#404040",
+                  "--color-neutral-800": "#262626",
+                  "--color-neutral-900": "#171717",
+                  "--color-neutral-950": "#141414",
+                  "--color-emerald-50": "#ecfdf5",
+                  "--color-emerald-600": "#059669",
+                  "--color-rose-600": "#dc2626"
+                }}
+              >
+                {/* Header */}
+                <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+                  <div>
+                    <div className="text-xl md:text-2xl font-black tracking-wider uppercase leading-none font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
+                    <div className="text-[9px] text-neutral-500 font-bold mt-1 uppercase">Premium Drop & Boutique</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[14px] font-black tracking-wider uppercase leading-snug">TAX INVOICE</div>
+                    <div className="text-[10px] font-mono font-normal text-neutral-500 mt-0.5"># {metadata.order_number}</div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  <div>
+                    <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Sold By</div>
+                    <div className="font-extrabold text-black uppercase font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
+                    <div className="text-neutral-700">Surat, Gujarat, India</div>
+                    <div className="text-neutral-700">Pincode: 395006</div>
+                    <div className="text-neutral-700">GSTIN: 24VAKRAYAN1234F1Z0</div>
+                  </div>
+                  <div>
+                    <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Billed To</div>
+                    <div className="font-extrabold text-black uppercase">{metadata.customer_name || 'Customer'}</div>
+                    <div className="text-neutral-700 lowercase break-all">{metadata.customer_email || order.email || ''}</div>
+                    <div className="text-neutral-700 uppercase">{addressText || ''}</div>
+                    <div className="text-neutral-700">Phone: {metadata.customer_phone || ''}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Invoice Details</div>
+                    <div className="text-neutral-700">Date: {new Date(order.$createdAt || order.createdAt || new Date().toISOString()).toLocaleDateString('en-IN')}</div>
+                    <div className="text-neutral-700">Payment: {order.paymentMethod === 'COD' ? 'CASH ON DELIVERY (COD)' : order.paymentMethod === 'WALLET' ? 'STORE WALLET' : 'RAZORPAY ONLINE'}</div>
+                    {order.paymentMethod !== 'COD' && (
+                      <div className="text-neutral-700 break-all">Transaction: {metadata.razorpay_payment_id || order.razorpayPaymentId || 'N/A'}</div>
+                    )}
+                    <div className="text-neutral-700">Status: {(order.status || 'PENDING').toUpperCase()}</div>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <table className="w-full border-collapse mb-8 text-[11px]">
+                  <thead>
+                    <tr className="border-b-2 border-black">
+                      <th className="text-left py-2 font-black uppercase text-[8px]">Item Description</th>
+                      <th className="text-center py-2 font-black uppercase text-[8px] w-[60px]">Size</th>
+                      <th className="text-center py-2 font-black uppercase text-[8px] w-[60px]">Qty</th>
+                      <th className="text-right py-2 font-black uppercase text-[8px] w-[100px]">Unit Price</th>
+                      <th className="text-right py-2 font-black uppercase text-[8px] w-[100px]">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedItems.map((item, idx) => (
+                      <tr key={idx} className="border-b border-neutral-100">
+                        <td className="py-2.5 font-bold uppercase">{item.name}</td>
+                        <td className="py-2.5 text-center font-mono">{(item.size || 'M').toUpperCase()}</td>
+                        <td className="py-2.5 text-center font-mono">{item.quantity}</td>
+                        <td className="py-2.5 text-right font-mono">₹{Number(item.price).toLocaleString('en-IN')}</td>
+                        <td className="py-2.5 text-right font-mono font-bold">₹{Number(item.price * item.quantity).toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Totals */}
+                <div className="w-[300px] ml-auto border-t-2 border-black pt-3 text-[11px]">
+                  <div className="flex justify-between mb-1.5 uppercase font-medium">
+                    <span className="text-neutral-500">Cart Value</span>
+                    <span className="font-mono">₹{subtotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  {order.couponApplied && order.couponApplied !== 'NONE' && discountVal > 0 && (
+                    <div className="flex justify-between mb-1.5 uppercase text-emerald-600 font-bold">
+                      <span>COUPON SAVINGS ({order.couponApplied})</span>
+                      <span className="font-mono">- ₹{discountVal.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between mb-1.5 uppercase font-medium">
+                    <span className="text-neutral-500">Shipping & Delivery</span>
+                    <span className="font-mono">{baseShippingCharge > 0 ? `₹${baseShippingCharge}` : 'FREE SHIPPING'}</span>
+                  </div>
+                  {remoteSurcharge > 0 && (
+                    <div className="flex justify-between mb-1.5 uppercase font-medium">
+                      <span className="text-neutral-500">Remote Route Surcharge</span>
+                      <span className="font-mono">₹{remoteSurcharge}</span>
+                    </div>
+                  )}
+                  {isCod && (
+                    <div className="flex justify-between mb-1.5 uppercase font-medium">
+                      <span className="text-neutral-500">COD Handling Fee</span>
+                      <span className="font-mono">₹{codFee}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-baseline border-t border-black pt-2.5 mt-2.5 uppercase font-bold">
+                    <span>Net Amount Paid <span className="text-[8px] font-normal text-neutral-500 lowercase normal-case">(incl. GST)</span></span>
+                    <span className="font-mono text-lg font-black">₹{Number(order.total || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                {/* Footer Info */}
+                <div className="mt-16 border-t border-neutral-100 pt-4 text-center text-[9px] text-neutral-400 font-bold tracking-widest uppercase leading-relaxed">
+                  Thank you for shopping with VAKRAYAN!<br/>
+                  This is a system generated tax invoice. No signature is required.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Footer />
+    </>
+  );
+}
+
+export default OrderDetail;
