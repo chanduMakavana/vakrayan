@@ -24,12 +24,16 @@ const DEFAULT_SLIDES = [
   }
 ]
 
+let cachedSlides = DEFAULT_SLIDES
+let cachedImagesLoaded = false
+const preloadedImageUrls = new Set()
+
 function Hero() {
   const navigate = useNavigate()
-  const [slides, setSlides] = useState([])
+  const [slides, setSlides] = useState(cachedSlides)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
-  const [imagesLoaded, setImagesLoaded] = useState(false)
+  const [imagesLoaded, setImagesLoaded] = useState(cachedImagesLoaded)
 
   // Touch Swipe coordinates (Mobile)
   const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 })
@@ -45,23 +49,57 @@ function Hero() {
         if (s.image) urls.push(s.image)
         if (s.mobileImage) urls.push(s.mobileImage)
       })
-      if (urls.length === 0) { setImagesLoaded(true); return }
+      if (urls.length === 0) {
+        cachedImagesLoaded = true
+        if (active) setImagesLoaded(true)
+        return
+      }
+
       let count = 0
       urls.forEach(url => {
+        if (preloadedImageUrls.has(url)) {
+          count++
+          if (count === urls.length && active) {
+            cachedImagesLoaded = true
+            setImagesLoaded(true)
+          }
+          return
+        }
+
         const img = new window.Image()
         img.src = url
-        img.onload = () => { count++; if (count === urls.length && active) setImagesLoaded(true) }
-        img.onerror = () => { count++; if (count === urls.length && active) setImagesLoaded(true) }
+        img.onload = () => {
+          preloadedImageUrls.add(url)
+          count++
+          if (count === urls.length && active) {
+            cachedImagesLoaded = true
+            setImagesLoaded(true)
+          }
+        }
+        img.onerror = () => {
+          preloadedImageUrls.add(url)
+          count++
+          if (count === urls.length && active) {
+            cachedImagesLoaded = true
+            setImagesLoaded(true)
+          }
+        }
       })
     }
+
     slidesService.getSlides().then(res => {
       if (active) {
         const list = res && res.length > 0 ? res : DEFAULT_SLIDES
+        cachedSlides = list
         setSlides(list)
         preloadImages(list)
       }
     }).catch(() => {
-      if (active) { setSlides(DEFAULT_SLIDES); preloadImages(DEFAULT_SLIDES) }
+      if (active) {
+        cachedSlides = DEFAULT_SLIDES
+        setSlides(DEFAULT_SLIDES)
+        preloadImages(DEFAULT_SLIDES)
+      }
     })
     return () => { active = false }
   }, [])
@@ -122,11 +160,17 @@ function Hero() {
 
   // Laptop Mouse Drag Gesture Handlers (Direct slide switch without dragging image position)
   const handleMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('.no-hero-link')) return
     setMouseDownX(e.clientX)
   }
 
   const handleMouseUp = (e) => {
     if (!mouseDownX) return
+    if (e.target.closest('button') || e.target.closest('.no-hero-link')) {
+      setMouseDownX(0)
+      return
+    }
+
     const diffX = mouseDownX - e.clientX
     const threshold = 40
 
@@ -214,8 +258,10 @@ function Hero() {
         >
           {/* Brand badge */}
           <div
-            className="inline-flex items-center gap-3 px-4 py-2.5 pointer-events-auto cursor-pointer"
-            onClick={() => { if (activeSlide.link) navigate(activeSlide.link) }}
+            className="inline-flex items-center gap-3 px-4 py-2.5 pointer-events-auto cursor-pointer no-hero-link"
+            onClick={(e) => { e.stopPropagation(); if (activeSlide.link) navigate(activeSlide.link) }}
+            onMouseDown={e => e.stopPropagation()}
+            onMouseUp={e => e.stopPropagation()}
             style={{
               background: 'rgba(244,250,247,0.14)',
               backdropFilter: 'blur(16px)',
@@ -241,6 +287,8 @@ function Hero() {
           <button
             type="button"
             onClick={prevSlide}
+            onMouseDown={e => e.stopPropagation()}
+            onMouseUp={e => e.stopPropagation()}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200 hover:scale-105"
             style={{
               background: 'rgba(244,250,247,0.18)',
@@ -264,6 +312,8 @@ function Hero() {
           <button
             type="button"
             onClick={nextSlide}
+            onMouseDown={e => e.stopPropagation()}
+            onMouseUp={e => e.stopPropagation()}
             className="absolute right-4 top-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200 hover:scale-105"
             style={{
               background: 'rgba(244,250,247,0.18)',
@@ -291,6 +341,8 @@ function Hero() {
                 key={idx}
                 type="button"
                 onClick={e => { e.stopPropagation(); setCurrentIndex(idx) }}
+                onMouseDown={e => e.stopPropagation()}
+                onMouseUp={e => e.stopPropagation()}
                 className="cursor-pointer transition-all duration-300"
                 style={{
                   height: 6,
