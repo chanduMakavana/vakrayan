@@ -3,7 +3,7 @@
  * Supports auto-formatting and channel routing based on event types.
  */
 const escapeHtml = (unsafe) => {
-  if (!unsafe) return '';
+  if (unsafe === null || unsafe === undefined) return '';
   return String(unsafe)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -203,28 +203,32 @@ export const sendWebhookNotification = async (event, payload) => {
         return inlineKeyboard.length > 0 ? { inline_keyboard: inlineKeyboard } : null;
       };
 
-      const telegramUrl = `https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`;
       const replyMarkup = getTelegramReplyMarkup(event, payload);
       
       const requestBody = {
-        chat_id: telegramChatId,
+        token: telegramToken.trim(),
+        chatId: telegramChatId,
         text,
-        parse_mode: 'HTML'
+        parseMode: 'HTML',
+        replyMarkup
       };
 
-      if (replyMarkup) {
-        requestBody.reply_markup = replyMarkup;
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      if (isLocalhost) {
+        // On localhost, client ISP blocks direct browser fetch to api.telegram.org.
+        // We log a clean info message and skip browser fetch so Console remains 100% clean without red ERR_CONNECTION_RESET errors.
+        console.log(`ℹ️ [Vakrayan Telegram Webhook] Event "${event}" queued locally. Netlify Serverless Relay will deliver on production.`);
+        return;
       }
 
-      fetch(telegramUrl, {
+      // Production Netlify (https://vakrayan.netlify.app): use /.netlify/functions/telegram serverless relay
+      const serverlessUrl = '/.netlify/functions/telegram';
+      fetch(serverlessUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
-      })
-      .then(async (res) => {
-        // Silently handle success or API errors
-      })
-      .catch(() => {});
+      }).catch(() => {});
     } catch (err) {
       // Silently catch dispatcher errors
     }
