@@ -213,22 +213,56 @@ export const sendWebhookNotification = async (event, payload) => {
         replyMarkup
       };
 
+      const directUrl = `https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`;
       const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
       if (isLocalhost) {
-        // On localhost, client ISP blocks direct browser fetch to api.telegram.org.
-        // We log a clean info message and skip browser fetch so Console remains 100% clean without red ERR_CONNECTION_RESET errors.
-        console.log(`ℹ️ [Vakrayan Telegram Webhook] Event "${event}" queued locally. Netlify Serverless Relay will deliver on production.`);
-        return;
+        // On localhost: Send direct fetch to Telegram API so local testing works!
+        fetch(directUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: telegramChatId,
+            text,
+            parse_mode: 'HTML',
+            reply_markup: replyMarkup
+          })
+        }).catch(() => {});
+      } else {
+        // Production Netlify (https://vakrayan.netlify.app): use /.netlify/functions/telegram serverless relay
+        const serverlessUrl = '/.netlify/functions/telegram';
+        fetch(serverlessUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        })
+        .then(res => {
+          if (!res.ok) {
+            return fetch(directUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: telegramChatId,
+                text,
+                parse_mode: 'HTML',
+                reply_markup: replyMarkup
+              })
+            });
+          }
+        })
+        .catch(() => {
+          fetch(directUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: telegramChatId,
+              text,
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup
+            })
+          }).catch(() => {});
+        });
       }
-
-      // Production Netlify (https://vakrayan.netlify.app): use /.netlify/functions/telegram serverless relay
-      const serverlessUrl = '/.netlify/functions/telegram';
-      fetch(serverlessUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }).catch(() => {});
     } catch (err) {
       // Silently catch dispatcher errors
     }
