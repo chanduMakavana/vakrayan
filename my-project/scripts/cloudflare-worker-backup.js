@@ -52,12 +52,18 @@ async function runBackupJob(env) {
   const oauthToken = await getGoogleAuthToken(serviceAccount);
   
   console.log("🔄 Fetching Firestore collections...");
-  const collections = ["users", "orders", "products"];
+  const collections = [
+    "users", "orders", "products", "addresses", "cart", "coupons",
+    "coupon_usage", "reviews", "wishlist", "restock_notifications",
+    "wallet", "settings", "category_configs", "slides", "offers",
+    "newsletter", "search_logs"
+  ];
   const backupData = {};
 
   for (const col of collections) {
     const docs = await fetchFirestoreCollection(env.FIREBASE_PROJECT_ID, col, oauthToken);
     backupData[col] = docs;
+    console.log(`   - ${col}: ${Object.keys(docs).length} documents fetched.`);
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -134,29 +140,44 @@ async function getGoogleAuthToken(serviceAccount) {
   return data.access_token;
 }
 
-// 2. Fetch documents from Firestore REST API
+// 2. Fetch documents from Firestore REST API with Pagination Loop
 async function fetchFirestoreCollection(projectId, collectionName, token) {
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-  
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(`Failed to fetch collection ${collectionName}: ${JSON.stringify(data)}`);
-  }
-
-  // Format documents to key-value maps
   const documents = {};
-  if (data.documents) {
-    for (const doc of data.documents) {
-      const nameParts = doc.name.split("/");
-      const docId = nameParts[nameParts.length - 1];
-      documents[docId] = formatFirestoreFields(doc.fields || {});
+  let pageToken = null;
+
+  do {
+    let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionName}?pageSize=300`;
+    if (pageToken) {
+      url += `&pageToken=${encodeURIComponent(pageToken)}`;
     }
-  }
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      // If collection doesn't exist or is empty, ignore 404 cleanly
+      if (response.status === 404) {
+        break;
+      }
+      throw new Error(`Failed to fetch collection ${collectionName}: ${JSON.stringify(data)}`);
+    }
+
+    // Format documents to key-value maps
+    if (data.documents) {
+      for (const doc of data.documents) {
+        const nameParts = doc.name.split("/");
+        const docId = nameParts[nameParts.length - 1];
+        documents[docId] = formatFirestoreFields(doc.fields || {});
+      }
+    }
+
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+
   return documents;
 }
 
