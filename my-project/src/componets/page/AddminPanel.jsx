@@ -566,14 +566,14 @@ function AdminPanel() {
       const response = await storageService.uploadFile(file);
       if (response?.$id) {
         const fileUrl = storageService.getFileView(response.$id);
-        setValue(fieldName, fileUrl);
-        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
+        setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        showToast("✓ Image uploaded successfully to Cloud Storage!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image drop upload failed:", err);
-      showToast("Firebase Storage upload failed.", "error");
+      showToast("Cloud Storage upload failed.", "error");
     } finally {
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
     }
@@ -620,7 +620,7 @@ function AdminPanel() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setValue(fieldName, '');
+                    setValue(fieldName, '', { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                   }}
                   className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200 cursor-pointer"
                   title="Remove Image"
@@ -697,14 +697,14 @@ function AdminPanel() {
       const response = await storageService.uploadFile(file);
       if (response?.$id) {
         const fileUrl = storageService.getFileView(response.$id);
-        setValue(fieldName, fileUrl);
-        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
+        setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        showToast("✓ Image uploaded successfully!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image upload failed:", err);
-      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+      showToast("Cloud Storage upload failed.", "error");
     } finally {
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
     }

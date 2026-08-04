@@ -365,34 +365,43 @@ export class Storage {
         
         // If Backblaze/Cloudflare Worker is configured, route uploads there!
         if (workerUrl) {
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const response = await fetch(workerUrl, {
-                method: 'POST',
-                body: formData,
-            });
-            
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(`Cloudflare/Backblaze Upload Error: ${text}`);
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch(workerUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.url) {
+                        return { $id: data.url };
+                    }
+                }
+                console.warn("Cloudflare Worker in adapter returned non-ok status or missing URL, falling back to Firebase Storage.");
+            } catch (err) {
+                console.warn("Cloudflare Worker upload in adapter failed, falling back to Firebase Storage:", err.message);
             }
-            
-            const data = await response.json();
-            // Worker returns { url: "https://..." }
-            return { $id: data.url };
         }
 
         // Fallback to Firebase Storage
         const uniqueId = fileId === 'unique()' ? Date.now().toString() : fileId;
         const storageRef = ref(firebaseStorage, `${bucketId}/${uniqueId}_${file.name}`);
         await uploadBytes(storageRef, file);
-        return { $id: storageRef.fullPath };
+        try {
+            const downloadUrl = await getDownloadURL(storageRef);
+            return { $id: downloadUrl };
+        } catch {
+            return { $id: `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(storageRef.fullPath)}?alt=media` };
+        }
     }
 
     getFileView(fileId, bucketId) {
-        // If fileId is already a full URL (like from Backblaze), just return it
-        if (fileId && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+        if (!fileId) return '';
+        // If fileId is already a full URL (like from Backblaze or Firebase Storage getDownloadURL), just return it
+        if (typeof fileId === 'string' && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
             return fileId;
         }
         return `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;

@@ -10,8 +10,8 @@ export class StorageService {
     }
 
     async uploadFile(file, bucketId = conf.firebaseBucketId || 'images') {
-        // If a Cloudflare Worker URL is configured, use it to upload to Backblaze B2.
-        // Otherwise, fall back to standard Firebase Storage.
+        // If a Cloudflare Worker URL is configured, try uploading to Backblaze B2.
+        // If worker fails, fall back gracefully to standard Firebase Storage.
         if (conf.firebaseCloudflareWorkerUrl) {
             try {
                 const formData = new FormData();
@@ -22,21 +22,15 @@ export class StorageService {
                     body: formData,
                 });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Worker upload failed: ${response.status} - ${errorText}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result && result.url) {
+                        return { $id: result.url };
+                    }
                 }
-
-                const result = await response.json();
-                if (result && result.success && result.url) {
-                    // Return the URL as $id so that direct references in components load it instantly.
-                    return { $id: result.url };
-                } else {
-                    throw new Error(result?.error || 'Invalid response from upload gateway');
-                }
+                console.warn("Cloudflare Worker upload response not OK or missing url, falling back to Firebase Storage.");
             } catch (error) {
-                console.error("Cloudflare Worker B2 Upload :: error", error.message);
-                throw error;
+                console.warn("Cloudflare Worker B2 Upload error, falling back to Firebase Storage:", error.message);
             }
         }
 
@@ -54,18 +48,18 @@ export class StorageService {
     }
 
     getFileView(fileId, bucketId = conf.firebaseBucketId || 'images') {
-        // If the fileId is a full URL (e.g. from Backblaze B2), return it directly.
-        if (fileId && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+        if (!fileId) return '';
+        // If the fileId is already a full HTTP/HTTPS URL, return it directly.
+        if (typeof fileId === 'string' && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
             return fileId;
         }
 
         try {
-            // getFileView returns a URL string (or object that can be converted to string)
-            const result = this.storage.getFileView(bucketId, fileId);
+            const result = this.storage.getFileView(fileId, bucketId);
             return typeof result === 'string' ? result : result.toString();
         } catch (error) {
             console.error("Firebase service :: getFileView :: error", error.message);
-            return `${conf.firebaseurl}/storage/buckets/${bucketId}/files/${fileId}/view?project=${conf.firebaseProjectId}`;
+            return fileId;
         }
     }
 }
