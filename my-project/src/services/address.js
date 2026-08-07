@@ -229,20 +229,18 @@ export class AddressService {
                     Query.limit(100)
                 ]
             );
-            for (const doc of response.documents) {
-                if (doc.$id !== defaultId) {
-                    try {
-                        await this.databases.updateDocument(
+            await Promise.all(
+                response.documents
+                    .filter(doc => doc.$id !== defaultId)
+                    .map(doc =>
+                        this.databases.updateDocument(
                             conf.firebaseDatabaseId,
                             conf.firebaseAddressesCollectionId,
                             doc.$id,
                             { is_default: false }
-                        );
-                    } catch (err) {
-                        console.warn("Failed to reset is_default on document:", doc.$id, err.message);
-                    }
-                }
-            }
+                        ).catch(err => console.warn("Failed to reset is_default on document:", doc.$id, err.message))
+                    )
+            );
         } catch (err) {
             console.warn("Default syncing issue:", err.message);
         }

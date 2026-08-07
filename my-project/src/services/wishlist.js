@@ -87,13 +87,14 @@ export class WishlistService {
             const cloudDocs = await this.getUserWishlist(userId);
             const cloudProductIds = cloudDocs.map(doc => doc.productId);
             
-            // 1. Upload local items that are missing in the cloud
-            for (const item of localItems) {
+            // 1. Upload local items that are missing in the cloud (parallel)
+            const missingItems = localItems.filter(item => {
                 const itemId = item.$id || item.id;
-                if (itemId && !cloudProductIds.includes(itemId)) {
-                    await this.addToWishlist(userId, itemId);
-                }
-            }
+                return itemId && !cloudProductIds.includes(itemId);
+            });
+            await Promise.all(
+                missingItems.map(item => this.addToWishlist(userId, item.$id || item.id))
+            );
 
             // 2. Fetch updated cloud wishlist and merge back to local structure format
             const finalCloudDocs = await this.getUserWishlist(userId);

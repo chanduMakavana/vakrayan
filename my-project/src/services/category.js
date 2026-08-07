@@ -148,14 +148,16 @@ export class CategoryService {
             }
             const configs = await this.getCategoryConfigs();
             const deletedConfigs = configs.filter(c => c.isDeleted);
-            for (const doc of deletedConfigs) {
-                await this.databases.updateDocument(
-                    conf.firebaseDatabaseId,
-                    conf.firebaseCategoryConfigsCollectionId,
-                    doc.$id,
-                    { isDeleted: false }
-                );
-            }
+            await Promise.all(
+                deletedConfigs.map(doc =>
+                    this.databases.updateDocument(
+                        conf.firebaseDatabaseId,
+                        conf.firebaseCategoryConfigsCollectionId,
+                        doc.$id,
+                        { isDeleted: false }
+                    )
+                )
+            );
             return true;
         } catch (error) {
             console.error("Firebase service :: restoreAllCategories :: error", error.message);

@@ -1,5 +1,6 @@
 import { useSelector } from 'react-redux'
 import { Navigate, useLocation } from 'react-router-dom'
+import Loader from './pageComponets/Loader'
 
 /**
  * ProtectedRoute — Router-level authentication guard.
@@ -18,7 +19,7 @@ function ProtectedRoute({ children }) {
 
   // While the session is being restored on mount, render nothing —
   // prevents a flash-redirect to /login before auth state is resolved.
-  if (loading) return null
+  if (loading) return <Loader type="splash" />
 
   if (!isAuthenticated) {
     return (

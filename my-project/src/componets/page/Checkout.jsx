@@ -405,6 +405,7 @@ function Checkout() {
     const pin = (data.pincode || '').trim();
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
       showToast("Please enter a valid 6-digit Indian PIN code.", "error");
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -414,6 +415,7 @@ function Checkout() {
       const pinData = await pinResponse.json();
       if (pinData && pinData[0] && pinData[0].Status === 'Error') {
         showToast(`Sorry, PIN code ${pin} is invalid or not serviceable. Please enter a valid deliverable PIN code.`, "error");
+        isSubmittingRef.current = false;
         return;
       }
       if (pinData && pinData[0] && pinData[0].PostOffice && pinData[0].PostOffice.length > 0) {
@@ -428,43 +430,29 @@ function Checkout() {
       const isCodAllowed = isCodAvailableForPincode(pin, resolvedState);
       if (!isCodAllowed) {
         showToast("Cash on Delivery (COD) is not serviceable for this remote route. Please use Online Payment.", "error");
+        isSubmittingRef.current = false;
         return;
       }
     }
 
-    // 0. Live Stock Validation — fetch fresh product data from Firebase at submit time
-    // This eliminates the TOCTOU race condition where two users could both pass
-    // a stale Redux cache check and oversell the last unit.
-    for (const cartItem of cartItems) {
-      try {
-        const liveProduct = await productsService.getProductById(cartItem.product_id);
-        if (liveProduct) {
-          let stocks;
-          try {
-            stocks = JSON.parse(liveProduct.sizes_stock || '{}');
-          } catch {
-            stocks = {};
-          }
-          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
-          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
-          if (Number(cartItem.quantity) > availableStock) {
-            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
-            return;
-          }
-        }
-      } catch (stockErr) {
-        console.warn(`Live stock check failed for ${cartItem.name}, proceeding with cached data:`, stockErr.message);
-        // Fallback to Redux cache if live fetch fails
-        const cachedProd = products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
-        if (cachedProd) {
-          let stocks;
-          try { stocks = JSON.parse(cachedProd.sizes_stock || '{}'); } catch { stocks = {}; }
-          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
-          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
-          if (Number(cartItem.quantity) > availableStock) {
-            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left.`, "error");
-            return;
-          }
+    // 0. Live Stock Validation — fetch all products in parallel to eliminate sequential N+1 waterfall
+    const stockResults = await Promise.allSettled(
+      cartItems.map(cartItem => productsService.getProductById(cartItem.product_id))
+    );
+    for (let idx = 0; idx < cartItems.length; idx++) {
+      const cartItem = cartItems[idx];
+      const result = stockResults[idx];
+      const liveProduct = result.status === 'fulfilled' ? result.value : null;
+      const productToCheck = liveProduct || products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
+      if (productToCheck) {
+        let stocks;
+        try { stocks = JSON.parse(productToCheck.sizes_stock || '{}'); } catch { stocks = {}; }
+        const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+        const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+        if (Number(cartItem.quantity) > availableStock) {
+          showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
+          isSubmittingRef.current = false;
+          return;
         }
       }
     }
@@ -523,13 +511,20 @@ function Checkout() {
                   });
                   const verifyData = await verifyResp.json();
                   if (!verifyData.success) {
-                    showToast('Payment verification failed. Please contact support.', 'error');
+                    showToast('Payment verification failed! Order was not placed.', 'error');
+                    isSubmittingRef.current = false;
                     return;
                   }
                 } catch (verifyErr) {
-                  console.warn('⚠️ Payment verification endpoint unreachable:', verifyErr.message);
-                  // Allow to proceed if verification endpoint is not configured yet
+                  console.error('❌ Payment verification error:', verifyErr.message);
+                  showToast('Payment verification unreachable. Order cancelled for security.', 'error');
+                  isSubmittingRef.current = false;
+                  return;
                 }
+              } else if (verifyUrl) {
+                showToast('Missing payment signature or details. Payment rejected.', 'error');
+                isSubmittingRef.current = false;
+                return;
               }
 
               processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);

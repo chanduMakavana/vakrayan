@@ -391,7 +391,7 @@ function Shop() {
       if (sortBy === 'price-high') return Number(b.price) - Number(a.price)
       return 0;
     })
-  }, [products, selectedCategory, selectedTag, offers, minPriceFilter, maxPriceFilter, selectedSizes, inStockOnly, searchQuery, sortBy])
+  }, [products, selectedCategory, selectedTag, offers, minPriceFilter, maxPriceFilter, selectedSizes, selectedColors, inStockOnly, searchQuery, sortBy])
 
   const drawerPreviewCount = useMemo(() => {
     if (!filterDrawerOpen) return filteredProducts.length

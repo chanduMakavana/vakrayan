@@ -1,0 +1,15 @@
+# Vakrayan — Robots.txt
+# https://vakrayan.in
+
+User-agent: *
+Allow: /
+
+# Block private/internal routes from indexing
+Disallow: /admin
+Disallow: /checkout
+Disallow: /profile
+Disallow: /order/
+Disallow: /cart
+
+# Sitemap
+Sitemap: https://vakrayan.in/sitemap.xml

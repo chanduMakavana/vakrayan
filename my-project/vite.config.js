@@ -1,4 +1,3 @@
-import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -29,6 +28,12 @@ export default defineConfig({
           }
           if (id.includes('node_modules/@reduxjs/') || id.includes('node_modules/react-redux') || id.includes('node_modules/redux')) {
             return 'vendor-redux';
+          }
+          if (id.includes('node_modules/firebase')) {
+            return 'vendor-firebase';
+          }
+          if (id.includes('node_modules/html2canvas') || id.includes('node_modules/jspdf')) {
+            return 'vendor-pdf';
           }
           if (id.includes('node_modules/framer-motion')) {
             return 'vendor-motion';

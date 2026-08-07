@@ -4,7 +4,7 @@ export async function handler(event) {
     return {
       statusCode: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://vakrayan.in',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
       },
@@ -18,16 +18,24 @@ export async function handler(event) {
 
   try {
     const payload = JSON.parse(event.body || '{}');
-    const { token, chatId, text, parseMode, replyMarkup } = payload;
+    const { text, parseMode, replyMarkup, channelRoute } = payload;
 
-    const botToken = (token && token.trim()) || process.env.VITE_TELEGRAM_BOT_TOKEN || "8918832059:AAEbqEa7cHG9Bs632f14nYEzmkcquP7kJD8";
-    const targetChatId = (chatId && chatId.trim()) || process.env.VITE_TELEGRAM_ORDER_CHAT_ID || "-1003947210182";
+    // Bot token is server-side only (no VITE_ prefix — never sent to client)
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+    // Resolve target chat ID based on channel route
+    const chatIdMap = {
+      order: process.env.TELEGRAM_ORDER_CHAT_ID,
+      event: process.env.TELEGRAM_EVENT_CHAT_ID,
+      cancel: process.env.TELEGRAM_CANCEL_CHAT_ID,
+    };
+    const targetChatId = chatIdMap[channelRoute] || process.env.TELEGRAM_ORDER_CHAT_ID;
 
     if (!botToken || !targetChatId) {
       return {
         statusCode: 400,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Missing Telegram bot token or chat ID' })
+        headers: { 'Access-Control-Allow-Origin': 'https://vakrayan.in' },
+        body: JSON.stringify({ error: 'Telegram bot token or chat ID is not configured on the server.' })
       };
     }
 
@@ -52,7 +60,7 @@ export async function handler(event) {
     return {
       statusCode: response.ok ? 200 : 400,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://vakrayan.in',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(result)
@@ -61,7 +69,7 @@ export async function handler(event) {
     return {
       statusCode: 500,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'https://vakrayan.in',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ error: err.message })

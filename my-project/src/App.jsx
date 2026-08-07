@@ -383,7 +383,7 @@ function AppContent() {
     };
 
     checkExpiry();
-    const intervalId = setInterval(checkExpiry, 10000);
+    const intervalId = setInterval(checkExpiry, 60000);
     return () => clearInterval(intervalId);
   }, [location.pathname, dispatch, showToast]);
 

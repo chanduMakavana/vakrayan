@@ -111,14 +111,13 @@ export class CartService {
     async convertCartItems(user_id, itemIds = null) {
         try {
             const items = await this.getCartItems(user_id);
-            for (const item of items) {
-                if (itemIds && !itemIds.includes(item.$id)) continue;
-                try {
-                    await this.updateCartItem(item.$id, { cart_status: 'converted' });
-                } catch (e) {
-                    console.warn("Firebase schema missing 'cart_status' attribute:", e.message);
-                }
-            }
+            const toConvert = itemIds ? items.filter(item => itemIds.includes(item.$id)) : items;
+            await Promise.all(
+                toConvert.map(item =>
+                    this.updateCartItem(item.$id, { cart_status: 'converted' })
+                        .catch(e => console.warn("Firebase schema missing 'cart_status' attribute:", e.message))
+                )
+            );
             return true;
         } catch (error) {
             console.error("Firebase service :: convertCartItems :: error", error.message);

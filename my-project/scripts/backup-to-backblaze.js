@@ -104,6 +104,7 @@ async function uploadToB2(localFilePath, remoteFileName) {
 // 3. Backup Firestore Collections
 async function backupFirestore() {
   console.log("🔄 Starting Firestore Backup...");
+  const backupData = {};
   // Get all collections dynamically from Firestore
   let collectionNames = [];
   try {

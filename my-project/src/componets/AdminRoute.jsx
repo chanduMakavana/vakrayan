@@ -1,5 +1,6 @@
 import { useSelector } from 'react-redux'
 import { Navigate } from 'react-router-dom'
+import Loader from './pageComponets/Loader'
 
 /**
  * AdminRoute — Router-level admin authorization guard.
@@ -19,7 +20,7 @@ function AdminRoute({ children }) {
   const { user, isAuthenticated, loading } = useSelector((state) => state.auth)
 
   // Hold render until session recovery completes to avoid a false redirect
-  if (loading) return null
+  if (loading) return <Loader type="splash" />
 
   // Must be authenticated first
   if (!isAuthenticated || !user) {

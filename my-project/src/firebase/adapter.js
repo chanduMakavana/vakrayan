@@ -2,7 +2,8 @@ import { auth, db as firestore, storage as firebaseStorage, googleProvider } fro
 import { 
   createUserWithEmailAndPassword, signInWithEmailAndPassword, 
   signOut, onAuthStateChanged, updateProfile, signInWithPopup,
-  sendPasswordResetEmail, confirmPasswordReset
+  sendPasswordResetEmail, confirmPasswordReset, updatePassword as updateAuthPassword,
+  EmailAuthProvider, reauthenticateWithCredential
 } from 'firebase/auth';
 import { 
   collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, arrayUnion, arrayRemove
@@ -23,7 +24,7 @@ export class Account {
     async create(userId, email, password, name) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: name });
-        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const sessionId = crypto.randomUUID();
         localStorage.setItem('current_session_id', sessionId);
         localStorage.removeItem('google_session_expiry');
         // Store preferences in a user document
@@ -33,7 +34,7 @@ export class Account {
 
     async createEmailPasswordSession(email, password) {
         const cred = await signInWithEmailAndPassword(auth, email, password);
-        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const sessionId = crypto.randomUUID();
         localStorage.setItem('current_session_id', sessionId);
         localStorage.removeItem('google_session_expiry');
         const userDocRef = doc(firestore, 'users', cred.user.uid);
@@ -67,12 +68,12 @@ export class Account {
                         const docSnap = await getDoc(doc(firestore, 'users', user.uid));
                         const data = docSnap.exists() ? docSnap.data() : { prefs: {} };
                         
-                        // Check if session has been invalidated
-                        const activeSessions = data.activeSessions || [];
+                        // Check if session has been invalidated (only if activeSessions array is explicitly maintained)
+                        const activeSessions = data.activeSessions;
                         const currentSessionId = localStorage.getItem('current_session_id');
                         
-                        // If current session is no longer in activeSessions (meaning user logged out all devices), sign out
-                        if (currentSessionId && !activeSessions.includes(currentSessionId)) {
+                        // Only sign out if activeSessions is explicitly populated and currentSessionId is missing from it
+                        if (currentSessionId && Array.isArray(activeSessions) && activeSessions.length > 0 && !activeSessions.includes(currentSessionId)) {
                             await signOut(auth);
                             localStorage.removeItem('current_session_id');
                             localStorage.removeItem('remember_me');
@@ -172,6 +173,13 @@ export class Account {
     }
 
     async updatePassword(password, oldPassword) {
+        if (!auth.currentUser) throw new Error("No user is currently signed in.");
+        // Re-authenticate before password change (required by Firebase for sessions older than ~5 min)
+        if (oldPassword && auth.currentUser.email) {
+            const credential = EmailAuthProvider.credential(auth.currentUser.email, oldPassword);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+        }
+        await updateAuthPassword(auth.currentUser, password);
         return true;
     }
 
@@ -181,7 +189,7 @@ export class Account {
             return signInWithPopup(auth, googleProvider)
                 .then(async (result) => {
                     const user = result.user;
-                    const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                    const sessionId = crypto.randomUUID();
                     localStorage.setItem('current_session_id', sessionId);
                     localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
 
@@ -361,7 +369,7 @@ export class Storage {
     constructor(client) { this.client = client; }
 
     async createFile(bucketId, fileId, file) {
-        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://b2-upload-gateway.chandumakavana61.workers.dev/";
+        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "";
         
         // If Backblaze/Cloudflare Worker is configured, route uploads there!
         if (workerUrl) {
@@ -404,7 +412,8 @@ export class Storage {
         if (typeof fileId === 'string' && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
             return fileId;
         }
-        return `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;
+        const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '';
+        return `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;
     }
     
     async deleteFile(bucketId, fileId) {

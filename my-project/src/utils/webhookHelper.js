@@ -93,178 +93,93 @@ export const sendWebhookNotification = async (event, payload) => {
     }
   }
 
-  // 2. Resolve Telegram Bot settings
-  const telegramToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-  const getTelegramChatId = (evt) => {
-    const orderChatId = import.meta.env.VITE_TELEGRAM_ORDER_CHAT_ID || import.meta.env.VITE_TELEGRAM_CHAT_ID_ORDERS;
-    const eventChatId = import.meta.env.VITE_TELEGRAM_EVENT_CHAT_ID || import.meta.env.VITE_TELEGRAM_CHAT_ID_EVENTS;
-    const cancelChatId = import.meta.env.VITE_TELEGRAM_CANCEL_CHAT_ID || import.meta.env.VITE_TELEGRAM_CHAT_ID_CANCEL;
-    const defaultChatId = import.meta.env.VITE_TELEGRAM_CHAT_ID;
-    
-    if (evt === 'order.cancelled') {
-      return (cancelChatId && cancelChatId.trim()) || (orderChatId && orderChatId.trim()) || (defaultChatId && defaultChatId.trim()) || (eventChatId && eventChatId.trim());
+  // 2. Send Telegram notification via server-side Netlify function
+  // Bot token and chat IDs are stored as server-side env vars (no VITE_ prefix)
+  // and are NOT available in the client-side bundle.
+  try {
+    let text = '';
+    if (event === 'order.created') {
+      const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity} @ ₹${i.price}`).join('\n');
+      text = `<b>🚨 NEW VAKRAYAN ORDER RECEIVED! 🚨</b>\n\n` +
+             `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+             `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
+             `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
+             `<b>Phone:</b> ${escapeHtml(payload.phone)}\n` +
+             `<b>Payment Method:</b> ${escapeHtml(payload.paymentMethod)}\n` +
+             `<b>Total Amount:</b> ₹${payload.total}\n` +
+             `<b>Shipping Address:</b> ${escapeHtml(payload.shippingAddress)}\n\n` +
+             `<b>Items Ordered:</b>\n${itemsList}`;
+    } else if (event === 'order.cancelled') {
+      const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity}`).join('\n');
+      text = `<b>🚫 VAKRAYAN ORDER CANCELLED BY CUSTOMER 🚫</b>\n\n` +
+             `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+             `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
+             `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
+             `<b>Total Refund Amount:</b> ₹${payload.total}\n` +
+             `<b>Reason for Cancellation:</b> <i>${escapeHtml(payload.reason)}</i>\n\n` +
+             `<b>Items in Cancelled Order:</b>\n${itemsList}`;
+    } else if (event === 'user.signup') {
+      text = `<b>👤 NEW USER REGISTERED! 👤</b>\n\n` +
+             `<b>Name:</b> ${escapeHtml(payload.name)}\n` +
+             `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
+             `<b>User ID:</b> <code>${escapeHtml(payload.userId)}</code>`;
+    } else if (event === 'newsletter.subscribe') {
+      text = `<b>📧 NEW NEWSLETTER SUBSCRIPTION! 📧</b>\n\n` +
+             `<b>Email Address:</b> ${escapeHtml(payload.email)}`;
+    } else if (event === 'restock.requested') {
+      text = `<b>🔄 RESTOCK NOTIFICATION REQUESTED! 🔄</b>\n\n` +
+             `<b>Product:</b> ${escapeHtml(payload.productName)} (ID: <code>${escapeHtml(payload.productId)}</code>)\n` +
+             `<b>Size Requested:</b> <code>${escapeHtml(payload.size)}</code>\n` +
+             `<b>Email:</b> ${escapeHtml(payload.email)}`;
+    } else if (event === 'return.requested') {
+      text = `<b>📦 RETURN/EXCHANGE REQUESTED! 📦</b>\n\n` +
+             `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+             `<b>Type:</b> ${escapeHtml(payload.type)} (Return or Exchange)\n` +
+             `<b>Reason:</b> ${escapeHtml(payload.reason)}\n` +
+             `<b>Customer Email:</b> ${escapeHtml(payload.email)}`;
+    } else if (event === 'system.error') {
+      text = `<b>🚨 CRITICAL WEBSITE ERROR CAUGHT! 🚨</b>\n\n` +
+             `<b>Error Message:</b> <code>${escapeHtml(payload.errorMessage)}</code>\n` +
+             `<b>Location URL:</b> ${escapeHtml(payload.url)}\n` +
+             `<b>User Agent:</b> <i>${escapeHtml(payload.userAgent)}</i>\n\n` +
+             `<b>Component Stack Trace:</b>\n<pre>${escapeHtml((payload.stack || '').substring(0, 1500))}</pre>`;
+    } else {
+      text = `<b>🔔 WEBSITE EVENT: ${event.toUpperCase()} 🔔</b>\n\n` +
+             `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
     }
-    if (evt === 'order.created') {
-      return (orderChatId && orderChatId.trim()) || (defaultChatId && defaultChatId.trim()) || (eventChatId && eventChatId.trim());
-    }
-    return (eventChatId && eventChatId.trim()) || (defaultChatId && defaultChatId.trim()) || (orderChatId && orderChatId.trim());
-  };
 
-  const telegramChatId = getTelegramChatId(event);
-  if (!telegramToken || !telegramToken.trim() || !telegramChatId) {
-    // Silently skip if misconfigured
-
-  } else {
-    try {
-      let text = '';
-      if (event === 'order.created') {
-        const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity} @ ₹${i.price}`).join('\n');
-        text = `<b>🚨 NEW VAKRAYAN ORDER RECEIVED! 🚨</b>\n\n` +
-               `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
-               `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
-               `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
-               `<b>Phone:</b> ${escapeHtml(payload.phone)}\n` +
-               `<b>Payment Method:</b> ${escapeHtml(payload.paymentMethod)}\n` +
-               `<b>Total Amount:</b> ₹${payload.total}\n` +
-               `<b>Shipping Address:</b> ${escapeHtml(payload.shippingAddress)}\n\n` +
-               `<b>Items Ordered:</b>\n${itemsList}`;
-      } else if (event === 'order.cancelled') {
-        const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity}`).join('\n');
-        text = `<b>🚫 VAKRAYAN ORDER CANCELLED BY CUSTOMER 🚫</b>\n\n` +
-               `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
-               `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
-               `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
-               `<b>Total Refund Amount:</b> ₹${payload.total}\n` +
-               `<b>Reason for Cancellation:</b> <i>${escapeHtml(payload.reason)}</i>\n\n` +
-               `<b>Items in Cancelled Order:</b>\n${itemsList}`;
-      } else if (event === 'user.signup') {
-        text = `<b>👤 NEW USER REGISTERED! 👤</b>\n\n` +
-               `<b>Name:</b> ${escapeHtml(payload.name)}\n` +
-               `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
-               `<b>User ID:</b> <code>${escapeHtml(payload.userId)}</code>`;
-      } else if (event === 'newsletter.subscribe') {
-        text = `<b>📧 NEW NEWSLETTER SUBSCRIPTION! 📧</b>\n\n` +
-               `<b>Email Address:</b> ${escapeHtml(payload.email)}`;
-      } else if (event === 'restock.requested') {
-        text = `<b>🔄 RESTOCK NOTIFICATION REQUESTED! 🔄</b>\n\n` +
-               `<b>Product:</b> ${escapeHtml(payload.productName)} (ID: <code>${escapeHtml(payload.productId)}</code>)\n` +
-               `<b>Size Requested:</b> <code>${escapeHtml(payload.size)}</code>\n` +
-               `<b>Email:</b> ${escapeHtml(payload.email)}`;
-      } else if (event === 'return.requested') {
-        text = `<b>📦 RETURN/EXCHANGE REQUESTED! 📦</b>\n\n` +
-               `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
-               `<b>Type:</b> ${escapeHtml(payload.type)} (Return or Exchange)\n` +
-               `<b>Reason:</b> ${escapeHtml(payload.reason)}\n` +
-               `<b>Customer Email:</b> ${escapeHtml(payload.email)}`;
-      } else if (event === 'system.error') {
-        text = `<b>🚨 CRITICAL WEBSITE ERROR CAUGHT! 🚨</b>\n\n` +
-               `<b>Error Message:</b> <code>${escapeHtml(payload.errorMessage)}</code>\n` +
-               `<b>Location URL:</b> ${escapeHtml(payload.url)}\n` +
-               `<b>User Agent:</b> <i>${escapeHtml(payload.userAgent)}</i>\n\n` +
-               `<b>Component Stack Trace:</b>\n<pre>${escapeHtml(payload.stack.substring(0, 1500))}</pre>`;
-      } else {
-        text = `<b>🔔 WEBSITE EVENT: ${event.toUpperCase()} 🔔</b>\n\n` +
-               `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
+    // Build inline keyboard for Telegram
+    let replyMarkup = null;
+    let baseUrl = 'https://vakrayan.in';
+    if (typeof window !== 'undefined' && window.location) {
+      const origin = window.location.origin;
+      if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+        baseUrl = origin;
       }
-
-      const getTelegramReplyMarkup = (evt, pld) => {
-        let baseUrl = 'https://vakrayan.in'; // Default to production domain so links work on mobile and satisfy Telegram's URL validation
-        
-        if (typeof window !== 'undefined' && window.location) {
-          const origin = window.location.origin;
-          // Use current origin only if it's a public domain (not localhost / local IP)
-          if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-            baseUrl = origin;
-          }
-        }
-
-        const inlineKeyboard = [];
-
-        if (evt === 'order.created' && pld.orderId) {
-          inlineKeyboard.push([
-            { text: '👁️ View Order', url: `${baseUrl}/order/${pld.orderId}` },
-            { text: '⚙️ Manage in Admin', url: `${baseUrl}/admin` }
-          ]);
-        } else if (evt === 'return.requested' && pld.orderId) {
-          inlineKeyboard.push([
-            { text: '👁️ View Order Info', url: `${baseUrl}/order/${pld.orderId}` },
-            { text: '⚙️ Manage in Admin', url: `${baseUrl}/admin` }
-          ]);
-        } else if (evt === 'restock.requested' && pld.productId) {
-          inlineKeyboard.push([
-            { text: '🛍️ View Product', url: `${baseUrl}/product/${pld.productId}` }
-          ]);
-        } else if (evt === 'order.cancelled' && pld.orderId) {
-          inlineKeyboard.push([
-            { text: '👁️ View Order Details', url: `${baseUrl}/order/${pld.orderId}` }
-          ]);
-        }
-
-        return inlineKeyboard.length > 0 ? { inline_keyboard: inlineKeyboard } : null;
-      };
-
-      const replyMarkup = getTelegramReplyMarkup(event, payload);
-      
-      const requestBody = {
-        token: telegramToken.trim(),
-        chatId: telegramChatId,
-        text,
-        parseMode: 'HTML',
-        replyMarkup
-      };
-
-      const directUrl = `https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`;
-      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-      if (isLocalhost) {
-        // On localhost: Send direct fetch to Telegram API so local testing works!
-        fetch(directUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: telegramChatId,
-            text,
-            parse_mode: 'HTML',
-            reply_markup: replyMarkup
-          })
-        }).catch(() => {});
-      } else {
-        // Production Netlify (https://vakrayan.netlify.app): use /.netlify/functions/telegram serverless relay
-        const serverlessUrl = '/.netlify/functions/telegram';
-        fetch(serverlessUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
-        })
-        .then(res => {
-          if (!res.ok) {
-            return fetch(directUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: telegramChatId,
-                text,
-                parse_mode: 'HTML',
-                reply_markup: replyMarkup
-              })
-            });
-          }
-        })
-        .catch(() => {
-          fetch(directUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: telegramChatId,
-              text,
-              parse_mode: 'HTML',
-              reply_markup: replyMarkup
-            })
-          }).catch(() => {});
-        });
-      }
-    } catch (err) {
-      // Silently catch dispatcher errors
     }
+    const inlineKeyboard = [];
+    if ((event === 'order.created' || event === 'return.requested' || event === 'order.cancelled') && payload.orderId) {
+      inlineKeyboard.push([
+        { text: '👁️ View Order', url: `${baseUrl}/order/${payload.orderId}` },
+        { text: '⚙️ Manage in Admin', url: `${baseUrl}/admin` }
+      ]);
+    } else if (event === 'restock.requested' && payload.productId) {
+      inlineKeyboard.push([{ text: '🛍️ View Product', url: `${baseUrl}/product/${payload.productId}` }]);
+    }
+    if (inlineKeyboard.length > 0) replyMarkup = { inline_keyboard: inlineKeyboard };
+
+    // Route the event type to the correct Telegram channel
+    const channelRoute = event === 'order.cancelled' ? 'cancel'
+                       : event === 'order.created' ? 'order'
+                       : 'event';
+
+    // Send via Netlify serverless function (bot token stays server-side)
+    fetch('/.netlify/functions/telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, parseMode: 'HTML', replyMarkup, channelRoute })
+    }).catch(() => {});
+  } catch (err) {
+    // Silently catch dispatcher errors
   }
 };

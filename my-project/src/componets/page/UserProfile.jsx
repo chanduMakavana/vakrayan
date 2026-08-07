@@ -243,8 +243,33 @@ function UserProfile() {
         },
         handler: async (response) => {
           try {
-            const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-            await handleTopUpSuccess(payId);
+            const payId = response.razorpay_payment_id;
+            const ordId = response.razorpay_order_id;
+            const sig = response.razorpay_signature;
+
+            const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
+            if (verifyUrl && ordId && payId && sig) {
+              const verifyResp = await fetch(verifyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: ordId,
+                  razorpay_payment_id: payId,
+                  razorpay_signature: sig,
+                }),
+              });
+              const verifyData = await verifyResp.json();
+              if (!verifyData.success) {
+                showToast('Top-up payment verification failed!', 'error');
+                return;
+              }
+            } else if (verifyUrl && !sig) {
+              showToast('Missing payment verification parameters.', 'error');
+              return;
+            }
+
+            const finalPayId = payId || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+            await handleTopUpSuccess(finalPayId);
           } catch (err) {
             console.error("Top-up processing issue:", err);
             showToast("Failed to complete top-up transaction.", "error");
@@ -581,18 +606,18 @@ function UserProfile() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* LEFT SIDEBAR: Navigation Menu */}
-            <div className={`lg:col-span-3 bg-[var(--color-surface)] lg:border border-[var(--color-border)] lg:rounded-xl p-2 lg:p-4 shadow-sm ${activeProfileTab === 'overview' ? 'hidden lg:block' : 'flex'} flex-row lg:flex-col overflow-x-auto scrollbar-none gap-2 pb-2 mb-4 lg:mb-0 lg:pb-0 lg:space-y-1`}>
-              <span className="hidden lg:block text-[9px] font-bold text-[var(--color-muted)] tracking-widest uppercase px-3 pb-2 border-b border-[var(--color-border)] mb-2">
+            <div className="lg:col-span-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 shadow-sm flex flex-col gap-1.5 mb-6 lg:mb-0">
+              <span className="text-[10px] font-bold text-[var(--color-muted)] tracking-widest uppercase px-3 pb-2.5 border-b border-[var(--color-border)] mb-1">
                 ACCOUNT DASHBOARD
               </span>
               
               <button
                 type="button"
                 onClick={() => { switchTab('overview'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'overview'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiCompass className="text-sm shrink-0" />
@@ -602,24 +627,23 @@ function UserProfile() {
               <button
                 type="button"
                 onClick={() => { switchTab('orders'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'orders'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiShoppingBag className="text-sm shrink-0" />
                 My Orders
               </button>
 
-              
               <button
                 type="button"
                 onClick={() => { switchTab('wallet'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'wallet'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FaWallet className="text-sm shrink-0" />
@@ -629,10 +653,10 @@ function UserProfile() {
               <button
                 type="button"
                 onClick={() => { switchTab('addresses'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'addresses'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiMapPin className="text-sm shrink-0" />
@@ -642,21 +666,21 @@ function UserProfile() {
               <button
                 type="button"
                 onClick={() => { switchTab('profile'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'profile'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiUser className="text-sm shrink-0" />
                 My Profile
               </button>
               
-              <div className="hidden lg:block pt-2 mt-2 border-t border-[var(--color-border)]">
+              <div className="pt-2 mt-2 border-t border-[var(--color-border)]">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left text-rose-600 hover:bg-rose-50 transition-all cursor-pointer border-l-4 border-transparent"
                 >
                   <FiLogOut className="text-sm shrink-0" />
                   Logout
@@ -1350,57 +1374,7 @@ function UserProfile() {
                     </div>
                   </div>
 
-                  {/* Push Notifications */}
-                  <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 space-y-4">
-                    <h3 className="text-[10px] font-black text-[var(--color-text)] tracking-wider uppercase border-b border-[var(--color-border)] pb-2 flex items-center gap-2">
-                      <FiBell className="text-xs text-[var(--color-accent)]" /> Push Notifications
-                    </h3>
-                    <p className="text-[11px] text-[var(--color-muted)] font-medium leading-relaxed max-w-xl">
-                      Get real-time updates for your orders, wallet top-ups, transaction receipts, and exclusive early product drop announcements.
-                    </p>
-                    
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-[var(--color-border)]">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)]">Status:</span>
-                        {notificationStatus === 'granted' ? (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded-md uppercase tracking-wider">
-                            Active
-                          </span>
-                        ) : notificationStatus === 'denied' ? (
-                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-[9px] font-black rounded-md uppercase tracking-wider">
-                            Blocked
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-neutral-200 text-neutral-800 text-[9px] font-black rounded-md uppercase tracking-wider">
-                            Disabled
-                          </span>
-                        )}
-                      </div>
 
-                      <div className="flex flex-wrap gap-3">
-                        {notificationStatus !== 'granted' && (
-                          <button
-                            type="button"
-                            disabled={notificationLoading || notificationStatus === 'denied'}
-                            onClick={handleEnableNotifications}
-                            className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] font-mono font-black text-[10px] tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                          >
-                            {notificationLoading ? 'ENABLING...' : 'ENABLE NOTIFICATIONS'}
-                          </button>
-                        )}
-
-                        {notificationStatus === 'granted' && (
-                          <button
-                            type="button"
-                            onClick={handleSendTestNotification}
-                            className="px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 font-mono font-black text-[10px] tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer shadow-md"
-                          >
-                            SEND TEST PUSH
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
                 </div>
               )}

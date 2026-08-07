@@ -9,21 +9,14 @@ export class WalletService {
         this.databases = new Databases(client);
     }
 
-    // Local Storage Helpers (Fallback)
-    getLocalTransactions(userId) {
-        return JSON.parse(localStorage.getItem(`walletTx_${userId}`)) || [];
-    }
-
-    saveLocalTransaction(userId, tx) {
-        const list = this.getLocalTransactions(userId);
-        list.push(tx);
-        localStorage.setItem(`walletTx_${userId}`, JSON.stringify(list));
-        return tx;
-    }
-
     // ➡️ 1. Create a new wallet transaction
     async createWalletTransaction({ userId, amount, type, title, referenceId = '' }) {
         try {
+            if (!conf.firebaseWalletCollectionId) {
+                console.warn("⚠️ Wallet collection not configured. Transaction skipped.");
+                return null;
+            }
+
             const payload = {
                 userId,
                 amount: Number(amount),
@@ -31,16 +24,6 @@ export class WalletService {
                 title,
                 referenceId
             };
-
-            if (!conf.firebaseWalletCollectionId) {
-                const mockTx = {
-                    $id: 'wtx-' + Date.now(),
-                    $createdAt: new Date().toISOString(),
-                    ...payload
-                };
-                this.saveLocalTransaction(userId, mockTx);
-                return mockTx;
-            }
 
             return await this.databases.createDocument(
                 conf.firebaseDatabaseId,
@@ -50,18 +33,7 @@ export class WalletService {
             );
         } catch (error) {
             console.error("Firebase service :: createWalletTransaction :: error", error.message);
-            // Fallback locally
-            const mockTx = {
-                $id: 'wtx-' + Date.now(),
-                $createdAt: new Date().toISOString(),
-                userId,
-                amount: Number(amount),
-                type,
-                title,
-                referenceId
-            };
-            this.saveLocalTransaction(userId, mockTx);
-            return mockTx;
+            throw error;
         }
     }
 
@@ -69,9 +41,7 @@ export class WalletService {
     async getUserWalletTransactions(userId) {
         try {
             if (!userId) return [];
-            if (!conf.firebaseWalletCollectionId) {
-                return this.getLocalTransactions(userId);
-            }
+            if (!conf.firebaseWalletCollectionId) return [];
 
             const response = await this.databases.listDocuments(
                 conf.firebaseDatabaseId,
@@ -83,13 +53,10 @@ export class WalletService {
                 ]
             );
             
-            if (response.documents) {
-                return response.documents;
-            }
-            return this.getLocalTransactions(userId);
+            return response.documents || [];
         } catch (error) {
-            console.warn("Firebase wallet transactions list error. Reading locally:", error.message);
-            return this.getLocalTransactions(userId);
+            console.error("Firebase wallet transactions list error:", error.message);
+            return [];
         }
     }
 
