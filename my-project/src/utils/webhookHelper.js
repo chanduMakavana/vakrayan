@@ -173,12 +173,46 @@ export const sendWebhookNotification = async (event, payload) => {
                        : event === 'order.created' ? 'order'
                        : 'event';
 
-    // Send via Netlify serverless function (bot token stays server-side)
-    fetch('/.netlify/functions/telegram', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, parseMode: 'HTML', replyMarkup, channelRoute })
-    }).catch(() => {});
+    // Send via Netlify serverless function with failover to direct Telegram API
+    const sendDirectTelegram = async () => {
+      const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+      if (!botToken) return;
+
+      const chatIdMap = {
+        order: import.meta.env.VITE_TELEGRAM_ORDER_CHAT_ID,
+        event: import.meta.env.VITE_TELEGRAM_EVENT_CHAT_ID,
+        cancel: import.meta.env.VITE_TELEGRAM_CANCEL_CHAT_ID,
+      };
+      const chatId = chatIdMap[channelRoute] || import.meta.env.VITE_TELEGRAM_ORDER_CHAT_ID;
+      if (!chatId) return;
+
+      const directUrl = `https://api.telegram.org/bot${botToken.trim()}/sendMessage`;
+      const directBody = {
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML'
+      };
+      if (replyMarkup) directBody.reply_markup = replyMarkup;
+
+      await fetch(directUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(directBody)
+      }).catch(err => console.warn("Direct Telegram API send fallback warning:", err));
+    };
+
+    try {
+      const res = await fetch('/.netlify/functions/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, parseMode: 'HTML', replyMarkup, channelRoute })
+      });
+      if (!res.ok) {
+        await sendDirectTelegram();
+      }
+    } catch {
+      await sendDirectTelegram();
+    }
   } catch (err) {
     // Silently catch dispatcher errors
   }

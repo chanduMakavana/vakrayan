@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../services/auth';
 import addressService from '../../services/address';
@@ -528,12 +528,14 @@ function UserProfile() {
       } else {
         await authService.logout();
       }
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
       localStorage.removeItem('remember_me');
       sessionStorage.removeItem('session_active');
       dispatch(logoutAction());
+      showToast("Signed out of your account", "info");
       navigate('/');
-    } catch (err) {
-      console.error("Logout failed:", err);
     }
   };
 
@@ -605,8 +607,8 @@ function UserProfile() {
           {/* Main Layout Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* LEFT SIDEBAR: Navigation Menu */}
-            <div className="lg:col-span-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 shadow-sm flex flex-col gap-1.5 mb-6 lg:mb-0">
+            {/* LEFT SIDEBAR: Navigation Menu (Desktop Only) */}
+            <div className="hidden lg:flex lg:col-span-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 shadow-sm flex-col gap-1.5 mb-6 lg:mb-0">
               <span className="text-[10px] font-bold text-[var(--color-muted)] tracking-widest uppercase px-3 pb-2.5 border-b border-[var(--color-border)] mb-1">
                 ACCOUNT DASHBOARD
               </span>
@@ -689,7 +691,73 @@ function UserProfile() {
             </div>
 
             {/* RIGHT CONTENT WORKSPACE */}
-            <div className="lg:col-span-9 space-y-6">
+            <div className="w-full lg:col-span-9 space-y-6">
+              
+              {/* MOBILE SUB-TAB NAVIGATION BAR (Only shown on mobile when inside sub-tabs) */}
+              {activeProfileTab !== 'overview' && (
+                <div className="flex lg:hidden overflow-x-auto gap-2 pb-2.5 mb-4 scrollbar-none border-b border-[var(--color-border)] shrink-0 animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('overview'); setEditingAddress(null); }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)] shrink-0"
+                  >
+                    <FiCompass className="text-sm shrink-0" />
+                    Overview
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('orders'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'orders'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FiShoppingBag className="text-sm shrink-0" />
+                    Orders
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('wallet'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'wallet'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FaWallet className="text-sm shrink-0" />
+                    Wallet
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('addresses'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'addresses'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FiMapPin className="text-sm shrink-0" />
+                    Addresses
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('profile'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'profile'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FiUser className="text-sm shrink-0" />
+                    Profile
+                  </button>
+                </div>
+              )}
               
               {/* TAB 1: OVERVIEW */}
               {activeProfileTab === 'overview' && (
@@ -789,7 +857,18 @@ function UserProfile() {
                       <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">Reach Out To Us</p>
                     </div>
 
+                  </div>
 
+                  {/* Sleek Compact Logout Button (Mobile Only — PC already has left sidebar logout) */}
+                  <div className="pt-2 flex justify-center lg:hidden">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 py-2.5 px-6 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 font-mono font-bold text-xs tracking-wider uppercase transition-all cursor-pointer shadow-2xs"
+                    >
+                      <FiLogOut className="text-sm shrink-0" />
+                      Logout of Account
+                    </button>
                   </div>
                 </div>
               )}
@@ -1539,40 +1618,46 @@ function UserProfile() {
 
       {/* Logout Confirmation Modal */}
       {isLogoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/60 backdrop-blur-xs" 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
             onClick={() => setIsLogoutModalOpen(false)}
           />
-          <div className="relative z-50 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
-            <div>
-              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">LOGOUT CONFIRMATION</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
-                Confirm Log Out
+          <div className="relative z-[101] w-full max-w-sm bg-[var(--color-surface)] p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-xs">
+                <FiLogOut />
+              </div>
+              <h2 className="text-base font-black tracking-wider uppercase text-[var(--color-text)] mt-3">
+                Log Out of Account?
               </h2>
-              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
-                Are you sure you want to log out? You will need to sign in again to place orders or view your profile.
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                Are you sure you want to log out? You will need to sign in again to view orders or profile details.
               </p>
             </div>
+            
             <div className="flex flex-col gap-2.5 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => confirmLogout(false)}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md text-center"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-sm text-center flex items-center justify-center gap-2"
               >
-                Log Out Current Device
+                <FiLogOut className="text-sm" />
+                Log Out
               </button>
+              
               <button
                 type="button"
                 onClick={() => confirmLogout(true)}
-                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md text-center"
+                className="w-full py-2.5 bg-transparent hover:bg-[var(--color-subtle)] text-[11px] font-bold uppercase tracking-wider text-rose-600 rounded-xl cursor-pointer transition-all text-center"
               >
                 Log Out from All Devices
               </button>
+
               <button
                 type="button"
                 onClick={() => setIsLogoutModalOpen(false)}
-                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer text-center"
+                className="w-full py-2.5 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider text-[var(--color-text)] rounded-xl cursor-pointer text-center"
               >
                 Cancel
               </button>

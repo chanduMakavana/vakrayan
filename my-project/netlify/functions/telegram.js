@@ -1,19 +1,22 @@
 export async function handler(event) {
+  const allowOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || '*';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': 'https://vakrayan.in',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      headers: corsHeaders,
       body: ''
     };
   }
 
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
   }
 
   try {
@@ -34,7 +37,7 @@ export async function handler(event) {
     if (!botToken || !targetChatId) {
       return {
         statusCode: 400,
-        headers: { 'Access-Control-Allow-Origin': 'https://vakrayan.in' },
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'Telegram bot token or chat ID is not configured on the server.' })
       };
     }
@@ -60,7 +63,7 @@ export async function handler(event) {
     return {
       statusCode: response.ok ? 200 : 400,
       headers: {
-        'Access-Control-Allow-Origin': 'https://vakrayan.in',
+        ...corsHeaders,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(result)
@@ -69,7 +72,7 @@ export async function handler(event) {
     return {
       statusCode: 500,
       headers: {
-        'Access-Control-Allow-Origin': 'https://vakrayan.in',
+        ...corsHeaders,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ error: err.message })
