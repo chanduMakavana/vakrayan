@@ -2052,30 +2052,66 @@ function ProductDetail() {
                   {shippingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                 </button>
                 <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-[350px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)]/40 border border-white/20 backdrop-blur-md p-4 rounded-xl shadow-2xs space-y-2.5">
+                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)]/40 border border-white/20 backdrop-blur-md p-4.5 rounded-xl shadow-2xs space-y-3 font-medium">
                     {returnPolicy === "No Return" || returnPolicy.toLowerCase().includes("no return") ? (
                       <>
-                        <p className="text-rose-600 font-bold">&bull; Return policy: All sales are final. No returns or exchanges accepted.</p>
-                        <p>&bull; Please refer to the size chart carefully before placing your order.</p>
-                        <p>&bull; Replacement or refund is only applicable if you receive a damaged or wrong product (with unboxing video proof).</p>
+                        <p className="text-rose-600 font-bold flex items-start gap-2">
+                          <span className="shrink-0">🛑</span>
+                          <span><strong>Non-Returnable Item Policy:</strong> Final sale — no returns or exchanges accepted for this item.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">📐</span>
+                          <span>Please check the size chart carefully before placing your order.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">📦</span>
+                          <span>Replacement or refund is only applicable if you receive a damaged or wrong product (with unboxing video proof).</span>
+                        </p>
                       </>
                     ) : returnPolicy === "Return Only" || returnPolicy.toLowerCase().includes("return only") || returnPolicy.toLowerCase().includes("no exchange") ? (
                       <>
-                        <p className="text-amber-700 font-semibold">&bull; Return policy: Easy 7-day return guarantee for a full refund.</p>
-                        <p>&bull; No direct exchanges available; please return the item and place a new order.</p>
-                        <p>&bull; Items must be kept in original condition with tags to process the return.</p>
+                        <p className="text-amber-700 font-semibold flex items-start gap-2">
+                          <span className="shrink-0">📦</span>
+                          <span><strong>Return Only Policy:</strong> Easy 7-day return guarantee for wallet/bank refund.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">🔄</span>
+                          <span>No direct size exchange available; please return the item for a refund and place a new order.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">🏷️</span>
+                          <span>Items must be unused, unwashed, and with all original tags intact.</span>
+                        </p>
                       </>
                     ) : returnPolicy === "Exchange Only" || returnPolicy.toLowerCase().includes("exchange only") ? (
                       <>
-                        <p className="text-amber-700 font-semibold">&bull; Exchange policy: Easy 7-day size or defect exchanges.</p>
-                        <p>&bull; All sales are final; no monetary refunds are processed.</p>
-                        <p>&bull; Exchange request must be created within 7 days of delivery with original tags.</p>
+                        <p className="text-amber-700 font-semibold flex items-start gap-2">
+                          <span className="shrink-0">🔄</span>
+                          <span><strong>Exchange Only Policy:</strong> Easy 7-day size or defect exchange.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">🚫</span>
+                          <span>All sales are final — monetary refunds are not processed for this item.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">🏷️</span>
+                          <span>In case of sizing issues or defects, request an exchange within 7 days of delivery with original tags intact.</span>
+                        </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-emerald-700 font-semibold">&bull; Return & Exchange policy: Easy 7-day hassle-free returns and exchanges.</p>
-                        <p>&bull; In case of sizing issues or defects, request an exchange within 7 days of delivery.</p>
-                        <p>&bull; Items must be unused, unwashed, and with original tags intact.</p>
+                        <p className="text-emerald-600 font-bold flex items-start gap-2">
+                          <span className="shrink-0">🟢</span>
+                          <span><strong>Return & Exchange Policy:</strong> Easy 7-day hassle-free returns and exchanges.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">👕</span>
+                          <span>In case of sizing issues or defects, request an exchange or return within 7 days of delivery.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <span className="shrink-0">🏷️</span>
+                          <span>Items must be unused, unwashed, and with original tags intact.</span>
+                        </p>
                       </>
                     )}
                   </div>
@@ -2467,12 +2503,13 @@ function ProductDetail() {
                     </button>
                   </form>
                 ) : (
-                  <div className="text-center py-6 px-4 border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 rounded-none space-y-3">
-                    <p className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider leading-relaxed">
-                      Review Lock Active
-                    </p>
-                    <p className="text-xs text-[var(--color-muted)] leading-relaxed font-sans">
-                      Reviews are restricted to verified purchasers of this item. To submit a review, you must have an order for this product marked as <strong className="text-neutral-950 font-bold">Delivered</strong> in your profile history.
+                  <div className="p-5 border border-dashed border-amber-500/30 bg-amber-500/5 rounded-xl space-y-2 text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 text-amber-600 font-bold text-xs uppercase tracking-wider">
+                      <span className="text-base">🔒</span>
+                      <span>Verified Buyers Only</span>
+                    </div>
+                    <p className="text-xs text-[var(--color-muted)] leading-relaxed font-medium">
+                      Reviews can only be submitted by customers who have purchased and received this product. Once your order status is marked as <strong className="text-[var(--color-text)] font-bold uppercase">Delivered</strong> in your profile history, the review form will unlock automatically!
                     </p>
                   </div>
                 )}

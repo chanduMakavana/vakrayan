@@ -48,6 +48,16 @@ export const sendWebhookNotification = async (event, payload) => {
                    `**Total Amount:** ₹${payload.total}\n` +
                    `**Shipping Address:** ${payload.shippingAddress}\n\n` +
                    `**Items Ordered:**\n${itemsList}`;
+        } else if (event === 'order.reactivated') {
+          const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity} @ ₹${i.price}`).join('\n');
+          content = `🔄 **VAKRAYAN ORDER REACTIVATED / RESTORED!** 🔄\n\n` +
+                   `**Order Number:** \`${payload.orderNumber}\`\n` +
+                   `**Customer Name:** ${payload.customerName}\n` +
+                   `**Email:** ${payload.email}\n` +
+                   `**Payment Method:** ${payload.paymentMethod}\n` +
+                   `**Total Amount:** ₹${payload.total}\n` +
+                   `**Note:** Reactivated by customer within 24h (Cancellation Locked)\n\n` +
+                   `**Items in Reactivated Order:**\n${itemsList}`;
         } else if (event === 'order.cancelled') {
           const itemsList = (payload.items || []).map(i => `• ${i.name} (Size: ${i.size}) x${i.quantity}`).join('\n');
           content = `🚫 **VAKRAYAN ORDER CANCELLED BY CUSTOMER** 🚫\n\n` +
@@ -109,6 +119,16 @@ export const sendWebhookNotification = async (event, payload) => {
              `<b>Total Amount:</b> ₹${payload.total}\n` +
              `<b>Shipping Address:</b> ${escapeHtml(payload.shippingAddress)}\n\n` +
              `<b>Items Ordered:</b>\n${itemsList}`;
+    } else if (event === 'order.reactivated') {
+      const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity} @ ₹${i.price}`).join('\n');
+      text = `<b>🔄 VAKRAYAN ORDER REACTIVATED / RESTORED! 🔄</b>\n\n` +
+             `<b>Order Number:</b> <code>${escapeHtml(payload.orderNumber)}</code>\n` +
+             `<b>Customer Name:</b> ${escapeHtml(payload.customerName)}\n` +
+             `<b>Email:</b> ${escapeHtml(payload.email)}\n` +
+             `<b>Payment Method:</b> ${escapeHtml(payload.paymentMethod)}\n` +
+             `<b>Total Amount:</b> ₹${payload.total}\n` +
+             `<b>Note:</b> Reactivated by customer within 24h (Cancellation Locked)\n\n` +
+             `<b>Items in Reactivated Order:</b>\n${itemsList}`;
     } else if (event === 'order.cancelled') {
       const itemsList = (payload.items || []).map(i => `• ${escapeHtml(i.name)} (Size: ${escapeHtml(i.size)}) x${i.quantity}`).join('\n');
       text = `<b>🚫 VAKRAYAN ORDER CANCELLED BY CUSTOMER 🚫</b>\n\n` +
@@ -158,7 +178,7 @@ export const sendWebhookNotification = async (event, payload) => {
       }
     }
     const inlineKeyboard = [];
-    if ((event === 'order.created' || event === 'return.requested' || event === 'order.cancelled') && payload.orderId) {
+    if ((event === 'order.created' || event === 'order.reactivated' || event === 'return.requested' || event === 'order.cancelled') && payload.orderId) {
       inlineKeyboard.push([
         { text: '👁️ View Order', url: `${baseUrl}/order/${payload.orderId}` },
         { text: '⚙️ Manage in Admin', url: `${baseUrl}/admin` }

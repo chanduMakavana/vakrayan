@@ -146,11 +146,6 @@ function CategoryGrid() {
 
                   {/* Luxury Editorial Label Details */}
                   <div className="absolute inset-0 p-5 flex flex-col justify-end select-none">
-                    <span 
-                      className="text-[11px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block opacity-85 transition-opacity duration-500 ease-[0.16,1,0.3,1] group-hover:opacity-100"
-                    >
-                      COLLECTION 0{idx + 1}
-                    </span>
                     <h3 
                       style={{
                         fontFamily: "'Barlow Condensed', 'Jost', sans-serif",

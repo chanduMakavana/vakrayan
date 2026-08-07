@@ -73,6 +73,7 @@ function OrderDetail() {
 
   // Cancellation reasons modal states
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [cancellationReasonOption, setCancellationReasonOption] = useState("Ordered wrong size / color details");
   const [customCancellationText, setCustomCancellationText] = useState("");
   const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
@@ -301,6 +302,8 @@ function OrderDetail() {
 
   const { addressText, metadata } = parseOrderAddressAndMetadata(order);
 
+  const isCancellationLocked = !!(metadata.cancellation_locked || order.cancellation_locked || metadata.uncancelled_at || order.uncancelled_at);
+
   // Check if order was cancelled by the admin / store
   const isAdminCancelled = 
     metadata.cancelled_by === 'admin' || 
@@ -332,67 +335,46 @@ function OrderDetail() {
     return (now - cancelTime) <= twentyFourHoursInMs;
   })();
 
-  // Reorder items from cancelled order back into cart
+  // Reactivate / Restore cancelled order back to PENDING status within 24 hours
   const handleReorderOrder = async () => {
     if (!order) return;
     try {
       setReorderLoading(true);
-      let items = [];
-      try {
-        items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
-      } catch (err) {
-        items = [];
-      }
+      const orderId = order.$id || order.id;
+      const orderNumber = metadata.order_number || order.order_number || `ORD-${orderId.substring(0, 6).toUpperCase()}`;
 
-      if (items.length === 0) {
-        showToast("No items found in this order to reorder.", "error");
-        return;
-      }
+      // Update order status back to PENDING in Firebase
+      const updatedOrder = await ordersService.updateOrderStatus(orderId, 'PENDING', {
+        uncancelled_at: new Date().toISOString(),
+        reactivated_by: 'customer'
+      });
 
-      let addedCount = 0;
-      for (const item of items) {
-        const prodId = item.product_id || item.productId || item.$id || item.id;
-        const prodName = item.name || 'Product';
-        const size = item.size || 'M';
-        const price = Number(item.price || 0);
-        const quantity = Number(item.quantity || 1);
-        const img = item.product_Image || item.product_image || item.image || '';
+      if (updatedOrder) {
+        showToast(`✓ Order #${orderNumber} reactivated successfully!`, "success");
 
-        if (user && user.$id) {
-          const existingInCart = (cartItems || []).find(c => (c.product_id === prodId || c.productId === prodId) && c.size === size);
-          const res = await cartService.addToCart({
-            name: prodName,
-            size: size,
-            price: price,
-            quantity: quantity,
-            product_id: prodId,
-            product_Image: img,
-            userId: user.$id,
-            existingCartItem: existingInCart
-          });
-          if (res) dispatch(addCartItemState(res));
-          addedCount++;
+        // Send Telegram notification about order reactivation to MAIN order chat
+        sendWebhookNotification('order.reactivated', {
+          orderId: orderId,
+          orderNumber: orderNumber,
+          customerName: user?.name || order.name || 'Customer',
+          email: user?.email || order.email || '',
+          total: Math.round(order.total || 0),
+          paymentMethod: order.paymentMethod || 'COD',
+          items: parsedItems,
+          note: 'Order reactivated by customer within 24 hours'
+        });
+
+        // Reload current order data so screen updates instantly
+        const refreshedOrder = await ordersService.getOrderById(id || orderId);
+        if (refreshedOrder) {
+          setOrder(refreshedOrder);
         } else {
-          const guestItem = {
-            $id: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            name: prodName,
-            size: size,
-            price: price,
-            quantity: quantity,
-            subtotal: price * quantity,
-            product_id: prodId,
-            product_Image: img
-          };
-          dispatch(addCartItemState(guestItem));
-          addedCount++;
+          setOrder(updatedOrder);
         }
       }
-
-      showToast(`Added ${addedCount} item(s) to your cart from cancelled order!`, "success");
-      navigate('/checkout');
     } catch (err) {
-      console.error("Failed to reorder items:", err);
-      showToast("Could not reorder items. Please try again.", "error");
+      console.error("Failed to reactivate order:", err);
+      showToast("Could not reactivate order. Please try again.", "error");
     } finally {
       setReorderLoading(false);
     }
@@ -505,6 +487,11 @@ function OrderDetail() {
   };
 
   const handleCancelOrder = () => {
+    const isLocked = metadata.cancellation_locked || order.cancellation_locked || metadata.uncancelled_at;
+    if (isLocked) {
+      showToast("🚫 Restored orders cannot be cancelled again.", "error");
+      return;
+    }
     setIsCancelModalOpen(true);
   };
 
@@ -667,13 +654,18 @@ function OrderDetail() {
                     </button>
                   </div>
 
-                  {(order.status === 'PENDING' || order.status === 'PROCESSING') && (
+                  {(order.status === 'PENDING' || order.status === 'PROCESSING') && !isCancellationLocked && (
                     <button
                       onClick={handleCancelOrder}
                       className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-bold text-[10px] tracking-widest uppercase px-4 py-2.5 rounded-xl transition-all cursor-pointer"
                     >
                       Cancel Order
                     </button>
+                  )}
+                  {(order.status === 'PENDING' || order.status === 'PROCESSING') && isCancellationLocked && (
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-amber-700 bg-amber-500/10 border border-amber-500/20 font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl select-none">
+                      🔒 Cancellation Locked (Restored)
+                    </span>
                   )}
                   {order.status === 'DELIVERED' && (
                     <button
@@ -744,12 +736,12 @@ function OrderDetail() {
                       <div className="border-t border-rose-500/10 pt-3">
                         <button
                           type="button"
-                          onClick={handleReorderOrder}
+                          onClick={() => setIsRestoreModalOpen(true)}
                           disabled={reorderLoading}
-                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-wider uppercase py-2.5 px-6 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-black text-xs tracking-wider uppercase py-2.5 px-6 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
                         >
                           <FiRefreshCw className={`text-sm ${reorderLoading ? 'animate-spin' : ''}`} />
-                          <span>{reorderLoading ? 'Reordering...' : 'Reorder Items (Within 24h)'}</span>
+                          <span>{reorderLoading ? 'Reactivating Order...' : 'Restore & Reactivate Order'}</span>
                         </button>
                       </div>
                     )}
@@ -777,12 +769,12 @@ function OrderDetail() {
                       <div className="border-t border-amber-500/10 pt-3">
                         <button
                           type="button"
-                          onClick={handleReorderOrder}
+                          onClick={() => setIsRestoreModalOpen(true)}
                           disabled={reorderLoading}
-                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-wider uppercase py-2.5 px-6 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-black text-xs tracking-wider uppercase py-2.5 px-6 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
                         >
                           <FiRefreshCw className={`text-sm ${reorderLoading ? 'animate-spin' : ''}`} />
-                          <span>{reorderLoading ? 'Reordering...' : 'Reorder Items (Within 24h)'}</span>
+                          <span>{reorderLoading ? 'Reactivating Order...' : 'Restore & Reactivate Order'}</span>
                         </button>
                       </div>
                     )}
@@ -1824,6 +1816,51 @@ function OrderDetail() {
                   This is a system generated tax invoice. No signature is required.
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Order Confirmation Warning Modal */}
+      {isRestoreModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border border-neutral-200 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-neutral-900">
+                Reactivate order?
+              </h3>
+              <p className="text-xs text-neutral-500 font-mono">
+                Order #{metadata.order_number || order.order_number || (order.$id || order.id || '').substring(0, 6).toUpperCase()}
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs text-neutral-600 leading-relaxed">
+              <p>
+                Are you sure you want to reactivate this order? It will be placed back into our shipping queue immediately.
+              </p>
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 font-medium leading-relaxed">
+                Please note: Once reactivated, this order cannot be cancelled again.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsRestoreModalOpen(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-neutral-300 text-xs font-semibold hover:bg-neutral-50 transition-all cursor-pointer text-neutral-700"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRestoreModalOpen(false);
+                  handleReorderOrder();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              >
+                Reactivate Order
+              </button>
             </div>
           </div>
         </div>

@@ -58,6 +58,7 @@ function UserProfile() {
     typeof window !== 'undefined' && window.Notification ? window.Notification.permission : 'default'
   );
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [reorderConfirmOrder, setReorderConfirmOrder] = useState(null);
 
   const handleEnableNotifications = async () => {
     setNotificationLoading(true);
@@ -560,66 +561,43 @@ function UserProfile() {
     return (now - cancelTime) <= twentyFourHours;
   };
 
-  // Reorder items from a cancelled order within 24 hours
+  // Reactivate / Restore cancelled order back to PENDING status within 24 hours
   const handleReorderOrder = async (orderToReorder, e) => {
     if (e) e.stopPropagation();
     try {
-      let items = [];
-      try {
-        items = typeof orderToReorder.items === 'string' ? JSON.parse(orderToReorder.items) : orderToReorder.items || [];
-      } catch (err) {
-        items = [];
-      }
+      const orderId = orderToReorder.$id || orderToReorder.id;
+      const orderNumber = orderToReorder.order_number || `ORD-${orderId.substring(0, 6).toUpperCase()}`;
 
-      if (items.length === 0) {
-        showToast("No items found in this order to reorder.", "error");
-        return;
-      }
+      const updated = await ordersService.updateOrderStatus(orderId, 'PENDING', {
+        uncancelled_at: new Date().toISOString(),
+        reactivated_by: 'customer'
+      });
 
-      let addedCount = 0;
-      for (const item of items) {
-        const prodId = item.product_id || item.productId || item.$id || item.id;
-        const prodName = item.name || 'Product';
-        const size = item.size || 'M';
-        const price = Number(item.price || 0);
-        const quantity = Number(item.quantity || 1);
-        const img = item.product_Image || item.product_image || item.image || '';
+      if (updated) {
+        showToast(`✓ Order #${orderNumber} reactivated successfully!`, "success");
+
+        let itemsList = [];
+        try { itemsList = typeof orderToReorder.items === 'string' ? JSON.parse(orderToReorder.items) : orderToReorder.items || []; } catch { itemsList = []; }
+
+        sendWebhookNotification('order.reactivated', {
+          orderId: orderId,
+          orderNumber: orderNumber,
+          customerName: user?.name || orderToReorder.name || 'Customer',
+          email: user?.email || orderToReorder.email || '',
+          total: Math.round(orderToReorder.total || 0),
+          paymentMethod: orderToReorder.paymentMethod || 'COD',
+          items: itemsList,
+          note: 'Order reactivated by customer within 24 hours'
+        });
 
         if (user && user.$id) {
-          const existingInCart = (cartItems || []).find(c => (c.product_id === prodId || c.productId === prodId) && c.size === size);
-          const res = await cartService.addToCart({
-            name: prodName,
-            size: size,
-            price: price,
-            quantity: quantity,
-            product_id: prodId,
-            product_Image: img,
-            userId: user.$id,
-            existingCartItem: existingInCart
-          });
-          if (res) dispatch(addCartItemState(res));
-          addedCount++;
-        } else {
-          const guestItem = {
-            $id: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-            name: prodName,
-            size: size,
-            price: price,
-            quantity: quantity,
-            subtotal: price * quantity,
-            product_id: prodId,
-            product_Image: img
-          };
-          dispatch(addCartItemState(guestItem));
-          addedCount++;
+          const userOrders = await ordersService.getOrdersByUser(user.$id);
+          setOrders(userOrders || []);
         }
       }
-
-      showToast(`Added ${addedCount} item(s) to your cart from cancelled order!`, "success");
-      navigate('/checkout');
     } catch (err) {
-      console.error("Failed to reorder items:", err);
-      showToast("Could not reorder items. Please try again.", "error");
+      console.error("Failed to reactivate order:", err);
+      showToast("Could not reactivate order. Please try again.", "error");
     }
   };
 
@@ -1094,16 +1072,19 @@ function UserProfile() {
 
                               {isWithin1DayOfCancellation(order) && (
                                 <div className="mt-3 pt-2.5 border-t border-[var(--color-border)] flex items-center justify-between flex-wrap gap-2">
-                                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
-                                    ⏰ Cancelled within 24h — eligible for reorder
+                                  <span className="text-[10px] font-mono text-emerald-600 font-bold uppercase tracking-wider">
+                                    ⏰ Cancelled within 24h — eligible to restore
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={(e) => handleReorderOrder(order, e)}
-                                    className="inline-flex items-center gap-1.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-[10px] tracking-wider px-3 py-1.5 rounded-lg uppercase transition-all shadow-xs cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReorderConfirmOrder(order);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-1.5 rounded-lg uppercase transition-all shadow-xs cursor-pointer"
                                   >
                                     <FiRefreshCw className="text-xs shrink-0" />
-                                    <span>Reorder Items</span>
+                                    <span>Reactivate & Restore Order</span>
                                   </button>
                                 </div>
                               )}
@@ -1887,6 +1868,52 @@ function UserProfile() {
           handleTopUpSuccess(generatedPayId);
         }}
       />
+
+      {/* Reorder / Restore Order Confirmation Warning Modal */}
+      {reorderConfirmOrder && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border border-neutral-200 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-neutral-900">
+                Reactivate order?
+              </h3>
+              <p className="text-xs text-neutral-500 font-mono">
+                Order #{reorderConfirmOrder.order_number || (reorderConfirmOrder.$id || reorderConfirmOrder.id || '').substring(0, 6).toUpperCase()}
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs text-neutral-600 leading-relaxed">
+              <p>
+                Are you sure you want to reactivate this order? It will be placed back into our shipping queue immediately.
+              </p>
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 font-medium leading-relaxed">
+                Please note: Once reactivated, this order cannot be cancelled again.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setReorderConfirmOrder(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-neutral-300 text-xs font-semibold hover:bg-neutral-50 transition-all cursor-pointer text-neutral-700"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetOrd = reorderConfirmOrder;
+                  setReorderConfirmOrder(null);
+                  handleReorderOrder(targetOrd);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              >
+                Reactivate Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </>
