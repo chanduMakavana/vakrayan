@@ -766,7 +766,6 @@ function AdminPanel() {
     loadCustomerOrders();
     loadSlides();
     loadOffersList();
-    loadCategories();
     fetchStoreTelemetry();
 
     // Hydrate campaigns
