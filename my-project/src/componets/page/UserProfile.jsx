@@ -544,8 +544,9 @@ function UserProfile() {
 
   // Helper to check if cancelled order occurred within 24 hours (1 day)
   const isWithin1DayOfCancellation = (ord) => {
+    if (!ord) return false;
     const status = (ord?.status || ord?.order_status || '').toUpperCase();
-    if (status !== 'CANCELLED' && status !== 'CANCELLATION_APPROVED') {
+    if (!status.includes('CANCEL')) {
       return false;
     }
     const cancelTimeStr = ord.cancelledAt || ord.metadata?.cancelled_at || ord.$updatedAt || ord.updatedAt || ord.$createdAt || ord.createdAt;

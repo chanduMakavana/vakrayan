@@ -316,7 +316,9 @@ function OrderDetail() {
 
   // Check if cancellation occurred within 24 hours (1 day)
   const isWithin1DayOfCancellation = (() => {
-    if (!order || (order.status !== 'CANCELLED' && order.status !== 'CANCELLATION_APPROVED')) {
+    if (!order) return false;
+    const status = (order.status || '').toUpperCase();
+    if (!status.includes('CANCEL')) {
       return false;
     }
     const cancelTimeStr = order.cancelledAt || metadata?.cancelled_at || order.$updatedAt || order.updatedAt || order.$createdAt || order.createdAt;
@@ -768,6 +770,20 @@ function OrderDetail() {
                         <span className="text-xs font-mono font-bold text-amber-500 block mt-0.5 uppercase">
                           &ldquo;{metadata.cancel_reason}&rdquo;
                         </span>
+                      </div>
+                    )}
+
+                    {isWithin1DayOfCancellation && (
+                      <div className="border-t border-amber-500/10 pt-3">
+                        <button
+                          type="button"
+                          onClick={handleReorderOrder}
+                          disabled={reorderLoading}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-wider uppercase py-2.5 px-6 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                          <FiRefreshCw className={`text-sm ${reorderLoading ? 'animate-spin' : ''}`} />
+                          <span>{reorderLoading ? 'Reordering...' : 'Reorder Items (Within 24h)'}</span>
+                        </button>
                       </div>
                     )}
                   </div>

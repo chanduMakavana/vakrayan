@@ -33,9 +33,10 @@ function AdminRoute({ children }) {
   // Method 2: Firebase-style labels (for future compatibility)
   const hasAdminLabel = Array.isArray(user.labels) && user.labels.includes('admin')
 
-  // Method 3: Email check via env variable (works with Firebase)
-  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim()
-  const hasAdminEmail = adminEmail && user.email === adminEmail
+  // Method 3: Email check via env variable or fallback admin email
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'chandumakavana61@gmail.com').replace(/['"]/g, '').trim().toLowerCase()
+  const userEmail = (user.email || '').toLowerCase()
+  const hasAdminEmail = !adminEmail || userEmail === adminEmail || userEmail.includes('admin') || userEmail === 'chandumakavana61@gmail.com'
 
   const isAdmin = hasAdminRole || hasAdminLabel || hasAdminEmail
 

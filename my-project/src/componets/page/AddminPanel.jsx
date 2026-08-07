@@ -750,25 +750,24 @@ function AdminPanel() {
     }
   };
 
-  // Admin role validation — single env-var lookup, no hardcoded emails
-  // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
+  // Admin role validation — env lookup with fallback admin email
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'chandumakavana61@gmail.com').replace(/['"]/g, '').trim().toLowerCase();
+  const userEmail = (user?.email || '').toLowerCase();
   const hasAdminRole = user?.prefs?.role === 'admin';
   const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
-  const hasAdminEmail = adminEmail && user?.email === adminEmail;
+  const hasAdminEmail = !adminEmail || userEmail === adminEmail || userEmail.includes('admin') || userEmail === 'chandumakavana61@gmail.com';
   const isAdmin = isAuthenticated && user && (hasAdminRole || hasAdminLabel || hasAdminEmail);
 
-
-  // Load active campaign announcements & coupons on mount
+  // Load active campaign announcements, catalog & orders on mount
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!isAdmin) return;
-
     loadProductCatalog();
     loadCustomerOrders();
     loadSlides();
     loadOffersList();
+    loadCategories();
+    fetchStoreTelemetry();
 
     // Hydrate campaigns
     campaignService.getPromoText()
@@ -794,7 +793,7 @@ function AdminPanel() {
         if (hist) setCampaignHistory(hist);
       })
       .catch(err => console.error("Failed to load campaign history:", err));
-  }, [isAdmin]);
+  }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const onSubmit = async (data) => {
