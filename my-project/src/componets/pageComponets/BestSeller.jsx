@@ -17,14 +17,89 @@ const cardVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } }
 }
 
+const FALLBACK_DROPS = [
+  {
+    $id: 'fallback_1',
+    id: 'fallback_1',
+    name: 'VAKRAYAN OVERSIZED HEAVYWEIGHT TEE',
+    slug: 'oversized-heavyweight-tee',
+    price: 1499,
+    original_price: 2499,
+    discount_percentage: 40,
+    front_image_link: 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg',
+    back_image_links: ['https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg'],
+    category: 'oversized-tshirt',
+    tag: 'BEST SELLER',
+    is_live: true,
+    sizes: ['S', 'M', 'L', 'XL'],
+    sizes_stock: '{"S":10,"M":15,"L":20,"XL":10}'
+  },
+  {
+    $id: 'fallback_2',
+    id: 'fallback_2',
+    name: 'ACID WASH VINTAGE HOODIE',
+    slug: 'acid-wash-vintage-hoodie',
+    price: 2999,
+    original_price: 4999,
+    discount_percentage: 40,
+    front_image_link: 'https://cdn1.ozone.ru/s3/multimedia-b/6643972691.jpg',
+    back_image_links: ['https://cdn1.ozone.ru/s3/multimedia-b/6643972691.jpg'],
+    category: 'hoodie',
+    tag: 'NEW DROP',
+    is_live: true,
+    sizes: ['S', 'M', 'L', 'XL'],
+    sizes_stock: '{"S":8,"M":12,"L":15,"XL":5}'
+  },
+  {
+    $id: 'fallback_3',
+    id: 'fallback_3',
+    name: 'GOTHIC PRINT BOX FIT TEE',
+    slug: 'gothic-print-box-fit-tee',
+    price: 1699,
+    original_price: 2699,
+    discount_percentage: 37,
+    front_image_link: 'https://cdn1.ozone.ru/s3/multimedia-1/6643972693.jpg',
+    back_image_links: ['https://cdn1.ozone.ru/s3/multimedia-1/6643972693.jpg'],
+    category: 'oversized-tshirt',
+    tag: 'FEW LEFT',
+    is_live: true,
+    sizes: ['M', 'L', 'XL'],
+    sizes_stock: '{"M":5,"L":4,"XL":2}'
+  },
+  {
+    $id: 'fallback_4',
+    id: 'fallback_4',
+    name: 'SIGNATURE DROP CARGO HOODIE',
+    slug: 'signature-drop-cargo-hoodie',
+    price: 3499,
+    original_price: 5499,
+    discount_percentage: 36,
+    front_image_link: 'https://cdn1.ozone.ru/s3/multimedia-6/6643972662.jpg',
+    back_image_links: ['https://cdn1.ozone.ru/s3/multimedia-6/6643972662.jpg'],
+    category: 'hoodie',
+    tag: 'LIMITED ITEM',
+    is_live: true,
+    sizes: ['S', 'M', 'L'],
+    sizes_stock: '{"S":6,"M":8,"L":4}'
+  }
+]
+
 function BestSellers() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const products = useSelector(state => state.products.items || [])
+  const allItems = useSelector(state => state.products.allItems || [])
   const fetched = useSelector(state => state.products.fetched)
   const wishlist = useSelector(state => state.wishlist || [])
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
-  const loading = !fetched && products.length === 0
+
+  const activeProducts = (products && products.length > 0)
+    ? products
+    : (allItems && allItems.length > 0)
+      ? allItems
+      : FALLBACK_DROPS
+
+  const loading = !fetched && activeProducts.length === 0
   const showSkeletons = useDelayedLoading(loading, 1500)
 
   const isOutOfStock = (product) => {
@@ -43,7 +118,7 @@ function BestSellers() {
     return 0
   })
 
-  const sortedProducts = scatterProducts(sortInStockFirst(products))
+  const sortedProducts = scatterProducts(sortInStockFirst(activeProducts))
   const featuredProducts = scatterProducts(sortedProducts.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1'))
   const displayedProducts = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : sortedProducts.slice(0, 4)
 

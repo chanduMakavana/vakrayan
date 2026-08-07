@@ -16,6 +16,7 @@ import walletService from '../../services/wallet';
 import categoryService from '../../services/category';
 import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders } from 'react-icons/fi';
 import AdminAnalytics from '../pageComponets/AdminAnalytics';
+import { sendWebhookNotification } from '../../utils/webhookHelper';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -1596,6 +1597,21 @@ function AdminPanel() {
         } catch (walletErr) {
           console.error("Failed to write credit wallet transaction on admin action:", walletErr.message);
         }
+      }
+
+      // Send Telegram notification if order status changed to CANCELLED
+      if (targetStatus === 'CANCELLED') {
+        let rawItems = [];
+        try { rawItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || []; } catch { rawItems = []; }
+        sendWebhookNotification('order.cancelled', {
+          orderId: order.$id || order.id,
+          orderNumber: order.order_number || 'ORDER',
+          customerName: order.name || order.customerName || 'Customer',
+          email: order.email || '',
+          total: Math.round(order.total || 0),
+          reason: extraData?.cancel_reason || 'Cancelled by Store Admin',
+          items: rawItems
+        });
       }
 
       showToast(`✅ Order status transitioned to ${targetStatus}!`, 'success');

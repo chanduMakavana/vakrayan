@@ -568,6 +568,17 @@ function OrderDetail() {
       if (updatedOrder) {
         setOrder(updatedOrder);
         showToast("Cancellation request submitted successfully. Awaiting admin approval.", "success");
+
+        // Send Telegram notification for order cancellation
+        sendWebhookNotification('order.cancelled', {
+          orderId: order.$id || order.id,
+          orderNumber: metadata.order_number || order.order_number,
+          customerName: user?.name || order.name || 'Customer',
+          email: user?.email || order.email || '',
+          total: Math.round(order.total || 0),
+          reason: finalReason,
+          items: parsedItems
+        });
       }
     } catch (err) {
       console.error("Order cancellation request failed:", err);
