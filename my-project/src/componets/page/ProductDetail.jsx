@@ -472,6 +472,7 @@ function ProductDetail() {
 
   const [sizeAdvisorOpen, setSizeAdvisorOpen] = useState(false);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
+  const [sizeUnit, setSizeUnit] = useState('IN'); // 'IN' | 'CM'
   const [advHeight, setAdvHeight] = useState('');
   const [advWeight, setAdvWeight] = useState('');
   const [advRecommendation, setAdvRecommendation] = useState('');
@@ -1208,7 +1209,12 @@ function ProductDetail() {
   const rawDescription = product?.description || "";
   const returnPolicyMatch = rawDescription.match(/\[RETURN_POLICY\]:\s*(.+)/);
   const returnPolicy = product?.return_policy || (returnPolicyMatch ? returnPolicyMatch[1].trim() : "7 Day Return");
-  const displayDescription = rawDescription.replace(/\[RETURN_POLICY\]:\s*(.+)/, "").trim();
+  const sizeChartMatch = rawDescription.match(/\[SIZE_CHART\]:\s*(.+)/);
+  const customSizeChartImage = product?.size_chart_image || product?.size_chart || (sizeChartMatch ? sizeChartMatch[1].trim() : "");
+  const displayDescription = rawDescription
+    .replace(/\[RETURN_POLICY\]:\s*(.+)/, "")
+    .replace(/\[SIZE_CHART\]:\s*(.+)/, "")
+    .trim();
 
   return (
     <>
@@ -2030,15 +2036,15 @@ function ProductDetail() {
                 <div className="py-3.5">
                   <button
                     onClick={() => setDescExpanded(!descExpanded)}
-                    className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none"
+                    className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none cursor-pointer"
                   >
-                    <span>Description</span>
+                    <span>DESCRIPTION</span>
                     {descExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                   </button>
-                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <p className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] p-4 rounded-none border border-neutral-950/10">
-                      {displayDescription}
-                    </p>
+                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-60 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] border border-[var(--color-border)] p-4 space-y-2">
+                      <p>{displayDescription}</p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2048,69 +2054,69 @@ function ProductDetail() {
                   onClick={() => setShippingExpanded(!shippingExpanded)}
                   className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none cursor-pointer"
                 >
-                  <span><FiTruck className="inline mr-2 text-sm" /> Returns & Exchanges</span>
+                  <span>RETURNS & EXCHANGES</span>
                   {shippingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                 </button>
-                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-[350px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)]/40 border border-white/20 backdrop-blur-md p-4.5 rounded-xl shadow-2xs space-y-3 font-medium">
+                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-[400px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] border border-[var(--color-border)] p-4 space-y-3 font-medium">
                     {returnPolicy === "No Return" || returnPolicy.toLowerCase().includes("no return") ? (
                       <>
                         <p className="text-rose-600 font-bold flex items-start gap-2">
                           <span className="shrink-0">🛑</span>
-                          <span><strong>Non-Returnable Item Policy:</strong> Final sale — no returns or exchanges accepted for this item.</span>
+                          <span><strong>Non-Returnable Item Policy:</strong> Final sale — standard returns or size exchanges are not accepted for this item.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">📐</span>
                           <span>Please check the size chart carefully before placing your order.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">📦</span>
-                          <span>Replacement or refund is only applicable if you receive a damaged or wrong product (with unboxing video proof).</span>
+                          <span className="shrink-0">📹</span>
+                          <span><strong>Damaged or Wrong Item:</strong> Replacement is only provided if you receive a damaged or incorrect product (unboxing video proof required).</span>
                         </p>
                       </>
                     ) : returnPolicy === "Return Only" || returnPolicy.toLowerCase().includes("return only") || returnPolicy.toLowerCase().includes("no exchange") ? (
                       <>
-                        <p className="text-amber-700 font-semibold flex items-start gap-2">
+                        <p className="text-amber-700 dark:text-amber-400 font-bold flex items-start gap-2">
                           <span className="shrink-0">📦</span>
-                          <span><strong>Return Only Policy:</strong> Easy 7-day return guarantee for wallet/bank refund.</span>
+                          <span><strong>Return Only Policy:</strong> Easy 7-day return guarantee for refund.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">🔄</span>
-                          <span>No direct size exchange available; please return the item for a refund and place a new order.</span>
+                          <span>Direct size exchanges are not offered for this product; please return for a refund and place a new order.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">🏷️</span>
-                          <span>Items must be unused, unwashed, and with all original tags intact.</span>
+                          <span>Items must be unused, unwashed, and with all original brand tags intact.</span>
                         </p>
                       </>
                     ) : returnPolicy === "Exchange Only" || returnPolicy.toLowerCase().includes("exchange only") ? (
                       <>
-                        <p className="text-amber-700 font-semibold flex items-start gap-2">
+                        <p className="text-amber-700 dark:text-amber-400 font-bold flex items-start gap-2">
                           <span className="shrink-0">🔄</span>
-                          <span><strong>Exchange Only Policy:</strong> Easy 7-day size or defect exchange.</span>
+                          <span><strong>Exchange Only Policy:</strong> Easy 7-day size or defect exchange available.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">🚫</span>
-                          <span>All sales are final — monetary refunds are not processed for this item.</span>
+                          <span>Monetary refunds are not processed for this item; only size/color replacements are accepted.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">🏷️</span>
-                          <span>In case of sizing issues or defects, request an exchange within 7 days of delivery with original tags intact.</span>
+                          <span>Request an exchange within 7 days of delivery with original tags intact.</span>
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-emerald-600 font-bold flex items-start gap-2">
+                        <p className="text-emerald-600 dark:text-emerald-400 font-bold flex items-start gap-2">
                           <span className="shrink-0">🟢</span>
-                          <span><strong>Return & Exchange Policy:</strong> Easy 7-day hassle-free returns and exchanges.</span>
+                          <span><strong>7-Day Return & Exchange Policy:</strong> Easy 7-day hassle-free returns and size exchanges.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">👕</span>
-                          <span>In case of sizing issues or defects, request an exchange or return within 7 days of delivery.</span>
+                          <span>In case of sizing issues or defects, request a return or size exchange within 7 days of delivery.</span>
                         </p>
                         <p className="flex items-start gap-2">
                           <span className="shrink-0">🏷️</span>
-                          <span>Items must be unused, unwashed, and with original tags intact.</span>
+                          <span>Items must be unused, unwashed, and with all original brand tags intact.</span>
                         </p>
                       </>
                     )}
@@ -2202,107 +2208,6 @@ function ProductDetail() {
             </div>
           </div>
         )}
-
-        {/* Recently Viewed Products */}
-        {(() => {
-          const saved = localStorage.getItem('recently_viewed');
-          let viewedIds = [];
-          if (saved) {
-            try {
-              viewedIds = JSON.parse(saved);
-            } catch {
-              viewedIds = [];
-            }
-          }
-          const currentId = product?.$id || product?.id;
-          const filteredIds = viewedIds.filter(id => id !== currentId);
-          
-          const viewedProducts = filteredIds
-            .map(id => products.find(p => p.$id === id || p.id === id))
-            .filter(Boolean)
-            .slice(0, 4);
-
-          if (viewedProducts.length === 0) return null;
-
-          return (
-            <div className="pt-12 border-t border-[var(--color-border)] space-y-6">
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--color-text)] font-display uppercase">
-                  Recently Viewed
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-                {viewedProducts.map((item) => {
-                  const uniqueId = item.$id || item.id;
-                  const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';
-                  const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
-                  const activeTag = item.tag || (item.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
-
-                  return (
-                    <div 
-                      key={uniqueId} 
-                      onClick={() => {
-                        navigate(`/product/${item.slug || uniqueId}`);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} 
-                      className="group relative flex flex-col bg-[var(--color-surface)] rounded-none p-2 border border-neutral-955/10 hover:border-[var(--color-accent)] transition-all duration-300 cursor-pointer overflow-hidden rounded-xl hover:shadow-md"
-                    >
-                      <div className="w-full aspect-[3/4] overflow-hidden bg-neutral-100 relative border border-[var(--color-border)]/50 rounded-xl">
-                        
-                        {activeTag ? (
-                          <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
-                            <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
-                              {activeTag}
-                            </span>
-                          </div>
-                        ) : null}
-
-                        <div className="w-full h-full relative overflow-hidden">
-                          <img
-                            src={frontView}
-                            alt={item.name}
-                            loading="lazy"
-                            className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
-                          />
-                          <img  
-                            src={backView}
-                            alt={`${item.name} alternate frame`}
-                            loading="lazy"
-                            className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-3 px-1 flex flex-col justify-between grow">
-                        <div>
-                          <span className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider block mb-0.5">
-                            {item.category?.replace('-', ' ') || "Collection"}
-                          </span>
-                          <h3 className="text-xs font-bold text-neutral-950 uppercase group-hover:text-[var(--color-muted)] transition-colors truncate">
-                            {item.name}
-                          </h3>
-                        </div>
-                        
-                        <div className="mt-3 pt-2 border-t border-neutral-950/10 flex items-center justify-between gap-4">
-                          <div className="flex items-baseline gap-1.5 font-mono">
-                            <span className="text-sm font-bold text-neutral-950">
-                              ₹{Number(item.price).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <span className="text-[9px] font-sans font-bold uppercase tracking-wide text-[var(--color-muted)] whitespace-nowrap">
-                            INCL. TAXES
-                          </span>
-                        </div>
-                      </div>
-
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
 
         <div id="reviews-section" className="pt-16 border-t border-[var(--color-border)] space-y-8">
           <div>
@@ -2659,19 +2564,20 @@ function ProductDetail() {
             onClick={() => setIsSizeChartOpen(false)}
           />
 
-          <div className="relative bg-[var(--color-surface)] rounded-none max-w-md w-full shadow-2xl p-6 border border-neutral-950 z-10 animate-scale-up space-y-6 text-[var(--color-text)]">
+          <div className="relative bg-[var(--color-surface)] rounded-2xl max-w-lg w-full shadow-2xl p-6 border border-[var(--color-border)] z-10 animate-scale-up space-y-5 text-[var(--color-text)] max-h-[90vh] overflow-y-auto scrollbar-none">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
               <div>
-                <h3 className="text-sm font-mono font-bold uppercase tracking-[0.2em] text-neutral-950">
-                  📏 VAKRAYAN SIZE GUIDE
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text)] flex items-center gap-2">
+                  <span>📏</span>
+                  <span>VAKRAYAN SIZE GUIDE</span>
                 </h3>
-                <p className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider mt-0.5">
-                  Size chart for boxy and oversized fits
+                <p className="text-[11px] text-[var(--color-muted)] tracking-wide mt-0.5">
+                  Measurements for boxy & oversized fits
                 </p>
               </div>
               <button 
                 onClick={() => setIsSizeChartOpen(false)}
-                className="text-[var(--color-muted)] hover:text-neutral-950 p-2 transition-colors cursor-pointer"
+                className="text-[var(--color-muted)] hover:text-[var(--color-text)] p-2 transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -2679,52 +2585,101 @@ function ProductDetail() {
               </button>
             </div>
 
-            <div className="overflow-hidden border border-neutral-950">
+            {/* Custom Uploaded Size Chart Image (If Available) */}
+            {customSizeChartImage && (
+              <div className="space-y-2 border border-[var(--color-border)] p-2 rounded-xl bg-[var(--color-bg)]">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] block px-1">
+                  Product Specific Size Chart:
+                </span>
+                <img 
+                  src={customSizeChartImage} 
+                  alt="Product Size Chart" 
+                  className="w-full h-auto rounded-lg object-contain max-h-72 border border-[var(--color-border)]/50"
+                />
+              </div>
+            )}
+
+            {/* Unit Toggle Switcher (IN vs CM) */}
+            <div className="flex items-center justify-between bg-[var(--color-bg)] p-2.5 rounded-xl border border-[var(--color-border)]">
+              <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-wider">
+                MEASUREMENT UNIT:
+              </span>
+              <div className="inline-flex rounded-lg p-0.5 bg-[var(--color-surface)] border border-[var(--color-border)]">
+                <button
+                  type="button"
+                  onClick={() => setSizeUnit('IN')}
+                  className={`px-3 py-1 text-[11px] font-mono font-bold rounded-md transition-all cursor-pointer ${
+                    sizeUnit === 'IN' 
+                      ? 'bg-neutral-900 text-white shadow-xs' 
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  INCHES (IN)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSizeUnit('CM')}
+                  className={`px-3 py-1 text-[11px] font-mono font-bold rounded-md transition-all cursor-pointer ${
+                    sizeUnit === 'CM' 
+                      ? 'bg-neutral-900 text-white shadow-xs' 
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  CENTIMETERS (CM)
+                </button>
+              </div>
+            </div>
+
+            {/* Size Table */}
+            <div className="overflow-x-auto border border-[var(--color-border)] rounded-xl">
               <table className="w-full text-left text-xs font-mono uppercase font-bold">
                 <thead>
-                  <tr className="bg-[var(--color-surface)] border-b border-neutral-955 text-[10px] font-black text-[var(--color-muted)]">
+                  <tr className="bg-[var(--color-bg)] border-b border-[var(--color-border)] text-[10px] font-black text-[var(--color-muted)]">
                     <th className="p-3">SIZE</th>
-                    <th className="p-3">CHEST (IN)</th>
-                    <th className="p-3">SHOULDER (IN)</th>
-                    <th className="p-3">LENGTH (IN)</th>
+                    <th className="p-3">CHEST ({sizeUnit})</th>
+                    <th className="p-3">SHOULDER ({sizeUnit})</th>
+                    <th className="p-3">LENGTH ({sizeUnit})</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-100 font-bold text-[var(--color-text)]">
+                <tbody className="divide-y divide-[var(--color-border)] font-bold text-[var(--color-text)]">
                   {[
-                    { size: 'XS', chest: '42', shoulder: '19', length: '27.5' },
-                    { size: 'S', chest: '44', shoulder: '20', length: '28' },
-                    { size: 'M', chest: '46', shoulder: '21', length: '29' },
-                    { size: 'L', chest: '48', shoulder: '22', length: '30' },
-                    { size: 'XL', chest: '50', shoulder: '23', length: '31' },
-                    { size: 'XXL', chest: '52', shoulder: '24', length: '32' }
-                  ].map((row) => (
-                    <tr 
-                      key={row.size} 
-                      className={`hover:bg-[var(--color-surface)] transition-colors ${
-                        selectedSize === row.size ? 'bg-[var(--color-surface)] font-black text-neutral-950' : ''
-                      }`}
-                    >
-                      <td className="p-3 font-sans font-black">{row.size} {selectedSize === row.size && '•'}</td>
-                      <td className="p-3">{row.chest}</td>
-                      <td className="p-3">{row.shoulder}</td>
-                      <td className="p-3">{row.length}</td>
-                    </tr>
-                  ))}
+                    { size: 'XS', chest: 42, shoulder: 19, length: 27.5 },
+                    { size: 'S', chest: 44, shoulder: 20, length: 28 },
+                    { size: 'M', chest: 46, shoulder: 21, length: 29 },
+                    { size: 'L', chest: 48, shoulder: 22, length: 30 },
+                    { size: 'XL', chest: 50, shoulder: 23, length: 31 },
+                    { size: 'XXL', chest: 52, shoulder: 24, length: 32 }
+                  ].map((row) => {
+                    const formatVal = (val) => sizeUnit === 'CM' ? (val * 2.54).toFixed(1) : val.toString();
+                    return (
+                      <tr 
+                        key={row.size} 
+                        className={`hover:bg-[var(--color-bg)] transition-colors ${
+                          selectedSize === row.size ? 'bg-amber-500/10 font-black text-amber-900 dark:text-amber-300' : ''
+                        }`}
+                      >
+                        <td className="p-3 font-sans font-black">{row.size} {selectedSize === row.size && '•'}</td>
+                        <td className="p-3">{formatVal(row.chest)}</td>
+                        <td className="p-3">{formatVal(row.shoulder)}</td>
+                        <td className="p-3">{formatVal(row.length)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-[10px] uppercase font-bold text-[var(--color-muted)] tracking-wide leading-relaxed">
-              <span className="font-black text-[var(--color-text)] block mb-0.5">💡 VAKRAYAN FIT MEMENTO</span>
-              Our cuts are designed for a relaxed, slightly boxy drop-shoulder aesthetic. For a fitted standard silhouette, we recommend choosing one size smaller.
+            <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl text-xs font-medium text-amber-900 leading-relaxed">
+              <span className="font-bold block mb-0.5 text-amber-950">💡 Fit Recommendation:</span>
+              Our cuts are designed for a relaxed, slightly boxy drop-shoulder aesthetic. If you prefer a regular fitted silhouette, select one size smaller.
             </div>
 
             <button
               type="button"
               onClick={() => setIsSizeChartOpen(false)}
-              className="w-full py-3 bg-neutral-950 hover:bg-neutral-850 transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer text-center"
+              className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 transition-all text-xs font-semibold uppercase tracking-wider text-white rounded-xl cursor-pointer text-center shadow-xs"
             >
-              Close Guide
+              Close Size Guide
             </button>
           </div>
         </div>

@@ -865,8 +865,18 @@ function AdminPanel() {
       is_featured: !!data.is_featured,
       is_vip_only: !!data.is_vip_only,
       is_live: !!data.is_live,
+      size_chart_image: data.size_chart_image?.trim() || "",
       slug: data.slug?.trim() || data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || ""
     };
+
+    let fullDescription = productPayload.description;
+    if (data.size_chart_image && data.size_chart_image.trim()) {
+      fullDescription += `\n[SIZE_CHART]: ${data.size_chart_image.trim()}`;
+    }
+    if (data.return_policy && data.return_policy !== '7 Day Return') {
+      fullDescription += `\n[RETURN_POLICY]: ${data.return_policy}`;
+    }
+    productPayload.description = fullDescription.trim();
 
     const updateHelper = async (id, payload) => {
       try {
@@ -970,10 +980,16 @@ function AdminPanel() {
       const rawDesc = product.description || '';
       const rpMatch = rawDesc.match(/\[RETURN_POLICY\]:\s*(.+)/);
       const returnPolicy = product.return_policy || (rpMatch ? rpMatch[1].trim() : '7 Day Return');
-      const cleanDesc = rawDesc.replace(/\[RETURN_POLICY\]:\s*(.+)/, '').trim();
+      const scMatch = rawDesc.match(/\[SIZE_CHART\]:\s*(.+)/);
+      const sizeChartImage = product.size_chart_image || product.size_chart || (scMatch ? scMatch[1].trim() : '');
+      const cleanDesc = rawDesc
+        .replace(/\[RETURN_POLICY\]:\s*(.+)/, '')
+        .replace(/\[SIZE_CHART\]:\s*(.+)/, '')
+        .trim();
 
       setValue('description', cleanDesc);
       setValue('return_policy', returnPolicy);
+      setValue('size_chart_image', sizeChartImage);
       
       // Hydrate Stocks
       let parsedStock = {};
@@ -2414,6 +2430,11 @@ function AdminPanel() {
                             );
                           })}
                         </div>
+                      </div>
+
+                      {/* Custom Size Chart Image Uploader */}
+                      <div className="md:col-span-2 border-t border-[var(--color-border)]/40 pt-4 mt-2">
+                        {renderImageUploader('size_chart_image', 'Custom Product Size Chart Image (Optional)', undefined)}
                       </div>
 
                     </div>
