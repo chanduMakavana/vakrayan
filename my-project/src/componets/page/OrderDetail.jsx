@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy } from 'react-icons/fi';
+import { useSelector, useDispatch } from 'react-redux';
+import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy, FiRefreshCw } from 'react-icons/fi';
+import cartService from '../../services/cart';
+import { addCartItemState } from '../../features/addToCart';
 import ordersService from '../../services/orders';
 import reviewsService from '../../services/reviews';
 import { useToast } from '../../context/ToastContext';
@@ -15,12 +17,15 @@ import { jsPDF } from 'jspdf';
 function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
+  const cartItems = useSelector(state => state.cart || []);
   const products = useSelector(state => state.products.allItems || []);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reorderLoading, setReorderLoading] = useState(false);
 
   // Review submission state for the order details write-review modal
   const [reviewModalItem, setReviewModalItem] = useState(null); // stores { name: '...', productId: '...' }
@@ -308,6 +313,88 @@ function OrderDetail() {
       metadata.cancel_reason.toLowerCase().includes('admin') ||
       metadata.cancel_reason.toLowerCase().includes('store')
     ));
+
+  // Check if cancellation occurred within 24 hours (1 day)
+  const isWithin1DayOfCancellation = (() => {
+    if (!order || (order.status !== 'CANCELLED' && order.status !== 'CANCELLATION_APPROVED')) {
+      return false;
+    }
+    const cancelTimeStr = order.cancelledAt || metadata?.cancelled_at || order.$updatedAt || order.updatedAt || order.$createdAt || order.createdAt;
+    if (!cancelTimeStr) return true;
+    
+    const cancelTime = new Date(cancelTimeStr).getTime();
+    if (isNaN(cancelTime)) return true;
+    
+    const now = Date.now();
+    const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
+    return (now - cancelTime) <= twentyFourHoursInMs;
+  })();
+
+  // Reorder items from cancelled order back into cart
+  const handleReorderOrder = async () => {
+    if (!order) return;
+    try {
+      setReorderLoading(true);
+      let items = [];
+      try {
+        items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
+      } catch (err) {
+        items = [];
+      }
+
+      if (items.length === 0) {
+        showToast("No items found in this order to reorder.", "error");
+        return;
+      }
+
+      let addedCount = 0;
+      for (const item of items) {
+        const prodId = item.product_id || item.productId || item.$id || item.id;
+        const prodName = item.name || 'Product';
+        const size = item.size || 'M';
+        const price = Number(item.price || 0);
+        const quantity = Number(item.quantity || 1);
+        const img = item.product_Image || item.product_image || item.image || '';
+
+        if (user && user.$id) {
+          const existingInCart = (cartItems || []).find(c => (c.product_id === prodId || c.productId === prodId) && c.size === size);
+          const res = await cartService.addToCart({
+            name: prodName,
+            size: size,
+            price: price,
+            quantity: quantity,
+            product_id: prodId,
+            product_Image: img,
+            userId: user.$id,
+            existingCartItem: existingInCart
+          });
+          if (res) dispatch(addCartItemState(res));
+          addedCount++;
+        } else {
+          const guestItem = {
+            $id: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            name: prodName,
+            size: size,
+            price: price,
+            quantity: quantity,
+            subtotal: price * quantity,
+            product_id: prodId,
+            product_Image: img
+          };
+          dispatch(addCartItemState(guestItem));
+          addedCount++;
+        }
+      }
+
+      showToast(`Added ${addedCount} item(s) to your cart from cancelled order!`, "success");
+      navigate('/checkout');
+    } catch (err) {
+      console.error("Failed to reorder items:", err);
+      showToast("Could not reorder items. Please try again.", "error");
+    } finally {
+      setReorderLoading(false);
+    }
+  };
 
   // Extract base shipping, remote route surcharge, and COD handling fee from the stored total shipping charge
   const totalShipping = Number(metadata.shipping_charge || order.shipping_charge || 0);
@@ -637,6 +724,20 @@ function OrderDetail() {
                         <span className="text-xs font-mono font-bold text-rose-500 block mt-0.5 uppercase">
                           &ldquo;{metadata.cancel_reason}&rdquo;
                         </span>
+                      </div>
+                    )}
+
+                    {isWithin1DayOfCancellation && (
+                      <div className="border-t border-rose-500/10 pt-3">
+                        <button
+                          type="button"
+                          onClick={handleReorderOrder}
+                          disabled={reorderLoading}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-mono font-black text-xs tracking-wider uppercase py-2.5 px-6 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                          <FiRefreshCw className={`text-sm ${reorderLoading ? 'animate-spin' : ''}`} />
+                          <span>{reorderLoading ? 'Reordering...' : 'Reorder Items (Within 24h)'}</span>
+                        </button>
                       </div>
                     )}
                   </div>

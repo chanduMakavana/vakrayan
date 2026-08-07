@@ -2,13 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell, FiRefreshCw } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../services/auth';
 import addressService from '../../services/address';
 import ordersService from '../../services/orders';
 import reviewsService from '../../services/reviews';
 import productsService from '../../services/products';
+import cartService from '../../services/cart';
+import { addCartItemState } from '../../features/addToCart';
 import { setProducts } from '../../features/productsSlice';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
@@ -26,6 +28,7 @@ function UserProfile() {
   const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
+  const cartItems = useSelector(state => state.cart);
   const { items: products, fetched: productsFetched } = useSelector(state => state.products);
 
   const [orders, setOrders] = useState([]);
@@ -539,7 +542,85 @@ function UserProfile() {
     }
   };
 
-  // handleVipSuccess has been moved above to resolve hoisting issues
+  // Helper to check if cancelled order occurred within 24 hours (1 day)
+  const isWithin1DayOfCancellation = (ord) => {
+    const status = (ord?.status || ord?.order_status || '').toUpperCase();
+    if (status !== 'CANCELLED' && status !== 'CANCELLATION_APPROVED') {
+      return false;
+    }
+    const cancelTimeStr = ord.cancelledAt || ord.metadata?.cancelled_at || ord.$updatedAt || ord.updatedAt || ord.$createdAt || ord.createdAt;
+    if (!cancelTimeStr) return true;
+    
+    const cancelTime = new Date(cancelTimeStr).getTime();
+    if (isNaN(cancelTime)) return true;
+    
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    return (now - cancelTime) <= twentyFourHours;
+  };
+
+  // Reorder items from a cancelled order within 24 hours
+  const handleReorderOrder = async (orderToReorder, e) => {
+    if (e) e.stopPropagation();
+    try {
+      let items = [];
+      try {
+        items = typeof orderToReorder.items === 'string' ? JSON.parse(orderToReorder.items) : orderToReorder.items || [];
+      } catch (err) {
+        items = [];
+      }
+
+      if (items.length === 0) {
+        showToast("No items found in this order to reorder.", "error");
+        return;
+      }
+
+      let addedCount = 0;
+      for (const item of items) {
+        const prodId = item.product_id || item.productId || item.$id || item.id;
+        const prodName = item.name || 'Product';
+        const size = item.size || 'M';
+        const price = Number(item.price || 0);
+        const quantity = Number(item.quantity || 1);
+        const img = item.product_Image || item.product_image || item.image || '';
+
+        if (user && user.$id) {
+          const existingInCart = (cartItems || []).find(c => (c.product_id === prodId || c.productId === prodId) && c.size === size);
+          const res = await cartService.addToCart({
+            name: prodName,
+            size: size,
+            price: price,
+            quantity: quantity,
+            product_id: prodId,
+            product_Image: img,
+            userId: user.$id,
+            existingCartItem: existingInCart
+          });
+          if (res) dispatch(addCartItemState(res));
+          addedCount++;
+        } else {
+          const guestItem = {
+            $id: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            name: prodName,
+            size: size,
+            price: price,
+            quantity: quantity,
+            subtotal: price * quantity,
+            product_id: prodId,
+            product_Image: img
+          };
+          dispatch(addCartItemState(guestItem));
+          addedCount++;
+        }
+      }
+
+      showToast(`Added ${addedCount} item(s) to your cart from cancelled order!`, "success");
+      navigate('/checkout');
+    } catch (err) {
+      console.error("Failed to reorder items:", err);
+      showToast("Could not reorder items. Please try again.", "error");
+    }
+  };
 
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
@@ -1007,6 +1088,22 @@ function UserProfile() {
                                       );
                                     })}
                                   </div>
+                                </div>
+                              )}
+
+                              {isWithin1DayOfCancellation(order) && (
+                                <div className="mt-3 pt-2.5 border-t border-[var(--color-border)] flex items-center justify-between flex-wrap gap-2">
+                                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
+                                    ⏰ Cancelled within 24h — eligible for reorder
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleReorderOrder(order, e)}
+                                    className="inline-flex items-center gap-1.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white font-bold text-[10px] tracking-wider px-3 py-1.5 rounded-lg uppercase transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <FiRefreshCw className="text-xs shrink-0" />
+                                    <span>Reorder Items</span>
+                                  </button>
                                 </div>
                               )}
                             </div>
