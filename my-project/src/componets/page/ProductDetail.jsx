@@ -275,6 +275,13 @@ function ProductDetail() {
     };
   }, [activeImageIdx]);
 
+  // Auto-sync imageLoaded state if active image is already cached / completed
+  useEffect(() => {
+    if (mainImageRef.current && mainImageRef.current.complete) {
+      setImageLoaded(true);
+    }
+  }, [activeImageIdx]);
+
   // Touch and wheel event handler for lightbox modal (blocking viewport zoom & reload)
   useEffect(() => {
     if (!isLightboxOpen) return;
@@ -1242,8 +1249,12 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => {
-                      setImageLoaded(false);
-                      setActiveImageIdx(idx);
+                      if (activeImageIdx !== idx) {
+                        setImageLoaded(false);
+                        setActiveImageIdx(idx);
+                      } else {
+                        setImageLoaded(true);
+                      }
                       mainPhotoZoomRef.current = 1;
                       mainPhotoOffsetRef.current = { x: 0, y: 0 };
                       setMainPhotoZoom(1);
