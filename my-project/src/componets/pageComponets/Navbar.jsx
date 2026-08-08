@@ -583,7 +583,7 @@ function Navbar() {
           boxShadow: '0 4px 24px rgba(5,150,105,0.06), 0 1px 4px rgba(0,0,0,0.04)'
         }}
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 md:px-10 lg:px-12 py-0">
+        <div className="max-w-[1728px] mx-auto px-3 sm:px-6 md:px-10 lg:px-12 py-0">
           <div className="flex items-center justify-between h-20">
 
             {/* Brand */}

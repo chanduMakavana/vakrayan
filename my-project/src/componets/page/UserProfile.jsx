@@ -662,7 +662,7 @@ function UserProfile() {
   return (
     <>
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20 pt-6">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 space-y-8">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-8 space-y-8">
           
           {/* Main Layout Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

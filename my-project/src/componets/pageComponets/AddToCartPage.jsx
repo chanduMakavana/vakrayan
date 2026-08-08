@@ -435,7 +435,7 @@ function AddToCartPage() {
 
   return (
     <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20">
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-12 space-y-10">
+      <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-12 space-y-10">
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[var(--color-border)]">

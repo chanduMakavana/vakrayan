@@ -151,7 +151,7 @@ function ProductReviews() {
   return (
     <>
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative pb-20">
-        <div className="max-w-6xl mx-auto px-6 md:px-12 py-10 space-y-8 relative z-20">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-12 py-10 space-y-8 relative z-20">
           
           {/* Header Action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]/40">

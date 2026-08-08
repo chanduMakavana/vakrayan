@@ -2073,7 +2073,7 @@ function AdminPanel() {
       <div className="absolute top-1/4 left-1/12 w-96 h-96 bg-[var(--color-accent)]/5 rounded-full blur-3xl pointer-events-none z-0"></div>
       <div className="absolute bottom-1/4 right-1/12 w-96 h-96 bg-[var(--color-info)]/5 rounded-full blur-3xl pointer-events-none z-0"></div>
 
-      <div className="relative z-20 max-w-7xl mx-auto space-y-8">
+      <div className="relative z-20 max-w-[1728px] mx-auto space-y-8">
         
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           

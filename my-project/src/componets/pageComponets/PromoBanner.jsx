@@ -56,7 +56,7 @@ function PromoBanner() {
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: '-80px' }}
-        className="relative z-10 max-w-5xl mx-auto px-6 py-20 text-center"
+        className="relative z-10 max-w-[1728px] mx-auto px-6 py-20 text-center"
       >
         <motion.div variants={childVariants} className="flex justify-center mb-5">
           <div className="accent-line" />

@@ -54,7 +54,7 @@ function Footer() {
       {/* Top green glow line */}
       <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, #059669, #34D399, #059669, transparent)' }} />
 
-      <div className="max-w-7xl mx-auto px-6 md:px-12 pt-16 pb-10">
+      <div className="max-w-[1728px] mx-auto px-6 md:px-12 pt-16 pb-10">
         
         {/* Giant Brand Logo Title */}
         <div className="w-full flex flex-col items-center mb-16 px-4 text-center">

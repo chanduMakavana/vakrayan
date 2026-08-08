@@ -7,7 +7,7 @@ function PageSkeleton({ path: propPath }) {
   // 1. Product Detail Page Skeleton
   if (path.startsWith('/product/')) {
     return (
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 min-h-[80vh] select-none">
+      <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-10 min-h-[80vh] select-none">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 md:gap-16">
           {/* Left: Image skeleton */}
           <div className="aspect-[4/5] md:aspect-[3/4] w-full rounded-2xl skeleton" />
@@ -47,7 +47,7 @@ function PageSkeleton({ path: propPath }) {
   // 2. Cart Page Skeleton
   if (path === '/cart') {
     return (
-      <div className="max-w-7xl mx-auto px-6 md:px-12 py-12 min-h-[80vh] select-none">
+      <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-12 min-h-[80vh] select-none">
         <div className="h-10 w-48 rounded-lg skeleton mb-10" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Left: Cart Items List */}
@@ -177,7 +177,7 @@ function PageSkeleton({ path: propPath }) {
         <div className="w-full h-[38px] skeleton border-y border-neutral-100/50" />
 
         {/* 3. Best Sellers Section Skeleton */}
-        <div className="max-w-7xl mx-auto px-4 md:px-12 py-16 border-b border-neutral-100/30">
+        <div className="max-w-[1728px] mx-auto px-4 md:px-12 py-16 border-b border-neutral-100/30">
           <div className="mb-12">
             <div className="w-12 h-1 mb-3 rounded skeleton" />
             <div className="h-4 w-24 rounded skeleton mb-3" />
@@ -193,7 +193,7 @@ function PageSkeleton({ path: propPath }) {
         </div>
 
         {/* 4. Category Grid Section Skeleton */}
-        <div className="max-w-7xl mx-auto px-4 md:px-12 py-16 border-b border-neutral-100/30">
+        <div className="max-w-[1728px] mx-auto px-4 md:px-12 py-16 border-b border-neutral-100/30">
           <div className="mb-12 flex flex-col items-center text-center">
             <div className="w-12 h-1 mb-3 rounded skeleton" />
             <div className="h-4 w-32 rounded skeleton mb-3" />
@@ -212,7 +212,7 @@ function PageSkeleton({ path: propPath }) {
         </div>
 
         {/* 5. Promo Banner Section Skeleton */}
-        <div className="max-w-7xl mx-auto px-4 md:px-12 py-16">
+        <div className="max-w-[1728px] mx-auto px-4 md:px-12 py-16">
           <div className="w-full aspect-[21/9] md:aspect-[3.2/1] rounded-2xl skeleton" />
         </div>
       </div>
@@ -223,7 +223,7 @@ function PageSkeleton({ path: propPath }) {
   if (path.startsWith('/shop') || path.startsWith('/category')) {
     return (
       <div className="w-full bg-[var(--color-bg)] pb-20 select-none">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
+        <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
           {/* Headline Title Skeleton */}
           <div className="text-center md:text-left space-y-4 border-b border-[var(--color-border)] pb-6">

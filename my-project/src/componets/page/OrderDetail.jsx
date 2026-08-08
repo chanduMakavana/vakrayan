@@ -615,7 +615,7 @@ function OrderDetail() {
       >
         <div className="absolute inset-0 bg-[var(--color-bg)]/80 backdrop-blur-xs z-10" />
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-8 relative z-20 space-y-6">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-8 relative z-20 space-y-6">
           
           {/* Header Action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">

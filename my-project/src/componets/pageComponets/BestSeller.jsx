@@ -51,7 +51,7 @@ function BestSellers() {
     <section id="drops" className="scroll-mt-20 selection:bg-[var(--color-accent)] selection:text-white"
       style={{ background: 'var(--color-bg)', padding: '72px 0', borderTop: '1px solid var(--color-border)' }}
     >
-      <div className="max-w-7xl mx-auto px-4 md:px-12">
+      <div className="max-w-[1728px] mx-auto px-4 md:px-12">
 
         {/* Section Header */}
         <div className="mb-12 flex flex-col sm:flex-row sm:items-end justify-between gap-4">

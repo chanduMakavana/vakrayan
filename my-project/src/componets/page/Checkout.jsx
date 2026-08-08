@@ -869,7 +869,7 @@ function Checkout() {
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
         <div className="absolute inset-0 bg-[var(--color-bg)]/96 backdrop-blur-xs z-10" />
 
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
+        <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">

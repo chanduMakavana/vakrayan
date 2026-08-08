@@ -527,7 +527,7 @@ function Shop() {
     <>
       
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-16">
-        <div className="max-w-7xl mx-auto px-4 md:px-12 py-5 md:py-10 relative z-20 space-y-4 md:space-y-8">
+        <div className="max-w-[1728px] mx-auto px-4 md:px-12 py-5 md:py-10 relative z-20 space-y-4 md:space-y-8">
           
           {/* Headline Title */}
           <div className="text-center md:text-left space-y-1 border-b border-[var(--color-border)] pb-3 md:pb-5">
