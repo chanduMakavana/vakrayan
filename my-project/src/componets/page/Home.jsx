@@ -9,7 +9,7 @@ import Footer from '../pageComponets/Footer'
 
 function Home() {
   useEffect(() => {
-    document.title = 'Vakrayan — Premium Apparel'
+    document.title = 'Vakrayan | Premium Apparel'
   }, [])
   return (
     <>

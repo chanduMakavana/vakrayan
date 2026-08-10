@@ -40,7 +40,7 @@ function UserProfile() {
   // ✅ SEO: Dynamic page title — shows user's name in the browser tab
   useEffect(() => {
     const name = user?.name ? `${user.name}'s Profile` : 'My Profile'
-    document.title = `${name} — Vakrayan`
+    document.title = `${name} | Vakrayan`
   }, [user?.name])
 
   const [activeProfileTab, setActiveProfileTab] = useState(() => {
@@ -1144,7 +1144,7 @@ function UserProfile() {
                         <input
                           type="text"
                           placeholder="ENTER GIFT VOUCHER CODE..."
-                          className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-lg px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider outline-hidden"
+                          className="flex-1 bg-white border border-zinc-300 focus:border-zinc-900 text-zinc-900 placeholder:text-zinc-400 rounded-lg px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider outline-hidden shadow-xs"
                         />
                         <button
                           onClick={() => showToast("Voucher code verified. simulated gift voucher redeemed!", "success")}

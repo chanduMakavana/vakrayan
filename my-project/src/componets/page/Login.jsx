@@ -56,7 +56,7 @@ function Login() {
 
   const showOverlay = useDelayedLoading(loading, 1500)
 
-  useEffect(() => { document.title = 'Login — Vakrayan' }, [])
+  useEffect(() => { document.title = 'Login | Vakrayan' }, [])
 
   const onSubmit = async (data) => {
     setServerError(''); setLoading(true)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 import slidesService from '../../services/slides'
 
 const DEFAULT_SLIDES = [
@@ -233,8 +234,11 @@ function Hero() {
             className="absolute inset-0 cursor-pointer"
           >
             <img
-              src={isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image}
+              src={getOptimizedImageUrl(isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image, isMobile ? 800 : 1600, 80)}
               alt="Vakrayan Banner"
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
               className="w-full h-full object-cover select-none pointer-events-none"
               draggable={false}
             />

@@ -30,23 +30,23 @@ Theme: Streetwear Editorial · Emerald Green · Barlow Condensed
 --font-label:   'Jost', ui-sans-serif, sans-serif;        /* Removed Bungee — use Jost 900 */
 
 
-/* ── Core Palette — Fresh Cream + Emerald ───────────────── */
---color-bg:          #F4FAF7;        /* Soft green-tinted white bg */
---color-surface:     #FFFFFF;        /* Pure white card surface */
---color-surface-alt: #EDFAF3;        /* Light emerald tint surface */
---color-border:      rgba(5,150,105,0.13);  /* Soft green border */
---color-border-hard: #C6E6D9;        /* Solid soft green border */
---color-text:        #0D1A14;        /* Near-black, green-tinted */
---color-muted:       #527060;        /* Muted green-gray */
---color-subtle:      #F0F7F3;        /* Very light green-white */
+/* ── Core Palette — Pure White & Emerald Green Design System ──── */
+--color-bg:          #FFFFFF;        /* Pure Crisp White Background */
+--color-surface:     #FFFFFF;        /* Pure White Card Surface */
+--color-surface-alt: #F0FDF7;        /* Soft Emerald Air Surface */
+--color-border:      rgba(5,150,105,0.16);  /* Subtle emerald hairline border */
+--color-border-hard: #C6E6D9;        /* Defined emerald border */
+--color-text:        #062C1E;        /* Deep Forest Emerald Text */
+--color-muted:       #3B6E58;        /* Medium Forest Emerald Muted Text */
+--color-subtle:      #F0FDF7;        /* Subtle Light Mint Background */
 
 /* ── Accent — Emerald Green ─────────────────────────────── */
 --color-accent:       #059669;
 --color-accent-hover: #047857;
---color-accent-dark:  #065F46;
---color-accent-light: rgba(5,150,105,0.08);
+--color-accent-dark:  #064E3B;
+--color-accent-light: #ECFDF5;
 --color-accent-glow:  rgba(5,150,105,0.22);
---color-accent-glass: rgba(5,150,105,0.12);
+--color-accent-glass: rgba(5,150,105,0.10);
 
 /* ── Glassmorphism Surfaces ─────────────────────────────── */
 --glass-bg:       rgba(255,255,255,0.72);
@@ -63,24 +63,24 @@ Theme: Streetwear Editorial · Emerald Green · Barlow Condensed
 --color-warning:  #D97706;
 --color-info:     #0891B2;
 
-/* ── Border Radius ──────────────────────────────────────── */
---radius-xs:  4px;
---radius-sm:  8px;
---radius-md:  12px;
---radius-lg:  16px;
---radius-xl:  24px;
---radius-2xl: 32px;
+/* ── Border Radius — Crisp & Sharp Streetwear ─────────── */
+--radius-xs:  2px;
+--radius-sm:  6px;
+--radius-md:  8px;
+--radius-lg:  12px;
+--radius-xl:  16px;
+--radius-2xl: 20px;
 --radius-full: 9999px;
 
-/* ── Shadows — Emerald-tinted depth ─────────────────────── */
---shadow-xs:    0 1px 3px rgba(5,150,105,0.06), 0 1px 2px rgba(0,0,0,0.04);
---shadow-sm:    0 4px 12px rgba(5,150,105,0.08), 0 1px 4px rgba(0,0,0,0.04);
---shadow-md:    0 8px 24px rgba(5,150,105,0.10), 0 2px 8px rgba(0,0,0,0.05);
---shadow-lg:    0 16px 40px rgba(5,150,105,0.12), 0 4px 16px rgba(0,0,0,0.06);
---shadow-xl:    0 24px 64px rgba(5,150,105,0.14), 0 8px 24px rgba(0,0,0,0.08);
---shadow-glass: 0 8px 32px rgba(5,150,105,0.10), inset 0 1px 0 rgba(255,255,255,0.7);
---shadow-glow:  0 0 0 3px var(--color-accent-glow);
---shadow-card-hover: 0 20px 48px rgba(5,150,105,0.15), 0 6px 20px rgba(0,0,0,0.06);
+/* ── Shadows — Sharp & Defined depth ─────────────────────── */
+--shadow-xs:    0 1px 2px rgba(0,0,0,0.05);
+--shadow-sm:    0 2px 8px rgba(5,150,105,0.08), 0 1px 3px rgba(0,0,0,0.05);
+--shadow-md:    0 6px 18px rgba(5,150,105,0.10), 0 2px 6px rgba(0,0,0,0.06);
+--shadow-lg:    0 12px 32px rgba(5,150,105,0.12), 0 4px 12px rgba(0,0,0,0.07);
+--shadow-xl:    0 20px 48px rgba(5,150,105,0.14), 0 6px 18px rgba(0,0,0,0.08);
+--shadow-glass: 0 6px 24px rgba(5,150,105,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+--shadow-glow:  0 0 0 2px var(--color-accent);
+--shadow-card-hover: 0 12px 30px rgba(5,150,105,0.18), 0 4px 12px rgba(0,0,0,0.06);
 
 /* ── Transitions ─────────────────────────────────────────── */
 --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -413,35 +413,64 @@ transform: translateY(-1px);
 }
 .btn-ghost:active { transform: scale(0.97); }
 
-/* ── Form Inputs ─────────────────────────────────────────── */
+/* ── Form Inputs — Clean White Background & Crisp Dark Text ───────── */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="password"],
+input[type="tel"],
+input[type="search"],
+textarea,
+select,
 .input-field {
-width: 100%;
-background: rgba(255,255,255,0.80);
-border: 1.5px solid var(--color-border-hard);
-border-radius: var(--radius-sm);
-padding: 13px 16px;
-font-size: 15px;
-font-weight: 400;
-color: var(--color-text);
-outline: none;
-transition: border-color var(--duration-base) var(--ease-smooth),
-background var(--duration-base) var(--ease-smooth),
-box-shadow var(--duration-base) var(--ease-smooth);
-backdrop-filter: blur(8px);
--webkit-backdrop-filter: blur(8px);
+  background-color: #FFFFFF !important;
+  color: #121212 !important;
+  border-color: #E4E4E7;
+}
+
+input::placeholder,
+textarea::placeholder,
+.input-field::placeholder {
+  color: #71717A !important;
+  opacity: 1;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.input-field:focus {
+  background-color: #FFFFFF !important;
+  color: #121212 !important;
+  border-color: #18181B !important;
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.1) !important;
+}
+
+.input-field {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1.5px solid #E4E4E7;
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #121212;
+  outline: none;
+  transition: border-color var(--duration-base) var(--ease-smooth),
+              background var(--duration-base) var(--ease-smooth),
+              box-shadow var(--duration-base) var(--ease-smooth);
 }
 .input-field::placeholder {
-color: var(--color-muted);
-font-weight: 400;
+  color: #71717A;
+  font-weight: 400;
 }
 .input-field:focus {
-background: var(--color-surface);
-border-color: var(--color-accent);
-box-shadow: 0 0 0 3px var(--color-accent-glow);
+  background: #FFFFFF;
+  border-color: #18181B;
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
 }
 .input-field.error {
-border-color: var(--color-danger);
-box-shadow: 0 0 0 3px rgba(220,38,38,0.12);
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(220,38,38,0.12);
 }
 
 /* ── Product Image Wrap ─────────────────────────────────── */
@@ -452,14 +481,12 @@ background: var(--color-subtle);
 border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-/* ── Product Card ───────────────────────────────────────── */
+/* ── Product Card — Sharp 90-Degree Fashion Editorial ───── */
 .product-card {
-background: var(--glass-bg);
-backdrop-filter: var(--glass-blur-sm);
--webkit-backdrop-filter: var(--glass-blur-sm);
-border: 1px solid var(--glass-border-green);
-border-radius: var(--radius-lg);
-box-shadow: var(--shadow-sm);
+background: var(--color-surface);
+border: 1px solid var(--color-border-hard);
+border-radius: 0px;
+box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 3px rgba(5,150,105,0.06);
 overflow: hidden;
 transition: transform var(--duration-base) var(--ease-out-expo),
 box-shadow var(--duration-base) var(--ease-out-expo),
@@ -467,9 +494,9 @@ border-color var(--duration-base) var(--ease-smooth);
 cursor: pointer;
 }
 .product-card:hover {
-transform: translateY(-6px) scale(1.01);
-box-shadow: var(--shadow-card-hover);
-border-color: rgba(5,150,105,0.30);
+transform: translateY(-3px);
+box-shadow: 0 10px 24px rgba(5,150,105,0.15), 0 3px 8px rgba(0,0,0,0.06);
+border-color: var(--color-accent);
 }
 
 /* ── Badges ─────────────────────────────────────────────── */

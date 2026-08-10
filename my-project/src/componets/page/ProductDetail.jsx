@@ -17,6 +17,7 @@ import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
+import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
 
 
 function ProductDetail() {
@@ -39,11 +40,11 @@ function ProductDetail() {
   // Fires whenever product loads (cached or API). Each product gets a unique <title>.
   useEffect(() => {
     if (!product) {
-      document.title = 'Loading... — Vakrayan';
+      document.title = 'Loading... | Vakrayan';
       return;
     }
     const productName = product.name || 'Product';
-    document.title = `${productName} — Vakrayan`;
+    document.title = `${productName} | Vakrayan`;
 
     // Remove any existing product schema
     const existing = document.getElementById('product-jsonld');
@@ -730,6 +731,17 @@ function ProductDetail() {
   }, [product, products]);
 
   useEffect(() => {
+    if (!product) return;
+    const rawImgs = [
+      product.front_image_link || product.image_url || product.image,
+      ...(Array.isArray(product.back_image_links) ? product.back_image_links : product.back_image_link ? [product.back_image_link] : [])
+    ].filter(Boolean);
+    rawImgs.forEach((imgUrl, idx) => {
+      preloadImage(getOptimizedImageUrl(imgUrl, 1000, 80), idx === 0);
+    });
+  }, [product]);
+
+  useEffect(() => {
     let isMounted = true;
     async function loadReviews() {
       try {
@@ -1156,7 +1168,6 @@ function ProductDetail() {
       ].filter(Boolean);
 
   const galleryImages = Array.from(new Set(rawGalleryImages));
-
   galleryImagesRef.current = galleryImages;
 
   const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
@@ -1962,7 +1973,7 @@ function ProductDetail() {
                       }
                     }}
                     placeholder="ENTER 6-DIGIT PINCODE"
-                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)] rounded-none pl-8 pr-4 py-2 text-xs font-mono text-[var(--color-text)] placeholder-[var(--color-muted)] outline-none tracking-widest transition-all"
+                    className="w-full bg-white border border-zinc-300 focus:border-zinc-900 rounded-none pl-8 pr-4 py-2 text-xs font-mono text-zinc-900 placeholder:text-zinc-400 outline-none tracking-widest transition-all"
                   />
                 </div>
                 <button

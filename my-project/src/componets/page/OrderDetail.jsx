@@ -1810,8 +1810,33 @@ function OrderDetail() {
                   </div>
                 </div>
 
+                {/* QR Code & Marketplace Fulfillment Bar */}
+                <div className="mt-8 pt-4 border-t-2 border-dashed border-neutral-200 flex justify-between items-center bg-neutral-50 p-4 rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=0&data=${encodeURIComponent(order.tracking_url || `${window.location.origin}/order/${order.$id || order.id || ''}`)}`}
+                      alt="Order Tracking QR Code" 
+                      className="w-16 h-16 border border-neutral-300 rounded-lg p-1 bg-white shrink-0"
+                      onerror="this.onerror=null; this.src='https://quickchart.io/qr?text=${encodeURIComponent(order.tracking_url || `${window.location.origin}/order/${order.$id || order.id || ''}`)}&size=100';"
+                    />
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-black">SCAN QR TO TRACK SHIPMENT</div>
+                      <div className="text-[8px] text-neutral-500 font-mono mt-0.5">ORDER TRACKING URL & DISPATCH STATUS</div>
+                      <div className="text-[8px] font-mono text-neutral-700 mt-1 truncate max-w-[280px]">
+                        {order.tracking_url || `${window.location.origin}/order/${order.$id || order.id || ''}`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="inline-block bg-black text-white text-[9px] font-black px-2.5 py-1 rounded uppercase tracking-wider">
+                      FULFILLED VIA: {order.channel || 'MEESHO / FLIPKART / VAKRAYAN DIRECT'}
+                    </span>
+                    <div className="text-[8px] font-mono text-neutral-500 mt-1">HSN: 61091000 | WT: 0.40 KG</div>
+                  </div>
+                </div>
+
                 {/* Footer Info */}
-                <div className="mt-16 border-t border-neutral-100 pt-4 text-center text-[9px] text-neutral-400 font-bold tracking-widest uppercase leading-relaxed">
+                <div className="mt-12 border-t border-neutral-100 pt-4 text-center text-[9px] text-neutral-400 font-bold tracking-widest uppercase leading-relaxed">
                   Thank you for shopping with VAKRAYAN!<br/>
                   This is a system generated tax invoice. No signature is required.
                 </div>

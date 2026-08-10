@@ -66,7 +66,7 @@ function Checkout() {
   const [checkoutStatus, setCheckoutStatus] = useState('idle') // idle | processing | success
 
   // ✅ SEO: Dynamic page title
-  useEffect(() => { document.title = 'Checkout — Vakrayan' }, [])
+  useEffect(() => { document.title = 'Checkout | Vakrayan' }, [])
 
   useEffect(() => {
     if (checkoutStatus === 'success') {
@@ -936,12 +936,12 @@ function Checkout() {
                 
                 {/* Full name */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Full Name</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Full Name</label>
                   <input
                     type="text"
                     defaultValue={user?.name || ''}
                     placeholder="ENTER YOUR NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.name ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('name', { required: 'Name is required' })}
                   />
                   {errors.name && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -949,12 +949,12 @@ function Checkout() {
 
                 {/* Email address */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Email Address</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Email Address</label>
                   <input
                     type="text"
                     defaultValue={user?.email || ''}
                     placeholder="YOU@EXAMPLE.COM"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.email ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('email', { 
                       required: 'Email is required',
                       pattern: {
@@ -968,11 +968,11 @@ function Checkout() {
 
                 {/* Mobile number */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Contact Phone</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Contact Phone</label>
                   <input
                     type="tel"
                     placeholder="9876543210"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.phone ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.phone ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('phone', { 
                       required: 'Phone is required',
                       pattern: {
@@ -986,11 +986,11 @@ function Checkout() {
 
                 {/* Street address */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Street Address</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Street Address</label>
                   <input
                     type="text"
                     placeholder="HOUSE NO, APARTMENT, STREET NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.address ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('address', { required: 'Street address is required' })}
                   />
                   {errors.address && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.address.message}</span>}
@@ -998,11 +998,11 @@ function Checkout() {
 
                 {/* City */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">City</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">City</label>
                   <input
                     type="text"
                     placeholder="MUMBAI"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.city ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('city', { required: 'City is required' })}
                   />
                   {errors.city && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.city.message}</span>}
@@ -1010,11 +1010,11 @@ function Checkout() {
 
                 {/* Pin Code */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">PIN Code</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">PIN Code</label>
                   <input
                     type="text"
                     placeholder="400001"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.pincode ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.pincode ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('pincode', { 
                       required: 'Pin code is required',
                       pattern: {
@@ -1029,11 +1029,11 @@ function Checkout() {
 
                 {/* State */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">State</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">State</label>
                   <input
                     type="text"
                     placeholder="MAHARASHTRA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.state ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('state', { required: 'State is required' })}
                   />
                   {errors.state && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.state.message}</span>}
@@ -1041,12 +1041,12 @@ function Checkout() {
 
                 {/* Country */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Country</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Country</label>
                   <input
                     type="text"
                     placeholder="INDIA"
                     defaultValue="INDIA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.country ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('country', { required: 'Country is required' })}
                   />
                   {errors.country && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.country.message}</span>}

@@ -83,12 +83,12 @@ function CategoryGrid() {
   return (
     <section
       id="categories-section"
-      style={{ background: 'var(--color-bg)', padding: '72px 0', borderBottom: '1px solid var(--color-border)' }}
+      style={{ background: '#F0FDF7', padding: '36px 0 48px 0', borderTop: '1px solid rgba(5,150,105,0.15)', borderBottom: '1px solid rgba(5,150,105,0.15)' }}
     >
       <div className="max-w-[1728px] mx-auto px-4 md:px-12">
 
         {/* Section header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
             <div className="accent-line" />
           </div>

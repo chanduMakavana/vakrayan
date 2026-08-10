@@ -47,31 +47,31 @@ function Footer() {
   return (
     <footer
       style={{
-        background: 'linear-gradient(160deg, #0D1A14 0%, #0A1510 60%, #031008 100%)',
-        borderTop: '1px solid rgba(5,150,105,0.20)'
+        background: 'linear-gradient(160deg, #062C1E 0%, #031F14 60%, #02140D 100%)',
+        borderTop: '1px solid rgba(5,150,105,0.30)'
       }}
     >
       {/* Top green glow line */}
       <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, #059669, #34D399, #059669, transparent)' }} />
 
-      <div className="max-w-[1728px] mx-auto px-6 md:px-12 pt-16 pb-10">
+      <div className="max-w-[1728px] mx-auto px-6 md:px-12 pt-10 pb-8">
         
         {/* Giant Brand Logo Title */}
-        <div className="w-full flex flex-col items-center mb-16 px-4 text-center">
+        <div className="w-full flex flex-col items-center mb-8 px-4 text-center">
           <img 
             src="/vakrayan-text.png"
             alt="Vakrayan"
-            className="w-full max-w-[900px] h-auto object-contain"
+            className="w-full max-w-[700px] h-auto object-contain"
             style={{
               filter: 'brightness(0) invert(1)',
               opacity: 0.95
             }}
           />
-          <p className="mt-6 max-w-md" style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, fontFamily: "'Jost', sans-serif" }}>
+          <p className="mt-3 max-w-md" style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.6, fontFamily: "'Jost', sans-serif" }}>
             Premium heavyweight drops crafted carefully to define contemporary street culture.
           </p>
           {/* Social icons — proper SVGs */}
-          <div className="flex gap-4 mt-6">
+          <div className="flex gap-4 mt-4">
             {[
               { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/' },
               { Icon: PinterestIcon, label: 'Pinterest', href: '#' },

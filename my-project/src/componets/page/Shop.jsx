@@ -12,6 +12,7 @@ import { setProducts } from '../../features/productsSlice'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import Fuse from 'fuse.js'
 import { scatterProducts } from '../../utils/colorHelper'
+import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer'
 
 function Shop() {
   const navigate = useNavigate()
@@ -32,8 +33,8 @@ function Shop() {
       ? urlCategory.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
       : null
     document.title = label
-      ? `${label} — Vakrayan`
-      : 'Shop All Drops — Vakrayan'
+      ? `${label} | Vakrayan`
+      : 'Shop All Drops | Vakrayan'
   }, [urlCategory])
 
   
@@ -983,154 +984,149 @@ function Shop() {
                       isAllOutOfStock = totalStock === 0;
                     }
 
-                   return (
-                     <div 
-                       key={uniqueId} 
-                       onClick={() => navigate(clickPath)} 
-                       className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-300 ease-out pb-4 border-b border-transparent hover:border-[var(--color-border)] rounded-xl hover:shadow-lg"
-                     >
-                       {/* Image Aspect Ratio Canvas */}
-                       <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-[var(--color-subtle)] relative transition-transform duration-700 ease-out">
-                         
-                         {/* Floating Heart Button */}
-                         <button
-                           onClick={async (e) => {
-                             e.stopPropagation();
-                             const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
-                             let updated;
-                             if (exists) {
-                               dispatch(removeWishlistItemState(parentId));
-                               const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                               updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
-                               localStorage.setItem('wishlist', JSON.stringify(updated));
-                               if (isAuthenticated && user) {
-                                 try {
-                                   await wishlistService.removeFromWishlist(user.$id, parentId);
-                                 } catch (err) {
-                                   console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
-                                 }
-                               }
-                             } else {
-                                dispatch(addWishlistItemState(product));
+                    return (
+                      <div 
+                        key={uniqueId} 
+                        onClick={() => navigate(clickPath)} 
+                        className="group relative flex flex-col bg-white border border-emerald-900/15 hover:border-emerald-600 transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer rounded-none overflow-hidden"
+                      >
+                        {/* Image Aspect Ratio Canvas */}
+                        <div className="w-full aspect-[3/4] overflow-hidden bg-[#F0F7F3] relative transition-transform duration-700 ease-out border-b border-emerald-900/15">
+                          
+                          {/* Floating Heart Button */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
+                              let updated;
+                              if (exists) {
+                                dispatch(removeWishlistItemState(parentId));
                                 const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                                updated = [...saved, product];
-                               localStorage.setItem('wishlist', JSON.stringify(updated));
-                               if (isAuthenticated && user) {
-                                 try {
-                                   await wishlistService.addToWishlist(user.$id, parentId);
-                                 } catch (err) {
-                                   console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
-                                 }
-                               }
-                             }
-                           }}
-                           aria-label={wishlist.some(item => item.$id === parentId || item.id === parentId) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
-                           className="absolute top-4 right-4 z-20 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
-                         >
-                           {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
-                             <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
-                               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                             </svg>
-                           ) : (
-                             <svg className="w-3.5 h-3.5 text-[var(--color-muted)] group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
-                               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                             </svg>
-                           )}
-                         </button>
- 
-                         {/* Edit Button for Admin Mode */}
-                         {adminMode && (
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               navigate('/admin', { state: { editProductId: parentId } });
-                             }}
-                             className="absolute bottom-4 left-4 z-20 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
-                           >
-                             ✏️ EDIT
-                           </button>
-                         )}
- 
+                                updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
+                                localStorage.setItem('wishlist', JSON.stringify(updated));
+                                if (isAuthenticated && user) {
+                                  try {
+                                    await wishlistService.removeFromWishlist(user.$id, parentId);
+                                  } catch (err) {
+                                    console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
+                                  }
+                                }
+                              } else {
+                                 dispatch(addWishlistItemState(product));
+                                 const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                                 updated = [...saved, product];
+                                localStorage.setItem('wishlist', JSON.stringify(updated));
+                                if (isAuthenticated && user) {
+                                  try {
+                                    await wishlistService.addToWishlist(user.$id, parentId);
+                                  } catch (err) {
+                                    console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
+                                  }
+                                }
+                              }
+                            }}
+                            aria-label={wishlist.some(item => item.$id === parentId || item.id === parentId) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+                            className={`absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center cursor-pointer transition-all duration-200 border rounded-none shadow-xs ${
+                              wishlist.some(item => item.$id === parentId || item.id === parentId)
+                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                : 'bg-white/95 border-emerald-900/20 text-emerald-800 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                            }`}
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill={wishlist.some(item => item.$id === parentId || item.id === parentId) ? '#fff' : 'none'} stroke="currentColor" strokeWidth="2">
+                              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                          </button>
+  
+                          {/* Edit Button for Admin Mode */}
+                          {adminMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/admin', { state: { editProductId: parentId } });
+                              }}
+                              className="absolute bottom-3 left-3 z-30 px-3 py-1.5 cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[10px] uppercase tracking-wider bg-emerald-700 hover:bg-emerald-800 rounded-none border-none shadow-xs"
+                            >
+                              Edit
+                            </button>
+                          )}
+  
                           {activeTag && (
-                            <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
-                              <span className="text-neutral-900 font-sans text-[11px] tracking-widest uppercase font-bold">
+                            <div className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-emerald-700 text-white rounded-none shadow-xs">
+                              <span className="text-[10px] font-mono font-bold tracking-widest uppercase">
                                 {activeTag}
                               </span>
                             </div>
                           )}
- 
-                         {/* Out of Stock Overlay */}
-                         {isAllOutOfStock && (
-                           <div className="absolute inset-0 bg-[var(--color-surface)]/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
-                             <span className="bg-[var(--color-surface)]/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
-                               SOLD OUT
-                             </span>
-                           </div>
-                         )}
- 
-                         {/* Image Flip */}
-                         <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
-                           <img
-                             src={frontView}
-                             alt={product.name}
-                             loading="lazy"
-                             decoding="async"
-                             className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
-                           />
-                           <img  
-                             src={backView}
-                             alt={`${product.name} alternate frame`}
-                             loading="lazy"
-                             decoding="async"
-                             className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
-                           />
-                         </div>
-                       </div>
- 
-                       {/* Metadata Content */}
-                       <div className="mt-3 px-1 flex flex-col justify-between grow">
-                         <div>
-                           <div className="flex items-center justify-between gap-2 mb-1">
-                             <span className="text-[11px] font-mono text-[var(--color-muted)] tracking-wider uppercase">
-                               {product.category?.replace('-', ' ') || "HQ MERCH"}
-                             </span>
-                           </div>
-                           
-                           <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
-                             {product.name}
-                           </h3>
-                         </div>
-                        
-                        <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
-                              ₹{Number(product.price).toLocaleString('en-IN')}
-                            </span>
-                            {(() => {
-                              const priceNum = Number(product.price || 0);
-                              const compareNum = Number(product.compare_at_price || 0);
-                              const showCompare = compareNum > priceNum;
-                              const compareDisplay = showCompare
-                                ? compareNum
-                                : (product.discount_percent > 0
-                                    ? Math.round(priceNum / (1 - product.discount_percent / 100))
-                                    : null);
-                              return compareDisplay ? (
-                                <span className="text-[9px] font-mono text-[var(--color-muted)] line-through">
-                                  ₹{compareDisplay.toLocaleString('en-IN')}
-                                </span>
-                              ) : null;
-                            })()}
+  
+                          {/* Out of Stock Overlay */}
+                          {isAllOutOfStock && (
+                            <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-xs z-10 flex items-center justify-center pointer-events-none">
+                              <span className="px-3.5 py-1.5 bg-white border border-emerald-900/20 font-mono text-[10px] font-black tracking-widest uppercase text-emerald-950 rounded-none shadow-xs">
+                                SOLD OUT
+                              </span>
+                            </div>
+                          )}
+  
+                          {/* Image Flip */}
+                          <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`} onMouseEnter={() => preloadImage(getOptimizedImageUrl(backView, 600, 75))}>
+                            <img
+                              src={getOptimizedImageUrl(frontView, 600, 75)}
+                              alt={product.name}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
+                            />
+                            <img  
+                              src={getOptimizedImageUrl(backView, 600, 75)}
+                              alt={`${product.name} alternate frame`}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
+                            />
                           </div>
-                          <span className="text-[8px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
-                            incl. taxes
-                          </span>
+                        </div>
+  
+                        {/* Metadata Content */}
+                        <div className="p-3.5 flex flex-col justify-between flex-1 bg-white">
+                          <div>
+                            <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-emerald-700 mb-1">
+                              {product.category?.replace('-', ' ') || "HQ MERCH"}
+                            </p>
+                            <h3 className="text-xs font-black tracking-wide text-[#0D1A14] uppercase truncate mb-3 font-sans">
+                              {product.name}
+                            </h3>
+                          </div>
+                         
+                          <div className="flex items-baseline justify-between gap-2 pt-2.5 border-t border-emerald-900/15">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-sm font-black text-[#0D1A14] font-sans">
+                                ₹{Number(product.price).toLocaleString('en-IN')}
+                              </span>
+                              {(() => {
+                                const priceNum = Number(product.price || 0);
+                                const compareNum = Number(product.compare_at_price || 0);
+                                const showCompare = compareNum > priceNum;
+                                const compareDisplay = showCompare
+                                  ? compareNum
+                                  : (product.discount_percent > 0
+                                      ? Math.round(priceNum / (1 - product.discount_percent / 100))
+                                      : null);
+                                return compareDisplay ? (
+                                  <span className="text-[11px] text-[#527060] line-through font-sans">
+                                    ₹{compareDisplay.toLocaleString('en-IN')}
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
+                            <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700">
+                              INCL. TAXES
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    );
+                  })}
+                </div>
 
               {/* ── Load More Button ── */}
               {hasMore && (

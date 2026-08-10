@@ -815,8 +815,8 @@ function Navbar() {
               exit={{ height: 0, opacity: 0, transition: { duration: 0.2 } }}
               className="border-t overflow-visible"
               style={{ 
-                background: 'rgba(244,250,247,0.97)',
-                borderColor: 'rgba(5,150,105,0.10)',
+                background: 'rgba(255,255,255,0.98)',
+                borderColor: 'rgba(5,150,105,0.15)',
                 backdropFilter: 'blur(16px)',
                 WebkitBackdropFilter: 'blur(16px)'
               }}
@@ -850,7 +850,7 @@ function Navbar() {
 
                 {/* Suggestions / Recent History */}
                 <AnimatePresence>
-                  {searchOpen && (
+                  {searchOpen && (searchVal.trim().length >= 2 || recentSearches.length > 0) && (
                     <motion.div
                       variants={dropdownVariants}
                       initial="hidden" animate="visible" exit="exit"
@@ -883,10 +883,10 @@ function Navbar() {
                           {searchSuggestions.products.length > 0 && (
                             <div className="space-y-2">
                               <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
-                                👕 Matching Products
+                                📦 Products
                               </span>
-                              <div className="divide-y divide-[var(--color-border)]/50">
-                                {searchSuggestions.products.map(p => {
+                              <div className="divide-y divide-zinc-100 max-h-60 overflow-y-auto pr-1">
+                                {searchSuggestions.products.slice(0, 5).map(p => {
                                   const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/80x100';
                                   return (
                                     <button
@@ -920,50 +920,42 @@ function Navbar() {
                             </div>
                           )}
                         </>
-                      ) : (
+                      ) : recentSearches.length > 0 ? (
                         /* Zero-Query suggestions: ONLY Recently Searched History */
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
                             <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
                               🕒 Recent Searches
                             </span>
-                            {recentSearches.length > 0 && (
-                              <button 
-                                type="button" 
-                                onClick={clearRecentSearches}
-                                className="text-[9px] font-mono text-red-500 hover:underline cursor-pointer font-bold"
-                              >
-                                  Clear all
-                                </button>
-                              )}
-                            </div>
-                            {recentSearches.length > 0 ? (
-                              <div className="flex flex-col gap-1">
-                                {recentSearches.map(term => (
-                                  <button
-                                    key={term}
-                                    type="button"
-                                    onClick={() => handleKeywordSearch(term)}
-                                    className="flex items-center justify-between hover:bg-[var(--color-subtle)] text-[11px] font-medium text-[var(--color-text)] px-3 py-2 rounded-xl cursor-pointer transition-colors text-left"
-                                  >
-                                    <div className="flex items-center gap-2 truncate">
-                                      <span className="text-[12px]">🔍</span>
-                                      <span className="truncate">{term}</span>
-                                    </div>
-                                    <span className="text-[9px] text-[var(--color-muted)] font-mono">search</span>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-[var(--color-muted)] font-mono py-6 text-center border border-dashed border-[var(--color-border)] rounded-2xl bg-[var(--color-subtle)]/30">
-                                No recent search history
-                              </div>
-                            )}
+                            <button 
+                              type="button" 
+                              onClick={clearRecentSearches}
+                              className="text-[9px] font-mono text-red-500 hover:underline cursor-pointer font-bold"
+                            >
+                              Clear all
+                            </button>
                           </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                          <div className="flex flex-col gap-1">
+                            {recentSearches.map(term => (
+                              <button
+                                key={term}
+                                type="button"
+                                onClick={() => handleKeywordSearch(term)}
+                                className="flex items-center justify-between hover:bg-[var(--color-subtle)] text-[11px] font-medium text-[var(--color-text)] px-3 py-2 rounded-xl cursor-pointer transition-colors text-left"
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="text-[12px]">🔍</span>
+                                  <span className="truncate">{term}</span>
+                                </div>
+                                <span className="text-[9px] text-[var(--color-muted)] font-mono">search</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           )}
@@ -977,8 +969,8 @@ function Navbar() {
               initial="hidden" animate="visible" exit="exit"
               className="lg:hidden border-t max-h-[calc(100dvh-130px)] sm:max-h-[calc(100vh-130px)] overflow-y-auto scrollbar-thin touch-pan-y"
               style={{ 
-                background: 'rgba(244,250,247,0.98)',
-                borderColor: 'rgba(5,150,105,0.10)',
+                background: 'rgba(255,255,255,0.98)',
+                borderColor: 'rgba(5,150,105,0.15)',
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
                 WebkitOverflowScrolling: 'touch',

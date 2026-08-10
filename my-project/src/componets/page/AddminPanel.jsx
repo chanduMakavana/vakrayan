@@ -17,6 +17,7 @@ import categoryService from '../../services/category';
 import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders } from 'react-icons/fi';
 import AdminAnalytics from '../pageComponets/AdminAnalytics';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
+import { getStoredShiprocketConfig, saveShiprocketConfig, authenticateShiprocket, createShiprocketShipment, fetchShiprocketOfficialLabel } from '../../services/shiprocket';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -73,10 +74,26 @@ function AdminPanel() {
 
   // Admin Search & Custom Dialog States
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [printChannel, setPrintChannel] = useState('VAKRAYAN'); // 'VAKRAYAN' | 'MEESHO' | 'FLIPKART' | 'AMAZON'
   const [isSweepProductModalOpen, setIsSweepProductModalOpen] = useState(false);
   const [sweepTargetProductId, setSweepTargetProductId] = useState(null);
   const [deleteTargetOrder, setDeleteTargetOrder] = useState(null);
   const [isDeleteOrderModalOpen, setIsDeleteOrderModalOpen] = useState(false);
+
+  // Shiprocket Integration States
+  const [isShiprocketDispatchModalOpen, setIsShiprocketDispatchModalOpen] = useState(false);
+  const [shiprocketTargetOrder, setShiprocketTargetOrder] = useState(null);
+  const [isShiprocketSettingsOpen, setIsShiprocketSettingsOpen] = useState(false);
+  const [shiprocketConfig, setShiprocketConfig] = useState(() => getStoredShiprocketConfig() || {
+    email: '',
+    password: '',
+    pickupLocation: 'Primary'
+  });
+  const [shiprocketWeight, setShiprocketWeight] = useState(0.40);
+  const [shiprocketLength, setShiprocketLength] = useState(25);
+  const [shiprocketBreadth, setShiprocketBreadth] = useState(20);
+  const [shiprocketHeight, setShiprocketHeight] = useState(5);
+  const [shiprocketLoading, setShiprocketLoading] = useState(false);
 
   // Drops Manager Search & Filter States
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -1245,8 +1262,74 @@ function AdminPanel() {
     });
   };
 
-  const handlePrintShippingLabels = () => {
-    const filtered = getFilteredOrders();
+  // Shiprocket Logistics Dispatch & Settings Handlers
+  const handleSaveShiprocketSettings = async (e) => {
+    if (e) e.preventDefault();
+    setShiprocketLoading(true);
+    try {
+      if (shiprocketConfig.email && shiprocketConfig.password) {
+        const authData = await authenticateShiprocket(shiprocketConfig.email, shiprocketConfig.password);
+        const newConfig = {
+          ...shiprocketConfig,
+          token: authData.token || '',
+          authenticatedAt: new Date().toISOString()
+        };
+        setShiprocketConfig(newConfig);
+        saveShiprocketConfig(newConfig);
+        showToast("🚀 Shiprocket Account Authenticated & Saved Successfully!", "success");
+      } else {
+        saveShiprocketConfig(shiprocketConfig);
+        showToast("Shiprocket settings saved locally.", "info");
+      }
+      setIsShiprocketSettingsOpen(false);
+    } catch (err) {
+      showToast("Shiprocket Auth Failed: " + err.message, "error");
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
+
+  const handleExecuteShiprocketDispatch = async () => {
+    if (!shiprocketTargetOrder) return;
+    setShiprocketLoading(true);
+    try {
+      const res = await createShiprocketShipment(shiprocketTargetOrder, {
+        weight: shiprocketWeight,
+        length: shiprocketLength,
+        breadth: shiprocketBreadth,
+        height: shiprocketHeight,
+        pickupLocation: shiprocketConfig.pickupLocation || 'Primary'
+      });
+
+      if (res.success && res.awb_number) {
+        // Automatically shift order status in database to SHIPPED with AWB and tracking URL
+        await handleOrderStatusShift(shiprocketTargetOrder, 'SHIPPED', {
+          tracking_number: res.awb_number,
+          tracking_url: res.tracking_url
+        });
+
+        showToast(`🚀 Shiprocket Parcel Created! AWB: ${res.awb_number} (${res.courier_partner})`, "success");
+        setIsShiprocketDispatchModalOpen(false);
+
+        // Auto print shipping label slip with generated AWB and tracking QR code
+        handlePrintShippingLabels({
+          ...shiprocketTargetOrder,
+          status: 'SHIPPED',
+          tracking_number: res.awb_number,
+          tracking_url: res.tracking_url
+        });
+      } else {
+        showToast("Could not create Shiprocket parcel.", "error");
+      }
+    } catch (err) {
+      showToast("Shiprocket Dispatch Error: " + err.message, "error");
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
+
+  const handlePrintShippingLabels = (singleOrder = null, channelOverride = null) => {
+    const filtered = singleOrder ? [singleOrder] : getFilteredOrders();
     if (filtered.length === 0) {
       showToast("No orders available to print.", "error");
       return;
@@ -1302,6 +1385,10 @@ function AdminPanel() {
         }
       }
 
+      // Extract 6-digit Pincode for Courier Routing Box
+      const pincodeMatch = addressText.match(/\b\d{6}\b/);
+      const destinationPincode = pincodeMatch ? pincodeMatch[0] : '';
+
       let parsedItems;
       try {
         parsedItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
@@ -1309,7 +1396,7 @@ function AdminPanel() {
         parsedItems = [];
       }
 
-      // Group identical products by name and size to ensure correct quantities per size
+      // Group identical products by name and size
       const groupedItemsMap = {};
       parsedItems.forEach(item => {
         const name = (item.name || '').trim();
@@ -1329,9 +1416,9 @@ function AdminPanel() {
 
       const itemsListHtml = Object.values(groupedItemsMap).map(item => {
         return `
-          <div style="font-size: 11px; font-weight: bold; border-bottom: 1px dashed #ddd; padding: 4px 0; display: flex; justify-content: space-between;">
-            <span>${item.name.toUpperCase()} (${item.size.toUpperCase()})</span>
-            <span>QTY: ${item.quantity}</span>
+          <div style="font-size: 10px; font-weight: 800; border-bottom: 1px dashed #bbb; padding: 4px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: sans-serif; text-transform: uppercase;">${item.name} (${item.size})</span>
+            <span style="font-family: monospace; font-size: 11px; font-weight: 900; background: #eee; padding: 1px 5px; border-radius: 2px;">QTY: ${item.quantity}</span>
           </div>
         `;
       }).join('');
@@ -1340,44 +1427,136 @@ function AdminPanel() {
       const paymentType = isCod ? 'COD' : 'PREPAID';
 
       const codInstructionHtml = isCod
-        ? `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 14px; margin-top: 10px; background-color: #000; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">
-             COLLECT CASH: ₹${Number(order.total).toLocaleString('en-IN')}
+        ? `<div style="border: 2px solid #000; padding: 7px; text-align: center; font-weight: 950; font-size: 15px; margin-top: 6px; background-color: #000; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">
+             COLLECT CASH (COD): ₹${Number(order.total).toLocaleString('en-IN')}
            </div>`
-        : `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 11px; margin-top: 10px; color: #000; text-transform: uppercase; letter-spacing: 0.5px;">
-             PREPAID - DO NOT COLLECT CASH
+        : `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 11px; margin-top: 6px; background-color: #f3f4f6; color: #000; text-transform: uppercase; letter-spacing: 0.5px;">
+             PREPAID — DO NOT COLLECT CASH
            </div>`;
 
       const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
+      const orderId = order.$id || order.id || '';
+      
+      // Target Order Tracking URL for QR Code scanning
+      const trackingUrl = order.tracking_url || `${window.location.origin}/order/${orderId}`;
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(trackingUrl)}`;
+
+      // Determine Channel / Logistics Info (Shiprocket, Meesho, Flipkart, VAKRAYAN)
+      const activeChannel = channelOverride || order.channel || printChannel || 'VAKRAYAN';
+      let channelBadgeLabel = 'VAKRAYAN DIRECT';
+      let channelBg = '#000000';
+      let channelColor = '#ffffff';
+
+      if (order.tracking_number && order.tracking_number.startsWith('SR')) {
+        channelBadgeLabel = 'SHIPROCKET EXPRESS';
+        channelBg = '#6b21a8';
+        channelColor = '#ffffff';
+      } else if (activeChannel.toUpperCase() === 'MEESHO' || activeChannel.toUpperCase().includes('MEESHO')) {
+        channelBadgeLabel = 'MEESHO SELLER HUB';
+        channelBg = '#9c27b0';
+        channelColor = '#ffffff';
+      } else if (activeChannel.toUpperCase() === 'FLIPKART' || activeChannel.toUpperCase().includes('FLIPKART')) {
+        channelBadgeLabel = 'FLIPKART ASSURED';
+        channelBg = '#2874f0';
+        channelColor = '#ffffff';
+      } else if (activeChannel.toUpperCase() === 'AMAZON' || activeChannel.toUpperCase().includes('AMAZON')) {
+        channelBadgeLabel = 'AMAZON EASY SHIP';
+        channelBg = '#232f3e';
+        channelColor = '#ff9900';
+      }
+
+      const trackingNumber = order.tracking_number || `SR${orderId ? orderId.substring(0, 10).toUpperCase() : Date.now().toString().slice(-10)}`;
+      const courierPartner = order.tracking_number ? 'DELHIVERY / SHIPROCKET AIR' : 'DELHIVERY / EKART LOGISTICS';
+
+      // Barcode API image URL for courier scanner
+      const barcodeImgUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(trackingNumber)}&scale=2&height=12&inkcolor=000000`;
 
       return `
         <div class="label-card">
+          <!-- Top Header: Brand & Logistics Channel -->
           <div class="header">
-            <div class="store-name">VAKRAYAN</div>
-            <div class="carrier">${paymentType}</div>
-          </div>
-          
-          <div class="barcode-area">
-            <div class="order-num"># ${metadata.order_number}</div>
-            <div style="font-size: 9px; font-family: monospace; color: #666; margin-top: 2px;">ID: ${order.$id || order.id}</div>
+            <div>
+              <div class="store-name">VAKRAYAN</div>
+              <div class="store-sub">PREMIUM APPAREL & BOUTIQUE</div>
+            </div>
+            <div class="channel-badge" style="background-color: ${channelBg}; color: ${channelColor};">
+              ${channelBadgeLabel}
+            </div>
           </div>
 
+          <!-- Dispatch & Courier Bar with Barcode -->
+          <div class="carrier-bar">
+            <div style="flex: 1;">
+              <div style="font-size: 8px; font-weight: 800; color: #444;">COURIER PARTNER: ${courierPartner}</div>
+              <div style="font-size: 11px; font-weight: 950; font-family: monospace; letter-spacing: 0.5px;">AWB: ${trackingNumber}</div>
+              <div style="margin-top: 3px;">
+                <img 
+                  src="${barcodeImgUrl}" 
+                  alt="AWB Barcode" 
+                  style="height: 24px; max-width: 180px; display: block;" 
+                  onerror="this.style.display='none';" 
+                />
+              </div>
+            </div>
+            <div class="payment-tag ${isCod ? 'cod-tag' : 'prepaid-tag'}">
+              ${paymentType}
+            </div>
+          </div>
+
+          <!-- Order ID & Tracking QR Code Section -->
+          <div class="tracking-grid">
+            <div class="order-details-col">
+              <div class="section-title">ORDER REF & SPECIFICATION:</div>
+              <div class="order-num"># ${metadata.order_number}</div>
+              <div class="sub-text">ORDER ID: ${orderId}</div>
+              <div class="sub-text">DATE: ${new Date(orderDate).toLocaleDateString('en-IN')}</div>
+              <div class="sub-text" style="margin-top: 4px; font-weight: 900; color: #000;">HSN: 61091000 | WT: 0.40 KG</div>
+            </div>
+            
+            <div class="qr-col">
+              <img 
+                src="${qrApiUrl}" 
+                alt="Scan to Track Order" 
+                class="qr-img" 
+                onerror="this.onerror=null; this.src='https://quickchart.io/qr?text=${encodeURIComponent(trackingUrl)}&size=140';"
+              />
+              <div class="qr-caption">SCAN QR TO TRACK</div>
+            </div>
+          </div>
+
+          <!-- Destination Address Section -->
           <div class="address-section">
-            <div class="section-title">SHIP TO:</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+              <div class="section-title" style="margin-bottom: 0;">DELIVER TO (SHIP TO):</div>
+              ${destinationPincode ? `<div style="background: #000; color: #fff; font-size: 10px; font-weight: 950; padding: 2px 6px; border-radius: 3px; font-family: monospace;">PIN: ${destinationPincode}</div>` : ''}
+            </div>
             <div class="customer-name">${metadata.customer_name.toUpperCase()}</div>
             <div class="address-text">${addressText.toUpperCase()}</div>
-            <div class="phone-text">PHONE: ${metadata.customer_phone || 'N/A'}</div>
+            <div class="phone-text">TEL: ${metadata.customer_phone || 'N/A'} ${metadata.customer_email ? ' | EMAIL: ' + metadata.customer_email : ''}</div>
           </div>
 
+          <!-- Items Section -->
           <div class="items-section">
-            <div class="section-title">PACKAGE CONTENT:</div>
+            <div class="section-title">PACKAGE CONTENTS / MANIFEST:</div>
             ${itemsListHtml}
           </div>
 
+          <!-- Return Address Section -->
+          <div class="return-section">
+            <div class="section-title">IF UNDELIVERED, RETURN TO:</div>
+            <div class="return-text">
+              <strong>VAKRAYAN APPAREL HQ & LOGISTICS HUB</strong><br/>
+              Ring Road Textile Market, Surat, Gujarat - 395006 | GSTIN: 24VAKRAYAN1234F1Z0
+            </div>
+          </div>
+
+          <!-- Payment Instructions -->
           ${codInstructionHtml}
 
+          <!-- Footer -->
           <div class="footer">
-            <div>DATE: ${new Date(orderDate).toLocaleDateString('en-IN')}</div>
-            <div style="font-weight: bold;">TOTAL: ₹${Number(order.total).toLocaleString('en-IN')}</div>
+            <div>PRINTED VIA VAKRAYAN SELLER CONSOLE</div>
+            <div style="font-weight: 900;">TOTAL AMOUNT: ₹${Number(order.total).toLocaleString('en-IN')}</div>
           </div>
         </div>
       `;
@@ -1386,105 +1565,140 @@ function AdminPanel() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Shipping Slips - Bulk Print</title>
+          <title>Shipping Slips (4x6 Thermal Label Standard) - Print View</title>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900;950&display=swap" rel="stylesheet">
           <style>
-            body { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 20px; background-color: #f3f4f6; }
+            @page {
+              size: 4in 6in portrait;
+              margin: 0;
+            }
+            * { box-sizing: border-box; }
+            body { 
+              font-family: 'Inter', Arial, sans-serif; 
+              margin: 0; 
+              padding: 12px; 
+              background-color: #e5e7eb; 
+              color: #000; 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
             .label-card {
               background-color: #fff;
-              width: 380px;
-              min-height: 480px;
+              width: 3.8in;
+              height: 5.7in;
               border: 2px solid #000;
-              margin: 0 auto 30px auto;
-              padding: 15px;
+              margin: 0 auto 20px auto;
+              padding: 10px 12px;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
               page-break-after: always;
               break-inside: avoid;
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             }
             .header {
               display: flex;
               justify-content: space-between;
               align-items: center;
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
+              padding-bottom: 5px;
+              margin-bottom: 5px;
             }
             .store-name {
               font-size: 20px;
               font-weight: 950;
-              letter-spacing: 1.5px;
-            }
-            .carrier {
-              font-size: 11px;
-              font-weight: 900;
-              background-color: #000;
-              color: #fff;
-              padding: 3px 8px;
               letter-spacing: 1px;
+              line-height: 1;
             }
-            .barcode-area {
-              text-align: center;
+            .store-sub {
+              font-size: 7px;
+              font-weight: 800;
+              color: #444;
+              letter-spacing: 0.8px;
+              margin-top: 2px;
+            }
+            .channel-badge {
+              font-size: 8.5px;
+              font-weight: 900;
+              padding: 3px 6px;
+              border-radius: 3px;
+              letter-spacing: 0.5px;
+              text-transform: uppercase;
+            }
+            .carrier-bar {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
-            }
-            .order-num {
-              font-size: 16px;
-              font-weight: 900;
-              letter-spacing: 1px;
-            }
-            .address-section {
-              border-bottom: 2px solid #000;
-              padding-bottom: 12px;
-              margin-bottom: 10px;
-              flex-grow: 1;
-            }
-            .section-title {
-              font-size: 9px;
-              font-weight: 900;
-              color: #555;
-              letter-spacing: 1px;
+              padding-bottom: 5px;
               margin-bottom: 5px;
             }
-            .customer-name {
-              font-size: 14px;
-              font-weight: 900;
-              margin-bottom: 4px;
-            }
-            .address-text {
+            .payment-tag {
               font-size: 11px;
-              font-weight: 700;
-              line-height: 1.4;
-              color: #111;
+              font-weight: 950;
+              padding: 4px 8px;
+              letter-spacing: 0.5px;
+              border-radius: 3px;
+              text-align: center;
+              shrink: 0;
             }
-            .phone-text {
-              font-size: 11px;
-              font-weight: 900;
-              margin-top: 6px;
-              font-family: monospace;
+            .cod-tag { background-color: #000; color: #fff; }
+            .prepaid-tag { background-color: #e5e7eb; color: #000; border: 1.5px solid #000; }
+            
+            .tracking-grid {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 5px;
+              margin-bottom: 5px;
             }
+            .order-details-col { flex: 1; padding-right: 6px; }
+            .order-num { font-size: 13.5px; font-weight: 950; }
+            .sub-text { font-size: 8.5px; color: #222; font-family: monospace; }
+            
+            .qr-col { text-align: center; width: 90px; flex-shrink: 0; }
+            .qr-img { width: 80px; height: 80px; border: 1.5px solid #000; padding: 2px; background: #fff; border-radius: 3px; }
+            .qr-caption { font-size: 6.5px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-transform: uppercase; }
+            
+            .address-section {
+              border-bottom: 2px solid #000;
+              padding-bottom: 6px;
+              margin-bottom: 5px;
+            }
+            .section-title { font-size: 7.5px; font-weight: 900; color: #444; letter-spacing: 0.8px; margin-bottom: 2px; }
+            .customer-name { font-size: 13px; font-weight: 950; margin-bottom: 2px; color: #000; }
+            .address-text { font-size: 10px; font-weight: 800; line-height: 1.25; color: #000; }
+            .phone-text { font-size: 9px; font-weight: 900; margin-top: 3px; font-family: monospace; color: #000; }
+            
             .items-section {
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
-              max-height: 180px;
+              padding-bottom: 5px;
+              margin-bottom: 5px;
+              max-height: 90px;
               overflow: hidden;
             }
+            .return-section {
+              border-bottom: 2px solid #000;
+              padding-bottom: 4px;
+              margin-bottom: 5px;
+            }
+            .return-text { font-size: 7.5px; color: #222; line-height: 1.2; }
+            
             .footer {
               display: flex;
               justify-content: space-between;
-              font-size: 10px;
+              font-size: 8px;
               font-weight: bold;
               font-family: monospace;
+              margin-top: 2px;
             }
             @media print {
-              body { background-color: #fff; padding: 0; margin: 0; }
-              .label-card { margin: 0 auto; border: 2px solid #000; box-shadow: none; }
+              body { background-color: #fff; padding: 0; margin: 0; width: 4in; }
+              .label-card { margin: 0 auto; border: 2px solid #000; box-shadow: none; width: 4in; height: 6in; }
             }
           </style>
         </head>
@@ -3025,7 +3239,7 @@ function AdminPanel() {
                 <div className="flex flex-wrap gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={handlePrintShippingLabels}
+                    onClick={() => handlePrintShippingLabels()}
                     className="bg-[var(--color-accent)] hover:bg-indigo-700 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center flex items-center gap-1.5 shadow-xs"
                   >
                     <FiFileText className="text-xs" /> Print Shipping Slips
@@ -3403,6 +3617,15 @@ function AdminPanel() {
 
                           {/* Actions to shift status */}
                           <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-[var(--color-border)]/40">
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handlePrintShippingLabels(order)}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-mono font-black text-[9px] tracking-wider uppercase px-3.5 py-2 rounded-lg border border-slate-700 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                              title="Print shipping label slip for this order"
+                            >
+                              <FiFileText className="text-xs text-indigo-400" /> Print Label Slip
+                            </button>
                             {/* Reset to Pending button */}
                             {(order.status !== 'PENDING' && order.status !== 'CANCELLED') && (
                               <button

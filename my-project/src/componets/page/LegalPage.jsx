@@ -8,7 +8,7 @@ function LegalPage() {
   const isPrivacy = location.pathname.includes('privacy')
 
   useEffect(() => {
-    document.title = isPrivacy ? 'Privacy Policy — Vakrayan' : 'Terms of Service — Vakrayan'
+    document.title = isPrivacy ? 'Privacy Policy | Vakrayan' : 'Terms of Service | Vakrayan'
     window.scrollTo(0, 0)
   }, [isPrivacy])
 
