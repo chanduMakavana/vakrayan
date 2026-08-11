@@ -194,33 +194,30 @@ function BestSellers() {
                 </div>
 
                 {/* Card info */}
-                <div className="p-3.5 flex flex-col justify-between flex-1 bg-white">
-                  <div>
-                    <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-emerald-700 mb-1">
+                <div className="p-2.5 md:p-3 flex flex-col justify-between bg-white">
+                  <div className="mb-1.5">
+                    <p className="text-[9.5px] font-mono font-bold tracking-widest uppercase text-emerald-700 mb-0.5">
                       {product.category?.replace(/-/g, ' ') || 'Premium'}
                     </p>
-                    <h3 className="text-xs font-black tracking-wide text-[#0D1A14] uppercase truncate mb-3 font-sans">
+                    <h3 className="text-xs font-black tracking-wide text-[#0D1A14] uppercase truncate font-sans">
                       {product.name}
                     </h3>
                   </div>
 
-                  <div className="flex items-baseline justify-between gap-2 pt-2.5 border-t border-emerald-900/15">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-sm font-black text-[#0D1A14] font-sans">
-                        ₹{Number(product.price).toLocaleString('en-IN')}
-                      </span>
-                      {(() => {
-                        const priceNum = Number(product.price || 0)
-                        const compareNum = Number(product.compare_at_price || 0)
-                        const compareDisplay = compareNum > priceNum ? compareNum : (product.discount_percent > 0 ? Math.round(priceNum / (1 - product.discount_percent / 100)) : null)
-                        return compareDisplay ? (
-                          <span className="text-[11px] text-[#527060] line-through font-sans">
-                            ₹{compareDisplay.toLocaleString('en-IN')}
-                          </span>
-                        ) : null
-                      })()}
-                    </div>
-                    <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700">INCL. TAXES</span>
+                  <div className="flex items-baseline gap-1.5 pt-1.5 border-t border-emerald-900/15">
+                    <span className="text-sm font-black text-[#0D1A14] font-sans">
+                      ₹{Number(product.price).toLocaleString('en-IN')}
+                    </span>
+                    {(() => {
+                      const priceNum = Number(product.price || 0)
+                      const compareNum = Number(product.compare_at_price || 0)
+                      const compareDisplay = compareNum > priceNum ? compareNum : (product.discount_percent > 0 ? Math.round(priceNum / (1 - product.discount_percent / 100)) : null)
+                      return compareDisplay ? (
+                        <span className="text-[11px] text-[#527060] line-through font-sans">
+                          ₹{compareDisplay.toLocaleString('en-IN')}
+                        </span>
+                      ) : null
+                    })()}
                   </div>
                 </div>
               </motion.div>

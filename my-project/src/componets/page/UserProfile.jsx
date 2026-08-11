@@ -656,7 +656,7 @@ function UserProfile() {
   const showSkeleton = useDelayedLoading(loading, 300);
 
   if (loading) {
-    return showSkeleton ? <PageSkeleton /> : null;
+    return showSkeleton ? <PageSkeleton path="/profile" /> : null;
   }
 
   return (

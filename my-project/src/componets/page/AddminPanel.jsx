@@ -604,8 +604,8 @@ function AdminPanel() {
 
     return (
       <div className="flex flex-col gap-1.5 w-full">
-        <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">
-          {labelText}
+        <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+          {labelText} {requiredRule && <span className="text-[#059669] font-bold">*</span>}
         </label>
         
         <div
@@ -846,9 +846,21 @@ function AdminPanel() {
       }
     });
 
-    // Assign simple colorName and colorHex fields
+    // Validation: Color Name and Color Hex Code are COMPULSORY
     const finalColorName = data.color_name?.trim() || "";
     const finalColorHex = data.color_hex?.trim() || "";
+
+    if (!finalColorName) {
+      showToast("⚠️ Color Name is compulsory! Please enter a color name (e.g. Jet Black, Off White).", "error");
+      setActionLoading(false);
+      return;
+    }
+
+    if (!finalColorHex) {
+      showToast("⚠️ Color Hex Code is compulsory! Please enter a valid hex color code (e.g. #121212, #FFFFFF).", "error");
+      setActionLoading(false);
+      return;
+    }
 
     // Helper to format/slugify custom category
     const slugifyCategory = (cat) => {
@@ -2486,7 +2498,9 @@ function AdminPanel() {
               
               {/* Product Name */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Product Name</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+                  Product Name <span className="text-[#059669] font-bold">*</span>
+                </label>
                 <input
                   type="text"
                   disabled={actionLoading}
@@ -2499,7 +2513,9 @@ function AdminPanel() {
 
               {/* Price */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Price (INR)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+                  Price (INR) <span className="text-[#059669] font-bold">*</span>
+                </label>
                 <input
                   type="number"
                   placeholder="1499"
@@ -2527,7 +2543,9 @@ function AdminPanel() {
 
               {/* Category */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Category</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+                  Category <span className="text-[#059669] font-bold">*</span>
+                </label>
                 {!isCustomCategory ? (
                   <div className="relative">
                     <select
@@ -2728,51 +2746,42 @@ function AdminPanel() {
 
                       {/* Color Name */}
                       <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
-                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Name</label>
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase flex items-center gap-1">
+                          Color Name <span className="text-[#059669] font-bold">*</span>
+                        </label>
                         <input
                           type="text"
                           disabled={actionLoading}
                           placeholder="E.G., JET BLACK"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
-                          {...register('color_name')}
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-neutral-900 bg-transparent py-1"
+                          {...register('color_name', { required: true })}
                         />
                       </div>
 
                       {/* Color Hex */}
                       <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
-                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Hex Code</label>
-                        <input
-                          type="text"
-                          disabled={actionLoading}
-                          placeholder="E.G., #000000"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
-                          {...register('color_hex')}
-                        />
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase flex items-center gap-1">
+                          Color Hex Code <span className="text-[#059669] font-bold">*</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            disabled={actionLoading}
+                            value={watch('color_hex') || '#121212'}
+                            className="w-6 h-6 rounded cursor-pointer border border-zinc-300 p-0 bg-transparent shrink-0"
+                            onChange={(e) => setValue('color_hex', e.target.value.toUpperCase())}
+                          />
+                          <input
+                            type="text"
+                            disabled={actionLoading}
+                            placeholder="E.G., #121212"
+                            className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-neutral-900 bg-transparent py-1 uppercase"
+                            {...register('color_hex', { required: true })}
+                          />
+                        </div>
                       </div>
 
-                  {/* Fit Type */}
-                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
-                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Fit Type</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., OVERSIZED BOX FIT"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
-                      {...register('fit_type')}
-                    />
-                  </div>
 
-                  {/* Fabric GSM */}
-                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
-                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Fabric GSM</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., 240 GSM 100% COMBED COTTON"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
-                      {...register('fabric_gsm')}
-                    />
-                  </div>
 
                   {/* Featured Product Flag */}
                   <div className="flex items-center gap-3 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
@@ -2807,14 +2816,17 @@ function AdminPanel() {
                 </div>
               </div>
 
-              {/* Description Spec */}
+              {/* Description Spec with Markdown Support */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Description (Optional)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Product Description</label>
+                  <span className="text-[9px] font-mono text-[#059669] font-bold">✨ Markdown Formatting Supported (**bold**, - bullets, ## headings)</span>
+                </div>
                 <textarea
-                  rows="3"
+                  rows="6"
                   disabled={actionLoading}
-                  placeholder="E.G., 280 GSM 100% FRENCH TERRY COTTON. BOOTCUT BOXED DROP LAYOUT SPEC..."
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium resize-none disabled:opacity-50"
+                  placeholder={`Write description with Markdown formatting:\n\n- 240 GSM 100% Heavyweight Combed Cotton\n- Oversized Boxy Drop Fit\n- High-Density Screen Print\n\n**Care Instructions:**\n- Machine wash cold with like colors\n- Do not iron directly on print`}
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-mono disabled:opacity-50"
                   {...register('description')}
                 />
               </div>

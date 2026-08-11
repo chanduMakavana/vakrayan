@@ -39,7 +39,7 @@ export default function FastImage({
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
-        {...(priority ? { fetchpriority: 'high' } : {})}
+        {...(priority ? { fetchPriority: 'high' } : {})}
         onLoad={(e) => {
           setIsLoaded(true);
           if (onLoad) onLoad(e);

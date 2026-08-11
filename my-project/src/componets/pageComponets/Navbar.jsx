@@ -15,9 +15,28 @@ import { calculateOffersDiscount } from '../../utils/discountCalculator';
 import { generateGuestCartId, loadGuestCartItems, saveGuestCartItems } from '../../utils/guestCartHelper';
 
 // Icons (inline SVGs — no extra dependency)
-const SearchIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const SearchIcon = ({ size = 18, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+  </svg>
+);
+const TagIcon = ({ size = 14, className = "text-[var(--color-accent)] inline-block" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+    <line x1="7" y1="7" x2="7.01" y2="7"/>
+  </svg>
+);
+const PackageIcon = ({ size = 14, className = "text-[var(--color-accent)] inline-block" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  </svg>
+);
+const ClockIcon = ({ size = 14, className = "text-[var(--color-accent)] inline-block" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
   </svg>
 );
 const HeartIcon = ({ filled }) => (
@@ -861,8 +880,8 @@ function Navbar() {
                           {/* Suggested Keywords / Tags Section */}
                           {searchSuggestions.keywords.length > 0 && (
                             <div className="space-y-2">
-                              <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
-                                🏷️ Suggested Searches
+                              <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest flex items-center gap-1.5">
+                                <TagIcon size={12} /> Suggested Searches
                               </span>
                               <div className="flex flex-wrap gap-2">
                                 {searchSuggestions.keywords.map(keyword => (
@@ -882,8 +901,8 @@ function Navbar() {
                           {/* Matching Products Section */}
                           {searchSuggestions.products.length > 0 && (
                             <div className="space-y-2">
-                              <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
-                                📦 Products
+                              <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest flex items-center gap-1.5">
+                                <PackageIcon size={12} /> Products
                               </span>
                               <div className="divide-y divide-zinc-100 max-h-60 overflow-y-auto pr-1">
                                 {searchSuggestions.products.slice(0, 5).map(p => {
@@ -915,8 +934,8 @@ function Navbar() {
                           )}
 
                           {searchSuggestions.keywords.length === 0 && searchSuggestions.products.length === 0 && (
-                            <div className="py-6 text-center text-[var(--color-muted)] text-[11px] font-mono tracking-wider">
-                              🔍 No matching suggestions found
+                            <div className="py-6 text-center text-[var(--color-muted)] text-[11px] font-mono tracking-wider flex items-center justify-center gap-2">
+                              <SearchIcon size={14} /> No matching suggestions found
                             </div>
                           )}
                         </>
@@ -924,8 +943,8 @@ function Navbar() {
                         /* Zero-Query suggestions: ONLY Recently Searched History */
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
-                            <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest block">
-                              🕒 Recent Searches
+                            <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest flex items-center gap-1.5">
+                              <ClockIcon size={12} /> Recent Searches
                             </span>
                             <button 
                               type="button" 
@@ -944,7 +963,7 @@ function Navbar() {
                                 className="flex items-center justify-between hover:bg-[var(--color-subtle)] text-[11px] font-medium text-[var(--color-text)] px-3 py-2 rounded-xl cursor-pointer transition-colors text-left"
                               >
                                 <div className="flex items-center gap-2 truncate">
-                                  <span className="text-[12px]">🔍</span>
+                                  <SearchIcon size={12} className="text-[var(--color-muted)] shrink-0" />
                                   <span className="truncate">{term}</span>
                                 </div>
                                 <span className="text-[9px] text-[var(--color-muted)] font-mono">search</span>
@@ -1068,21 +1087,21 @@ function Navbar() {
 
         {/* Free Shipping Progress */}
         {cartItems.length > 0 && (
-          <div className="bg-[var(--color-subtle)] border-b border-[var(--color-border)] p-4 px-6 space-y-2">
+          <div className="bg-neutral-50 border-b border-zinc-200 p-3.5 px-6 space-y-2">
             <div className="flex justify-between items-center text-[10px] font-bold tracking-wider uppercase">
-              <span className="text-[var(--color-text)]">
+              <span className="text-zinc-900 font-mono">
                 {cartTotal >= 999 
                   ? "✓ You've unlocked free shipping!" 
                   : `₹${Math.round(999 - cartTotal)} away from free shipping`
                 }
               </span>
-              <span className="text-[var(--color-muted)] font-mono">
+              <span className="text-zinc-500 font-mono">
                 {Math.min(100, Math.round((cartTotal / 999) * 100))}%
               </span>
             </div>
-            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-zinc-200 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                className="h-full bg-zinc-950 rounded-full transition-all duration-500" 
                 style={{ width: `${Math.min(100, (cartTotal / 999) * 100)}%` }}
               />
             </div>
@@ -1094,16 +1113,16 @@ function Navbar() {
           {cartItems.length === 0 ? (
             <div className="flex flex-col">
               <div className="flex flex-col items-center justify-center gap-4 text-center py-12">
-                <div className="w-16 h-16 rounded-2xl bg-[var(--color-subtle)] flex items-center justify-center text-[var(--color-muted)]">
+                <div className="w-16 h-16 rounded-2xl bg-neutral-100 flex items-center justify-center text-zinc-400">
                   <BagIcon />
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-[var(--color-muted)]">Your bag is empty</p>
-                  <p className="text-[11px] text-[var(--color-muted)] mt-1">Add some styles to get started</p>
+                  <p className="text-[13px] font-semibold text-zinc-600">Your bag is empty</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">Add some styles to get started</p>
                 </div>
                 <button
                   onClick={() => { setCartDrawerOpen(false); navigate('/shop'); }}
-                  className="btn-dark text-[11px] px-6 py-3"
+                  className="bg-zinc-950 text-white hover:bg-zinc-800 text-[11px] font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition-all"
                 >
                   Shop Now
                 </button>
@@ -1111,8 +1130,8 @@ function Navbar() {
 
               {/* Recommendations when empty */}
               {products.length > 0 && (
-                <div className="border-t border-[var(--color-border)] pt-6 mt-6">
-                  <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Curated For You</h4>
+                <div className="border-t border-zinc-200 pt-6 mt-6">
+                  <h4 className="text-[10px] font-bold tracking-wider uppercase text-zinc-500 mb-3 text-left">Curated For You</h4>
                   <div
                     className="flex gap-3 pb-3"
                     style={{
@@ -1165,10 +1184,10 @@ function Navbar() {
                       const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                       const pId = p.$id || p.id;
                       return (
-                        <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl snap-start" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
-                          <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
-                          <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
-                          <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
+                        <div key={pId} className="flex flex-col bg-white border border-zinc-200 p-3 rounded-xl snap-start" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                          <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-neutral-100" draggable={false} />
+                          <p className="text-[10px] font-bold text-zinc-900 truncate mt-2">{p.name}</p>
+                          <p className="text-[11px] font-black text-zinc-900 mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -1188,8 +1207,8 @@ function Navbar() {
           ) : (
             <>
               {/* Select All Toggle inside Drawer */}
-              <div className="flex items-center justify-between p-2.5 bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl text-[10px] font-mono mb-2">
-                <label className="flex items-center gap-2 cursor-pointer font-bold uppercase text-[var(--color-text)]">
+              <div className="flex items-center justify-between p-2.5 bg-white border border-zinc-200 rounded-xl text-[10px] font-mono mb-2 text-zinc-900">
+                <label className="flex items-center gap-2 cursor-pointer font-bold uppercase text-zinc-900">
                   <input
                     type="checkbox"
                     checked={cartItems.length > 0 && selectedItemIds.length === cartItems.length}
@@ -1206,7 +1225,7 @@ function Navbar() {
                         sessionStorage.setItem('selected_cart_item_ids', JSON.stringify(allIds));
                       }
                     }}
-                    className="w-3.5 h-3.5 rounded text-[var(--color-accent)] focus:ring-[var(--color-accent)] accent-[var(--color-accent)] border-[var(--color-border)] cursor-pointer"
+                    className="w-3.5 h-3.5 rounded text-zinc-950 focus:ring-zinc-950 accent-zinc-950 border-zinc-300 cursor-pointer"
                   />
                   SELECT ALL ({cartItems.length})
                 </label>
@@ -1219,7 +1238,7 @@ function Navbar() {
                       sessionStorage.setItem('deselected_cart_item_ids', JSON.stringify(allIds));
                       sessionStorage.setItem('selected_cart_item_ids', JSON.stringify([]));
                     }}
-                    className="text-[9px] font-black text-rose-655 hover:text-rose-700 uppercase cursor-pointer"
+                    className="text-[9px] font-black text-rose-600 hover:text-rose-700 uppercase cursor-pointer"
                   >
                     Deselect
                   </button>
@@ -1237,8 +1256,8 @@ function Navbar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: 40 }}
                     transition={{ duration: 0.2 }}
-                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-base ${
-                      isSelected ? 'border-[var(--color-accent)]/60 bg-[var(--color-surface)] shadow-2xs' : 'border-[var(--color-border)]'
+                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${
+                      isSelected ? 'border-zinc-400 bg-white shadow-xs' : 'border-zinc-200 bg-white'
                     }`}
                   >
                     {/* Item Checkbox */}
@@ -1257,22 +1276,22 @@ function Navbar() {
                           .map(i => i.$id);
                         sessionStorage.setItem('selected_cart_item_ids', JSON.stringify(updatedSelected));
                       }}
-                      className="w-3.5 h-3.5 rounded text-[var(--color-accent)] focus:ring-[var(--color-accent)] accent-[var(--color-accent)] border-[var(--color-border)] cursor-pointer shrink-0"
+                      className="w-3.5 h-3.5 rounded text-zinc-950 focus:ring-zinc-950 accent-zinc-950 border-zinc-300 cursor-pointer shrink-0"
                     />
 
-                    <img src={img} alt={item.name} className="w-18 h-22 w-[72px] h-[88px] object-cover rounded-xl bg-[var(--color-subtle)] shrink-0" />
+                    <img src={img} alt={item.name} className="w-[72px] h-[88px] object-cover rounded-xl bg-neutral-100 border border-zinc-200 shrink-0" />
                     <div className="flex-1 flex flex-col justify-between min-w-0">
                       <div className="flex justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-[12px] font-semibold text-[var(--color-text)] truncate">{item.name}</p>
+                          <p className="text-[12px] font-bold text-zinc-900 uppercase truncate">{item.name}</p>
                           
                           {/* Size Selection Dropdown */}
-                          <div className="flex items-center gap-1 text-[10px] text-[var(--color-muted)] mt-1">
+                          <div className="flex items-center gap-1 text-[10px] text-zinc-600 mt-1">
                             <span>Size:</span>
                             <select
                               value={item.size || 'M'}
                               onChange={(e) => handleSizeChange(item, e.target.value)}
-                              className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-lg px-1.5 py-0.5 text-[10px] text-[var(--color-text)] font-semibold outline-hidden cursor-pointer transition-colors"
+                              className="bg-white border border-zinc-300 focus:border-zinc-900 rounded-md px-1.5 py-0.5 text-[10px] text-zinc-900 font-bold outline-none cursor-pointer transition-colors"
                             >
                               {((products.find(p => p.$id === item.product_id || p.id === item.product_id)?.sizes || []).length > 0
                                 ? products.find(p => p.$id === item.product_id || p.id === item.product_id).sizes
@@ -1283,21 +1302,21 @@ function Navbar() {
                             </select>
                           </div>
                         </div>
-                        <button onClick={() => handleCartRemove(item.$id)} disabled={removingIds.has(item.$id)} className="text-[var(--color-muted)] hover:text-rose-400 transition-base cursor-pointer shrink-0 mt-0.5 disabled:opacity-50">
+                        <button onClick={() => handleCartRemove(item.$id)} disabled={removingIds.has(item.$id)} className="text-zinc-400 hover:text-zinc-900 transition-colors cursor-pointer shrink-0 mt-0.5 disabled:opacity-50">
                           <CloseIcon size={15} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-1 bg-[var(--color-subtle)] rounded-lg p-1">
-                          <button onClick={() => handleQtyShift(item, 'decrease')} className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--color-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] transition-base cursor-pointer">
+                        <div className="flex items-center gap-1 bg-white border border-zinc-300 rounded-lg p-0.5">
+                          <button onClick={() => handleQtyShift(item, 'decrease')} className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-600 hover:bg-neutral-100 transition-colors cursor-pointer">
                             <MinusIcon />
                           </button>
-                          <span className="w-6 text-center text-[12px] font-bold text-[var(--color-text)]">{item.quantity}</span>
-                          <button onClick={() => handleQtyShift(item, 'increase')} className="w-6 h-6 flex items-center justify-center rounded-md text-[var(--color-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] transition-base cursor-pointer">
+                          <span className="w-6 text-center text-[12px] font-bold text-zinc-900">{item.quantity}</span>
+                          <button onClick={() => handleQtyShift(item, 'increase')} className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-600 hover:bg-neutral-100 transition-colors cursor-pointer">
                             <PlusIcon />
                           </button>
                         </div>
-                        <span className="text-[13px] font-bold text-[var(--color-text)]">₹{Number(item.subtotal || 0).toLocaleString('en-IN')}</span>
+                        <span className="text-[13px] font-bold text-zinc-900 font-mono">₹{Number(item.subtotal || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -1306,8 +1325,8 @@ function Navbar() {
 
               {/* Recommendations when not empty */}
               {products.length > 0 && (
-                <div className="border-t border-[var(--color-border)] pt-6 mt-6">
-                  <h4 className="text-[10px] font-bold tracking-wider uppercase text-[var(--color-muted)] mb-3 text-left">Complete Your Look</h4>
+                <div className="border-t border-zinc-200 pt-6 mt-6">
+                  <h4 className="text-[10px] font-bold tracking-wider uppercase text-zinc-500 mb-3 text-left">Complete Your Look</h4>
                   <div
                     className="flex gap-3 pb-3"
                     style={{ overflowX:'auto', overflowY:'hidden', WebkitOverflowScrolling:'touch', scrollbarWidth:'none', msOverflowStyle:'none', cursor:'grab', userSelect:'none' }}
@@ -1326,10 +1345,10 @@ function Navbar() {
                         const img = p.front_image_link || p.image_url || p.image || 'https://placehold.co/100x125';
                         const pId = p.$id || p.id;
                         return (
-                          <div key={pId} className="flex flex-col bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-xl" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
-                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-[var(--color-border)]" draggable={false} />
-                            <p className="text-[10px] font-bold text-[var(--color-text)] truncate mt-2">{p.name}</p>
-                            <p className="text-[11px] font-black text-[var(--color-text)] mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
+                          <div key={pId} className="flex flex-col bg-white border border-zinc-200 p-3 rounded-xl" style={{ minWidth: 140, maxWidth: 140, flexShrink: 0 }}>
+                            <img src={img} alt={p.name} className="w-full h-24 object-cover rounded-lg bg-neutral-100" draggable={false} />
+                            <p className="text-[10px] font-bold text-zinc-900 truncate mt-2">{p.name}</p>
+                            <p className="text-[11px] font-black text-zinc-900 mt-0.5">₹{Number(p.price).toLocaleString('en-IN')}</p>
                             <button
                               onClick={async (e) => { e.stopPropagation(); await handleMoveToCart(p); }}
                               className="mt-2 w-full py-1.5 bg-neutral-950 text-white rounded-lg text-[9px] font-mono tracking-widest font-bold uppercase text-center hover:bg-neutral-800 transition-colors"
@@ -1346,16 +1365,16 @@ function Navbar() {
 
         {/* Footer */}
         {cartItems.length > 0 && (
-          <div className="px-6 py-5 border-t border-[var(--color-border)] space-y-4" style={{ background: 'var(--color-bg)' }}>
+          <div className="px-6 py-5 border-t border-zinc-200 space-y-4 bg-white">
             <div className="space-y-2">
               {bundleDiscount > 0 && (
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-[var(--color-muted)] font-semibold uppercase tracking-wider font-mono text-[9px]">Original Subtotal</span>
-                  <span className="text-[var(--color-muted)] line-through font-mono">₹{cartTotalBeforeDiscount.toLocaleString('en-IN')}</span>
+                  <span className="text-zinc-500 font-semibold uppercase tracking-wider font-mono text-[9px]">Original Subtotal</span>
+                  <span className="text-zinc-400 line-through font-mono">₹{cartTotalBeforeDiscount.toLocaleString('en-IN')}</span>
                 </div>
               )}
               {bundleDiscount > 0 && (
-                <div className="space-y-1 bg-[var(--color-subtle)] border border-[var(--color-accent)]/10 p-2.5 rounded-lg text-[9px] uppercase font-mono tracking-wider text-[var(--color-text)]">
+                <div className="space-y-1 bg-neutral-50 border border-zinc-200 p-2.5 rounded-lg text-[9px] uppercase font-mono tracking-wider text-zinc-900">
                   <span className="font-bold block mb-1">Bundle Savings</span>
                   {appliedOffers.map((o) => (
                     <div key={o.id} className="flex justify-between">
@@ -1366,12 +1385,12 @@ function Navbar() {
                 </div>
               )}
               <div className="flex justify-between items-center">
-                <span className="text-[12px] font-semibold text-[var(--color-muted)]">Subtotal</span>
-                <span className="text-[16px] font-bold text-[var(--color-text)]">₹{cartTotal.toLocaleString('en-IN')}</span>
+                <span className="text-[12px] font-bold uppercase tracking-wider text-zinc-600 font-mono">Subtotal</span>
+                <span className="text-[16px] font-black text-zinc-900 font-mono">₹{cartTotal.toLocaleString('en-IN')}</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Link to="/cart" onClick={() => setCartDrawerOpen(false)} className="btn-ghost text-[11px] py-3 text-center rounded-xl">
+              <Link to="/cart" onClick={() => setCartDrawerOpen(false)} className="bg-white text-zinc-900 border border-zinc-300 hover:bg-neutral-100 text-[11px] font-bold uppercase tracking-wider py-3 text-center rounded-xl transition-all">
                 View Cart
               </Link>
               <button
@@ -1384,7 +1403,7 @@ function Navbar() {
                   sessionStorage.setItem('selected_cart_item_ids', JSON.stringify(selectedItemIds));
                   navigate('/checkout');
                 }}
-                className="btn-dark text-[11px] py-3 rounded-xl cursor-pointer"
+                className="bg-zinc-950 text-white hover:bg-zinc-800 text-[11px] font-bold uppercase tracking-wider py-3 rounded-xl cursor-pointer transition-all"
               >
                 Checkout
               </button>
@@ -1619,17 +1638,23 @@ function Navbar() {
               {/* Key Brand Pillars */}
               <div className="grid grid-cols-3 gap-3 pt-2 border-t border-[var(--color-border)] text-center">
                 <div className="p-3 rounded-2xl bg-[var(--color-subtle)]/50 border border-[var(--color-border)]">
-                  <span className="text-base block mb-1">🧵</span>
+                  <svg className="w-4 h-4 text-emerald-700 block mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
                   <span className="text-[9.5px] font-mono font-bold text-[var(--color-text)] uppercase block">240+ GSM</span>
                   <span className="text-[8px] text-[var(--color-muted)] uppercase">Heavy Cotton</span>
                 </div>
                 <div className="p-3 rounded-2xl bg-[var(--color-subtle)]/50 border border-[var(--color-border)]">
-                  <span className="text-base block mb-1">⚡</span>
+                  <svg className="w-4 h-4 text-amber-500 fill-amber-500 block mb-1" viewBox="0 0 24 24">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
                   <span className="text-[9.5px] font-mono font-bold text-[var(--color-text)] uppercase block">EXPRESS</span>
                   <span className="text-[8px] text-[var(--color-muted)] uppercase">Pan-India Delivery</span>
                 </div>
                 <div className="p-3 rounded-2xl bg-[var(--color-subtle)]/50 border border-[var(--color-border)]">
-                  <span className="text-base block mb-1">🛡️</span>
+                  <svg className="w-4 h-4 text-emerald-600 block mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
                   <span className="text-[9.5px] font-mono font-bold text-[var(--color-text)] uppercase block">7-DAY</span>
                   <span className="text-[8px] text-[var(--color-muted)] uppercase">Easy Returns</span>
                 </div>

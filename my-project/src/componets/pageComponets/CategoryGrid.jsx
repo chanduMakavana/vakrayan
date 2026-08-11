@@ -83,7 +83,7 @@ function CategoryGrid() {
   return (
     <section
       id="categories-section"
-      style={{ background: '#F0FDF7', padding: '36px 0 48px 0', borderTop: '1px solid rgba(5,150,105,0.15)', borderBottom: '1px solid rgba(5,150,105,0.15)' }}
+      style={{ background: '#FFFFFF', padding: '36px 0 48px 0', borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)' }}
     >
       <div className="max-w-[1728px] mx-auto px-4 md:px-12">
 

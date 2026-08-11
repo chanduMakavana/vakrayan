@@ -300,7 +300,7 @@ function AdminAnalytics({ orders = [], products = [] }) {
         {/* Order Status Breakdown Donut */}
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6 rounded-xl space-y-4 shadow-sm flex flex-col">
           <div className="pb-2 border-b border-[var(--color-border)]/40">
-            <h3 className="text-xs font-black tracking-[0.2em] text-[var(--color-text)] uppercase">📦 Fulfillment ratio</h3>
+            <h3 className="text-xs font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Fulfillment ratio</h3>
             <p className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Order status distribution</p>
           </div>
 
@@ -354,7 +354,7 @@ function AdminAnalytics({ orders = [], products = [] }) {
         {/* Best Selling Products */}
         <div className="lg:col-span-3 bg-[var(--color-surface)] border border-[var(--color-border)] p-6 rounded-xl space-y-4 shadow-sm">
           <div className="pb-2 border-b border-[var(--color-border)]/40">
-            <h3 className="text-xs font-black tracking-[0.2em] text-[var(--color-text)] uppercase">🔥 Best Selling Products</h3>
+            <h3 className="text-xs font-black tracking-[0.2em] text-[var(--color-text)] uppercase">Best Selling Products</h3>
             <p className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Top items by quantity sold</p>
           </div>
 

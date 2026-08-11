@@ -1,7 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck } from 'react-icons/fi';
+
+const RulerIcon = ({ className = "w-4 h-4 text-zinc-500 shrink-0 mt-0.5" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.3 15.3l-7.6-7.6c-.4-.4-1-.4-1.4 0l-7 7c-.4.4-.4 1 0 1.4l7.6 7.6c.4.4 1 .4 1.4 0l7-7c.4-.4.4-1 0-1.4z"/>
+    <line x1="14.5" y1="9.5" x2="16" y2="11"/>
+    <line x1="11.5" y1="12.5" x2="14" y2="15"/>
+    <line x1="8.5" y1="15.5" x2="10" y2="17"/>
+  </svg>
+);
+
+const ShieldCheckIcon = ({ className = "w-4 h-4 text-zinc-500 shrink-0 mt-0.5" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <polyline points="9 12 11 14 15 10"/>
+  </svg>
+);
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../services/products';
 import reviewsService from '../../services/reviews';
@@ -17,6 +33,7 @@ import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
+import Loader from '../pageComponets/Loader';
 import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
 
 
@@ -1042,11 +1059,83 @@ function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans">
-        <div className="flex flex-col items-center justify-center gap-4 py-32">
-          <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-none animate-spin" />
-          <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-mono font-bold uppercase">
-            Loading product details...
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20 select-none">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-6 space-y-6">
+          {/* Top Header Bar: Back to Shop + Breadcrumb */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 pb-4">
+            <div className="w-32 h-5 skeleton rounded-none" />
+            <div className="w-64 h-5 skeleton rounded-none" />
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Desktop 2-Column Product Image Grid Skeleton */}
+            <div className="hidden lg:grid grid-cols-2 gap-3.5 lg:col-span-7 items-start">
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+            </div>
+
+            {/* Mobile Single Photo Skeleton */}
+            <div className="lg:hidden col-span-1">
+              <div className="w-full aspect-3/4 skeleton rounded-none border border-neutral-200/80" />
+            </div>
+
+            {/* Right Column: Product Detail Form Skeleton */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Badges & Title */}
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <div className="w-28 h-6 skeleton rounded-none" />
+                  <div className="w-20 h-6 skeleton rounded-none" />
+                </div>
+                <div className="w-4/5 h-9 skeleton rounded-none" />
+                <div className="w-40 h-5 skeleton rounded-none" />
+                <div className="w-32 h-7 skeleton rounded-none" />
+              </div>
+
+              {/* Share buttons line */}
+              <div className="flex items-center gap-3 pt-1">
+                <div className="w-24 h-5 skeleton rounded-none" />
+                <div className="w-24 h-8 skeleton rounded-none" />
+                <div className="w-36 h-8 skeleton rounded-none" />
+              </div>
+
+              <div className="h-[1px] bg-neutral-200/80 w-full" />
+
+              {/* Color Section */}
+              <div className="space-y-2">
+                <div className="w-28 h-4 skeleton rounded-none" />
+                <div className="w-14 h-14 skeleton rounded-none" />
+              </div>
+
+              {/* Size Section */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="w-24 h-4 skeleton rounded-none" />
+                  <div className="w-20 h-4 skeleton rounded-none" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                </div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="space-y-3 pt-2">
+                <div className="w-full h-12 skeleton rounded-none" />
+                <div className="w-full h-12 skeleton rounded-none" />
+              </div>
+
+              {/* Description Accordion */}
+              <div className="pt-4 border-t border-neutral-200/80">
+                <div className="w-full h-12 skeleton rounded-none" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1217,6 +1306,275 @@ function ProductDetail() {
     }
   };
 
+  // Image Component with Smooth Surface Placeholder
+  const ImageWithSkeleton = ({ src, alt, className = "", loading = "lazy", onClick }) => {
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    return (
+      <div
+        onClick={onClick}
+        className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-zoom-in group transition-all duration-300 hover:border-neutral-900 ${className}`}
+      >
+        {/* Subtle Surface Loading Pulse */}
+        {!isLoaded && (
+          <div className="absolute inset-0 z-10 skeleton flex items-center justify-center">
+            <div className="w-5 h-5 rounded-full border-2 border-neutral-300 border-t-neutral-800 animate-spin opacity-40" />
+          </div>
+        )}
+
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setIsLoaded(true)}
+          className={`w-full h-full object-cover object-center group-hover:scale-[1.025] transition-all duration-300 ease-out ${
+            isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-98'
+          }`}
+        />
+      </div>
+    );
+  };
+
+  // 100% Full Markdown & GFM Parser Component
+  const RenderMarkdown = ({ content }) => {
+    if (!content) return null;
+
+    const rawText = String(content);
+
+    // Helper to parse inline markdown (bold, italic, strikethrough, inline code, links, images)
+    const parseInlineMarkdown = (text) => {
+      if (!text) return null;
+
+      const regex = /(!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)|`[^`]+`|\*\*.*?\*\*|__.*?__|~~.*?~~|\*.*?\*|_.*?_)/g;
+      const parts = text.split(regex);
+
+      return parts.map((part, index) => {
+        if (!part) return null;
+
+        // Image: ![alt](url)
+        if (part.startsWith('![') && part.includes('](') && part.endsWith(')')) {
+          const alt = part.slice(2, part.indexOf(']('));
+          const url = part.slice(part.indexOf('](') + 2, -1);
+          return (
+            <img
+              key={index}
+              src={url}
+              alt={alt}
+              className="max-w-full h-auto rounded-lg my-2 border border-zinc-200 shadow-xs block"
+            />
+          );
+        }
+
+        // Link: [text](url)
+        if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+          const linkText = part.slice(1, part.indexOf(']('));
+          const url = part.slice(part.indexOf('](') + 2, -1);
+          return (
+            <a
+              key={index}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#059669] font-bold underline hover:text-[#047857] transition-colors"
+            >
+              {linkText}
+            </a>
+          );
+        }
+
+        // Inline Code: `code`
+        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+          return (
+            <code key={index} className="bg-zinc-100 text-zinc-900 px-1.5 py-0.5 rounded font-mono text-[11px] border border-zinc-200 font-bold">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+
+        // Bold: **text** or __text__
+        if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+          return <strong key={index} className="font-extrabold text-[var(--color-text)]">{part.slice(2, -2)}</strong>;
+        }
+
+        // Strikethrough: ~~text~~
+        if (part.startsWith('~~') && part.endsWith('~~')) {
+          return <del key={index} className="line-through text-zinc-400">{part.slice(2, -2)}</del>;
+        }
+
+        // Italic: *text* or _text_
+        if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+          return <em key={index} className="italic text-zinc-800">{part.slice(1, -1)}</em>;
+        }
+
+        return part;
+      });
+    };
+
+    const lines = rawText.split(/\r?\n/);
+    const elements = [];
+
+    let inCodeBlock = false;
+    let codeBlockLang = '';
+    let codeBlockLines = [];
+
+    let currentList = [];
+    let currentListType = null; // 'ul' | 'ol' | 'task'
+
+    const flushList = () => {
+      if (currentList.length > 0) {
+        const listKey = `list-${elements.length}`;
+        if (currentListType === 'task') {
+          elements.push(
+            <ul key={listKey} className="space-y-1.5 my-2 pl-1 font-medium text-[var(--color-text)]">
+              {currentList.map((item, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    readOnly
+                    className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#059669] cursor-pointer"
+                  />
+                  <span className={item.checked ? 'line-through text-zinc-400' : ''}>
+                    {parseInlineMarkdown(item.text)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          );
+        } else if (currentListType === 'ul') {
+          elements.push(
+            <ul key={listKey} className="list-disc list-inside space-y-1 my-2 pl-1 font-medium text-[var(--color-text)]">
+              {currentList.map((item, i) => (
+                <li key={i}>{parseInlineMarkdown(item)}</li>
+              ))}
+            </ul>
+          );
+        } else if (currentListType === 'ol') {
+          elements.push(
+            <ol key={listKey} className="list-decimal list-inside space-y-1 my-2 pl-1 font-medium text-[var(--color-text)]">
+              {currentList.map((item, i) => (
+                <li key={i}>{parseInlineMarkdown(item)}</li>
+              ))}
+            </ol>
+          );
+        }
+        currentList = [];
+        currentListType = null;
+      }
+    };
+
+    lines.forEach((line, idx) => {
+      // 1. Code block handling: ```javascript or ```
+      if (line.trim().startsWith('```')) {
+        if (inCodeBlock) {
+          // End of code block
+          elements.push(
+            <div key={`code-${idx}`} className="my-3 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 text-emerald-400 font-mono text-xs">
+              {codeBlockLang && (
+                <div className="bg-zinc-900 text-zinc-400 px-3 py-1 text-[10px] uppercase font-bold tracking-wider border-b border-zinc-800">
+                  {codeBlockLang}
+                </div>
+              )}
+              <pre className="p-3.5 overflow-x-auto leading-relaxed">
+                <code>{codeBlockLines.join('\n')}</code>
+              </pre>
+            </div>
+          );
+          inCodeBlock = false;
+          codeBlockLang = '';
+          codeBlockLines = [];
+        } else {
+          // Start of code block
+          flushList();
+          inCodeBlock = true;
+          codeBlockLang = line.trim().slice(3).trim();
+          codeBlockLines = [];
+        }
+        return;
+      }
+
+      if (inCodeBlock) {
+        codeBlockLines.push(line);
+        return;
+      }
+
+      const trimmed = line.trim();
+
+      // 2. Empty line
+      if (!trimmed) {
+        flushList();
+        return;
+      }
+
+      // 3. Horizontal Rule: --- or *** or ___
+      if (/^([*_-]\s*){3,}$/.test(trimmed)) {
+        flushList();
+        elements.push(<hr key={`hr-${idx}`} className="my-4 border-t border-zinc-200 dark:border-zinc-800" />);
+        return;
+      }
+
+      // 4. Headings H1 to H6
+      if (/^#{1,6}\s+/.test(trimmed)) {
+        flushList();
+        const level = trimmed.match(/^#{1,6}/)[0].length;
+        const text = trimmed.replace(/^#{1,6}\s+/, '');
+        const inline = parseInlineMarkdown(text);
+
+        if (level === 1) {
+          elements.push(<h1 key={`h1-${idx}`} className="text-base md:text-lg font-mono font-black uppercase tracking-wider text-[var(--color-text)] mt-4 mb-2 border-b pb-1 border-zinc-200">{inline}</h1>);
+        } else if (level === 2) {
+          elements.push(<h2 key={`h2-${idx}`} className="text-sm md:text-base font-mono font-black uppercase tracking-wider text-[var(--color-text)] mt-3.5 mb-1.5">{inline}</h2>);
+        } else if (level === 3) {
+          elements.push(<h3 key={`h3-${idx}`} className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--color-text)] mt-3 mb-1">{inline}</h3>);
+        } else {
+          elements.push(<h4 key={`h4-${idx}`} className="text-xs font-mono font-bold uppercase tracking-wide text-[var(--color-text)] mt-2.5 mb-1">{inline}</h4>);
+        }
+        return;
+      }
+
+      // 5. Task List: - [x] task or - [ ] task
+      if (/^[-*•]\s+\[([ xX])\]\s+/.test(trimmed)) {
+        const match = trimmed.match(/^[-*•]\s+\[([ xX])\]\s+(.+)/);
+        if (match) {
+          if (currentListType && currentListType !== 'task') flushList();
+          currentListType = 'task';
+          const isChecked = match[1].toLowerCase() === 'x';
+          currentList.push({ checked: isChecked, text: match[2] });
+          return;
+        }
+      }
+
+      // 6. Unordered List Bullet: - Item or * Item or • Item
+      if (/^[-*•]\s+/.test(trimmed)) {
+        if (currentListType && currentListType !== 'ul') flushList();
+        currentListType = 'ul';
+        currentList.push(trimmed.replace(/^[-*•]\s+/, ''));
+        return;
+      }
+
+      // 7. Ordered List: 1. Item
+      if (/^\d+\.\s+/.test(trimmed)) {
+        if (currentListType && currentListType !== 'ol') flushList();
+        currentListType = 'ol';
+        currentList.push(trimmed.replace(/^\d+\.\s+/, ''));
+        return;
+      }
+
+      // 8. Regular paragraph
+      flushList();
+      elements.push(
+        <p key={`p-${idx}`} className="leading-relaxed text-[var(--color-muted)] my-1 font-medium">
+          {parseInlineMarkdown(trimmed)}
+        </p>
+      );
+    });
+
+    flushList();
+
+    return <div className="space-y-1 text-xs font-mono">{elements}</div>;
+  };
+
   const rawDescription = product?.description || "";
   const returnPolicyMatch = rawDescription.match(/\[RETURN_POLICY\]:\s*(.+)/);
   const returnPolicy = product?.return_policy || (returnPolicyMatch ? returnPolicyMatch[1].trim() : "7 Day Return");
@@ -1257,7 +1615,26 @@ function ProductDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:col-span-7">
+          {/* Desktop 2-Column Product Image Grid Gallery (Matching Luxury E-Commerce Layout with Skeletons) */}
+          <div className="hidden lg:grid grid-cols-2 gap-3.5 lg:col-span-7 items-start">
+            {galleryImages.map((imgUrl, idx) => (
+              <ImageWithSkeleton
+                key={idx}
+                src={imgUrl}
+                alt={`${product.name} view ${idx + 1}`}
+                loading={idx < 2 ? "eager" : "lazy"}
+                onClick={() => {
+                  setActiveImageIdx(idx);
+                  setIsLightboxOpen(true);
+                  setLightboxZoom(1);
+                  setLightboxOffset({ x: 0, y: 0 });
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Mobile & Tablet Product Image Gallery Viewer */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:hidden col-span-1">
 
              {galleryImages.length > 1 && (
               <div className="md:col-span-2 order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
@@ -1403,9 +1780,6 @@ function ProductDetail() {
               }}
               className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
             >
-              <div className="absolute top-4 right-4 bg-[var(--color-surface)] border border-neutral-950/15 text-[var(--color-text)] font-mono text-[9px] tracking-wider px-2 py-1 rounded-none z-10 pointer-events-none uppercase">
-                Swipe to Browse / Tap to Zoom
-              </div>
 
               {/* Navigation Chevron Buttons overlay */}
               {galleryImages.length > 1 && (
@@ -1816,9 +2190,22 @@ function ProductDetail() {
              </div>
 
 
-            {/* Extra bottom padding on mobile so content isn't hidden behind sticky bar */}
-            <div className="h-24 lg:hidden" aria-hidden="true" />
+            {/* Return Policy Banner (Mobile Only - Compact flow) */}
+            <div className="md:hidden flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none mt-2">
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
+                returnPolicy === "No Return" ? "bg-rose-500" :
+                returnPolicy === "Exchange Only" ? "bg-amber-500" :
+                returnPolicy === "Return Only" ? "bg-blue-500" : "bg-emerald-500"
+              }`} />
+              <p className="font-mono text-[10px] uppercase tracking-wide">
+                {returnPolicy === "No Return" ? "No return or exchange active." :
+                 returnPolicy === "Exchange Only" ? "7-Day exchange only active." :
+                 returnPolicy === "Return Only" ? "7-Day return only active." :
+                 "7-Day returns & exchanges active."}
+              </p>
+            </div>
 
+            {/* Desktop Action Buttons (Hidden on mobile where sticky bottom bar handles actions) */}
             <div className="hidden md:block space-y-4 pt-2 border-t border-neutral-150">
 
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1887,12 +2274,16 @@ function ProductDetail() {
                       disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
                       className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-2 sm:px-4 md:px-6 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : 'Buy Now'}
+                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : (
+                        <span className="flex items-center gap-1.5 justify-center">
+                          <FiZap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" /> Buy Now
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
+                <div className="hidden md:flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
                   <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
                     returnPolicy === "No Return" ? "bg-rose-500" :
                     returnPolicy === "Exchange Only" ? "bg-amber-500" :
@@ -2041,7 +2432,7 @@ function ProductDetail() {
               )}
             </div>
 
-            <div className="border-t border-b border-[var(--color-border)] divide-y divide-neutral-200">
+            <div className="border-t border-b border-[var(--color-border)] divide-y divide-neutral-200 mt-4">
 
               {displayDescription && (
                 <div className="py-3.5">
@@ -2049,12 +2440,12 @@ function ProductDetail() {
                     onClick={() => setDescExpanded(!descExpanded)}
                     className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none cursor-pointer"
                   >
-                    <span>DESCRIPTION</span>
+                    <span>DESCRIPTION & SPECIFICATIONS</span>
                     {descExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                   </button>
-                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-60 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] border border-[var(--color-border)] p-4 space-y-2">
-                      <p>{displayDescription}</p>
+                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-[800px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-xl">
+                      <RenderMarkdown content={displayDescription} />
                     </div>
                   </div>
                 </div>
@@ -2073,60 +2464,60 @@ function ProductDetail() {
                     {returnPolicy === "No Return" || returnPolicy.toLowerCase().includes("no return") ? (
                       <>
                         <p className="text-rose-600 font-bold flex items-start gap-2">
-                          <span className="shrink-0">🛑</span>
+                          <FiAlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                           <span><strong>Non-Returnable Item Policy:</strong> Final sale — standard returns or size exchanges are not accepted for this item.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">📐</span>
+                          <RulerIcon className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>Please check the size chart carefully before placing your order.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">📹</span>
+                          <FiVideo className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span><strong>Damaged or Wrong Item:</strong> Replacement is only provided if you receive a damaged or incorrect product (unboxing video proof required).</span>
                         </p>
                       </>
                     ) : returnPolicy === "Return Only" || returnPolicy.toLowerCase().includes("return only") || returnPolicy.toLowerCase().includes("no exchange") ? (
                       <>
                         <p className="text-amber-700 dark:text-amber-400 font-bold flex items-start gap-2">
-                          <span className="shrink-0">📦</span>
+                          <FiPackage className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                           <span><strong>Return Only Policy:</strong> Easy 7-day return guarantee for refund.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">🔄</span>
+                          <FiRefreshCw className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>Direct size exchanges are not offered for this product; please return for a refund and place a new order.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">🏷️</span>
+                          <FiTag className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>Items must be unused, unwashed, and with all original brand tags intact.</span>
                         </p>
                       </>
                     ) : returnPolicy === "Exchange Only" || returnPolicy.toLowerCase().includes("exchange only") ? (
                       <>
                         <p className="text-amber-700 dark:text-amber-400 font-bold flex items-start gap-2">
-                          <span className="shrink-0">🔄</span>
+                          <FiRefreshCw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                           <span><strong>Exchange Only Policy:</strong> Easy 7-day size or defect exchange available.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">🚫</span>
+                          <FiSlash className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>Monetary refunds are not processed for this item; only size/color replacements are accepted.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">🏷️</span>
+                          <FiTag className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>Request an exchange within 7 days of delivery with original tags intact.</span>
                         </p>
                       </>
                     ) : (
                       <>
                         <p className="text-emerald-600 dark:text-emerald-400 font-bold flex items-start gap-2">
-                          <span className="shrink-0">🟢</span>
+                          <FiCheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                           <span><strong>7-Day Return & Exchange Policy:</strong> Easy 7-day hassle-free returns and size exchanges.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">👕</span>
+                          <ShieldCheckIcon className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>In case of sizing issues or defects, request a return or size exchange within 7 days of delivery.</span>
                         </p>
                         <p className="flex items-start gap-2">
-                          <span className="shrink-0">🏷️</span>
+                          <FiTag className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
                           <span>Items must be unused, unwashed, and with all original brand tags intact.</span>
                         </p>
                       </>
@@ -2914,7 +3305,11 @@ function ProductDetail() {
               disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
               className="w-full h-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
             >
-              {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? '✕ Sold Out' : '⚡ Buy Now'}
+              {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : (
+                <span className="flex items-center gap-1.5">
+                  <FiZap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> Buy Now
+                </span>
+              )}
             </button>
           </div>
         </div>

@@ -238,7 +238,7 @@ function Hero() {
               alt="Vakrayan Banner"
               loading="eager"
               decoding="async"
-              fetchpriority="high"
+              fetchPriority="high"
               className="w-full h-full object-cover select-none pointer-events-none"
               draggable={false}
             />

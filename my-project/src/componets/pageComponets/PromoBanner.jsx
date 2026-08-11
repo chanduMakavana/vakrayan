@@ -106,8 +106,8 @@ function PromoBanner() {
           {statsData.map(({ value, label }) => (
             <div
               key={label}
-              className="glass-card p-5 text-center"
-              style={{ borderRadius: 0, border: '1px solid var(--color-border-hard)' }}
+              className="glass-card p-5 text-center transition-all duration-300 hover:shadow-md"
+              style={{ borderRadius: 16, border: '1px solid var(--color-border-hard)' }}
             >
               <p style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 30, fontWeight: 900, color: 'var(--color-accent)', lineHeight: 1, marginBottom: 6 }}>
                 {value}

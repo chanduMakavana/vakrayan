@@ -457,8 +457,9 @@ function AddToCartPage() {
           <div className="lg:col-span-7 space-y-4">
             
             {/* Select All Toggle */}
-            <div className="flex items-center justify-between p-3.5 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl text-xs font-mono mb-4">
-              <label className="flex items-center gap-2 cursor-pointer font-black uppercase text-[var(--color-text)]">
+            {/* Select All Bar */}
+            <div className="flex items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl text-xs font-mono mb-4 text-zinc-900">
+              <label className="flex items-center gap-2 cursor-pointer font-black uppercase text-zinc-900">
                 <input
                   type="checkbox"
                   checked={cartItems.length > 0 && selectedItemIds.length === cartItems.length}
@@ -475,7 +476,7 @@ function AddToCartPage() {
                       sessionStorage.setItem('selected_cart_item_ids', JSON.stringify(allIds));
                     }
                   }}
-                  className="w-4 h-4 rounded text-[var(--color-accent)] focus:ring-[var(--color-accent)] accent-[var(--color-accent)] border-[var(--color-border)] cursor-pointer"
+                  className="w-4 h-4 rounded text-zinc-950 focus:ring-zinc-950 accent-zinc-950 border-zinc-300 cursor-pointer"
                 />
                 SELECT ALL ITEMS ({cartItems.length})
               </label>
@@ -488,7 +489,7 @@ function AddToCartPage() {
                     sessionStorage.setItem('deselected_cart_item_ids', JSON.stringify(allIds));
                     sessionStorage.setItem('selected_cart_item_ids', JSON.stringify([]));
                   }}
-                  className="text-[10px] font-black text-rose-655 hover:text-rose-700 uppercase cursor-pointer"
+                  className="text-[10px] font-black text-rose-600 hover:text-rose-700 uppercase cursor-pointer"
                 >
                   DESELECT ALL
                 </button>
@@ -505,16 +506,17 @@ function AddToCartPage() {
               return (
                 <div 
                   key={uniqueId}
-                  className={`flex gap-4 p-4 bg-[var(--color-surface)] border rounded-xl relative group hover:shadow-md transition-all duration-300 ${
-                    isSelected ? 'border-[var(--color-accent)]/60 shadow-2xs' : 'border-[var(--color-border)]'
+                  className={`flex items-center gap-3 sm:gap-4 p-3.5 bg-white border rounded-2xl relative transition-all duration-200 ${
+                    isSelected ? 'border-zinc-400 shadow-xs' : 'border-zinc-200'
                   }`}
                 >
                   {/* Inline Loader Backdrop Overlay */}
                   {updatingItemIds.includes(uniqueId) && (
-                    <div className="absolute inset-0 bg-[var(--color-bg)]/60 backdrop-blur-[1px] rounded-xl flex items-center justify-center z-30 animate-fade-in">
-                      <div className="w-5 h-5 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
+                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-2xl flex items-center justify-center z-30 animate-fade-in">
+                      <div className="w-5 h-5 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
                     </div>
                   )}
+
                   {/* Item Checkbox */}
                   <div className="flex items-center justify-center shrink-0">
                     <input
@@ -532,20 +534,20 @@ function AddToCartPage() {
                           .map(item => item.$id);
                         sessionStorage.setItem('selected_cart_item_ids', JSON.stringify(updatedSelected));
                       }}
-                      className="w-4 h-4 rounded text-[var(--color-accent)] focus:ring-[var(--color-accent)] accent-[var(--color-accent)] border-[var(--color-border)] cursor-pointer"
+                      className="w-4 h-4 rounded text-zinc-950 focus:ring-zinc-950 accent-zinc-950 border-zinc-300 cursor-pointer"
                     />
                   </div>
 
                   {/* Remove Button */}
                   <button 
                     onClick={() => handleRemove(uniqueId)}
-                    className="absolute top-3 right-3 text-[var(--color-muted)] hover:text-[var(--color-text)] p-1 cursor-pointer transition-colors"
+                    className="absolute top-3 right-3 text-zinc-400 hover:text-zinc-900 p-1 cursor-pointer transition-colors"
                   >
-                    <HiX className="text-lg" />
+                    <HiX className="text-base" />
                   </button>
 
                   {/* Image */}
-                  <div className="w-20 h-26 sm:w-24 sm:h-32 rounded-lg overflow-hidden bg-[var(--color-subtle)] border border-[var(--color-border)]/30 shrink-0">
+                  <div className="w-20 h-24 sm:w-22 sm:h-26 rounded-xl overflow-hidden bg-neutral-100 border border-zinc-200 shrink-0">
                     <img 
                       src={imgUrl} 
                       alt={item.name} 
@@ -554,53 +556,52 @@ function AddToCartPage() {
                   </div>
 
                   {/* Details */}
-                  <div className="flex flex-col justify-between py-0.5 grow pr-4">
-                    <div className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-[var(--color-text)] line-clamp-1">
+                  <div className="flex flex-col justify-between grow min-w-0 py-0.5 pr-4 gap-2">
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-zinc-900 uppercase truncate font-sans tracking-wide pr-2">
                         {item.name}
                       </h3>
-                      <p className="text-[11px] text-[var(--color-muted)]">
-                        Price: ₹{Number(item.price).toLocaleString('en-IN')}
-                      </p>
-                      
-                      {/* Size Selection Dropdown */}
-                      <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-muted)] pt-0.5">
-                        <span>Size:</span>
-                        <select
-                          value={item.size || 'M'}
-                          onChange={(e) => handleSizeChange(item, e.target.value)}
-                          className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-lg px-2 py-0.5 text-xs text-[var(--color-text)] font-semibold outline-hidden cursor-pointer transition-colors"
-                        >
-                          {availableSizes.map((sz) => (
-                            <option key={sz} value={sz}>{sz}</option>
-                          ))}
-                        </select>
+                      <div className="flex items-center gap-3 text-[11px] text-zinc-600 mt-1 flex-wrap">
+                        <span>Price: <strong className="text-zinc-900 font-semibold">₹{Number(item.price).toLocaleString('en-IN')}</strong></span>
+                        <span className="text-zinc-300">•</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>Size:</span>
+                          <select
+                            value={item.size || 'M'}
+                            onChange={(e) => handleSizeChange(item, e.target.value)}
+                            className="bg-white border border-zinc-300 focus:border-zinc-900 rounded-md px-2 py-0.5 text-xs text-zinc-900 font-bold outline-none cursor-pointer transition-colors"
+                          >
+                            {availableSizes.map((sz) => (
+                              <option key={sz} value={sz}>{sz}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
                     {/* Quantity Controls & Subtotal */}
-                    <div className="flex items-center justify-between gap-4 mt-4 flex-wrap pt-2 border-t border-[var(--color-border)]">
-                      <div className="inline-flex items-center border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl overflow-hidden shadow-2xs">
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <div className="inline-flex items-center border border-zinc-300 bg-white rounded-lg overflow-hidden shadow-2xs">
                         <button 
                           onClick={() => handleQuantityShift(item, 'decrease')}
-                          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-muted)] border-r border-[var(--color-border)]"
+                          className="w-7 h-7 flex items-center justify-center hover:bg-neutral-100 text-zinc-600 transition-colors cursor-pointer border-r border-zinc-200"
                         >
                           <HiMinus className="text-xs" />
                         </button>
-                        <span className="w-9 text-center font-mono font-bold text-xs text-[var(--color-text)] border-r border-[var(--color-border)] py-1">
+                        <span className="w-8 text-center font-mono font-bold text-xs text-zinc-900 py-1">
                           {item.quantity}
                         </span>
                         <button 
                           onClick={() => handleQuantityShift(item, 'increase')}
-                          className="w-8 h-8 flex items-center justify-center hover:bg-[var(--color-accent)]/10 hover:text-[var(--color-accent)] transition-colors cursor-pointer text-[var(--color-muted)]"
+                          className="w-7 h-7 flex items-center justify-center hover:bg-neutral-100 text-zinc-600 transition-colors cursor-pointer border-l border-zinc-200"
                         >
                           <HiPlus className="text-xs" />
                         </button>
                       </div>
 
                       <div className="text-right">
-                        <span className="text-[10px] text-[var(--color-muted)] block uppercase font-medium">Subtotal</span>
-                        <span className="text-xs font-semibold text-[var(--color-text)]">
+                        <span className="text-[9.5px] text-zinc-500 font-mono font-bold uppercase tracking-wider block">SUBTOTAL</span>
+                        <span className="text-xs sm:text-sm font-black text-zinc-900 font-mono">
                           ₹{Number(item.subtotal).toLocaleString('en-IN')}
                         </span>
                       </div>

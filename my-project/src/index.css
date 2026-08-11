@@ -693,80 +693,15 @@ from { transform: translateX(-100%); }
 to   { transform: translateX(0); }
 }
 
-@keyframes shimmer {
-0%   { background-position: -200% 0; }
-100% { background-position: 200% 0; }
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
 }
 
-@keyframes loading {
-0%   { transform: translateX(-100%); }
-100% { transform: translateX(200%); }
-}
-
-@keyframes pulse-dot {
-0%, 100% { transform: scale(1);   opacity: 1; }
-50%       { transform: scale(1.4); opacity: 0.7; }
-}
-
-@keyframes float {
-0%, 100% { transform: translateY(0px); }
-50%       { transform: translateY(-8px); }
-}
-
-@keyframes glow-pulse {
-0%, 100% { box-shadow: 0 0 0 0 var(--color-accent-glow); }
-50%       { box-shadow: 0 0 0 8px transparent; }
-}
-
-@keyframes spin-slow {
-from { transform: rotate(0deg); }
-to   { transform: rotate(360deg); }
-}
-
-@keyframes stagger-up {
-from { opacity: 0; transform: translateY(24px); }
-to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes blob-drift {
-0%, 100% { transform: translate(0,0) scale(1); }
-33%       { transform: translate(30px,-20px) scale(1.08); }
-66%       { transform: translate(-20px,10px) scale(0.94); }
-}
-
-/* ============================================================
-ANIMATION UTILITY CLASSES
-============================================================ */
-.animate-fade-in    { animation: fadeIn var(--duration-base) var(--ease-smooth) forwards; }
-.animate-fade-up    { animation: fadeUp var(--duration-slow) var(--ease-out-expo) forwards; }
-.animate-fade-down  { animation: fadeDown var(--duration-slow) var(--ease-out-expo) forwards; }
-.animate-scale-up   { animation: scaleUp 0.3s var(--ease-spring) forwards; }
-.animate-slide-in-right { animation: slideInRight var(--duration-slow) var(--ease-out-expo) forwards; }
-.animate-marquee    { animation: marquee 28s linear infinite; }
-.animate-marquee:hover { animation-play-state: paused; }
-.animate-float      { animation: float 4s ease-in-out infinite; }
-.animate-glow-pulse { animation: glow-pulse 2.5s ease-in-out infinite; }
-.animate-spin-slow  { animation: spin-slow 12s linear infinite; }
-.animate-blob       { animation: blob-drift 8s ease-in-out infinite; }
-
-/* Stagger animation helpers */
-.stagger-1 { animation-delay: 0ms; }
-.stagger-2 { animation-delay: 60ms; }
-.stagger-3 { animation-delay: 120ms; }
-.stagger-4 { animation-delay: 180ms; }
-.stagger-5 { animation-delay: 240ms; }
-
-/* Skeleton shimmer */
+/* Skeleton - Clean Off-White Neutral (#f4f4f5) with minimal subtle pulse */
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-subtle) 25%,
-    rgba(5,150,105,0.06) 50%,
-    var(--color-subtle) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: var(--radius-md);
+  background-color: #f4f4f5;
+  animation: pulse-subtle 3s ease-in-out infinite;
 }
 
 .skeleton-dark {
