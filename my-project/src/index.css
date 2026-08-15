@@ -668,8 +668,24 @@ KEYFRAME ANIMATIONS
 }
 
 @keyframes marquee {
-0%   { transform: translateX(0%); }
-100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  display: flex !important;
+  flex-shrink: 0;
+  min-width: 100%;
+  animation: marquee 25s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
 }
 
 @keyframes fadeIn {
