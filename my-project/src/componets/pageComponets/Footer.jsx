@@ -61,6 +61,10 @@ function Footer() {
           <img 
             src="/vakrayan-text.png"
             alt="Vakrayan"
+            loading="lazy"
+            decoding="async"
+            width={700}
+            height={150}
             className="w-full max-w-[700px] h-auto object-contain"
             style={{
               filter: 'brightness(0) invert(1)',
@@ -101,9 +105,9 @@ function Footer() {
 
           {/* Navigation */}
           <div className="flex flex-col gap-4">
-            <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               NAVIGATION
-            </h4>
+            </h3>
             {[
               { to: '/', label: 'Home' },
               { to: '/shop', label: 'All Products' },
@@ -123,9 +127,9 @@ function Footer() {
 
           {/* Follow */}
           <div className="flex flex-col gap-4">
-            <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               FOLLOW US
-            </h4>
+            </h3>
             {[
               { label: 'Instagram ↗', href: 'https://www.instagram.com/vakrayan_official/' },
               { label: 'Pinterest ↗', href: 'https://www.pinterest.com/' },
@@ -146,9 +150,9 @@ function Footer() {
 
           {/* Newsletter */}
           <div className="flex flex-col gap-4">
-            <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               GET THE INTEL
-            </h4>
+            </h3>
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.6, fontFamily: "'Jost', sans-serif" }}>
               Early drops, secret discounts & exclusive access.
             </p>

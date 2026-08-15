@@ -661,6 +661,7 @@ function Navbar() {
                   </span>
                   <button
                     onClick={handleToggleAdminMode}
+                    aria-label="Toggle admin mode"
                     className={`relative inline-flex h-4 w-7 rounded-full border-0 cursor-pointer transition-colors duration-200 ${
                       adminMode ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-border)]'
                     }`}
@@ -673,6 +674,7 @@ function Navbar() {
               {/* Search */}
               <button
                 onClick={() => { setSearchOpen(v => !v); setSearchVal(''); }}
+                aria-label="Search store products"
                 className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-base cursor-pointer"
                 style={{ background: 'rgba(5,150,105,0.06)' }}
               >
@@ -682,6 +684,7 @@ function Navbar() {
               {/* Wishlist */}
               <button
                 onClick={() => { if (!isAuthenticated) { navigate('/login'); return; } setWishlistDrawerOpen(true); }}
+                aria-label={`View wishlist (${wishlist.length} items)`}
                 className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-base cursor-pointer"
                 style={{ 
                   color: wishlist.length > 0 ? 'var(--color-accent)' : 'var(--color-muted)',
@@ -708,6 +711,7 @@ function Navbar() {
               {/* Cart */}
               <button
                 onClick={() => setCartDrawerOpen(true)}
+                aria-label={`View shopping cart (${cartCount} items)`}
                 className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl transition-base cursor-pointer"
                 style={{ 
                   color: cartCount > 0 ? 'var(--color-accent)' : 'var(--color-muted)',
@@ -735,6 +739,7 @@ function Navbar() {
               <div id="account-menu" className="relative hidden sm:block">
                 <button
                   onClick={() => setAccountOpen(v => !v)}
+                  aria-label="Account menu"
                   className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer"
                 >
                   {isAuthenticated && user ? (
@@ -818,6 +823,7 @@ function Navbar() {
               {/* Mobile menu button */}
               <button
                 onClick={() => setIsOpen(v => !v)}
+                aria-label="Toggle navigation menu"
                 className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer lg:hidden"
               >
                 <AnimatePresence mode="wait" initial={false}>
@@ -1085,7 +1091,11 @@ function Navbar() {
               Your Bag <span className="text-[var(--color-muted)] font-normal">({cartCount})</span>
             </h3>
           </div>
-          <button onClick={() => setCartDrawerOpen(false)} className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer">
+          <button 
+            onClick={() => setCartDrawerOpen(false)} 
+            aria-label="Close shopping bag"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer"
+          >
             <CloseIcon />
           </button>
         </div>
@@ -1427,7 +1437,11 @@ function Navbar() {
               Wishlist <span className="text-[var(--color-muted)] font-normal">({wishlist.length})</span>
             </h3>
           </div>
-          <button onClick={() => setWishlistDrawerOpen(false)} className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer">
+          <button 
+            onClick={() => setWishlistDrawerOpen(false)} 
+            aria-label="Close wishlist drawer"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-subtle)] transition-base cursor-pointer"
+          >
             <CloseIcon />
           </button>
         </div>
@@ -1607,6 +1621,7 @@ function Navbar() {
               {/* Close Button */}
               <button
                 onClick={() => setAboutModalOpen(false)}
+                aria-label="Close about us modal"
                 className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center justify-center transition-all cursor-pointer font-bold text-xs"
               >
                 ✕

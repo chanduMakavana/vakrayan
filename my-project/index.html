@@ -31,22 +31,21 @@
     <!-- ✅ SEO: Canonical URL to prevent duplicate content indexing -->
     <link rel="canonical" href="https://vakrayan.in/" />
 
-    <!-- High-Performance Image CDN Preconnects (Instant First Load) -->
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
-    <link rel="dns-prefetch" href="https://images.unsplash.com" />
-    <link rel="preconnect" href="https://cloud.appwrite.io" crossorigin />
-    <link rel="dns-prefetch" href="https://cloud.appwrite.io" />
-    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
-    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
-
-    <!-- Google Fonts: preconnect + stylesheet link (faster than CSS @import) -->
+    <!-- High-Performance Cloudflare / Backblaze Gateway & Google Fonts Preconnects (Max 3) -->
+    <link rel="preconnect" href="https://b2-upload-gateway.vakrayan.workers.dev" crossorigin />
+    <link rel="dns-prefetch" href="https://b2-upload-gateway.vakrayan.workers.dev" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
 
-    <!-- Razorpay Checkout SDK — loaded on-demand via useRazorpaySDK hook (not here to avoid loading on every page) -->
+    <!-- Google Fonts: Asynchronously loaded to prevent render-blocking -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
+    </noscript>
+
+    <!-- Razorpay Checkout SDK DNS prefetch -->
     <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
-    <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin />
 
     <!-- JSON-LD Structured Data for Search Engine Rich Snippets -->
     <script type="application/ld+json">
@@ -82,7 +81,7 @@
     <title>Vakrayan | Premium Apparel</title>
   </head>
   <body>
-    <a href="#main-content" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[99999] focus:bg-black focus:text-white focus:px-4 focus:py-2 focus:rounded-md">Skip to main content</a>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[99999] focus:bg-black focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-400">Skip to main content</a>
     <div id="root"></div>
     <noscript>
       <div style="text-align:center;padding:2rem;font-family:system-ui">

@@ -88,7 +88,9 @@ function PageWrapper({ children }) {
       exit="exit"
       style={{ width: '100%' }}
     >
-      {children}
+      <main id="main-content" className="flex-1 w-full" tabIndex="-1">
+        {children}
+      </main>
     </motion.div>
   )
 }

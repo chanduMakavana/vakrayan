@@ -34,7 +34,6 @@ function Hero() {
   const [slides, setSlides] = useState(cachedSlides)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
-  const [imagesLoaded, setImagesLoaded] = useState(cachedImagesLoaded)
 
   // Touch Swipe coordinates (Mobile)
   const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 })
@@ -44,62 +43,16 @@ function Hero() {
 
   useEffect(() => {
     let active = true
-    const preloadImages = (slidesList) => {
-      const urls = []
-      slidesList.forEach(s => {
-        if (s.image) urls.push(s.image)
-        if (s.mobileImage) urls.push(s.mobileImage)
-      })
-      if (urls.length === 0) {
-        cachedImagesLoaded = true
-        if (active) setImagesLoaded(true)
-        return
-      }
-
-      let count = 0
-      urls.forEach(url => {
-        if (preloadedImageUrls.has(url)) {
-          count++
-          if (count === urls.length && active) {
-            cachedImagesLoaded = true
-            setImagesLoaded(true)
-          }
-          return
-        }
-
-        const img = new window.Image()
-        img.src = url
-        img.onload = () => {
-          preloadedImageUrls.add(url)
-          count++
-          if (count === urls.length && active) {
-            cachedImagesLoaded = true
-            setImagesLoaded(true)
-          }
-        }
-        img.onerror = () => {
-          preloadedImageUrls.add(url)
-          count++
-          if (count === urls.length && active) {
-            cachedImagesLoaded = true
-            setImagesLoaded(true)
-          }
-        }
-      })
-    }
 
     slidesService.getSlides().then(res => {
-      if (active) {
-        const list = res && res.length > 0 ? res : DEFAULT_SLIDES
-        cachedSlides = list
-        setSlides(list)
-        preloadImages(list)
+      if (active && res && res.length > 0) {
+        cachedSlides = res
+        setSlides(res)
       }
     }).catch(() => {
       if (active) {
         cachedSlides = DEFAULT_SLIDES
         setSlides(DEFAULT_SLIDES)
-        preloadImages(DEFAULT_SLIDES)
       }
     })
     return () => { active = false }
@@ -121,31 +74,27 @@ function Hero() {
     return () => clearInterval(timer)
   }, [currentIndex, slides.length])
 
-  const nextSlide = (e) => {
-    if (e) e.stopPropagation()
+  const nextSlide = () => {
+    if (slides.length <= 1) return
     setCurrentIndex(prev => (prev + 1) % slides.length)
   }
 
-  const prevSlide = (e) => {
-    if (e) e.stopPropagation()
+  const prevSlide = () => {
+    if (slides.length <= 1) return
     setCurrentIndex(prev => (prev - 1 + slides.length) % slides.length)
   }
 
-  // Mobile Touch Handlers
+  // Mobile Touch Swipe Handlers
   const handleTouchStart = (e) => {
-    if (e.targetTouches.length === 1) {
-      setTouchStartPos({
-        x: e.targetTouches[0].clientX,
-        y: e.targetTouches[0].clientY
-      })
-    }
+    setTouchStartPos({
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    })
   }
 
   const handleTouchEnd = (e) => {
-    if (!touchStartPos.x || !touchStartPos.y) return
+    if (!touchStartPos.x && !touchStartPos.y) return
     const touchEnd = e.changedTouches[0]
-    if (!touchEnd) return
-
     const diffX = touchStartPos.x - touchEnd.clientX
     const diffY = touchStartPos.y - touchEnd.clientY
 
@@ -199,23 +148,9 @@ function Hero() {
     exit: { opacity: 0, scale: 0.97, transition: { opacity: { duration: 0.35 }, scale: { type: 'tween', ease: 'easeIn', duration: 0.5 } } }
   }
 
-  if (!imagesLoaded) {
-    return (
-      <div className="w-full relative overflow-hidden select-none" style={{ height: 'clamp(300px, 70vh, 90vh)', background: 'linear-gradient(135deg, #0D1A14 0%, #071A10 100%)' }}>
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full animate-blob" style={{ background: '#059669', filter: 'blur(80px)', opacity: 0.08 }} />
-        <div className="absolute bottom-1/3 right-1/4 w-48 h-48 rounded-full animate-blob stagger-3" style={{ background: '#34D399', filter: 'blur(60px)', opacity: 0.06 }} />
-        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="w-2 h-2 rounded-full skeleton" style={{ opacity: 0.4 }} />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div 
-      className="w-full relative overflow-hidden select-none touch-pan-y" 
+      className="w-full relative overflow-hidden select-none touch-pan-y bg-neutral-950" 
       style={{ height: 'clamp(300px, 70vh, 90vh)' }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -234,11 +169,13 @@ function Hero() {
             className="absolute inset-0 cursor-pointer"
           >
             <img
-              src={getOptimizedImageUrl(isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image, isMobile ? 800 : 1600, 80)}
+              src={getOptimizedImageUrl(isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image, isMobile ? 800 : 1600, 75)}
               alt="Vakrayan Banner"
               loading="eager"
               decoding="async"
               fetchPriority="high"
+              width={isMobile ? 800 : 1600}
+              height={isMobile ? 600 : 900}
               className="w-full h-full object-cover select-none pointer-events-none"
               draggable={false}
             />

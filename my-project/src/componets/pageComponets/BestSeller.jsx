@@ -186,10 +186,24 @@ function BestSellers() {
 
                   {/* Image flip */}
                   <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`} onMouseEnter={() => preloadImage(getOptimizedImageUrl(backView, 600, 75))}>
-                    <img src={getOptimizedImageUrl(frontView, 600, 75)} alt={product.name} loading="lazy" decoding="async"
-                      className="w-full h-full object-cover absolute inset-0 transition-image-flip group-hover:opacity-0" />
-                    <img src={getOptimizedImageUrl(backView, 600, 75)} alt={`${product.name} back`} loading="lazy" decoding="async"
-                      className="w-full h-full object-cover absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100" />
+                    <img 
+                      src={getOptimizedImageUrl(frontView, 600, 75)} 
+                      alt={product.name} 
+                      loading="lazy" 
+                      decoding="async"
+                      width={600}
+                      height={800}
+                      className="w-full h-full object-cover absolute inset-0 transition-image-flip group-hover:opacity-0" 
+                    />
+                    <img 
+                      src={getOptimizedImageUrl(backView, 600, 75)} 
+                      alt={`${product.name} back`} 
+                      loading="lazy" 
+                      decoding="async"
+                      width={600}
+                      height={800}
+                      className="w-full h-full object-cover absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100" 
+                    />
                   </div>
                 </div>
 

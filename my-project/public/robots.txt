@@ -4,12 +4,25 @@
 User-agent: *
 Allow: /
 
-# Block private/internal routes from indexing
+# Private and non-indexable paths
 Disallow: /admin
 Disallow: /checkout
 Disallow: /profile
 Disallow: /order/
 Disallow: /cart
+
+# AI Search & Browsing Agents
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
 
 # Sitemap
 Sitemap: https://vakrayan.in/sitemap.xml

@@ -127,6 +127,10 @@ function CategoryGrid() {
                   <img
                     src={img}
                     alt={c.label}
+                    loading="lazy"
+                    decoding="async"
+                    width={300}
+                    height={400}
                     className="w-full h-full object-cover object-center transition-transform duration-700 ease-[0.16,1,0.3,1] group-hover:scale-106"
                   />
 
