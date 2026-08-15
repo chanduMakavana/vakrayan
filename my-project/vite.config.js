@@ -32,9 +32,6 @@ export default defineConfig({
           if (id.includes('node_modules/firebase')) {
             return 'vendor-firebase';
           }
-          if (id.includes('node_modules/html2canvas') || id.includes('node_modules/jspdf')) {
-            return 'vendor-pdf';
-          }
           if (id.includes('node_modules/framer-motion')) {
             return 'vendor-motion';
           }

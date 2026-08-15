@@ -53,8 +53,8 @@ const lazyWithRetry = (importFn) =>
 
 const shopImporter = () => import('./componets/page/Shop')
 const productDetailImporter = () => import('./componets/page/ProductDetail')
+import Home from './componets/page/Home'
 
-const Home          = lazyWithRetry(() => import('./componets/page/Home'))
 const SignUp        = lazyWithRetry(() => import('./componets/page/SignUp'))
 const Login         = lazyWithRetry(() => import('./componets/page/Login'))
 const ResetPassword = lazyWithRetry(() => import('./componets/page/ResetPassword'))
@@ -447,7 +447,7 @@ function AppContent() {
     return () => clearTimeout(timer)
   }, [dispatch])
 
-  // Premium loading splash screen — shown only while auth resolves
+  // Premium brand splash screen — rendered while initial session and assets resolve
   if (loading) {
     return <Loader type="splash" />
   }

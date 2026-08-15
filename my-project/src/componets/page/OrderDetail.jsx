@@ -11,8 +11,6 @@ import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 
 function OrderDetail() {
   const { id } = useParams();
@@ -509,6 +507,13 @@ function OrderDetail() {
     try {
       // Wait for all custom web fonts to be fully loaded first
       await document.fonts.ready;
+
+      const [html2canvasModule, jsPdfModule] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ]);
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const { jsPDF } = jsPdfModule;
 
       const canvas = await html2canvas(element, {
         scale: 2.5, // Balanced scale for high sharpness and fast performance
