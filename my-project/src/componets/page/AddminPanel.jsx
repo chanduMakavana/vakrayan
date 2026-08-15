@@ -491,7 +491,11 @@ function AdminPanel() {
     try {
       setSlidesLoading(true);
       const response = await slidesService.getSlides();
-      setSlides(response || []);
+      const slideList = response || [];
+      setSlides(slideList);
+      try {
+        localStorage.setItem('vakrayan_hero_slides', JSON.stringify(slideList));
+      } catch (e) {}
     } catch (err) {
       console.error("Failed to load slides:", err);
     } finally {
