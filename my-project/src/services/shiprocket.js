@@ -135,7 +135,7 @@ export function formatOrderForShiprocket(order, options = {}) {
     billing_pincode: pincode.replace(/\D/g, '').substring(0, 6) || '395006',
     billing_state: state,
     billing_country: 'India',
-    billing_email: metadata.customer_email || 'orders@vakrayan.in',
+    billing_email: metadata.customer_email || 'orders@vakrayan.com',
     billing_phone: metadata.customer_phone.replace(/\D/g, '').slice(-10) || '9876543210',
     shipping_is_billing: true,
     order_items: orderItems.length > 0 ? orderItems : [{

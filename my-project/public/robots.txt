@@ -1,5 +1,5 @@
 # Vakrayan — Robots.txt
-# https://vakrayan.in
+# https://vakrayan.com
 
 User-agent: *
 Allow: /
@@ -25,4 +25,4 @@ User-agent: PerplexityBot
 Allow: /
 
 # Sitemap
-Sitemap: https://vakrayan.in/sitemap.xml
+Sitemap: https://vakrayan.com/sitemap.xml

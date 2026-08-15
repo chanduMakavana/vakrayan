@@ -170,7 +170,7 @@ export const sendWebhookNotification = async (event, payload) => {
 
     // Build inline keyboard for Telegram
     let replyMarkup = null;
-    let baseUrl = 'https://vakrayan.in';
+    let baseUrl = 'https://vakrayan.com';
     if (typeof window !== 'undefined' && window.location) {
       const origin = window.location.origin;
       if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {

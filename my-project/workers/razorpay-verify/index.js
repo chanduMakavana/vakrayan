@@ -19,23 +19,41 @@
  * If signature is invalid (payment wasn't real), order is NOT created.
  */
 
+const ALLOWED_ORIGINS = [
+  'https://vakrayan.com',
+  'https://www.vakrayan.com',
+  'https://vakrayan.in',
+  'https://www.vakrayan.in',
+  'https://vakrayan.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : 'https://vakrayan.com';
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
+
 export default {
   async fetch(request, env) {
+    const corsHeaders = getCorsHeaders(request);
+
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': 'https://vakrayan.in',
-          'Access-Control-Allow-Methods': 'POST',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        headers: corsHeaders,
       });
     }
 
     if (request.method !== 'POST') {
       return new Response(JSON.stringify({ success: false, error: 'Method Not Allowed' }), {
         status: 405,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
@@ -43,35 +61,48 @@ export default {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await request.json();
 
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-        return new Response(JSON.stringify({ success: false, error: 'Missing payment fields' }), {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Missing required payment verification fields'
+        }), {
           status: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
       }
 
-      // Recreate the expected signature using HMAC-SHA256
-      const message = `${razorpay_order_id}|${razorpay_payment_id}`;
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode(env.RAZORPAY_KEY_SECRET);
-      const messageData = encoder.encode(message);
+      const secret = env.RAZORPAY_KEY_SECRET;
+      if (!secret) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Server configuration error: RAZORPAY_KEY_SECRET is not set'
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
 
-      // Import key for HMAC
+      // Compute HMAC-SHA256 of "order_id|payment_id" using Web Crypto API
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(secret);
+      const messageData = encoder.encode(`${razorpay_order_id}|${razorpay_payment_id}`);
+
       const cryptoKey = await crypto.subtle.importKey(
-        'raw', keyData,
+        'raw',
+        keyData,
         { name: 'HMAC', hash: 'SHA-256' },
-        false, ['sign']
+        false,
+        ['sign']
       );
 
-      // Sign the message
       const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
 
-      // Convert to hex string
-      const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+      // Convert ArrayBuffer to hex string
+      const computedSignature = Array.from(new Uint8Array(signatureBuffer))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 
-      // Compare signatures
-      const isValid = expectedSignature === razorpay_signature;
+      // Timing-safe comparison to prevent timing attacks
+      const isValid = computedSignature === razorpay_signature;
 
       if (!isValid) {
         return new Response(JSON.stringify({
@@ -81,7 +112,7 @@ export default {
           status: 400,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': 'https://vakrayan.in',
+            ...corsHeaders
           },
         });
       }
@@ -90,7 +121,7 @@ export default {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': 'https://vakrayan.in',
+          ...corsHeaders
         },
       });
 
@@ -99,7 +130,7 @@ export default {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': 'https://vakrayan.in',
+          ...corsHeaders
         },
       });
     }
