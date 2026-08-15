@@ -613,7 +613,12 @@ function Navbar() {
               <img
                 src="/vakrayan-merged-logo.png"
                 alt="Vakrayan"
-                className="h-11 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105"
+                className="h-11 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105 block [html[data-theme=dark]_&]:hidden"
+              />
+              <img
+                src="/vakrayan-merged-logo-white.png"
+                alt="Vakrayan"
+                className="h-11 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105 hidden [html[data-theme=dark]_&]:block"
               />
             </Link>
 
@@ -1608,16 +1613,18 @@ function Navbar() {
               </button>
 
               {/* Brand Emblem Header */}
-              <div className="flex flex-col items-center gap-3 pt-1">
+              <div className="flex flex-col items-center gap-2 pt-1">
                 <img
-                  src="/vakrayan-logo.png"
-                  alt="Vakrayan Golden Cobra Logo"
-                  className="w-16 h-16 object-contain drop-shadow-md"
+                  src="/vakrayan-merged-logo.png"
+                  alt="Vakrayan Logo"
+                  className="h-12 sm:h-14 w-auto object-contain drop-shadow-md block [html[data-theme=dark]_&]:hidden"
                 />
-                <h2 className="text-2xl font-black uppercase tracking-[0.25em] text-[var(--color-text)]" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>
-                  VAKRAYAN
-                </h2>
-                <span className="text-[9.5px] font-mono font-bold tracking-[0.25em] uppercase text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-3.5 py-1 rounded-full border border-[var(--color-accent)]/20">
+                <img
+                  src="/vakrayan-merged-logo-white.png"
+                  alt="Vakrayan Logo"
+                  className="h-12 sm:h-14 w-auto object-contain drop-shadow-md hidden [html[data-theme=dark]_&]:block"
+                />
+                <span className="text-[9.5px] font-mono font-bold tracking-[0.25em] uppercase text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-3.5 py-1 rounded-full border border-[var(--color-accent)]/20 mt-1">
                   HERITAGE & CRAFTSMANSHIP // EST. 2026
                 </span>
               </div>

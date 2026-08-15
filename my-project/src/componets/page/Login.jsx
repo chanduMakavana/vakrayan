@@ -33,12 +33,7 @@ const LockIcon = () => (
   </svg>
 )
 
-const features = [
-  { icon: '🛡️', text: 'Secure Firebase Authentication' },
-  { icon: '🚚', text: 'Fast Nationwide Delivery' },
-  { icon: '🔁', text: '7-Day Easy Returns' },
-  { icon: '✨', text: 'Premium Quality Apparel' },
-]
+
 
 function Login() {
   const { register, handleSubmit, formState: { errors }, reset } = useForm()
@@ -148,7 +143,7 @@ function Login() {
 
         {/* Vakrayan model hero image */}
         <img
-          src="/vakrayan-hero.png"
+          src="/vakrayan-signup-hero.jpg"
           alt="Vakrayan Premium Apparel"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
@@ -193,21 +188,9 @@ function Login() {
             {/* gold separator */}
             <div style={{ width: 40, height: 3, background: 'linear-gradient(90deg, #34D399, #059669)', borderRadius: 99, marginBottom: 20 }} />
 
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 1.70, maxWidth: 300, marginBottom: 40 }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 1.70, maxWidth: 300 }}>
               Sign in to access exclusive drops, track your orders, and manage your wardrobe all in one place.
             </p>
-
-            {/* features */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {features.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
-                    {f.icon}
-                  </div>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 500 }}>{f.text}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* trust badge */}

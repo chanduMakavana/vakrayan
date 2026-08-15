@@ -275,7 +275,7 @@ function Hero() {
             }}
           >
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399' }} />
-            <span className="font-brand" style={{ color: '#fff', fontFamily: "'VakrayanFont', 'Barlow Condensed', 'Impact', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span className="font-brand" style={{ color: '#fff', fontFamily: "'VakrayanFont', 'Barlow Condensed', 'Impact', sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
               Vakrayan
             </span>
             <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: "'Jost', sans-serif", fontWeight: 500, letterSpacing: '0.1em' }}>

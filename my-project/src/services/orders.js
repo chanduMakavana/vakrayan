@@ -76,64 +76,71 @@ export class OrdersService {
     // ➡️ 2. Retrieve all active orders (For Admin Dashboard)
     async getOrders() {
         try {
-            if (!conf.firebaseOrdersCollectionId) return [];
+            const collectionName = conf.firebaseOrdersCollectionId || 'orders';
             const response = await this.databases.listDocuments(
                 conf.firebaseDatabaseId,
-                conf.firebaseOrdersCollectionId,
+                collectionName,
                 [
                     Query.orderDesc("$createdAt"),
-                    Query.limit(500) // Safety cap for admin dashboard
+                    Query.limit(500)
                 ]
             );
-            return response.documents;
+            const documents = response?.documents || response || [];
+            
+            // Sort by most recent timestamp descending
+            documents.sort((a, b) => {
+                const dateA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.date || 0).getTime();
+                const dateB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || b.date || 0).getTime();
+                return dateB - dateA;
+            });
+
+            return documents;
         }
         catch (error) {
             console.error("Firebase service :: getOrders :: error", error.message);
-            throw error;
+            // Return empty array instead of crashing caller
+            return [];
         }
     }
 
     // ➡️ 3. Retrieve orders for a specific user (For User Order History)
     async getUserOrders(userId) {
         try {
-            if (!userId || !conf.firebaseOrdersCollectionId) return [];
+            if (!userId) return [];
+            const collectionName = conf.firebaseOrdersCollectionId || 'orders';
 
-            // ✅ SECURITY + PERFORMANCE FIX: Use server-side Query.equal to filter by userId.
-            // Firebase adapter translates this to Firestore: where("userId", "==", userId)
-            // This prevents fetching ALL orders and filtering client-side.
-            //
-            // ⚠️ FIREBASE SETUP REQUIRED: Create a composite index in Firebase Console:
-            //   Firestore → Indexes → Composite → Add:
-            //   Collection: "orders" | Fields: userId (Ascending) + $createdAt (Descending)
-            //   Without this index, Firestore will throw an error (fallback handles it).
             try {
                 const response = await this.databases.listDocuments(
                     conf.firebaseDatabaseId,
-                    conf.firebaseOrdersCollectionId,
+                    collectionName,
                     [
                         Query.equal("userId", userId),
                         Query.orderDesc("$createdAt"),
                         Query.limit(100)
                     ]
                 );
-                return response.documents || [];
+                let documents = response?.documents || response || [];
+                documents.sort((a, b) => {
+                    const dateA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || 0).getTime();
+                    const dateB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || 0).getTime();
+                    return dateB - dateA;
+                });
+                return documents;
             } catch (indexErr) {
-                // Fallback: Firestore composite index not yet created
-                // Go to Firebase Console → Firestore → Indexes → create composite index
-                // Collection: orders | userId ASC + $createdAt DESC
-                console.warn("⚠️ Firestore composite index missing for orders. Create it in Firebase Console. Falling back to client-side filter.", indexErr.message);
-                const fallback = await this.databases.listDocuments(
-                    conf.firebaseDatabaseId,
-                    conf.firebaseOrdersCollectionId,
-                    [Query.orderDesc("$createdAt"), Query.limit(500)]
-                );
-                return (fallback.documents || []).filter(order => order.userId === userId);
+                console.warn("⚠️ Firestore index missing or query failed for getUserOrders. Falling back to getOrders client-side filter:", indexErr.message);
+                const allOrders = await this.getOrders();
+                return (allOrders || []).filter(order => order.userId === userId);
             }
         }
         catch (error) {
             console.error("Firebase orders :: getUserOrders :: error", error.message);
-            throw error;
+            return [];
         }
+    }
+
+    // Alias for backwards compatibility
+    async getOrdersByUser(userId) {
+        return this.getUserOrders(userId);
     }
 
 

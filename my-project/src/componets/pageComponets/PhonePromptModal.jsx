@@ -66,7 +66,12 @@ function PhonePromptModal({ isOpen, onSubmitPhone }) {
               <img 
                 src="/vakrayan-merged-logo.png" 
                 alt="Vakrayan Logo" 
-                className="h-16 sm:h-20 w-auto object-contain mb-4" 
+                className="h-14 sm:h-16 w-auto object-contain mb-4 block [html[data-theme=dark]_&]:hidden" 
+              />
+              <img 
+                src="/vakrayan-merged-logo-white.png" 
+                alt="Vakrayan Logo" 
+                className="h-14 sm:h-16 w-auto object-contain mb-4 hidden [html[data-theme=dark]_&]:block" 
               />
 
               {/* Minimal Tag */}

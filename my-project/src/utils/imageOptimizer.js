@@ -7,7 +7,22 @@
 const preloadedUrls = new Set();
 
 /**
- * Transforms raw image URLs (Unsplash, Cloudinary, Appwrite, etc.) into compressed, high-performance WebP URLs
+ * Automatically rewrites legacy Cloudflare worker URLs to the active subdomain
+ * @param {string} url
+ * @returns {string}
+ */
+export function fixLegacyWorkerUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  if (url.includes('chandumakavana61.workers.dev')) {
+    return url.replace(/b2-upload-gateway\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+              .replace(/vakrayan-data\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+              .replace(/chandumakavana61\.workers\.dev/g, 'vakrayan.workers.dev');
+  }
+  return url;
+}
+
+/**
+ * Transforms raw image URLs (Unsplash, Cloudinary, Backblaze, etc.) into compressed, high-performance WebP URLs
  * @param {string} url - Raw image URL
  * @param {number} width - Target display width in pixels
  * @param {number} quality - Compression quality (default 75)
@@ -15,6 +30,9 @@ const preloadedUrls = new Set();
  */
 export function getOptimizedImageUrl(url, width = 600, quality = 75) {
   if (!url || typeof url !== 'string') return 'https://placehold.co/600x800?text=No+Image';
+
+  // Fix old worker domain to new active domain seamlessly
+  url = fixLegacyWorkerUrl(url);
 
   // Optimization for Unsplash CDN
   if (url.includes('images.unsplash.com')) {

@@ -14,7 +14,7 @@ import slidesService from '../../services/slides';
 import offersService from '../../services/offers';
 import walletService from '../../services/wallet';
 import categoryService from '../../services/category';
-import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders } from 'react-icons/fi';
+import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders, FiRefreshCw } from 'react-icons/fi';
 import AdminAnalytics from '../pageComponets/AdminAnalytics';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import { getStoredShiprocketConfig, saveShiprocketConfig, authenticateShiprocket, createShiprocketShipment, fetchShiprocketOfficialLabel } from '../../services/shiprocket';
@@ -44,6 +44,7 @@ function AdminPanel() {
 
   // Orders State (Fulfillment)
   const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderFilter, setOrderFilter] = useState('ALL');
 
   // Admin Order Cancellation Modal States
@@ -211,14 +212,18 @@ function AdminPanel() {
   };
 
   const handleCategoryImageUpload = async (e, catValue) => {
-    const file = e.target.files?.[0];
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const file = e?.target?.files?.[0];
     if (!file) return;
 
     setCategoryUploading(prev => ({ ...prev, [catValue]: true }));
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
         setNewCategoryImageUrls(prev => ({ ...prev, [catValue]: fileUrl }));
         // Auto save it
         await categoryService.saveCategoryImage(catValue, fileUrl);
@@ -230,9 +235,10 @@ function AdminPanel() {
       }
     } catch (err) {
       console.error("Category image upload failed:", err);
-      showToast("Firebase Storage upload failed.", "error");
+      showToast("Storage upload failed.", "error");
     } finally {
       setCategoryUploading(prev => ({ ...prev, [catValue]: false }));
+      if (e?.target) e.target.value = '';
     }
   };
 
@@ -494,14 +500,18 @@ function AdminPanel() {
   };
 
   const handleSlideImageUpload = async (e, isMobile = false) => {
-    const file = e.target.files?.[0];
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const file = e?.target?.files?.[0];
     if (!file) return;
 
     setSlideUploading(true);
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
         if (isMobile) {
           setSlideMobileImage(fileUrl);
         } else {
@@ -513,9 +523,10 @@ function AdminPanel() {
       }
     } catch (err) {
       console.error("Slide image upload failed:", err);
-      showToast("Firebase Storage upload failed.", "error");
+      showToast("Storage upload failed.", "error");
     } finally {
       setSlideUploading(false);
+      if (e?.target) e.target.value = '';
     }
   };
 
@@ -575,6 +586,7 @@ function AdminPanel() {
 
   const handleDrop = async (e, fieldName) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverFields(prev => ({ ...prev, [fieldName]: false }));
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
@@ -582,8 +594,8 @@ function AdminPanel() {
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
         setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
         showToast("✓ Image uploaded successfully to Cloud Storage!", "success");
       } else {
@@ -612,9 +624,12 @@ function AdminPanel() {
           onDragOver={(e) => handleDragOver(e, fieldName)}
           onDragLeave={(e) => handleDragLeave(e, fieldName)}
           onDrop={(e) => handleDrop(e, fieldName)}
-          onClick={() => {
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
             if (!imgUrl && !isUploading) {
-              document.getElementById(`file-input-${fieldName}`).click();
+              const fileInput = document.getElementById(`file-input-${fieldName}`);
+              if (fileInput) fileInput.click();
             }
           }}
           className={`relative border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all min-h-[140px] text-center select-none ${
@@ -637,6 +652,7 @@ function AdminPanel() {
                 <button
                   type="button"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setValue(fieldName, '', { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                   }}
@@ -653,8 +669,10 @@ function AdminPanel() {
                 <button
                   type="button"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
-                    document.getElementById(`file-input-${fieldName}`).click();
+                    const fileInput = document.getElementById(`file-input-${fieldName}`);
+                    if (fileInput) fileInput.click();
                   }}
                   className="text-[9px] font-mono text-[var(--color-accent)] hover:underline block mx-auto uppercase tracking-wider font-bold"
                 >
@@ -693,6 +711,12 @@ function AdminPanel() {
             type="text"
             disabled={actionLoading || isUploading}
             placeholder="PASTE IMAGE URL ADDRESS"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
             className="flex-1 bg-transparent text-[11px] font-mono text-[var(--color-text)] outline-none"
             {...register(fieldName, requiredRule)}
           />
@@ -707,14 +731,18 @@ function AdminPanel() {
   };
 
   const handleProductImageUpload = async (e, fieldName) => {
-    const file = e.target.files?.[0];
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const file = e?.target?.files?.[0];
     if (!file) return;
 
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
         setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
         showToast("✓ Image uploaded successfully!", "success");
       } else {
@@ -725,6 +753,7 @@ function AdminPanel() {
       showToast("Cloud Storage upload failed.", "error");
     } finally {
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
+      if (e?.target) e.target.value = '';
     }
   };
 
@@ -758,12 +787,22 @@ function AdminPanel() {
   };
 
   // Load customer orders from Firebase
-  const loadCustomerOrders = async () => {
+  const loadCustomerOrders = async (showToastNotice = false) => {
+    setOrdersLoading(true);
     try {
       const response = await ordersService.getOrders();
-      setOrders(response || []);
+      const loaded = response || [];
+      setOrders(loaded);
+      if (showToastNotice) {
+        showToast(`Refreshed ${loaded.length} orders from cloud database.`, "success");
+      }
     } catch (err) {
       console.error("Orders retrieval failed:", err.message);
+      if (showToastNotice) {
+        showToast("Orders retrieval failed: " + err.message, "error");
+      }
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
@@ -1082,11 +1121,12 @@ function AdminPanel() {
           }, 0);
           
           // Clean up location state and URL query parameter to prevent loop/stale edit state
-          window.history.replaceState({}, document.title);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          if (location.state) location.state.editProductId = null;
         }
       }
     }
-  }, [location, products, isAdmin, handleEdit]);
+  }, [location.search, isAdmin]);
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
@@ -3078,9 +3118,26 @@ function AdminPanel() {
               ========================================== */}
           {activeTab === 'orders' && (
             <div className="space-y-6">
-              <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
-                <h2 className="text-xs font-black tracking-[0.4em] text-[var(--color-accent)] uppercase">Incoming Customer Orders</h2>
-                <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{orders.length} TOTAL ORDERS</span>
+              <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between flex-wrap gap-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-xs font-black tracking-[0.4em] text-[var(--color-accent)] uppercase">Incoming Customer Orders</h2>
+                  <p className="text-[10px] font-mono text-[var(--color-muted)] uppercase">Real-time fulfillment pipeline & customer purchases</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => loadCustomerOrders(true)}
+                    disabled={ordersLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] rounded-lg border border-[var(--color-border)] cursor-pointer transition-all disabled:opacity-50"
+                    title="Reload live orders from database"
+                  >
+                    <FiRefreshCw className={`text-xs ${ordersLoading ? 'animate-spin' : ''}`} />
+                    <span>{ordersLoading ? 'Refreshing...' : 'Refresh Orders'}</span>
+                  </button>
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black bg-[var(--color-surface)] px-2.5 py-1 rounded-lg border border-[var(--color-border)]">
+                    {orders.length} TOTAL ORDERS
+                  </span>
+                </div>
               </div>
 
               {/* Telemetry Cards Row */}

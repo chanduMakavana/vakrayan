@@ -19,7 +19,7 @@ function Loader({ type = 'inline', text }) {
             />
             <div className="flex flex-col items-center gap-1">
               <h1
-                className="text-2xl md:text-3xl font-brand font-black tracking-[0.35em] text-[var(--color-text)] uppercase"
+                className="text-lg md:text-xl font-brand font-black tracking-[0.45em] text-[var(--color-text)] uppercase"
                 style={{ fontFamily: "'VakrayanFont', sans-serif" }}
               >
                 VAKRAYAN

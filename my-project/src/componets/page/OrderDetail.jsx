@@ -1716,7 +1716,7 @@ function OrderDetail() {
                 {/* Header */}
                 <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
                   <div>
-                    <div className="text-xl md:text-2xl font-black tracking-wider uppercase leading-none font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
+                    <div className="text-base md:text-lg font-black tracking-[0.20em] uppercase leading-none font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
                     <div className="text-[9px] text-neutral-500 font-bold mt-1 uppercase">Premium Drop & Boutique</div>
                   </div>
                   <div className="text-right">
@@ -1729,7 +1729,7 @@ function OrderDetail() {
                 <div className="grid grid-cols-3 gap-4 mb-8">
                   <div>
                     <div className="text-[8px] font-black tracking-widest text-neutral-500 uppercase border-b border-neutral-100 pb-1 mb-1.5">Sold By</div>
-                    <div className="font-extrabold text-black uppercase font-brand" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
+                    <div className="text-xs font-extrabold text-black uppercase font-brand tracking-[0.18em]" style={{ fontFamily: "'VakrayanFont', sans-serif" }}>VAKRAYAN</div>
                     <div className="text-neutral-700">Surat, Gujarat, India</div>
                     <div className="text-neutral-700">Pincode: 395006</div>
                     <div className="text-neutral-700">GSTIN: 24VAKRAYAN1234F1Z0</div>

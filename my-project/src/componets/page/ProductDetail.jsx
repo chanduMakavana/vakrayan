@@ -1313,7 +1313,7 @@ function ProductDetail() {
     return (
       <div
         onClick={onClick}
-        className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-zoom-in group transition-all duration-300 hover:border-neutral-900 ${className}`}
+        className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group transition-all duration-300 hover:border-neutral-900 ${className}`}
       >
         {/* Subtle Surface Loading Pulse */}
         {!isLoaded && (
@@ -1328,8 +1328,8 @@ function ProductDetail() {
           loading={loading}
           onLoad={() => setIsLoaded(true)}
           onError={() => setIsLoaded(true)}
-          className={`w-full h-full object-cover object-center group-hover:scale-[1.025] transition-all duration-300 ease-out ${
-            isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-98'
+          className={`w-full h-full object-cover object-center transition-opacity duration-300 ease-out ${
+            isLoaded ? 'opacity-100' : 'opacity-0'
           }`}
         />
       </div>
@@ -1666,8 +1666,6 @@ function ProductDetail() {
             )}
 
             <div
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
               ref={mainContainerRef}
               onMouseDown={(e) => {
                 if (e.button !== 0) return; // Only left click
@@ -1778,7 +1776,7 @@ function ProductDetail() {
                 setLightboxZoom(1);
                 setLightboxOffset({ x: 0, y: 0 });
               }}
-              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
             >
 
               {/* Navigation Chevron Buttons overlay */}
@@ -1828,12 +1826,12 @@ function ProductDetail() {
                   decoding="sync"
                   onLoad={() => setImageLoaded(true)}
                   style={{
-                    transformOrigin: mainPhotoZoom > 1 ? 'center center' : zoomStyle.transformOrigin,
+                    transformOrigin: 'center center',
                     transform: mainPhotoZoom > 1 
                       ? `translate(${mainPhotoOffset.x}px, ${mainPhotoOffset.y}px) scale(${mainPhotoZoom})`
-                      : `scale(${zoomStyle.scale})`
+                      : 'none'
                   }}
-                  className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-40 scale-[0.98]'}`}
+                  className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-40'}`}
                 />
               </div>
 
@@ -1865,25 +1863,25 @@ function ProductDetail() {
             </div>
           </div>
 
-          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+          <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-24">
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1.5 rounded-none whitespace-nowrap">
+                <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1 rounded-none whitespace-nowrap">
                   {product.category?.replace('-', ' ')}
                 </span>
                 {product.tag && (
-                  <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1.5 rounded-none border border-neutral-950 whitespace-nowrap">
+                  <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1 rounded-none border border-neutral-950 whitespace-nowrap">
                     {product.tag}
                   </span>
                 )}
                 {isAllOutOfStock ? (
-                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-3 py-1.5 rounded-none border border-rose-100 whitespace-nowrap">
+                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-3 py-1 rounded-none border border-rose-100 whitespace-nowrap">
                     <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-rose-500 animate-pulse" />
                     SOLD OUT
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-none whitespace-nowrap">
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-3 py-1 rounded-none whitespace-nowrap">
                     <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-emerald-500 animate-ping" />
                     IN STOCK
                   </span>
@@ -1891,7 +1889,7 @@ function ProductDetail() {
                 {adminMode && (
                   <button
                     onClick={() => navigate('/admin', { state: { editProductId: product.$id || product.id } })}
-                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1.5 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
+                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
                   >
                     Edit Drop
                   </button>
@@ -1899,13 +1897,13 @@ function ProductDetail() {
                 )}
               </div>
 
-              <div className="space-y-1">
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-neutral-950 uppercase">
+              <div className="space-y-0.5">
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-950 uppercase">
                   {product.name}
                 </h1>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-0.5">
                 <div className="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map((star) => {
                     const sum = reviews.reduce((acc, r) => {
@@ -1945,7 +1943,7 @@ function ProductDetail() {
                   : product.discount_percent;
 
                 return (
-                  <div className="flex items-baseline gap-3 pt-1 flex-wrap">
+                  <div className="flex items-baseline gap-3 pt-0.5 flex-wrap">
                     <span className="text-2xl font-mono font-bold text-neutral-950">
                       ₹{priceNum.toLocaleString('en-IN')}
                     </span>
@@ -1967,7 +1965,7 @@ function ProductDetail() {
               })()}
             </div>
 
-            <div className="flex items-center gap-3 pt-2 pb-4">
+            <div className="flex items-center gap-3 pt-1 pb-1">
               <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">Share Drop:</span>
               <button
                 onClick={() => {
@@ -1989,17 +1987,15 @@ function ProductDetail() {
               </a>
             </div>
 
-            <div className="border-t border-[var(--color-border)]/50" />
-
             {(() => {
 
               if (product.color_group_id && groupProducts.length > 1) {
                 return (
-                  <div className="space-y-3 pb-4">
+                  <div className="space-y-2 pb-1">
                     <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name || 'ORIGINAL'}</span>
                     </h4>
-                    <div className="flex gap-3 flex-wrap">
+                    <div className="flex gap-2.5 flex-wrap">
                       {groupProducts.map((sibling) => {
                         const siblingId = sibling.$id || sibling.id;
                         const isCurrent = siblingId === (product.$id || product.id);
@@ -2013,7 +2009,7 @@ function ProductDetail() {
                                 navigate(`/product/${sibling.slug || siblingId}`, { replace: true });
                               }
                             }}
-                            className={`w-16 h-20 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
+                            className={`w-14 h-18 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
                               isCurrent
                                 ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 scale-105 shadow-md'
                                 : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102'
@@ -2037,12 +2033,12 @@ function ProductDetail() {
               if (product.color_name) {
                 const img = product.front_image_link || product.image_url || product.image || 'https://placehold.co/100x125';
                 return (
-                  <div className="space-y-3 pb-4">
+                  <div className="space-y-2 pb-1">
                     <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name}</span>
                     </h4>
-                    <div className="flex gap-3">
-                      <div className="w-16 h-20 rounded-lg border-2 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 overflow-hidden shadow-md">
+                    <div className="flex gap-2.5">
+                      <div className="w-14 h-18 rounded-lg border-2 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 overflow-hidden shadow-md">
                         <img
                           src={img}
                           alt={product.color_name}
@@ -2067,7 +2063,7 @@ function ProductDetail() {
               }
 
               return (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-bold text-[var(--color-text)]">Select Size</h4>
                     <div className="flex gap-4">
@@ -2087,7 +2083,7 @@ function ProductDetail() {
                           key={size}
                           type="button"
                           onClick={() => setSelectedSize(size)}
-                          className={`py-2.5 rounded-none font-bold text-xs tracking-wider transition-all duration-200 cursor-pointer border ${
+                          className={`py-2 rounded-none font-bold text-xs tracking-wider transition-all duration-200 cursor-pointer border ${
                             isSoldOut && selectedSize === size
                             ? 'bg-neutral-200 text-[var(--color-muted)] border-neutral-400 line-through font-extrabold'
                             : isSoldOut 
@@ -2111,7 +2107,7 @@ function ProductDetail() {
                     if (stockVal < 5) {
                       const fillPercent = (stockVal / 5) * 100;
                       return (
-                        <div className="space-y-2 mt-2.5 animate-fade-in">
+                        <div className="space-y-1.5 mt-1.5 animate-fade-in">
                           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 animate-pulse">
                             <span className="flex items-center gap-1.5">
                               <svg className="w-3 h-3 fill-rose-500" viewBox="0 0 24 24"><path d="M12 2l11 19H1L12 2zM12 6l-7 12h14L12 6zm0 2l5.5 9.5H6.5L12 8z"/></svg>
@@ -2129,7 +2125,7 @@ function ProductDetail() {
                       );
                     }
                     return (
-                      <div className="p-3 bg-emerald-50/50 border border-emerald-100/60 rounded-none flex items-center gap-2 mt-2 animate-fade-in">
+                      <div className="p-2.5 bg-emerald-50/50 border border-emerald-100/60 rounded-none flex items-center gap-2 mt-1.5 animate-fade-in">
                         <svg className="w-3 h-3 fill-emerald-500 animate-pulse" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                         <p className="text-[10px] text-emerald-700 font-mono font-bold uppercase tracking-wider">
                           Size {selectedSize} is In Stock - Ready for immediate drop
@@ -2142,7 +2138,7 @@ function ProductDetail() {
             })()}
 
              {/* Quantity Selector Section — Always Visible */}
-             <div className="space-y-2 mt-4 pt-4 border-t border-[var(--color-border)]">
+             <div className="space-y-1.5 mt-2 pt-2 border-t border-[var(--color-border)]/40">
                <div className="flex justify-between items-center">
                  <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">
                    Quantity
@@ -2163,11 +2159,11 @@ function ProductDetail() {
                      type="button"
                      disabled={quantity <= 1}
                      onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                     className="w-9 h-9 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 disabled:opacity-30 cursor-pointer select-none transition-colors text-neutral-950 border-r border-[var(--color-border)]"
+                     className="w-8 h-8 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 disabled:opacity-30 cursor-pointer select-none transition-colors text-neutral-950 border-r border-[var(--color-border)]"
                    >
                      <FiMinus size={13} strokeWidth={2.5} />
                    </button>
-                   <span className="w-12 text-center font-mono font-bold text-sm select-none text-neutral-950 border-r border-[var(--color-border)] py-1.5">
+                   <span className="w-10 text-center font-mono font-bold text-xs select-none text-neutral-950 border-r border-[var(--color-border)] py-1">
                      {quantity}
                    </span>
                    <button
@@ -2181,7 +2177,7 @@ function ProductDetail() {
                        }
                        setQuantity(prev => prev + 1);
                      }}
-                     className="w-9 h-9 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 cursor-pointer select-none transition-colors text-neutral-950"
+                     className="w-8 h-8 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 cursor-pointer select-none transition-colors text-neutral-950"
                    >
                      <FiPlus size={13} strokeWidth={2.5} />
                    </button>
@@ -2191,7 +2187,7 @@ function ProductDetail() {
 
 
             {/* Return Policy Banner (Mobile Only - Compact flow) */}
-            <div className="md:hidden flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none mt-2">
+            <div className="md:hidden flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-2.5 rounded-none mt-1.5">
               <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
                 returnPolicy === "No Return" ? "bg-rose-500" :
                 returnPolicy === "Exchange Only" ? "bg-amber-500" :
@@ -2206,7 +2202,7 @@ function ProductDetail() {
             </div>
 
             {/* Desktop Action Buttons (Hidden on mobile where sticky bottom bar handles actions) */}
-            <div className="hidden md:block space-y-4 pt-2 border-t border-neutral-150">
+            <div className="hidden md:block space-y-2.5 pt-2 border-t border-neutral-150">
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex gap-3 w-full sm:w-auto sm:flex-1">
@@ -2924,7 +2920,7 @@ function ProductDetail() {
                                   key={idx}
                                   type="button"
                                   onClick={() => setActiveReviewImage(img)}
-                                  className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-zoom-in shadow-xs bg-[var(--color-surface)]/20"
+                                  className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-xs bg-[var(--color-surface)]/20"
                                 >
                                   <img
                                     src={img}

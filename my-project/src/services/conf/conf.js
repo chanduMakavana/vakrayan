@@ -18,5 +18,5 @@ export const conf = {
     firebaseWalletCollectionId: String(import.meta.env.VITE_FIREBASE_WALLET_COLLECTION_ID || "wallet").trim(),
     firebaseCategoryConfigsCollectionId: String(import.meta.env.VITE_FIREBASE_CATEGORY_CONFIGS_COLLECTION_ID || "category_configs").trim(),
     firebaseBucketId: String(import.meta.env.VITE_FIREBASE_BUCKET_ID || "images").trim(),
-    firebaseCloudflareWorkerUrl: String(import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://b2-upload-gateway.chandumakavana61.workers.dev/").trim(),
+    firebaseCloudflareWorkerUrl: String(import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://b2-upload-gateway.vakrayan.workers.dev/").trim(),
 }

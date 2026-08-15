@@ -49,8 +49,19 @@ export class StorageService {
 
     getFileView(fileId, bucketId = conf.firebaseBucketId || 'images') {
         if (!fileId) return '';
-        // If the fileId is already a full HTTP/HTTPS URL, return it directly.
-        if (typeof fileId === 'string' && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+        if (typeof fileId === 'object' && fileId !== null) {
+            fileId = fileId.$id || fileId.url || fileId.id || fileId.href || '';
+        }
+        if (typeof fileId !== 'string') return '';
+        fileId = fileId.trim();
+
+        // If the fileId is already a full HTTP/HTTPS URL, sanitize legacy subdomains and return directly.
+        if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+            if (fileId.includes('chandumakavana61.workers.dev')) {
+                return fileId.replace(/b2-upload-gateway\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/vakrayan-data\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/chandumakavana61\.workers\.dev/g, 'vakrayan.workers.dev');
+            }
             return fileId;
         }
 

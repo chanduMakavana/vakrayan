@@ -1,6 +1,19 @@
 import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
+import { fixLegacyWorkerUrl } from "../utils/imageOptimizer.js";
+
+const sanitizeProduct = (p) => {
+    if (!p) return p;
+    if (p.front_image_link) p.front_image_link = fixLegacyWorkerUrl(p.front_image_link);
+    if (p.image_url) p.image_url = fixLegacyWorkerUrl(p.image_url);
+    if (p.image) p.image = fixLegacyWorkerUrl(p.image);
+    if (Array.isArray(p.back_image_links)) {
+        p.back_image_links = p.back_image_links.map(fixLegacyWorkerUrl);
+    }
+    if (p.size_chart_image) p.size_chart_image = fixLegacyWorkerUrl(p.size_chart_image);
+    return p;
+};
 
 export class ProductsService {
     databases;
@@ -43,7 +56,7 @@ export class ProductsService {
                         Query.limit(500) // Raised from 100 to prevent silent catalog truncation
                     ]
                 );
-                return response.documents;
+                return (response.documents || []).map(sanitizeProduct);
             }
             catch (error) {
                 console.error("Firebase service :: getProducts :: error", error.message);
@@ -89,11 +102,12 @@ export class ProductsService {
     // Retrieve details for a specific product by ID
     async getProductById(documentId) {
         try {
-            return await this.databases.getDocument(
+            const product = await this.databases.getDocument(
                 conf.firebaseDatabaseId,
                 conf.firebaseProductsCollectionId,
                 documentId
             );
+            return sanitizeProduct(product);
         } catch (error) {
             console.error("Firebase service :: getProductById :: error", error.message);
             throw error;
@@ -113,14 +127,16 @@ export class ProductsService {
                 ]
             );
             if (response.documents && response.documents.length > 0) {
-                return response.documents[0];
+                return sanitizeProduct(response.documents[0]);
             }
             // Fallback to getProductById
-            return await this.getProductById(idOrSlug);
+            const fallbackProd = await this.getProductById(idOrSlug);
+            return sanitizeProduct(fallbackProd);
         } catch (error) {
             console.warn("Slug lookup failed, falling back to ID lookup:", error.message);
             try {
-                return await this.getProductById(idOrSlug);
+                const fallbackProd = await this.getProductById(idOrSlug);
+                return sanitizeProduct(fallbackProd);
             } catch {
                 throw error;
             }

@@ -286,56 +286,65 @@ export class Databases {
         try {
             querySnapshot = await getDocs(mainQuery);
         } catch (err) {
-            // Check if error is due to missing index or sorting constraints
-            const errorMsg = err.message || '';
-            if (sortOrders.length > 0 && (errorMsg.includes('index') || errorMsg.includes('FAILED_PRECONDITION') || errorMsg.includes('orderBy'))) {
-                console.warn(`⚠️ Firestore composite index missing for collection "${collectionId}". Falling back to client-side sorting & limit.`, err.message);
-                
-                // 2. Build fallback query (where clauses ONLY — never require composite indexes)
+            console.warn(`⚠️ Firestore query error for collection "${collectionId}". Falling back to client-side sorting & limit. Reason:`, err.message);
+            
+            // 2. Build fallback query (where clauses ONLY — never require composite indexes or complex sorting)
+            try {
                 let fallbackQuery = q;
                 filterWheres.forEach(w => { fallbackQuery = query(fallbackQuery, w); });
-                
                 querySnapshot = await getDocs(fallbackQuery);
-                
-                // Map documents
-                let documents = querySnapshot.docs.map(d => ({
-                    $id: d.id,
-                    $collectionId: collectionId,
-                    ...d.data()
-                }));
+            } catch (fallbackErr) {
+                console.warn(`⚠️ Filtered query fallback failed, reading base collection "${collectionId}":`, fallbackErr.message);
+                querySnapshot = await getDocs(q);
+            }
+            
+            // Map documents
+            let documents = querySnapshot.docs.map(d => ({
+                $id: d.id,
+                $collectionId: collectionId,
+                ...d.data()
+            }));
 
-                // Apply client-side sorting
+            // Apply client-side sorting
+            if (sortOrders.length > 0) {
                 sortOrders.forEach(s => {
                     documents.sort((a, b) => {
                         let valA = a[s.key];
                         let valB = b[s.key];
-                        // Handle date parsing if sorting by date fields like $createdAt
-                        if (s.key === '$createdAt' || s.key === 'createdAt' || s.key === '$updatedAt' || s.key === 'updatedAt') {
-                            valA = new Date(valA || 0).getTime();
-                            valB = new Date(valB || 0).getTime();
+                        // Handle date parsing if sorting by date fields
+                        if (s.key === '$createdAt' || s.key === 'createdAt' || s.key === '$updatedAt' || s.key === 'updatedAt' || s.key === 'created_at') {
+                            valA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.updatedAt || a.date || 0).getTime();
+                            valB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || b.updatedAt || b.date || 0).getTime();
                         }
                         if (valA < valB) return s.dir === 'desc' ? 1 : -1;
                         if (valA > valB) return s.dir === 'desc' ? -1 : 1;
                         return 0;
                     });
                 });
-
-                // Apply client-side limit
-                if (limitVal !== null) {
-                    documents = documents.slice(0, limitVal);
-                }
-
-                return { total: documents.length, documents };
-            } else {
-                throw err; // Re-throw other unexpected errors
             }
+
+            // Apply client-side limit
+            if (limitVal !== null) {
+                documents = documents.slice(0, limitVal);
+            }
+
+            return { total: documents.length, documents };
         }
 
-        const documents = querySnapshot.docs.map(d => ({
+        let documents = querySnapshot.docs.map(d => ({
             $id: d.id,
             $collectionId: collectionId,
             ...d.data()
         }));
+
+        // In case documents were missing $createdAt and weren't ordered properly, ensure safe descending order if orderDesc was requested
+        if (sortOrders.some(s => s.key === '$createdAt' || s.key === 'createdAt')) {
+            documents.sort((a, b) => {
+                const valA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.date || 0).getTime();
+                const valB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || b.date || 0).getTime();
+                return valB - valA;
+            });
+        }
 
         return { total: documents.length, documents };
     }
@@ -408,8 +417,19 @@ export class Storage {
 
     getFileView(fileId, bucketId) {
         if (!fileId) return '';
+        if (typeof fileId === 'object' && fileId !== null) {
+            fileId = fileId.$id || fileId.url || fileId.id || fileId.href || '';
+        }
+        if (typeof fileId !== 'string') return '';
+        fileId = fileId.trim();
+
         // If fileId is already a full URL (like from Backblaze or Firebase Storage getDownloadURL), just return it
-        if (typeof fileId === 'string' && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+        if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+            if (fileId.includes('chandumakavana61.workers.dev')) {
+                return fileId.replace(/b2-upload-gateway\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/vakrayan-data\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/chandumakavana61\.workers\.dev/g, 'vakrayan.workers.dev');
+            }
             return fileId;
         }
         const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '';
