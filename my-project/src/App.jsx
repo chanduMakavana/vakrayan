@@ -392,13 +392,6 @@ function AppContent() {
         fontsTask
       ])
 
-      // Ensure a smooth minimum splash duration of 1000ms for brand aesthetic
-      const elapsed = Date.now() - startTime
-      const minDuration = 1000
-      if (elapsed < minDuration) {
-        await new Promise(r => setTimeout(r, minDuration - elapsed))
-      }
-
       if (mounted) {
         setFontsLoaded(true)
         dispatch(setLoading(false))

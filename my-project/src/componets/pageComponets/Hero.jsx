@@ -216,7 +216,7 @@ function Hero() {
           <motion.div
             key={currentIndex}
             variants={slideVariants}
-            initial="enter"
+            initial={false}
             animate="center"
             exit="exit"
             className="absolute inset-0 cursor-pointer"
