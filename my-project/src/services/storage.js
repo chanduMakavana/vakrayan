@@ -10,12 +10,22 @@ export class StorageService {
     }
 
     async uploadFile(file, bucketId = conf.firebaseBucketId || 'images') {
+        // Automatically compress raw heavy images (e.g. 5MB-10MB 4K PNGs) down to crisp ~120KB WebP before upload
+        let fileToUpload = file;
+        if (file && file.type && file.type.startsWith('image/')) {
+            try {
+                fileToUpload = await compressImage(file, 1600, 2000, 0.82);
+            } catch (compErr) {
+                console.warn("Auto-compression skipped, using original file:", compErr.message);
+            }
+        }
+
         // If a Cloudflare Worker URL is configured, try uploading to Backblaze B2.
         // If worker fails, fall back gracefully to standard Firebase Storage.
         if (conf.firebaseCloudflareWorkerUrl) {
             try {
                 const formData = new FormData();
-                formData.append('file', file);
+                formData.append('file', fileToUpload);
 
                 const response = await fetch(conf.firebaseCloudflareWorkerUrl, {
                     method: 'POST',
@@ -38,7 +48,7 @@ export class StorageService {
             const response = await this.storage.createFile(
                 bucketId,
                 ID.unique(),
-                file
+                fileToUpload
             );
             return response;
         } catch (error) {
@@ -76,8 +86,17 @@ export class StorageService {
 }
 
 
-export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+export const compressImage = (file, maxWidth = 1600, maxHeight = 2000, quality = 0.82) => {
   return new Promise((resolve) => {
+    if (!file || !(file instanceof Blob) || !file.type || !file.type.startsWith('image/')) {
+      return resolve(file);
+    }
+
+    // Do not compress SVG vectors or GIF animations
+    if (file.type === 'image/svg+xml' || file.type === 'image/gif') {
+      return resolve(file);
+    }
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -88,41 +107,54 @@ export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0
         let width = img.width;
         let height = img.height;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
         }
 
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+
+        const targetFormat = 'image/webp';
+        const cleanName = (file.name || 'image').replace(/\.[^/.]+$/, "") + '.webp';
 
         canvas.toBlob(
           (blob) => {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
+            if (blob) {
+              const compressedFile = new File([blob], cleanName, {
+                type: targetFormat,
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              // Fallback to JPEG
+              canvas.toBlob((jpgBlob) => {
+                if (jpgBlob) {
+                  const jpgName = (file.name || 'image').replace(/\.[^/.]+$/, "") + '.jpg';
+                  resolve(new File([jpgBlob], jpgName, { type: 'image/jpeg', lastModified: Date.now() }));
+                } else {
+                  resolve(file);
+                }
+              }, 'image/jpeg', quality);
+            }
           },
-          'image/jpeg',
+          targetFormat,
           quality
         );
       };
       img.onerror = () => {
-        resolve(file); // fallback to original file if loading image fails
+        resolve(file);
       };
     };
     reader.onerror = () => {
-      resolve(file); // fallback to original file if reader fails
+      resolve(file);
     };
   });
 };
