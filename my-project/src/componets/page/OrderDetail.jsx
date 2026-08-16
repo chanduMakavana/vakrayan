@@ -11,6 +11,7 @@ import Footer from '../pageComponets/Footer';
 import { FaStar } from 'react-icons/fa';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 function OrderDetail() {
   const { id } = useParams();
@@ -941,8 +942,10 @@ function OrderDetail() {
                                 className="shrink-0 hover:opacity-85 transition-opacity"
                               >
                                 <img 
-                                  src={img} 
+                                  src={getOptimizedImageUrl(img, 160, 75)} 
                                   alt={item.name} 
+                                  loading="lazy"
+                                  decoding="async"
                                   className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
                                 />
                               </Link>

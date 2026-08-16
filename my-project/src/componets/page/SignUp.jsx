@@ -130,6 +130,8 @@ function SignUp() {
         <img
           src="/vakrayan-signup-hero.jpg"
           alt="Vakrayan Premium Apparel"
+          loading="eager"
+          decoding="async"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
         {/* light black overlay — no green tint */}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -18,6 +18,7 @@ import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, 
 import AdminAnalytics from '../pageComponets/AdminAnalytics';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import { getStoredShiprocketConfig, saveShiprocketConfig, authenticateShiprocket, createShiprocketShipment, fetchShiprocketOfficialLabel } from '../../services/shiprocket';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -38,6 +39,7 @@ function AdminPanel() {
   const [products, setProducts] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const processedEditRef = useRef(null);
 
   // Tab Manager State
   const [activeTab, setActiveTab] = useState('analytics'); // analytics | products | orders | campaigns
@@ -628,14 +630,6 @@ function AdminPanel() {
           onDragOver={(e) => handleDragOver(e, fieldName)}
           onDragLeave={(e) => handleDragLeave(e, fieldName)}
           onDrop={(e) => handleDrop(e, fieldName)}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!imgUrl && !isUploading) {
-              const fileInput = document.getElementById(`file-input-${fieldName}`);
-              if (fileInput) fileInput.click();
-            }
-          }}
           className={`relative border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all min-h-[140px] text-center select-none ${
             imgUrl 
               ? 'border-emerald-500/40 bg-emerald-500/[0.02]' 
@@ -650,9 +644,9 @@ function AdminPanel() {
               <span className="text-[10px] font-mono tracking-wider text-[var(--color-muted)] uppercase animate-pulse">Uploading...</span>
             </div>
           ) : imgUrl ? (
-            <div className="relative w-full flex flex-col items-center gap-3">
+            <div className="relative w-full flex flex-col items-center gap-3 z-20">
               <div className="relative group w-20 h-24 rounded-lg overflow-hidden border border-[var(--color-border)] shadow-xs">
-                <img src={imgUrl} alt="Product view" className="w-full h-full object-cover" />
+                <img src={getOptimizedImageUrl(imgUrl, 160, 75)} alt="Product view" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={(e) => {
@@ -670,42 +664,42 @@ function AdminPanel() {
                 <p className="text-[9px] font-mono text-slate-400 truncate text-center px-2 bg-neutral-900/5 py-1 rounded">
                   {imgUrl}
                 </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const fileInput = document.getElementById(`file-input-${fieldName}`);
-                    if (fileInput) fileInput.click();
-                  }}
-                  className="text-[9px] font-mono text-[var(--color-accent)] hover:underline block mx-auto uppercase tracking-wider font-bold"
-                >
+                <label className="text-[9px] font-mono text-[var(--color-accent)] hover:underline block mx-auto uppercase tracking-wider font-bold cursor-pointer">
                   Change Image
-                </button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleProductImageUpload(e, fieldName)}
+                    disabled={isUploading}
+                    className="hidden"
+                  />
+                </label>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 cursor-pointer">
-              <FiImage className="text-2xl text-[var(--color-muted)] animate-pulse" />
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">
-                  Drag & Drop Image here
-                </p>
-                <p className="text-[9px] text-[var(--color-muted)] uppercase font-medium">
-                  or click to browse local files
-                </p>
+            <>
+              {/* Native full-area file input for 100% reliable click & drag-and-drop */}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleProductImageUpload(e, fieldName)}
+                disabled={isUploading}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                title="Click or drag an image here to upload"
+              />
+              <div className="flex flex-col items-center gap-2 pointer-events-none">
+                <FiImage className="text-2xl text-[var(--color-muted)] animate-pulse" />
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">
+                    Drag & Drop Image here
+                  </p>
+                  <p className="text-[9px] text-[var(--color-muted)] uppercase font-medium">
+                    or click to browse local files
+                  </p>
+                </div>
               </div>
-            </div>
+            </>
           )}
-          
-          <input
-            id={`file-input-${fieldName}`}
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleProductImageUpload(e, fieldName)}
-            disabled={actionLoading || isUploading}
-            className="hidden"
-          />
         </div>
 
         {/* Text input fallback so they can still paste direct URLs */}
@@ -735,10 +729,6 @@ function AdminPanel() {
   };
 
   const handleProductImageUpload = async (e, fieldName) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
     const file = e?.target?.files?.[0];
     if (!file) return;
 
@@ -1014,6 +1004,7 @@ function AdminPanel() {
       console.error("Firebase product write failed:", cloudError.message);
       showToast("Failed to save product. Check Firebase connection.", "error");
     } finally {
+      processedEditRef.current = null;
       // Clear form
       reset();
       SIZE_OPTIONS.forEach(size => {
@@ -1034,107 +1025,146 @@ function AdminPanel() {
     }
   };
 
-  const handleEdit = useCallback((id) => {
-    const product = products.find(p => p.id === id || p.$id === id);
-    if (product) {
-      setIsCustomCategory(false);
-      setValue('name', product.name);
-      
-      const numericPrice = typeof product.price === 'string'
-        ? Number(product.price.replace(/[^0-9]/g, ''))
-        : product.price;
-      setValue('price', numericPrice || '');
-      
-      const tagsArray = Array.isArray(product.tags) ? product.tags : [];
-      setValue('search_keywords', tagsArray.join(', '));
-      setValue('category', product.category);
-      setValue('front_image_link', product.front_image_link || product.image_url || product.image || '');
-      const rawDesc = product.description || '';
-      const rpMatch = rawDesc.match(/\[RETURN_POLICY\]:\s*(.+)/);
-      const returnPolicy = product.return_policy || (rpMatch ? rpMatch[1].trim() : '7 Day Return');
-      const scMatch = rawDesc.match(/\[SIZE_CHART\]:\s*(.+)/);
-      const sizeChartImage = product.size_chart_image || product.size_chart || (scMatch ? scMatch[1].trim() : '');
-      const cleanDesc = rawDesc
-        .replace(/\[RETURN_POLICY\]:\s*(.+)/, '')
-        .replace(/\[SIZE_CHART\]:\s*(.+)/, '')
-        .trim();
+  const populateProductForm = useCallback((product) => {
+    if (!product) return;
+    const prodId = product.$id || product.id;
 
-      setValue('description', cleanDesc);
-      setValue('return_policy', returnPolicy);
-      setValue('size_chart_image', sizeChartImage);
-      
-      // Hydrate Stocks
-      let parsedStock = {};
-      try {
-        parsedStock = JSON.parse(product.sizes_stock || '{}');
-      } catch {
-        parsedStock = {};
-      }
+    // Check if category is standard or custom
+    const standardCategories = ['printed-tshirt', 'oversized-tshirt', 'shirts', 'hoodies'];
+    const isCustom = product.category && !standardCategories.includes(String(product.category).toLowerCase().trim());
+    setIsCustomCategory(Boolean(isCustom));
 
-      SIZE_OPTIONS.forEach(size => {
-        const isOffered = product.sizes?.includes(size);
-        setValue(
-          `stock_${size}`,
-          parsedStock[size] !== undefined 
-            ? parsedStock[size] 
-            : (isOffered ? 10 : '')
-        );
-      });
+    setValue('name', product.name || '');
+    
+    const numericPrice = typeof product.price === 'string'
+      ? Number(product.price.replace(/[^0-9]/g, ''))
+      : product.price;
+    setValue('price', numericPrice || '');
+    
+    const tagsArray = Array.isArray(product.tags) ? product.tags : [];
+    setValue('search_keywords', tagsArray.join(', '));
+    setValue('category', product.category || '');
+    setValue('front_image_link', product.front_image_link || product.image_url || product.image || '');
+    
+    const rawDesc = product.description || '';
+    const rpMatch = rawDesc.match(/\[RETURN_POLICY\]:\s*(.+)/);
+    const returnPolicy = product.return_policy || (rpMatch ? rpMatch[1].trim() : '7 Day Return');
+    const scMatch = rawDesc.match(/\[SIZE_CHART\]:\s*(.+)/);
+    const sizeChartImage = product.size_chart_image || product.size_chart || (scMatch ? scMatch[1].trim() : '');
+    const cleanDesc = rawDesc
+      .replace(/\[RETURN_POLICY\]:\s*(.+)/, '')
+      .replace(/\[SIZE_CHART\]:\s*(.+)/, '')
+      .trim();
 
-      const backImageLinks = Array.isArray(product.back_image_links)
-        ? product.back_image_links
-        : [product.back_image_link].filter(Boolean);
-
-      setBackImageCount(Math.max(1, backImageLinks.length));
-
-      BACK_IMAGE_FIELDS.forEach((fieldName, index) => {
-        setValue(fieldName, backImageLinks[index] || '');
-      });
-      setValue('single_tag', product.tag || '');
-      setValue('discount_percent', product.discount_percent || 0);
-      setValue('color_group_id', product.color_group_id || '');
-
-      setValue('color_name', product.color_name || '');
-      setValue('color_hex', product.color_hex || '');
-
-      setValue('fit_type', product.fit_type || '');
-      setValue('fabric_gsm', product.fabric_gsm || '');
-      setValue('compare_at_price', product.compare_at_price || '');
-      setValue('is_featured', product.is_featured === true || product.is_featured === 'true' || product.is_featured === 1 || product.is_featured === '1');
-      setValue('is_vip_only', product.is_vip_only === true || product.is_vip_only === 'true' || product.is_vip_only === 1 || product.is_vip_only === '1');
-      setValue('is_live', product.is_live === true || product.is_live === 'true' || product.is_live === 1 || product.is_live === '1');
-      setValue('slug', product.slug || '');
-      setEditingId(id);
-      setProductsSubTab('form');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    setValue('description', cleanDesc);
+    setValue('return_policy', returnPolicy);
+    setValue('size_chart_image', sizeChartImage);
+    
+    // Hydrate Stocks
+    let parsedStock = {};
+    try {
+      parsedStock = typeof product.sizes_stock === 'string'
+        ? JSON.parse(product.sizes_stock || '{}')
+        : (product.sizes_stock || {});
+    } catch {
+      parsedStock = {};
     }
-  }, [products, setValue]);
+
+    SIZE_OPTIONS.forEach(size => {
+      const isOffered = product.sizes?.includes(size);
+      setValue(
+        `stock_${size}`,
+        parsedStock[size] !== undefined 
+          ? parsedStock[size] 
+          : (isOffered ? 10 : '')
+      );
+    });
+
+    const backImageLinks = Array.isArray(product.back_image_links)
+      ? product.back_image_links
+      : [product.back_image_link].filter(Boolean);
+
+    setBackImageCount(Math.max(1, backImageLinks.length));
+
+    BACK_IMAGE_FIELDS.forEach((fieldName, index) => {
+      setValue(fieldName, backImageLinks[index] || '');
+    });
+    setValue('single_tag', product.tag || '');
+    setValue('discount_percent', product.discount_percent || 0);
+    setValue('color_group_id', product.color_group_id || '');
+
+    setValue('color_name', product.color_name || '');
+    setValue('color_hex', product.color_hex || '#121212');
+
+    setValue('fit_type', product.fit_type || '');
+    setValue('fabric_gsm', product.fabric_gsm || '');
+    setValue('compare_at_price', product.compare_at_price || '');
+    setValue('is_featured', product.is_featured === true || product.is_featured === 'true' || product.is_featured === 1 || product.is_featured === '1');
+    setValue('is_vip_only', product.is_vip_only === true || product.is_vip_only === 'true' || product.is_vip_only === 1 || product.is_vip_only === '1');
+    setValue('is_live', product.is_live === true || product.is_live === 'true' || product.is_live === 1 || product.is_live === '1');
+    setValue('slug', product.slug || '');
+    setEditingId(prodId);
+    setActiveTab('products');
+    setProductsSubTab('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [setValue]);
+
+  const handleEdit = useCallback(async (idOrProduct) => {
+    if (!idOrProduct) return;
+    if (typeof idOrProduct === 'object' && idOrProduct !== null) {
+      populateProductForm(idOrProduct);
+      return;
+    }
+
+    const id = String(idOrProduct).trim();
+    // 1. Check if found in currently loaded products list
+    const found = products.find(p => String(p.id || p.$id) === id);
+    if (found) {
+      populateProductForm(found);
+      return;
+    }
+
+    // 2. Fetch directly from Firebase if not yet in state (e.g. initial mount)
+    try {
+      setActionLoading(true);
+      const fetched = await productsService.getProductById(id);
+      if (fetched) {
+        populateProductForm(fetched);
+      } else {
+        showToast("Product details could not be found.", "error");
+      }
+    } catch (err) {
+      console.error("Failed to fetch product details for edit:", err);
+      showToast("Failed to load product details for edit: " + err.message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }, [products, populateProductForm, showToast]);
 
   useEffect(() => {
-    if (isAdmin && products.length > 0) {
-      const searchParams = new URLSearchParams(location.search);
-      const editIdFromQuery = searchParams.get('edit');
-      const targetEditId = location.state?.editProductId || editIdFromQuery;
-      
-      if (targetEditId) {
-        const found = products.find(p => p.id === targetEditId || p.$id === targetEditId);
-        if (found) {
-          setTimeout(() => {
-            setActiveTab('products');
-            handleEdit(targetEditId);
-          }, 0);
-          
-          // Clean up location state and URL query parameter to prevent loop/stale edit state
-          window.history.replaceState({}, document.title, window.location.pathname);
-          if (location.state) location.state.editProductId = null;
-        }
+    if (!isAdmin) return;
+
+    const searchParams = new URLSearchParams(location.search);
+    const editIdFromQuery = searchParams.get('edit');
+    const targetEditId = location.state?.editProductId || editIdFromQuery;
+
+    if (targetEditId && processedEditRef.current !== targetEditId) {
+      processedEditRef.current = targetEditId;
+      setActiveTab('products');
+      handleEdit(targetEditId);
+
+      // Clean up location state and URL query parameter to prevent loop/stale edit state
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (location.state && location.state.editProductId) {
+        location.state.editProductId = null;
       }
     }
-  }, [location.search, isAdmin]);
+  }, [location.search, location.state, isAdmin, handleEdit]);
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const handleCancelEdit = () => {
+    processedEditRef.current = null;
     reset();
     SIZE_OPTIONS.forEach(size => {
       setValue(`stock_${size}`, '');
@@ -1152,9 +1182,6 @@ function AdminPanel() {
     setValue('is_vip_only', false);
     setValue('is_live', false);
     setValue('slug', '');
-    setValue('color_hex', '');
-    setValue('fit_type', '');
-    setValue('fabric_gsm', '');
     setValue('return_policy', '7 Day Return');
     setBackImageCount(1);
     setEditingId(null);
@@ -3045,7 +3072,13 @@ function AdminPanel() {
                             return (
                               <div key={targetId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-subtle)]/30 transition-all rounded-2xl shadow-xs">
                                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                                  <img src={coverThumbnailUrl} alt={p.name} className="w-14 h-14 object-cover border border-[var(--color-border)] shrink-0 rounded-xl shadow-xs" />
+                                  <img 
+                                    src={getOptimizedImageUrl(coverThumbnailUrl, 120, 75)} 
+                                    alt={p.name} 
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-14 h-14 object-cover border border-[var(--color-border)] shrink-0 rounded-xl shadow-xs" 
+                                  />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <p className="text-sm font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
@@ -4592,12 +4625,12 @@ function AdminPanel() {
                         <div className="space-y-2">
                           <div className="flex gap-4">
                             <div className="w-1/2 aspect-[16/9] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
-                              <img src={slide.image} alt="Desktop slide view" className="w-full h-full object-cover" />
+                              <img src={getOptimizedImageUrl(slide.image, 600, 75)} alt="Desktop slide view" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                               <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">DESKTOP</span>
                             </div>
                             {slide.mobileImage ? (
                               <div className="w-1/4 aspect-[3/4] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
-                                <img src={slide.mobileImage} alt="Mobile slide view" className="w-full h-full object-cover" />
+                                <img src={getOptimizedImageUrl(slide.mobileImage, 400, 75)} alt="Mobile slide view" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                 <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">MOBILE</span>
                               </div>
                             ) : (
@@ -4702,8 +4735,10 @@ function AdminPanel() {
                               <td className="py-4 pr-4">
                                 <div className="w-12 h-12 rounded-full overflow-hidden border border-[var(--color-border)]/10">
                                   <img 
-                                    src={currentImageUrl} 
+                                    src={getOptimizedImageUrl(currentImageUrl, 100, 75)} 
                                     alt={cat.label} 
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-full h-full object-cover object-center" 
                                     onError={(e) => {
                                       e.target.src = 'https://placehold.co/150x150?text=FITS';
@@ -5014,7 +5049,13 @@ function AdminPanel() {
                                   }}
                                   className="w-3.5 h-3.5 accent-[var(--color-accent)] rounded-xl cursor-pointer"
                                 />
-                                <img src={p.front_image_link} alt="" className="w-6 h-6 object-cover object-center shrink-0 border border-[var(--color-border)] rounded" />
+                                <img 
+                                  src={getOptimizedImageUrl(p.front_image_link, 60, 75)} 
+                                  alt="" 
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-6 h-6 object-cover object-center shrink-0 border border-[var(--color-border)] rounded" 
+                                />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-[9px] font-bold truncate uppercase tracking-wider text-[var(--color-text)]">{p.name}</p>
                                   <p className="text-[8px] text-[var(--color-muted)] font-mono uppercase">₹{p.price} | {p.category}</p>

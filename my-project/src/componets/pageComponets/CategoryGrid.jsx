@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import categoryService from '../../services/category'
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -67,10 +68,9 @@ function CategoryGrid() {
       if (c.imageUrl) overrides[c.category] = c.imageUrl;
     });
     if (overrides[catValue]) return overrides[catValue];
-    if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg'
-    if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg'
-    if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg'
-    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=300&q=80'
+    if (catValue === 'printed-tshirt') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1785234981143_chnage_hair_like_2nd_image_202607281602.jpeg'
+    if (catValue === 'oversized-tshirt') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1784959032194_A_professional_studio_fashion_photoshoot_202606161943.jpeg'
+    if (catValue === 'shirts') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1784959058811_no_change_this_image_2K_202607241900__1_.jpeg'
     const firstProd = products.find(p => p.category === catValue)
     return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/300x400?text=Vakrayan'
   }
@@ -125,7 +125,7 @@ function CategoryGrid() {
                 >
                   {/* Image - smooth scale */}
                   <img
-                    src={img}
+                    src={getOptimizedImageUrl(img, 400, 75)}
                     alt={c.label}
                     loading="lazy"
                     decoding="async"

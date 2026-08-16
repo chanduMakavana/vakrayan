@@ -78,7 +78,7 @@ function Footer() {
           <div className="flex gap-4 mt-4">
             {[
               { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/' },
-              { Icon: PinterestIcon, label: 'Pinterest', href: '#' },
+              { Icon: PinterestIcon, label: 'Pinterest', href: 'https://in.pinterest.com/vakrayan_official' },
               { Icon: XIcon, label: 'X (Twitter)', href: '#' },
             ].map(({ Icon, label, href }) => (
               <a

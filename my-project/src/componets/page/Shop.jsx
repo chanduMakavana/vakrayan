@@ -704,8 +704,10 @@ function Shop() {
           >
             {/* Background Image */}
             <img
-              src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80"
+              src={getOptimizedImageUrl("https://images.unsplash.com/photo-1441986300917-64674bd600d8", 1200, 80)}
               alt="Explore Categories Banner"
+              loading="lazy"
+              decoding="async"
               className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 brightness-75"
             />
             {/* Heavy Dark Gradient Overlay for Maximum Text Contrast */}
@@ -849,7 +851,13 @@ function Shop() {
                                     }}
                                     className="w-full flex items-center gap-3 py-2.5 hover:bg-[var(--color-bg)] transition-all text-left border-b border-zinc-50/10 last:border-0 first:pt-0"
                                   >
-                                    <img src={img} alt={p.name} className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" />
+                                    <img 
+                                      src={getOptimizedImageUrl(img, 100, 75)} 
+                                      alt={p.name} 
+                                      loading="lazy" 
+                                      decoding="async" 
+                                      className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" 
+                                    />
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[11px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
                                       <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">{p.category?.replace(/-/g, ' ')}</p>
@@ -1172,7 +1180,7 @@ function Shop() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate('/admin', { state: { editProductId: parentId } });
+                                navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } });
                               }}
                               className="absolute bottom-3 left-3 z-30 px-3 py-1.5 cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[10px] uppercase tracking-wider bg-emerald-700 hover:bg-emerald-800 rounded-none border-none shadow-xs"
                             >

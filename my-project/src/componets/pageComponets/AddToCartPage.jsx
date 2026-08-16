@@ -14,6 +14,7 @@ import { loadGuestCartItems } from '../../utils/guestCartHelper'
 import PageSkeleton from './PageSkeleton'
 import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 import CouponSelector from './CouponSelector'
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
 
 function AddToCartPage() {
@@ -549,8 +550,10 @@ function AddToCartPage() {
                   {/* Image */}
                   <div className="w-20 h-24 sm:w-22 sm:h-26 rounded-xl overflow-hidden bg-neutral-100 border border-zinc-200 shrink-0">
                     <img 
-                      src={imgUrl} 
+                      src={getOptimizedImageUrl(imgUrl, 200, 75)} 
                       alt={item.name} 
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover object-center"
                     />
                   </div>

@@ -21,6 +21,7 @@ import walletService from '../../services/wallet';
 import PageSkeleton from '../pageComponets/PageSkeleton';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import { requestNotificationPermission } from '../../services/notifications';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -992,8 +993,10 @@ function UserProfile() {
                                 return (
                                   <img 
                                     key={itemIdx}
-                                    src={imgUrl}
+                                    src={getOptimizedImageUrl(imgUrl, 120, 75)}
                                     alt={item.name}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-10 h-14 object-cover rounded-md border border-[var(--color-surface)] shadow-xs"
                                   />
                                 );

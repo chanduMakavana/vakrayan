@@ -145,6 +145,8 @@ function Login() {
         <img
           src="/vakrayan-signup-hero.jpg"
           alt="Vakrayan Premium Apparel"
+          loading="eager"
+          decoding="async"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
 
@@ -197,7 +199,7 @@ function Login() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'rgba(0,0,0,0.28)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', backdropFilter: 'blur(8px)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.50)" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>
-              Trusted by <span style={{ color: '#34D399', fontWeight: 700 }}>10,000+</span> customers across India
+              Trusted by <span style={{ color: '#34D399', fontWeight: 700 }}>100+</span> customers across India
             </span>
           </div>
         </div>

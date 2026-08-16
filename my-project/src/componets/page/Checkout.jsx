@@ -21,6 +21,7 @@ import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
 import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelper'
 import CouponSelector from '../pageComponets/CouponSelector'
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
 
 
@@ -1195,8 +1196,10 @@ function Checkout() {
                   return (
                     <div key={item.$id} className="flex gap-3 items-center">
                       <img 
-                        src={imgUrl} 
+                        src={getOptimizedImageUrl(imgUrl, 160, 75)} 
                         alt={item.name} 
+                        loading="lazy"
+                        decoding="async"
                         className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-lg shrink-0" 
                       />
                       <div className="flex-1 min-w-0">

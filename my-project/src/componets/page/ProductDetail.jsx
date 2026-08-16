@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck, FiCopy, FiShare2 } from 'react-icons/fi';
 
 const RulerIcon = ({ className = "w-4 h-4 text-zinc-500 shrink-0 mt-0.5" }) => (
   <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -27,7 +27,7 @@ import { addWishlistItemState, removeWishlistItemState } from '../../features/wi
 import AddToCartButton from '../pageComponets/AddToCartButton';
 import Footer from '../pageComponets/Footer';
 import restockService from '../../services/restock';
-import { FaStar } from 'react-icons/fa';
+import { FaStar, FaWhatsapp } from 'react-icons/fa';
 import { useToast } from '../../context/ToastContext';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
@@ -102,6 +102,7 @@ function ProductDetail() {
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [activeVariant, setActiveVariant] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     setQuantity(1);
@@ -1659,7 +1660,7 @@ function ProductDetail() {
                     }}
                     className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImageIndex === idx ? 'border-neutral-950 scale-95 shadow-sm' : 'border-[var(--color-border)] hover:border-[var(--color-accent)]'}`}
                   >
-                    <img src={imgUrl} alt="Garment view" className="w-full h-full object-cover" />
+                    <img src={getOptimizedImageUrl(imgUrl, 160, 75)} alt="Garment view" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -1820,7 +1821,7 @@ function ProductDetail() {
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
                   ref={mainImageRef}
-                  src={activeImage}
+                  src={getOptimizedImageUrl(activeImage, 1000, 80)}
                   alt={product.name}
                   fetchPriority="high"
                   decoding="sync"
@@ -1888,12 +1889,14 @@ function ProductDetail() {
                 )}
                 {adminMode && (
                   <button
-                    onClick={() => navigate('/admin', { state: { editProductId: product.$id || product.id } })}
+                    onClick={() => {
+                      const targetId = product.$id || product.id;
+                      navigate(`/admin?edit=${targetId}`, { state: { editProductId: targetId } });
+                    }}
                     className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
                   >
                     Edit Drop
                   </button>
-
                 )}
               </div>
 
@@ -1965,25 +1968,33 @@ function ProductDetail() {
               })()}
             </div>
 
-            <div className="flex items-center gap-3 pt-1 pb-1">
+            <div className="flex items-center gap-2.5 pt-1 pb-1 flex-wrap">
               <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">Share Drop:</span>
               <button
+                type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
+                  setCopiedLink(true);
                   showToast("Link copied to clipboard!", "success");
-
+                  setTimeout(() => setCopiedLink(false), 2000);
                 }}
-                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] px-2.5 py-1 transition-all cursor-pointer font-sans"
+                className={`inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider border px-2.5 py-1 transition-all cursor-pointer rounded-xs ${
+                  copiedLink
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                    : 'text-[var(--color-text)] border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]'
+                }`}
               >
-                Copy Link
+                {copiedLink ? <FiCheck className="text-xs text-emerald-600" /> : <FiCopy className="text-xs" />}
+                <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
               </button>
               <a
                 href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this vakrayan fit drop: ${product.name} at ${window.location.href}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 border border-emerald-200 bg-emerald-50 hover:border-emerald-600 hover:bg-emerald-100/50 px-2.5 py-1 transition-all cursor-pointer font-sans no-underline"
+                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 border border-emerald-300/80 bg-emerald-50 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 px-2.5 py-1 transition-all cursor-pointer rounded-xs no-underline group"
               >
-                Share to WhatsApp
+                <FaWhatsapp className="text-xs text-[#25D366] group-hover:text-white transition-colors" />
+                <span>Share to WhatsApp</span>
               </a>
             </div>
 
@@ -2017,10 +2028,11 @@ function ProductDetail() {
                             title={sibling.color_name}
                           >
                             <img 
-                              src={siblingImage} 
+                              src={getOptimizedImageUrl(siblingImage, 120, 75)} 
                               alt={sibling.color_name} 
                               className="w-full h-full object-cover"
                               loading="lazy"
+                              decoding="async"
                             />
                           </button>
                         );
@@ -2040,8 +2052,10 @@ function ProductDetail() {
                     <div className="flex gap-2.5">
                       <div className="w-14 h-18 rounded-lg border-2 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 overflow-hidden shadow-md">
                         <img
-                          src={img}
+                          src={getOptimizedImageUrl(img, 120, 75)}
                           alt={product.color_name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                           title={product.color_name}
                         />
@@ -2564,15 +2578,17 @@ function ProductDetail() {
 
                       <div className="w-full h-full relative overflow-hidden">
                         <img
-                          src={frontView}
+                          src={getOptimizedImageUrl(frontView, 500, 75)}
                           alt={item.name}
                           loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
                         />
                         <img  
-                          src={backView}
+                          src={getOptimizedImageUrl(backView, 500, 75)}
                           alt={item.name}
                           loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
                         />
                       </div>
@@ -2923,8 +2939,10 @@ function ProductDetail() {
                                   className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-xs bg-[var(--color-surface)]/20"
                                 >
                                   <img
-                                    src={img}
+                                    src={getOptimizedImageUrl(img, 180, 75)}
                                     alt={`Customer image ${idx + 1}`}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                     onError={(e) => { e.target.style.display = 'none'; }}
                                   />
@@ -2990,8 +3008,10 @@ function ProductDetail() {
                   Product Specific Size Chart:
                 </span>
                 <img 
-                  src={customSizeChartImage} 
+                  src={getOptimizedImageUrl(customSizeChartImage, 800, 80)} 
                   alt="Product Size Chart" 
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-auto rounded-lg object-contain max-h-72 border border-[var(--color-border)]/50"
                 />
               </div>
@@ -3421,7 +3441,7 @@ function ProductDetail() {
             >
               <img
                 ref={lightboxImageRef}
-                src={activeImage}
+                src={getOptimizedImageUrl(activeImage, 1400, 85)}
                 alt="Product Detail Expanded"
                 className="max-w-full max-h-[75vh] object-contain transition-transform duration-100 ease-out select-none pointer-events-none"
                 style={{
@@ -3475,7 +3495,13 @@ function ProductDetail() {
                     }}
                     className={`w-10 h-12 border transition-all duration-300 shrink-0 ${activeImageIndex === idx ? 'border-white scale-95 shadow-lg' : 'border-white/25 opacity-60 hover:opacity-100'}`}
                   >
-                    <img src={imgUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                    <img 
+                      src={getOptimizedImageUrl(imgUrl, 100, 75)} 
+                      alt="Thumbnail preview" 
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover" 
+                    />
                   </button>
                 ))}
               </div>

@@ -159,7 +159,7 @@ function BestSellers() {
                   {/* Admin edit button */}
                   {adminMode && (
                     <button
-                      onClick={e => { e.stopPropagation(); navigate('/admin', { state: { editProductId: parentId } }) }}
+                      onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } }) }}
                       className="absolute bottom-3 left-3 z-30 px-3 py-1.5 cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[10px] uppercase tracking-wider bg-emerald-700 hover:bg-emerald-800 rounded-none border-none shadow-xs"
                     >
                       Edit
