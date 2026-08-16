@@ -411,7 +411,8 @@ export class Storage {
             const downloadUrl = await getDownloadURL(storageRef);
             return { $id: downloadUrl };
         } catch {
-            return { $id: `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(storageRef.fullPath)}?alt=media` };
+            const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'vakrayan-9ce25.firebasestorage.app';
+            return { $id: `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(storageRef.fullPath)}?alt=media` };
         }
     }
 

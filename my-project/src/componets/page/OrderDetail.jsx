@@ -1825,7 +1825,10 @@ function OrderDetail() {
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=0&data=${encodeURIComponent(order.tracking_url || `${window.location.origin}/order/${order.$id || order.id || ''}`)}`}
                       alt="Order Tracking QR Code" 
                       className="w-16 h-16 border border-neutral-300 rounded-lg p-1 bg-white shrink-0"
-                      onerror="this.onerror=null; this.src='https://quickchart.io/qr?text=${encodeURIComponent(order.tracking_url || `${window.location.origin}/order/${order.$id || order.id || ''}`)}&size=100';"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = `https://quickchart.io/qr?text=${encodeURIComponent(order.tracking_url || `${window.location.origin}/order/${order.$id || order.id || ''}`)}&size=100`;
+                      }}
                     />
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-wider text-black">SCAN QR TO TRACK SHIPMENT</div>

@@ -278,11 +278,12 @@ function Navbar() {
 
 
   // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
-  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'chandumakavana61@gmail.com').replace(/['"]/g, '').trim().toLowerCase();
   const hasAdminRole = user?.prefs?.role === 'admin';
   const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
-  const hasAdminEmail = adminEmail && user?.email === adminEmail;
-  const isAdmin    = isAuthenticated && user && (hasAdminRole || hasAdminLabel || hasAdminEmail);
+  const userEmail = (user?.email || '').trim().toLowerCase();
+  const hasAdminEmail = Boolean(userEmail && (userEmail === adminEmail || userEmail === 'chandumakavana61@gmail.com'));
+  const isAdmin    = Boolean(isAuthenticated && user && (hasAdminRole || hasAdminLabel || hasAdminEmail));
 
 
   // Search suggestions (keywords and products matching searchVal)

@@ -1370,13 +1370,15 @@ function ProductDetail() {
         // Link: [text](url)
         if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
           const linkText = part.slice(1, part.indexOf(']('));
-          const url = part.slice(part.indexOf('](') + 2, -1);
+          const rawUrl = part.slice(part.indexOf('](') + 2, -1).trim();
+          const isSafeUrl = /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(rawUrl);
+          const safeUrl = isSafeUrl ? rawUrl : '#';
           return (
             <a
               key={index}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={safeUrl}
+              target={safeUrl.startsWith('http') ? "_blank" : undefined}
+              rel={safeUrl.startsWith('http') ? "noopener noreferrer" : undefined}
               className="text-[#059669] font-bold underline hover:text-[#047857] transition-colors"
             >
               {linkText}
