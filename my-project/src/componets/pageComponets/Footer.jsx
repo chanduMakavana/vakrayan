@@ -220,7 +220,7 @@ function Footer() {
           style={{ borderTop: '1px solid rgba(5,150,105,0.15)' }}
         >
           <span style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}>
-            © 2026 Vakrayan Co. All rights reserved.
+            © 2026 Vakrayan.com All rights reserved.
           </span>
           <div className="flex gap-6">
             <Link
