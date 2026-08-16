@@ -45,22 +45,38 @@ export async function handler(event) {
     const payload = JSON.parse(event.body || '{}');
     const { text, parseMode, replyMarkup, channelRoute } = payload;
 
-    // Bot token is server-side only (no VITE_ prefix — never sent to client)
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    // Bot token — check both naming conventions:
+    //   TELEGRAM_BOT_TOKEN  (preferred, server-side only)
+    //   VITE_TELEGRAM_BOT_TOKEN (legacy — set in Netlify Dashboard 3+ months ago)
+    // Netlify functions can read VITE_-prefixed vars too; the VITE_ prefix only
+    // affects what gets bundled into the client-side JS by Vite.
+    const botToken =
+      process.env.TELEGRAM_BOT_TOKEN ||
+      process.env.VITE_TELEGRAM_BOT_TOKEN;
 
-    // Resolve target chat ID based on channel route
+    // Resolve target chat ID based on channel route (check both prefixes)
     const chatIdMap = {
-      order: process.env.TELEGRAM_ORDER_CHAT_ID,
-      event: process.env.TELEGRAM_EVENT_CHAT_ID,
-      cancel: process.env.TELEGRAM_CANCEL_CHAT_ID,
+      order : process.env.TELEGRAM_ORDER_CHAT_ID  || process.env.VITE_TELEGRAM_ORDER_CHAT_ID,
+      event : process.env.TELEGRAM_EVENT_CHAT_ID  || process.env.VITE_TELEGRAM_EVENT_CHAT_ID,
+      cancel: process.env.TELEGRAM_CANCEL_CHAT_ID || process.env.VITE_TELEGRAM_CANCEL_CHAT_ID,
     };
-    const targetChatId = chatIdMap[channelRoute] || process.env.TELEGRAM_ORDER_CHAT_ID;
+    const targetChatId =
+      chatIdMap[channelRoute] ||
+      process.env.TELEGRAM_ORDER_CHAT_ID ||
+      process.env.VITE_TELEGRAM_ORDER_CHAT_ID;
 
     if (!botToken || !targetChatId) {
+      const missing = [];
+      if (!botToken)     missing.push('TELEGRAM_BOT_TOKEN (or VITE_TELEGRAM_BOT_TOKEN)');
+      if (!targetChatId) missing.push(`TELEGRAM_${channelRoute.toUpperCase()}_CHAT_ID (or VITE_ variant)`);
+      console.error('[telegram.js] Missing env vars:', missing.join(', '));
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ error: 'Telegram bot token or chat ID is not configured on the server.' })
+        body: JSON.stringify({
+          error: 'Telegram env vars not configured on server.',
+          missing
+        })
       };
     }
 
