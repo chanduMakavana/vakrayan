@@ -63,17 +63,25 @@ function CategoryGrid() {
   })
 
   const getCategoryImage = (catValue) => {
+    // 1. Admin Panel Override (if admin explicitly set custom category image)
     const overrides = {};
     categoryConfigs.forEach(c => {
       if (c.imageUrl) overrides[c.category] = c.imageUrl;
     });
     if (overrides[catValue]) return overrides[catValue];
-    if (catValue === 'printed-tshirt') return 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=400&q=75';
-    if (catValue === 'oversized-tshirt') return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=75';
-    if (catValue === 'shirts') return 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=400&q=75';
-    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=400&q=75';
+
+    // 2. Real Product from that category (Vakrayan live product catalog)
     const firstProd = products.find(p => p.category === catValue);
-    return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=400&q=75';
+    if (firstProd?.front_image_link || firstProd?.image_url || firstProd?.image) {
+      return firstProd.front_image_link || firstProd.image_url || firstProd.image;
+    }
+
+    // 3. Original Vakrayan Brand Fallbacks
+    if (catValue === 'printed-tshirt') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1785234981143_chnage_hair_like_2nd_image_202607281602.jpeg';
+    if (catValue === 'oversized-tshirt') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1784959032194_A_professional_studio_fashion_photoshoot_202606161943.jpeg';
+    if (catValue === 'shirts') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1784959058811_no_change_this_image_2K_202607241900__1_.jpeg';
+
+    return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1785234981143_chnage_hair_like_2nd_image_202607281602.jpeg';
   };
 
   const visibleCategories = categoriesList.filter(c => {
