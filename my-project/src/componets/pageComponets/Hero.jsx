@@ -9,20 +9,14 @@ const STORAGE_KEY = 'vakrayan_hero_slides'
 const DEFAULT_SLIDES = [
   {
     $id: 'default-1',
-    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1600',
-    mobileImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=800',
+    image: 'https://b2-upload-gateway.vakrayan.workers.dev/file/1786854633429_Create_image_ratio_version_2K_202608152012-processed_lightpdf.com_.png',
+    mobileImage: 'https://b2-upload-gateway.vakrayan.workers.dev/file/1786854633429_Create_image_ratio_version_2K_202608152012-processed_lightpdf.com_.png',
     link: '/shop'
   },
   {
     $id: 'default-2',
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1600',
-    mobileImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=800',
-    link: '/shop'
-  },
-  {
-    $id: 'default-3',
-    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1600',
-    mobileImage: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=800',
+    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1600&q=75',
+    mobileImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=75',
     link: '/shop'
   }
 ]
@@ -39,7 +33,7 @@ const getInitialSlides = () => {
   } catch (e) {
     // Ignore error
   }
-  return null
+  return DEFAULT_SLIDES
 }
 
 function Hero() {
