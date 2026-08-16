@@ -614,11 +614,17 @@ function Navbar() {
               <img
                 src="/vakrayan-merged-logo.png"
                 alt="Vakrayan"
+                width={160}
+                height={56}
                 className="h-11 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105 block [html[data-theme=dark]_&]:hidden"
               />
               <img
                 src="/vakrayan-merged-logo-white.png"
                 alt="Vakrayan"
+                loading="lazy"
+                decoding="async"
+                width={160}
+                height={56}
                 className="h-11 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105 hidden [html[data-theme=dark]_&]:block"
               />
             </Link>
@@ -1633,11 +1639,19 @@ function Navbar() {
                 <img
                   src="/vakrayan-merged-logo.png"
                   alt="Vakrayan Logo"
+                  loading="lazy"
+                  decoding="async"
+                  width={160}
+                  height={56}
                   className="h-12 sm:h-14 w-auto object-contain drop-shadow-md block [html[data-theme=dark]_&]:hidden"
                 />
                 <img
                   src="/vakrayan-merged-logo-white.png"
                   alt="Vakrayan Logo"
+                  loading="lazy"
+                  decoding="async"
+                  width={160}
+                  height={56}
                   className="h-12 sm:h-14 w-auto object-contain drop-shadow-md hidden [html[data-theme=dark]_&]:block"
                 />
                 <span className="text-[9.5px] font-mono font-bold tracking-[0.25em] uppercase text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-3.5 py-1 rounded-full border border-[var(--color-accent)]/20 mt-1">

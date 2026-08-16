@@ -113,6 +113,7 @@ function ProductDetail() {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [lightboxOffset, setLightboxOffset] = useState({ x: 0, y: 0 });
+  const [lightboxImageLoaded, setLightboxImageLoaded] = useState(true);
   const touchStartRef = useRef(null);
 
   const [mainPhotoZoom, setMainPhotoZoom] = useState(1);
@@ -1058,6 +1059,28 @@ function ProductDetail() {
     }
   };
 
+  const rawGalleryImages = activeVariant
+    ? [activeVariant.front, activeVariant.back].filter(Boolean)
+    : [
+        product?.front_image_link || product?.image_url || product?.image,
+        ...(Array.isArray(product?.back_image_links) ? product?.back_image_links : product?.back_image_link ? [product?.back_image_link] : [])
+      ].filter(Boolean);
+
+  const galleryImages = Array.from(new Set(rawGalleryImages));
+  galleryImagesRef.current = galleryImages;
+
+  // Background preload all product gallery images into browser RAM cache for 0ms instant lightbox switching
+  useEffect(() => {
+    if (galleryImages && galleryImages.length > 0) {
+      galleryImages.forEach(imgUrl => {
+        if (imgUrl) {
+          const img = new Image();
+          img.src = getOptimizedImageUrl(imgUrl, 1200, 80);
+        }
+      });
+    }
+  }, [galleryImages]);
+
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20 select-none">
@@ -1250,22 +1273,13 @@ function ProductDetail() {
     isAllOutOfStock = totalStock === 0;
   }
 
-  const rawGalleryImages = activeVariant
-    ? [activeVariant.front, activeVariant.back].filter(Boolean)
-    : [
-        product.front_image_link || product.image_url || product.image,
-        ...(Array.isArray(product.back_image_links) ? product.back_image_links : product.back_image_link ? [product.back_image_link] : [])
-      ].filter(Boolean);
-
-  const galleryImages = Array.from(new Set(rawGalleryImages));
-  galleryImagesRef.current = galleryImages;
-
   const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
   const activeImage = galleryImages[activeImageIndex] || '';
 
   const handleLightboxNext = () => {
     if (galleryImages.length <= 1) return;
     setImageLoaded(false);
+    setLightboxImageLoaded(false);
     setActiveImageIdx((prevIdx) => (prevIdx + 1) % galleryImages.length);
     setLightboxZoom(1);
     setLightboxOffset({ x: 0, y: 0 });
@@ -1288,6 +1302,7 @@ function ProductDetail() {
   const handleLightboxPrev = () => {
     if (galleryImages.length <= 1) return;
     setImageLoaded(false);
+    setLightboxImageLoaded(false);
     setActiveImageIdx((prevIdx) => (prevIdx - 1 + galleryImages.length) % galleryImages.length);
     setLightboxZoom(1);
     setLightboxOffset({ x: 0, y: 0 });
@@ -3441,11 +3456,18 @@ function ProductDetail() {
               ref={lightboxContainerRef}
               className={`relative max-w-full max-h-[75vh] w-auto h-auto flex items-center justify-center ${lightboxZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
             >
+              {/* Spinner while high-res image resolves */}
+              {!lightboxImageLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-9 h-9 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                </div>
+              )}
               <img
                 ref={lightboxImageRef}
-                src={getOptimizedImageUrl(activeImage, 1400, 85)}
+                src={getOptimizedImageUrl(activeImage, 1200, 80)}
                 alt="Product Detail Expanded"
-                className="max-w-full max-h-[75vh] object-contain transition-transform duration-100 ease-out select-none pointer-events-none"
+                onLoad={() => setLightboxImageLoaded(true)}
+                className={`max-w-full max-h-[75vh] object-contain transition-opacity duration-150 select-none pointer-events-none ${lightboxImageLoaded ? 'opacity-100' : 'opacity-30'}`}
                 style={{
                   transform: `translate(${lightboxOffset.x}px, ${lightboxOffset.y}px) scale(${lightboxZoom})`,
                 }}
@@ -3477,6 +3499,9 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => {
+                      if (activeImageIndex !== idx) {
+                        setLightboxImageLoaded(false);
+                      }
                       setActiveImageIdx(idx);
                       setLightboxZoom(1);
                       setLightboxOffset({ x: 0, y: 0 });
