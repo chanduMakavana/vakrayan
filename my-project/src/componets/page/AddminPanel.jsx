@@ -163,7 +163,8 @@ function AdminPanel() {
   const [offerSearchQuery, setOfferSearchQuery] = useState('');
   const [slideMobileImage, setSlideMobileImage] = useState("");
   const [slideLink, setSlideLink] = useState("");
-  const [slideUploading, setSlideUploading] = useState(false);
+  const [slideDesktopUploading, setSlideDesktopUploading] = useState(false);
+  const [slideMobileUploading, setSlideMobileUploading] = useState(false);
 
   // Category manager states
   const [categoryImages, setCategoryImages] = useState({});
@@ -513,7 +514,11 @@ function AdminPanel() {
     const file = e?.target?.files?.[0];
     if (!file) return;
 
-    setSlideUploading(true);
+    if (isMobile) {
+      setSlideMobileUploading(true);
+    } else {
+      setSlideDesktopUploading(true);
+    }
     try {
       const response = await storageService.uploadFile(file);
       const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
@@ -531,7 +536,11 @@ function AdminPanel() {
       console.error("Slide image upload failed:", err);
       showToast("Storage upload failed.", "error");
     } finally {
-      setSlideUploading(false);
+      if (isMobile) {
+        setSlideMobileUploading(false);
+      } else {
+        setSlideDesktopUploading(false);
+      }
       if (e?.target) e.target.value = '';
     }
   };
@@ -4537,13 +4546,13 @@ function AdminPanel() {
                         className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                       />
                       <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
-                        {slideUploading ? "Uploading..." : "Upload"}
+                        {slideDesktopUploading ? "Uploading..." : "Upload"}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           onChange={(e) => handleSlideImageUpload(e, false)}
-                          disabled={slideUploading}
+                          disabled={slideDesktopUploading}
                         />
                       </label>
                     </div>
@@ -4567,13 +4576,13 @@ function AdminPanel() {
                         className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                       />
                       <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
-                        {slideUploading ? "Uploading..." : "Upload"}
+                        {slideMobileUploading ? "Uploading..." : "Upload"}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           onChange={(e) => handleSlideImageUpload(e, true)}
-                          disabled={slideUploading}
+                          disabled={slideMobileUploading}
                         />
                       </label>
                     </div>
@@ -4601,7 +4610,7 @@ function AdminPanel() {
                 <button
                   type="button"
                   onClick={handleAddSlide}
-                  disabled={actionLoading || slideUploading || !slideImage.trim()}
+                  disabled={actionLoading || slideDesktopUploading || slideMobileUploading || !slideImage.trim()}
                   className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-xl uppercase transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   🚀 DEPLOY BANNER SLIDE

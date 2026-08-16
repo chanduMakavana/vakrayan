@@ -34,11 +34,17 @@ export const db = dbInstance;
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Safe Messaging Initialization Helper
-import { getMessaging, isSupported } from "firebase/messaging";
+// Safe Messaging Initialization Helper with Dynamic Import
 export const getMessagingInstance = async () => {
-  if (typeof window !== "undefined" && await isSupported()) {
-    return getMessaging(app);
+  if (typeof window !== "undefined") {
+    try {
+      const { getMessaging, isSupported } = await import("firebase/messaging");
+      if (await isSupported()) {
+        return getMessaging(app);
+      }
+    } catch {
+      return null;
+    }
   }
   return null;
 };
