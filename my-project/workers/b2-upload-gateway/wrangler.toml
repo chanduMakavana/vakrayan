@@ -1,0 +1,15 @@
+﻿name = "b2-upload-gateway"
+main = "index.js"
+compatibility_date = "2024-09-23"
+
+# Environment variable — set actual value in CF Dashboard:
+# Workers & Pages → b2-upload-gateway → Settings → Variables & Secrets
+# Variable name: B2_BUCKET_URL
+# Value: https://f005.backblazeb2.com/file/YOUR_BUCKET_NAME
+# (Find in: Backblaze → Buckets → your bucket → Bucket Settings → Friendly URL)
+
+[vars]
+B2_BUCKET_URL = ""
+
+[observability]
+enabled = true
