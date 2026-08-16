@@ -5,16 +5,15 @@ import Loader from './pageComponets/Loader'
 /**
  * AdminRoute — Router-level admin authorization guard.
  *
- * Firebase Adapter के साथ 3 तरीकों से admin check होता है:
+ * Admin check is performed server-side via Firestore — no admin email is
+ * stored in the client-side JS bundle.
  *
- * Method 1 (Recommended): Firestore user document में prefs.role = 'admin' set करो
+ * Method 1 (Active): Firestore user document prefs.role = 'admin'
  *   - Firebase Console → Firestore → users → [your-uid] → prefs → role: "admin"
- *   - यह सबसे secure है
+ *   - This is the most secure approach — set it directly in the Firebase Console.
  *
- * Method 2 (Easy): VITE_ADMIN_EMAIL environment variable
- *   - .env file में: VITE_ADMIN_EMAIL="youremail@gmail.com"
- *
- * Method 3: user.labels (future Firebase compatibility)
+ * Method 2 (Future): user.labels array containing 'admin'
+ *   - For forward compatibility with Firebase custom claims.
  */
 function AdminRoute({ children }) {
   const { user, isAuthenticated, loading } = useSelector((state) => state.auth)
@@ -33,12 +32,7 @@ function AdminRoute({ children }) {
   // Method 2: Firebase-style labels (for future compatibility)
   const hasAdminLabel = Array.isArray(user.labels) && user.labels.includes('admin')
 
-  // Method 3: Email check via env variable or master admin email
-  const configuredAdminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'chandumakavana61@gmail.com').replace(/['"]/g, '').trim().toLowerCase()
-  const userEmail = (user.email || '').trim().toLowerCase()
-  const hasAdminEmail = Boolean(userEmail && (userEmail === configuredAdminEmail || userEmail === 'chandumakavana61@gmail.com'))
-
-  const isAdmin = hasAdminRole || hasAdminLabel || hasAdminEmail
+  const isAdmin = hasAdminRole || hasAdminLabel
 
   if (!isAdmin) {
     return <Navigate to="/" replace />

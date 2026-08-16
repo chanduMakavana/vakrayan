@@ -77,14 +77,15 @@ function Footer() {
           {/* Social icons — proper SVGs */}
           <div className="flex gap-4 mt-4">
             {[
-              { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/' },
-              { Icon: PinterestIcon, label: 'Pinterest', href: 'https://in.pinterest.com/vakrayan_official' },
-              { Icon: XIcon, label: 'X (Twitter)', href: '#' },
-            ].map(({ Icon, label, href }) => (
+              { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/', rel: 'noopener noreferrer' },
+              { Icon: PinterestIcon, label: 'Pinterest', href: 'https://in.pinterest.com/vakrayan_official', rel: 'noopener noreferrer' },
+              { Icon: XIcon, label: 'X (Twitter)', href: 'https://x.com/vakrayan_official', rel: 'noopener noreferrer' },
+            ].map(({ Icon, label, href, rel }) => (
               <a
                 key={label}
                 target='_blank'
                 href={href}
+                rel={rel || 'noopener noreferrer'}
                 aria-label={label}
                 className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer"
                 style={{

@@ -73,18 +73,28 @@ function Hero() {
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    // Debounced to prevent render flooding during window resize
+    let debounceTimer
+    const debouncedResize = () => {
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(handleResize, 150)
+    }
+    window.addEventListener('resize', debouncedResize)
+    return () => {
+      window.removeEventListener('resize', debouncedResize)
+      clearTimeout(debounceTimer)
+    }
   }, [])
 
-  // Auto-play timer resets to full 5 seconds whenever currentIndex changes
+  // Auto-play timer — uses functional state update so currentIndex is NOT a dep.
+  // This prevents the timer from being recreated on every slide advance.
   useEffect(() => {
     if (!slides || slides.length <= 1) return
     const timer = setInterval(() => {
       setCurrentIndex(prev => (prev + 1) % slides.length)
     }, 5000)
     return () => clearInterval(timer)
-  }, [currentIndex, slides?.length])
+  }, [slides?.length])
 
   const nextSlide = () => {
     if (!slides || slides.length <= 1) return
@@ -217,7 +227,7 @@ function Hero() {
           >
             <img
               src={getOptimizedImageUrl(isMobile && activeSlide.mobileImage ? activeSlide.mobileImage : activeSlide.image, isMobile ? 800 : 1600, 75)}
-              alt="Vakrayan Banner"
+              alt={activeSlide.alt || activeSlide.title || 'Vakrayan Premium Apparel Collection'}
               loading="eager"
               decoding="async"
               fetchPriority="high"

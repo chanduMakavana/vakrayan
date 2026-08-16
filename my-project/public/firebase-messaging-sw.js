@@ -17,7 +17,8 @@ const messaging = firebase.messaging();
 
 // Intercept and display background notifications
 messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] Background notification received:', payload);
+  // NOTE: Firebase config in service workers must be hardcoded — SW cannot access
+  // build-time environment variables. This is a known Firebase limitation.
   
   const notificationTitle = payload.notification?.title || "Vakrayan";
   const notificationOptions = {

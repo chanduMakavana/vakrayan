@@ -1,10 +1,31 @@
+const ALLOWED_ORIGINS = [
+  'https://vakrayan.com',
+  'https://www.vakrayan.com',
+  'https://vakrayan.in',
+  'https://www.vakrayan.in',
+  'https://vakrayan.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 export async function handler(event) {
-  const allowOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || '*';
+  const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+  const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin);
+
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : 'https://vakrayan.com',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
+
+  // Block requests from unknown origins
+  if (!isAllowedOrigin && event.httpMethod !== 'OPTIONS') {
+    return {
+      statusCode: 403,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Forbidden: Origin not allowed.' })
+    };
+  }
 
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -14,6 +35,7 @@ export async function handler(event) {
       body: ''
     };
   }
+
 
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };

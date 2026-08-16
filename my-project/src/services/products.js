@@ -163,7 +163,9 @@ export class ProductsService {
             console.warn("Firebase search logs collection unavailable. Storing locally.", error.message);
             const logs = JSON.parse(localStorage.getItem('search_logs')) || [];
             logs.push(payload);
-            localStorage.setItem('search_logs', JSON.stringify(logs));
+            // Cap at 50 entries to prevent unbounded localStorage growth
+            const cappedLogs = logs.length > 50 ? logs.slice(-50) : logs;
+            localStorage.setItem('search_logs', JSON.stringify(cappedLogs));
             return payload;
         }
     }

@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const ToastContext = createContext(null)
@@ -40,18 +40,32 @@ const CloseIcon = () => (
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([])
+  const timersRef = useRef({})
+
+  // Clean up all pending timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(timersRef.current).forEach(clearTimeout)
+    }
+  }, [])
 
   const showToast = useCallback((message, type = 'info') => {
     const id = Math.random().toString(36).substring(2, 9)
     setToasts((prevToasts) => [...prevToasts, { id, message, type }])
     
-    // Auto dismiss after 4 seconds
-    setTimeout(() => {
+    // Auto dismiss after 4 seconds — store ID so it can be cancelled on manual dismiss
+    timersRef.current[id] = setTimeout(() => {
       setToasts((prevToasts) => prevToasts.filter((t) => t.id !== id))
+      delete timersRef.current[id]
     }, 4000)
   }, [])
 
   const removeToast = useCallback((id) => {
+    // Cancel the auto-dismiss timeout if the user manually closes the toast
+    if (timersRef.current[id]) {
+      clearTimeout(timersRef.current[id])
+      delete timersRef.current[id]
+    }
     setToasts((prevToasts) => prevToasts.filter((t) => t.id !== id))
   }, [])
 

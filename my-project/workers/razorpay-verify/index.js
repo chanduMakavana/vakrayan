@@ -101,8 +101,18 @@ export default {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 
-      // Timing-safe comparison to prevent timing attacks
-      const isValid = computedSignature === razorpay_signature;
+      // Convert to Uint8Array for constant-time comparison
+      const computedBytes = new TextEncoder().encode(computedSignature);
+      const receivedBytes = new TextEncoder().encode(razorpay_signature);
+
+      // Constant-time comparison to prevent timing attacks.
+      // Uses XOR of all bytes so execution time does not depend on where bytes differ.
+      let mismatch = computedBytes.length !== receivedBytes.length ? 1 : 0;
+      const len = Math.max(computedBytes.length, receivedBytes.length);
+      for (let i = 0; i < len; i++) {
+        mismatch |= (computedBytes[i] ?? 0) ^ (receivedBytes[i] ?? 0);
+      }
+      const isValid = mismatch === 0;
 
       if (!isValid) {
         return new Response(JSON.stringify({

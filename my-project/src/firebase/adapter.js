@@ -278,8 +278,8 @@ export class Databases {
 
         // 1. Build optimal query (with server-side orderBy + limit)
         let mainQuery = q;
-        filterWheres.forEach(w => { mainQuery = query(mainQuery, w); });
-        sortOrders.forEach(s => { mainQuery = query(mainQuery, orderBy(s.key, s.dir)); });
+        filterWheres.forEach(clause => { mainQuery = query(mainQuery, clause); });
+        sortOrders.forEach(sort => { mainQuery = query(mainQuery, orderBy(sort.key, sort.dir)); });
         if (limitVal !== null) { mainQuery = query(mainQuery, limit(limitVal)); }
 
         let querySnapshot;
@@ -291,7 +291,7 @@ export class Databases {
             // 2. Build fallback query (where clauses ONLY — never require composite indexes or complex sorting)
             try {
                 let fallbackQuery = q;
-                filterWheres.forEach(w => { fallbackQuery = query(fallbackQuery, w); });
+                filterWheres.forEach(clause => { fallbackQuery = query(fallbackQuery, clause); });
                 querySnapshot = await getDocs(fallbackQuery);
             } catch (fallbackErr) {
                 console.warn(`⚠️ Filtered query fallback failed, reading base collection "${collectionId}":`, fallbackErr.message);

@@ -42,6 +42,8 @@
     <!-- ⚡ LCP Hero Banner Early Preload: Starts downloading at 0.1s in parallel with HTML/JS -->
     <link rel="preload" as="image" href="https://b2-upload-gateway.vakrayan.workers.dev/file/1786854633429_Create_image_ratio_version_2K_202608152012-processed_lightpdf.com_.png?w=800&dpr=2&q=75" fetchpriority="high" media="(max-width: 767px)" />
     <link rel="preload" as="image" href="https://b2-upload-gateway.vakrayan.workers.dev/file/1786854633429_Create_image_ratio_version_2K_202608152012-processed_lightpdf.com_.png?w=1600&dpr=2&q=75" fetchpriority="high" media="(min-width: 768px)" />
+    <!-- Preload splash screen logo (LCP-critical — shown on every first visit) -->
+    <link rel="preload" as="image" href="/vakrayan-logo-icon.png" fetchpriority="high" />
 
     <!-- Google Fonts: Asynchronously loaded to prevent render-blocking -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
@@ -118,7 +120,7 @@
     <title>Vakrayan | Premium Apparel</title>
   </head>
   <body>
-    <a href="#main-content" class="skip-to-content" style="position:absolute;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;">Skip to main content</a>
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
     <div id="root"></div>
     <noscript>
       <div style="text-align:center;padding:2rem;font-family:system-ui">

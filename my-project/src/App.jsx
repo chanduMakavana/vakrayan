@@ -372,7 +372,12 @@ function AppContent() {
             categoryService.getCategoryConfigs(),
             campaignService.getPromoText()
           ])
-        } catch {}
+        } catch (metaErr) {
+          // Meta tasks failing is non-critical — log in dev only
+          if (import.meta.env.DEV) {
+            console.warn('[App] metaTask error (non-critical):', metaErr)
+          }
+        }
       })()
 
       // 6. Google Web Fonts Loading
@@ -412,7 +417,10 @@ function AppContent() {
       mounted = false
       clearTimeout(maxTimer)
     }
-  }, [dispatch, showToast])
+  }, [dispatch]) // eslint-disable-line react-hooks/exhaustive-deps
+  // showToast is intentionally excluded: it is created with useCallback([], []) and
+  // is guaranteed stable. Including it would re-trigger the entire app warmup
+  // (auth check, product fetch) on every parent re-render.
 
   // Periodic Google session expiration check (every 60s)
   useEffect(() => {
@@ -437,20 +445,31 @@ function AppContent() {
     checkExpiry()
     const intervalId = setInterval(checkExpiry, 60000)
     return () => clearInterval(intervalId)
-  }, [location.pathname, dispatch, showToast])
+  }, [dispatch, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
+  // location.pathname intentionally excluded: the interval must not be torn down
+  // and recreated on every navigation — only on mount/unmount.
 
   // Re-filter products when adminMode changes
   useEffect(() => {
     dispatch(filterProductsForMode(adminMode))
   }, [adminMode, dispatch])
 
-  // Background preloading of critical route chunks during idle time
+  // Background preloading of critical route chunks during browser idle time
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const load = () => {
       shopImporter()
       productDetailImporter()
-    }, 1500)
-    return () => clearTimeout(timer)
+    }
+    // requestIdleCallback defers until browser is idle, preventing competition
+    // with the critical auth+product warmup sequence on initial load.
+    if ('requestIdleCallback' in window) {
+      const id = requestIdleCallback(load, { timeout: 3000 })
+      return () => cancelIdleCallback(id)
+    } else {
+      // Safari fallback
+      const timer = setTimeout(load, 2000)
+      return () => clearTimeout(timer)
+    }
   }, [])
 
   // Handle Chrome tab background/visibility restore

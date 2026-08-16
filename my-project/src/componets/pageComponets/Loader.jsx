@@ -15,6 +15,7 @@ function Loader({ type = 'inline', text }) {
             <img 
               src="/vakrayan-logo-icon.png" 
               alt="Vakrayan Logo" 
+              fetchPriority="high"
               className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-md" 
             />
             <div className="flex flex-col items-center gap-1">
@@ -26,7 +27,7 @@ function Loader({ type = 'inline', text }) {
               </h1>
               <p
                 className="text-[9px] font-bold tracking-[0.3em] uppercase"
-                style={{ color: 'var(--color-muted)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                style={{ color: 'var(--color-muted)', fontFamily: 'Jost, sans-serif' }}
               >
                 Premium Apparel
               </p>

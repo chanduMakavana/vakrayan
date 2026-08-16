@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, useMemo } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
 import wishlistService from '../../services/wishlist'
@@ -27,16 +27,24 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
   const hasBackView = backView && backView !== frontView;
   const activeTag = product.tag || (product.category === 'oversized-tshirt' ? 'OVERSIZED' : '');
 
+  const productPath = `/product/${product.slug || parentId}`
+
   return (
+    <Link
+      to={productPath}
+      className="group relative flex flex-col bg-white border border-emerald-900/15 hover:border-emerald-600 transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer rounded-none overflow-hidden no-underline"
+      style={{ textDecoration: 'none', color: 'inherit' }}
+      tabIndex={0}
+      aria-label={`View ${product.name}`}
+    >
     <motion.div
       variants={cardVariants}
-      onClick={() => navigate(`/product/${product.slug || parentId}`)}
+      className="flex flex-col w-full h-full"
       onMouseEnter={() => {
         setIsHovered(true);
         if (hasBackView) preloadImage(getOptimizedImageUrl(backView, 500, 75));
       }}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative flex flex-col bg-white border border-emerald-900/15 hover:border-emerald-600 transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer rounded-none overflow-hidden"
     >
       {/* Image area */}
       <div className="w-full aspect-[3/4] relative overflow-hidden bg-[#F0F7F3] border-b border-emerald-900/15">
@@ -153,6 +161,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
         </div>
       </div>
     </motion.div>
+    </Link>
   );
 }
 
@@ -182,8 +191,14 @@ function BestSellers() {
     return 0
   })
 
-  const sortedProducts = scatterProducts(sortInStockFirst(products))
-  const featuredProducts = scatterProducts(sortedProducts.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1'))
+  const sortedProducts = useMemo(() =>
+    scatterProducts(sortInStockFirst(products))
+  , [products]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const featuredProducts = useMemo(() =>
+    scatterProducts(sortedProducts.filter(p => p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1'))
+  , [sortedProducts])
+
   const displayedProducts = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : sortedProducts.slice(0, 4)
 
   useEffect(() => {
