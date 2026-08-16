@@ -13,8 +13,8 @@ const childVariants = {
 }
 
 const statsData = [
-  { value: '500+', label: 'Happy Customers' },
-  { value: '50+', label: 'Premium Styles' },
+  { value: '100+', label: 'Happy Customers' },
+  { value: '10+', label: 'Premium Styles' },
   { value: '7 Days', label: 'Easy Returns' },
   { value: '100%', label: 'Quality Assured' },
 ]

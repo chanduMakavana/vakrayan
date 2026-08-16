@@ -169,7 +169,7 @@ function Hero() {
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, rgba(5,150,105,0.05) 0%, rgba(0,0,0,0.6) 100%)' }} />
 
         {/* Bottom hero content overlay */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-10 md:pb-14 pointer-events-none">
+        <div className="hidden md:block absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-4 md:pb-5 pointer-events-none">
           <div
             className="inline-flex items-center gap-3 px-4 py-2.5"
             style={{
@@ -244,7 +244,7 @@ function Hero() {
       </div>
 
       {/* Bottom hero content overlay */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-10 md:pb-14 pointer-events-none">
+      <div className="hidden md:block absolute bottom-0 left-0 right-0 z-20 px-6 md:px-14 pb-4 md:pb-5 pointer-events-none">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
