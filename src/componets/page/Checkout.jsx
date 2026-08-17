@@ -66,6 +66,7 @@ function Checkout() {
   const { items: products, fetched: productsFetched } = useSelector(state => state.products)
 
   const [checkoutStatus, setCheckoutStatus] = useState('idle') // idle | processing | success
+  const [isSubmitting, setIsSubmitting] = useState(false) // true while pre-checks run (pincode + stock)
 
   // ✅ SEO: Dynamic page title
   useEffect(() => { document.title = 'Checkout | Vakrayan' }, [])
@@ -400,6 +401,7 @@ function Checkout() {
     if (isSubmittingRef.current) return;
 
     isSubmittingRef.current = true;
+    setIsSubmitting(true); // Show button spinner immediately on click
 
 
 
@@ -408,6 +410,7 @@ function Checkout() {
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
       showToast("Please enter a valid 6-digit Indian PIN code.", "error");
       isSubmittingRef.current = false;
+      setIsSubmitting(false);
       return;
     }
 
@@ -418,6 +421,7 @@ function Checkout() {
       if (pinData && pinData[0] && pinData[0].Status === 'Error') {
         showToast(`Sorry, PIN code ${pin} is invalid or not serviceable. Please enter a valid deliverable PIN code.`, "error");
         isSubmittingRef.current = false;
+        setIsSubmitting(false);
         return;
       }
       if (pinData && pinData[0] && pinData[0].PostOffice && pinData[0].PostOffice.length > 0) {
@@ -433,6 +437,7 @@ function Checkout() {
       if (!isCodAllowed) {
         showToast("Cash on Delivery (COD) is not serviceable for this remote route. Please use Online Payment.", "error");
         isSubmittingRef.current = false;
+        setIsSubmitting(false);
         return;
       }
     }
@@ -454,9 +459,15 @@ function Checkout() {
         if (Number(cartItem.quantity) > availableStock) {
           showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
           isSubmittingRef.current = false;
+          setIsSubmitting(false);
           return;
         }
       }
+    }
+
+    // For COD/WALLET: show splash loader immediately — no payment popup needed
+    if (selectedPayment === 'COD' || selectedPayment === 'WALLET') {
+      setIsSubmitting(false);
     }
 
     if (selectedPayment === 'ONLINE') {
@@ -562,6 +573,7 @@ function Checkout() {
       }
 
       // Fallback: custom sandbox simulator
+      setIsSubmitting(false);
       setRazorpayModalOpen(true);
       return;
     }
@@ -575,7 +587,9 @@ function Checkout() {
     await processFinalizeOrder(data, 'COD', 'UNPAID', '', '');
   };
 
+
   const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
+    setIsSubmitting(false);
     setCheckoutStatus('processing');
 
     try {
@@ -1123,9 +1137,21 @@ function Checkout() {
                 {/* Simulated Order Submission */}
                 <button
                   type="submit"
-                  className="w-full md:col-span-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.99] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer mt-4"
+                  disabled={isSubmitting}
+                  className={`w-full md:col-span-2 font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all mt-4 ${
+                    isSubmitting
+                      ? 'bg-[var(--color-accent)]/70 cursor-not-allowed text-white/80'
+                      : 'bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.99] text-white cursor-pointer'
+                  }`}
                 >
-                  FINALIZE & PLACE ORDER // ₹{Math.round(finalAmount).toLocaleString('en-IN')}
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                      {selectedPayment === 'ONLINE' ? 'VERIFYING & OPENING PAYMENT...' : 'PLACING ORDER...'}
+                    </span>
+                  ) : (
+                    `FINALIZE & PLACE ORDER // ₹${Math.round(finalAmount).toLocaleString('en-IN')}`
+                  )}
                 </button>
 
               </form>
