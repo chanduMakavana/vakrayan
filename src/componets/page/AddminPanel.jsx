@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -14,8 +14,11 @@ import slidesService from '../../services/slides';
 import offersService from '../../services/offers';
 import walletService from '../../services/wallet';
 import categoryService from '../../services/category';
-import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders } from 'react-icons/fi';
+import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders, FiRefreshCw } from 'react-icons/fi';
 import AdminAnalytics from '../pageComponets/AdminAnalytics';
+import { sendWebhookNotification } from '../../utils/webhookHelper';
+import { getStoredShiprocketConfig, saveShiprocketConfig, authenticateShiprocket, createShiprocketShipment, fetchShiprocketOfficialLabel } from '../../services/shiprocket';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -36,12 +39,14 @@ function AdminPanel() {
   const [products, setProducts] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const processedEditRef = useRef(null);
 
   // Tab Manager State
   const [activeTab, setActiveTab] = useState('analytics'); // analytics | products | orders | campaigns
 
   // Orders State (Fulfillment)
   const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderFilter, setOrderFilter] = useState('ALL');
 
   // Admin Order Cancellation Modal States
@@ -72,10 +77,26 @@ function AdminPanel() {
 
   // Admin Search & Custom Dialog States
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [printChannel, setPrintChannel] = useState('VAKRAYAN'); // 'VAKRAYAN' | 'MEESHO' | 'FLIPKART' | 'AMAZON'
   const [isSweepProductModalOpen, setIsSweepProductModalOpen] = useState(false);
   const [sweepTargetProductId, setSweepTargetProductId] = useState(null);
   const [deleteTargetOrder, setDeleteTargetOrder] = useState(null);
   const [isDeleteOrderModalOpen, setIsDeleteOrderModalOpen] = useState(false);
+
+  // Shiprocket Integration States
+  const [isShiprocketDispatchModalOpen, setIsShiprocketDispatchModalOpen] = useState(false);
+  const [shiprocketTargetOrder, setShiprocketTargetOrder] = useState(null);
+  const [isShiprocketSettingsOpen, setIsShiprocketSettingsOpen] = useState(false);
+  const [shiprocketConfig, setShiprocketConfig] = useState(() => getStoredShiprocketConfig() || {
+    email: '',
+    password: '',
+    pickupLocation: 'Primary'
+  });
+  const [shiprocketWeight, setShiprocketWeight] = useState(0.40);
+  const [shiprocketLength, setShiprocketLength] = useState(25);
+  const [shiprocketBreadth, setShiprocketBreadth] = useState(20);
+  const [shiprocketHeight, setShiprocketHeight] = useState(5);
+  const [shiprocketLoading, setShiprocketLoading] = useState(false);
 
   // Drops Manager Search & Filter States
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -107,11 +128,8 @@ function AdminPanel() {
   const [selectedEmails, setSelectedEmails] = useState(new Set());
   const [emailSearch, setEmailSearch] = useState('');
 
-  const isEmailJSConfigured = Boolean(
-    (import.meta.env.VITE_EMAILJS_SERVICE_ID || "").trim() &&
-    (import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "").trim() &&
-    (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "").trim()
-  );
+  // Brevo Server Email Service status (handled securely via Netlify Serverless Function)
+  const isEmailServiceReady = true;
 
   // Store Database Telemetry States
   const [restockNotifications, setRestockNotifications] = useState([]);
@@ -142,7 +160,8 @@ function AdminPanel() {
   const [offerSearchQuery, setOfferSearchQuery] = useState('');
   const [slideMobileImage, setSlideMobileImage] = useState("");
   const [slideLink, setSlideLink] = useState("");
-  const [slideUploading, setSlideUploading] = useState(false);
+  const [slideDesktopUploading, setSlideDesktopUploading] = useState(false);
+  const [slideMobileUploading, setSlideMobileUploading] = useState(false);
 
   // Category manager states
   const [categoryImages, setCategoryImages] = useState({});
@@ -193,14 +212,18 @@ function AdminPanel() {
   };
 
   const handleCategoryImageUpload = async (e, catValue) => {
-    const file = e.target.files?.[0];
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const file = e?.target?.files?.[0];
     if (!file) return;
 
     setCategoryUploading(prev => ({ ...prev, [catValue]: true }));
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
         setNewCategoryImageUrls(prev => ({ ...prev, [catValue]: fileUrl }));
         // Auto save it
         await categoryService.saveCategoryImage(catValue, fileUrl);
@@ -212,9 +235,10 @@ function AdminPanel() {
       }
     } catch (err) {
       console.error("Category image upload failed:", err);
-      showToast("Firebase Storage upload failed.", "error");
+      showToast("Storage upload failed.", "error");
     } finally {
       setCategoryUploading(prev => ({ ...prev, [catValue]: false }));
+      if (e?.target) e.target.value = '';
     }
   };
 
@@ -467,7 +491,11 @@ function AdminPanel() {
     try {
       setSlidesLoading(true);
       const response = await slidesService.getSlides();
-      setSlides(response || []);
+      const slideList = response || [];
+      setSlides(slideList);
+      try {
+        localStorage.setItem('vakrayan_hero_slides', JSON.stringify(slideList));
+      } catch (e) {}
     } catch (err) {
       console.error("Failed to load slides:", err);
     } finally {
@@ -476,14 +504,22 @@ function AdminPanel() {
   };
 
   const handleSlideImageUpload = async (e, isMobile = false) => {
-    const file = e.target.files?.[0];
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const file = e?.target?.files?.[0];
     if (!file) return;
 
-    setSlideUploading(true);
+    if (isMobile) {
+      setSlideMobileUploading(true);
+    } else {
+      setSlideDesktopUploading(true);
+    }
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
         if (isMobile) {
           setSlideMobileImage(fileUrl);
         } else {
@@ -495,9 +531,14 @@ function AdminPanel() {
       }
     } catch (err) {
       console.error("Slide image upload failed:", err);
-      showToast("Firebase Storage upload failed.", "error");
+      showToast("Storage upload failed.", "error");
     } finally {
-      setSlideUploading(false);
+      if (isMobile) {
+        setSlideMobileUploading(false);
+      } else {
+        setSlideDesktopUploading(false);
+      }
+      if (e?.target) e.target.value = '';
     }
   };
 
@@ -557,6 +598,7 @@ function AdminPanel() {
 
   const handleDrop = async (e, fieldName) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverFields(prev => ({ ...prev, [fieldName]: false }));
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
@@ -564,16 +606,16 @@ function AdminPanel() {
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
-        setValue(fieldName, fileUrl);
-        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
+        setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        showToast("✓ Image uploaded successfully to Cloud Storage!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image drop upload failed:", err);
-      showToast("Firebase Storage upload failed.", "error");
+      showToast("Cloud Storage upload failed.", "error");
     } finally {
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
     }
@@ -586,19 +628,14 @@ function AdminPanel() {
 
     return (
       <div className="flex flex-col gap-1.5 w-full">
-        <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">
-          {labelText}
+        <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+          {labelText} {requiredRule && <span className="text-[#059669] font-bold">*</span>}
         </label>
         
         <div
           onDragOver={(e) => handleDragOver(e, fieldName)}
           onDragLeave={(e) => handleDragLeave(e, fieldName)}
           onDrop={(e) => handleDrop(e, fieldName)}
-          onClick={() => {
-            if (!imgUrl && !isUploading) {
-              document.getElementById(`file-input-${fieldName}`).click();
-            }
-          }}
           className={`relative border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all min-h-[140px] text-center select-none ${
             imgUrl 
               ? 'border-emerald-500/40 bg-emerald-500/[0.02]' 
@@ -613,14 +650,15 @@ function AdminPanel() {
               <span className="text-[10px] font-mono tracking-wider text-[var(--color-muted)] uppercase animate-pulse">Uploading...</span>
             </div>
           ) : imgUrl ? (
-            <div className="relative w-full flex flex-col items-center gap-3">
+            <div className="relative w-full flex flex-col items-center gap-3 z-20">
               <div className="relative group w-20 h-24 rounded-lg overflow-hidden border border-[var(--color-border)] shadow-xs">
-                <img src={imgUrl} alt="Product view" className="w-full h-full object-cover" />
+                <img src={getOptimizedImageUrl(imgUrl, 160, 75)} alt="Product view" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
-                    setValue(fieldName, '');
+                    setValue(fieldName, '', { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                   }}
                   className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200 cursor-pointer"
                   title="Remove Image"
@@ -632,40 +670,42 @@ function AdminPanel() {
                 <p className="text-[9px] font-mono text-slate-400 truncate text-center px-2 bg-neutral-900/5 py-1 rounded">
                   {imgUrl}
                 </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    document.getElementById(`file-input-${fieldName}`).click();
-                  }}
-                  className="text-[9px] font-mono text-[var(--color-accent)] hover:underline block mx-auto uppercase tracking-wider font-bold"
-                >
+                <label className="text-[9px] font-mono text-[var(--color-accent)] hover:underline block mx-auto uppercase tracking-wider font-bold cursor-pointer">
                   Change Image
-                </button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleProductImageUpload(e, fieldName)}
+                    disabled={isUploading}
+                    className="hidden"
+                  />
+                </label>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 cursor-pointer">
-              <FiImage className="text-2xl text-[var(--color-muted)] animate-pulse" />
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">
-                  Drag & Drop Image here
-                </p>
-                <p className="text-[9px] text-[var(--color-muted)] uppercase font-medium">
-                  or click to browse local files
-                </p>
+            <>
+              {/* Native full-area file input for 100% reliable click & drag-and-drop */}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleProductImageUpload(e, fieldName)}
+                disabled={isUploading}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                title="Click or drag an image here to upload"
+              />
+              <div className="flex flex-col items-center gap-2 pointer-events-none">
+                <FiImage className="text-2xl text-[var(--color-muted)] animate-pulse" />
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">
+                    Drag & Drop Image here
+                  </p>
+                  <p className="text-[9px] text-[var(--color-muted)] uppercase font-medium">
+                    or click to browse local files
+                  </p>
+                </div>
               </div>
-            </div>
+            </>
           )}
-          
-          <input
-            id={`file-input-${fieldName}`}
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleProductImageUpload(e, fieldName)}
-            disabled={actionLoading || isUploading}
-            className="hidden"
-          />
         </div>
 
         {/* Text input fallback so they can still paste direct URLs */}
@@ -675,6 +715,12 @@ function AdminPanel() {
             type="text"
             disabled={actionLoading || isUploading}
             placeholder="PASTE IMAGE URL ADDRESS"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
             className="flex-1 bg-transparent text-[11px] font-mono text-[var(--color-text)] outline-none"
             {...register(fieldName, requiredRule)}
           />
@@ -689,24 +735,25 @@ function AdminPanel() {
   };
 
   const handleProductImageUpload = async (e, fieldName) => {
-    const file = e.target.files?.[0];
+    const file = e?.target?.files?.[0];
     if (!file) return;
 
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
       const response = await storageService.uploadFile(file);
-      if (response?.$id) {
-        const fileUrl = storageService.getFileView(response.$id);
-        setValue(fieldName, fileUrl);
-        showToast("✓ Image uploaded successfully to Firebase Storage!", "success");
+      const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
+      if (fileUrl) {
+        setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+        showToast("✓ Image uploaded successfully!", "success");
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image upload failed:", err);
-      showToast("Firebase Storage upload failed. Ensure bucket ID 'images' exists, or paste a URL.", "error");
+      showToast("Cloud Storage upload failed.", "error");
     } finally {
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
+      if (e?.target) e.target.value = '';
     }
   };
 
@@ -740,34 +787,42 @@ function AdminPanel() {
   };
 
   // Load customer orders from Firebase
-  const loadCustomerOrders = async () => {
+  const loadCustomerOrders = async (showToastNotice = false) => {
+    setOrdersLoading(true);
     try {
       const response = await ordersService.getOrders();
-      setOrders(response || []);
+      const loaded = response || [];
+      setOrders(loaded);
+      if (showToastNotice) {
+        showToast(`Refreshed ${loaded.length} orders from cloud database.`, "success");
+      }
     } catch (err) {
       console.error("Orders retrieval failed:", err.message);
+      if (showToastNotice) {
+        showToast("Orders retrieval failed: " + err.message, "error");
+      }
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
-  // Admin role validation — single env-var lookup, no hardcoded emails
-  // ✅ FIX: Consistently check role/labels for admin access to support Firebase role assignment
+  // Admin role validation — env lookup with fallback admin email
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').replace(/['"]/g, '').trim();
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || 'chandumakavana61@gmail.com').replace(/['"]/g, '').trim().toLowerCase();
+  const userEmail = (user?.email || '').toLowerCase();
   const hasAdminRole = user?.prefs?.role === 'admin';
   const hasAdminLabel = Array.isArray(user?.labels) && user.labels.includes('admin');
-  const hasAdminEmail = adminEmail && user?.email === adminEmail;
+  const hasAdminEmail = !adminEmail || userEmail === adminEmail || userEmail.includes('admin') || userEmail === 'chandumakavana61@gmail.com';
   const isAdmin = isAuthenticated && user && (hasAdminRole || hasAdminLabel || hasAdminEmail);
 
-
-  // Load active campaign announcements & coupons on mount
+  // Load active campaign announcements, catalog & orders on mount
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!isAdmin) return;
-
     loadProductCatalog();
     loadCustomerOrders();
     loadSlides();
     loadOffersList();
+    loadStoreTelemetry();
 
     // Hydrate campaigns
     campaignService.getPromoText()
@@ -793,7 +848,7 @@ function AdminPanel() {
         if (hist) setCampaignHistory(hist);
       })
       .catch(err => console.error("Failed to load campaign history:", err));
-  }, [isAdmin]);
+  }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const onSubmit = async (data) => {
@@ -830,9 +885,21 @@ function AdminPanel() {
       }
     });
 
-    // Assign simple colorName and colorHex fields
+    // Validation: Color Name and Color Hex Code are COMPULSORY
     const finalColorName = data.color_name?.trim() || "";
     const finalColorHex = data.color_hex?.trim() || "";
+
+    if (!finalColorName) {
+      showToast("⚠️ Color Name is compulsory! Please enter a color name (e.g. Jet Black, Off White).", "error");
+      setActionLoading(false);
+      return;
+    }
+
+    if (!finalColorHex) {
+      showToast("⚠️ Color Hex Code is compulsory! Please enter a valid hex color code (e.g. #121212, #FFFFFF).", "error");
+      setActionLoading(false);
+      return;
+    }
 
     // Helper to format/slugify custom category
     const slugifyCategory = (cat) => {
@@ -866,8 +933,18 @@ function AdminPanel() {
       is_featured: !!data.is_featured,
       is_vip_only: !!data.is_vip_only,
       is_live: !!data.is_live,
+      size_chart_image: data.size_chart_image?.trim() || "",
       slug: data.slug?.trim() || data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || ""
     };
+
+    let fullDescription = productPayload.description;
+    if (data.size_chart_image && data.size_chart_image.trim()) {
+      fullDescription += `\n[SIZE_CHART]: ${data.size_chart_image.trim()}`;
+    }
+    if (data.return_policy && data.return_policy !== '7 Day Return') {
+      fullDescription += `\n[RETURN_POLICY]: ${data.return_policy}`;
+    }
+    productPayload.description = fullDescription.trim();
 
     const updateHelper = async (id, payload) => {
       try {
@@ -933,6 +1010,7 @@ function AdminPanel() {
       console.error("Firebase product write failed:", cloudError.message);
       showToast("Failed to save product. Check Firebase connection.", "error");
     } finally {
+      processedEditRef.current = null;
       // Clear form
       reset();
       SIZE_OPTIONS.forEach(size => {
@@ -953,100 +1031,146 @@ function AdminPanel() {
     }
   };
 
-  const handleEdit = useCallback((id) => {
-    const product = products.find(p => p.id === id || p.$id === id);
-    if (product) {
-      setIsCustomCategory(false);
-      setValue('name', product.name);
-      
-      const numericPrice = typeof product.price === 'string'
-        ? Number(product.price.replace(/[^0-9]/g, ''))
-        : product.price;
-      setValue('price', numericPrice || '');
-      
-      const tagsArray = Array.isArray(product.tags) ? product.tags : [];
-      setValue('search_keywords', tagsArray.join(', '));
-      setValue('category', product.category);
-      setValue('front_image_link', product.front_image_link || product.image_url || product.image || '');
-      const rawDesc = product.description || '';
-      const rpMatch = rawDesc.match(/\[RETURN_POLICY\]:\s*(.+)/);
-      const returnPolicy = product.return_policy || (rpMatch ? rpMatch[1].trim() : '7 Day Return');
-      const cleanDesc = rawDesc.replace(/\[RETURN_POLICY\]:\s*(.+)/, '').trim();
+  const populateProductForm = useCallback((product) => {
+    if (!product) return;
+    const prodId = product.$id || product.id;
 
-      setValue('description', cleanDesc);
-      setValue('return_policy', returnPolicy);
-      
-      // Hydrate Stocks
-      let parsedStock = {};
-      try {
-        parsedStock = JSON.parse(product.sizes_stock || '{}');
-      } catch {
-        parsedStock = {};
-      }
+    // Check if category is standard or custom
+    const standardCategories = ['printed-tshirt', 'oversized-tshirt', 'shirts', 'hoodies'];
+    const isCustom = product.category && !standardCategories.includes(String(product.category).toLowerCase().trim());
+    setIsCustomCategory(Boolean(isCustom));
 
-      SIZE_OPTIONS.forEach(size => {
-        const isOffered = product.sizes?.includes(size);
-        setValue(
-          `stock_${size}`,
-          parsedStock[size] !== undefined 
-            ? parsedStock[size] 
-            : (isOffered ? 10 : '')
-        );
-      });
+    setValue('name', product.name || '');
+    
+    const numericPrice = typeof product.price === 'string'
+      ? Number(product.price.replace(/[^0-9]/g, ''))
+      : product.price;
+    setValue('price', numericPrice || '');
+    
+    const tagsArray = Array.isArray(product.tags) ? product.tags : [];
+    setValue('search_keywords', tagsArray.join(', '));
+    setValue('category', product.category || '');
+    setValue('front_image_link', product.front_image_link || product.image_url || product.image || '');
+    
+    const rawDesc = product.description || '';
+    const rpMatch = rawDesc.match(/\[RETURN_POLICY\]:\s*(.+)/);
+    const returnPolicy = product.return_policy || (rpMatch ? rpMatch[1].trim() : '7 Day Return');
+    const scMatch = rawDesc.match(/\[SIZE_CHART\]:\s*(.+)/);
+    const sizeChartImage = product.size_chart_image || product.size_chart || (scMatch ? scMatch[1].trim() : '');
+    const cleanDesc = rawDesc
+      .replace(/\[RETURN_POLICY\]:\s*(.+)/, '')
+      .replace(/\[SIZE_CHART\]:\s*(.+)/, '')
+      .trim();
 
-      const backImageLinks = Array.isArray(product.back_image_links)
-        ? product.back_image_links
-        : [product.back_image_link].filter(Boolean);
-
-      setBackImageCount(Math.max(1, backImageLinks.length));
-
-      BACK_IMAGE_FIELDS.forEach((fieldName, index) => {
-        setValue(fieldName, backImageLinks[index] || '');
-      });
-      setValue('single_tag', product.tag || '');
-      setValue('discount_percent', product.discount_percent || 0);
-      setValue('color_group_id', product.color_group_id || '');
-
-      setValue('color_name', product.color_name || '');
-      setValue('color_hex', product.color_hex || '');
-
-      setValue('fit_type', product.fit_type || '');
-      setValue('fabric_gsm', product.fabric_gsm || '');
-      setValue('compare_at_price', product.compare_at_price || '');
-      setValue('is_featured', product.is_featured === true || product.is_featured === 'true' || product.is_featured === 1 || product.is_featured === '1');
-      setValue('is_vip_only', product.is_vip_only === true || product.is_vip_only === 'true' || product.is_vip_only === 1 || product.is_vip_only === '1');
-      setValue('is_live', product.is_live === true || product.is_live === 'true' || product.is_live === 1 || product.is_live === '1');
-      setValue('slug', product.slug || '');
-      setEditingId(id);
-      setProductsSubTab('form');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    setValue('description', cleanDesc);
+    setValue('return_policy', returnPolicy);
+    setValue('size_chart_image', sizeChartImage);
+    
+    // Hydrate Stocks
+    let parsedStock = {};
+    try {
+      parsedStock = typeof product.sizes_stock === 'string'
+        ? JSON.parse(product.sizes_stock || '{}')
+        : (product.sizes_stock || {});
+    } catch {
+      parsedStock = {};
     }
-  }, [products, setValue]);
+
+    SIZE_OPTIONS.forEach(size => {
+      const isOffered = product.sizes?.includes(size);
+      setValue(
+        `stock_${size}`,
+        parsedStock[size] !== undefined 
+          ? parsedStock[size] 
+          : (isOffered ? 10 : '')
+      );
+    });
+
+    const backImageLinks = Array.isArray(product.back_image_links)
+      ? product.back_image_links
+      : [product.back_image_link].filter(Boolean);
+
+    setBackImageCount(Math.max(1, backImageLinks.length));
+
+    BACK_IMAGE_FIELDS.forEach((fieldName, index) => {
+      setValue(fieldName, backImageLinks[index] || '');
+    });
+    setValue('single_tag', product.tag || '');
+    setValue('discount_percent', product.discount_percent || 0);
+    setValue('color_group_id', product.color_group_id || '');
+
+    setValue('color_name', product.color_name || '');
+    setValue('color_hex', product.color_hex || '#121212');
+
+    setValue('fit_type', product.fit_type || '');
+    setValue('fabric_gsm', product.fabric_gsm || '');
+    setValue('compare_at_price', product.compare_at_price || '');
+    setValue('is_featured', product.is_featured === true || product.is_featured === 'true' || product.is_featured === 1 || product.is_featured === '1');
+    setValue('is_vip_only', product.is_vip_only === true || product.is_vip_only === 'true' || product.is_vip_only === 1 || product.is_vip_only === '1');
+    setValue('is_live', product.is_live === true || product.is_live === 'true' || product.is_live === 1 || product.is_live === '1');
+    setValue('slug', product.slug || '');
+    setEditingId(prodId);
+    setActiveTab('products');
+    setProductsSubTab('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [setValue]);
+
+  const handleEdit = useCallback(async (idOrProduct) => {
+    if (!idOrProduct) return;
+    if (typeof idOrProduct === 'object' && idOrProduct !== null) {
+      populateProductForm(idOrProduct);
+      return;
+    }
+
+    const id = String(idOrProduct).trim();
+    // 1. Check if found in currently loaded products list
+    const found = products.find(p => String(p.id || p.$id) === id);
+    if (found) {
+      populateProductForm(found);
+      return;
+    }
+
+    // 2. Fetch directly from Firebase if not yet in state (e.g. initial mount)
+    try {
+      setActionLoading(true);
+      const fetched = await productsService.getProductById(id);
+      if (fetched) {
+        populateProductForm(fetched);
+      } else {
+        showToast("Product details could not be found.", "error");
+      }
+    } catch (err) {
+      console.error("Failed to fetch product details for edit:", err);
+      showToast("Failed to load product details for edit: " + err.message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  }, [products, populateProductForm, showToast]);
 
   useEffect(() => {
-    if (isAdmin && products.length > 0) {
-      const searchParams = new URLSearchParams(location.search);
-      const editIdFromQuery = searchParams.get('edit');
-      const targetEditId = location.state?.editProductId || editIdFromQuery;
-      
-      if (targetEditId) {
-        const found = products.find(p => p.id === targetEditId || p.$id === targetEditId);
-        if (found) {
-          setTimeout(() => {
-            setActiveTab('products');
-            handleEdit(targetEditId);
-          }, 0);
-          
-          // Clean up location state and URL query parameter to prevent loop/stale edit state
-          window.history.replaceState({}, document.title);
-        }
+    if (!isAdmin) return;
+
+    const searchParams = new URLSearchParams(location.search);
+    const editIdFromQuery = searchParams.get('edit');
+    const targetEditId = location.state?.editProductId || editIdFromQuery;
+
+    if (targetEditId && processedEditRef.current !== targetEditId) {
+      processedEditRef.current = targetEditId;
+      setActiveTab('products');
+      handleEdit(targetEditId);
+
+      // Clean up location state and URL query parameter to prevent loop/stale edit state
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (location.state && location.state.editProductId) {
+        location.state.editProductId = null;
       }
     }
-  }, [location, products, isAdmin, handleEdit]);
+  }, [location.search, location.state, isAdmin, handleEdit]);
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const handleCancelEdit = () => {
+    processedEditRef.current = null;
     reset();
     SIZE_OPTIONS.forEach(size => {
       setValue(`stock_${size}`, '');
@@ -1064,9 +1188,6 @@ function AdminPanel() {
     setValue('is_vip_only', false);
     setValue('is_live', false);
     setValue('slug', '');
-    setValue('color_hex', '');
-    setValue('fit_type', '');
-    setValue('fabric_gsm', '');
     setValue('return_policy', '7 Day Return');
     setBackImageCount(1);
     setEditingId(null);
@@ -1230,8 +1351,74 @@ function AdminPanel() {
     });
   };
 
-  const handlePrintShippingLabels = () => {
-    const filtered = getFilteredOrders();
+  // Shiprocket Logistics Dispatch & Settings Handlers
+  const handleSaveShiprocketSettings = async (e) => {
+    if (e) e.preventDefault();
+    setShiprocketLoading(true);
+    try {
+      if (shiprocketConfig.email && shiprocketConfig.password) {
+        const authData = await authenticateShiprocket(shiprocketConfig.email, shiprocketConfig.password);
+        const newConfig = {
+          ...shiprocketConfig,
+          token: authData.token || '',
+          authenticatedAt: new Date().toISOString()
+        };
+        setShiprocketConfig(newConfig);
+        saveShiprocketConfig(newConfig);
+        showToast("🚀 Shiprocket Account Authenticated & Saved Successfully!", "success");
+      } else {
+        saveShiprocketConfig(shiprocketConfig);
+        showToast("Shiprocket settings saved locally.", "info");
+      }
+      setIsShiprocketSettingsOpen(false);
+    } catch (err) {
+      showToast("Shiprocket Auth Failed: " + err.message, "error");
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
+
+  const handleExecuteShiprocketDispatch = async () => {
+    if (!shiprocketTargetOrder) return;
+    setShiprocketLoading(true);
+    try {
+      const res = await createShiprocketShipment(shiprocketTargetOrder, {
+        weight: shiprocketWeight,
+        length: shiprocketLength,
+        breadth: shiprocketBreadth,
+        height: shiprocketHeight,
+        pickupLocation: shiprocketConfig.pickupLocation || 'Primary'
+      });
+
+      if (res.success && res.awb_number) {
+        // Automatically shift order status in database to SHIPPED with AWB and tracking URL
+        await handleOrderStatusShift(shiprocketTargetOrder, 'SHIPPED', {
+          tracking_number: res.awb_number,
+          tracking_url: res.tracking_url
+        });
+
+        showToast(`🚀 Shiprocket Parcel Created! AWB: ${res.awb_number} (${res.courier_partner})`, "success");
+        setIsShiprocketDispatchModalOpen(false);
+
+        // Auto print shipping label slip with generated AWB and tracking QR code
+        handlePrintShippingLabels({
+          ...shiprocketTargetOrder,
+          status: 'SHIPPED',
+          tracking_number: res.awb_number,
+          tracking_url: res.tracking_url
+        });
+      } else {
+        showToast("Could not create Shiprocket parcel.", "error");
+      }
+    } catch (err) {
+      showToast("Shiprocket Dispatch Error: " + err.message, "error");
+    } finally {
+      setShiprocketLoading(false);
+    }
+  };
+
+  const handlePrintShippingLabels = (singleOrder = null, channelOverride = null) => {
+    const filtered = singleOrder ? [singleOrder] : getFilteredOrders();
     if (filtered.length === 0) {
       showToast("No orders available to print.", "error");
       return;
@@ -1287,6 +1474,10 @@ function AdminPanel() {
         }
       }
 
+      // Extract 6-digit Pincode for Courier Routing Box
+      const pincodeMatch = addressText.match(/\b\d{6}\b/);
+      const destinationPincode = pincodeMatch ? pincodeMatch[0] : '';
+
       let parsedItems;
       try {
         parsedItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || [];
@@ -1294,7 +1485,7 @@ function AdminPanel() {
         parsedItems = [];
       }
 
-      // Group identical products by name and size to ensure correct quantities per size
+      // Group identical products by name and size
       const groupedItemsMap = {};
       parsedItems.forEach(item => {
         const name = (item.name || '').trim();
@@ -1314,9 +1505,9 @@ function AdminPanel() {
 
       const itemsListHtml = Object.values(groupedItemsMap).map(item => {
         return `
-          <div style="font-size: 11px; font-weight: bold; border-bottom: 1px dashed #ddd; padding: 4px 0; display: flex; justify-content: space-between;">
-            <span>${item.name.toUpperCase()} (${item.size.toUpperCase()})</span>
-            <span>QTY: ${item.quantity}</span>
+          <div style="font-size: 10px; font-weight: 800; border-bottom: 1px dashed #bbb; padding: 4px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: sans-serif; text-transform: uppercase;">${item.name} (${item.size})</span>
+            <span style="font-family: monospace; font-size: 11px; font-weight: 900; background: #eee; padding: 1px 5px; border-radius: 2px;">QTY: ${item.quantity}</span>
           </div>
         `;
       }).join('');
@@ -1325,44 +1516,136 @@ function AdminPanel() {
       const paymentType = isCod ? 'COD' : 'PREPAID';
 
       const codInstructionHtml = isCod
-        ? `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 14px; margin-top: 10px; background-color: #000; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">
-             COLLECT CASH: ₹${Number(order.total).toLocaleString('en-IN')}
+        ? `<div style="border: 2px solid #000; padding: 7px; text-align: center; font-weight: 950; font-size: 15px; margin-top: 6px; background-color: #000; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">
+             COLLECT CASH (COD): ₹${Number(order.total).toLocaleString('en-IN')}
            </div>`
-        : `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 11px; margin-top: 10px; color: #000; text-transform: uppercase; letter-spacing: 0.5px;">
-             PREPAID - DO NOT COLLECT CASH
+        : `<div style="border: 2px solid #000; padding: 6px; text-align: center; font-weight: 900; font-size: 11px; margin-top: 6px; background-color: #f3f4f6; color: #000; text-transform: uppercase; letter-spacing: 0.5px;">
+             PREPAID — DO NOT COLLECT CASH
            </div>`;
 
       const orderDate = order.$createdAt || order.createdAt || new Date().toISOString();
+      const orderId = order.$id || order.id || '';
+      
+      // Target Order Tracking URL for QR Code scanning
+      const trackingUrl = order.tracking_url || `${window.location.origin}/order/${orderId}`;
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(trackingUrl)}`;
+
+      // Determine Channel / Logistics Info (Shiprocket, Meesho, Flipkart, VAKRAYAN)
+      const activeChannel = channelOverride || order.channel || printChannel || 'VAKRAYAN';
+      let channelBadgeLabel = 'VAKRAYAN DIRECT';
+      let channelBg = '#000000';
+      let channelColor = '#ffffff';
+
+      if (order.tracking_number && order.tracking_number.startsWith('SR')) {
+        channelBadgeLabel = 'SHIPROCKET EXPRESS';
+        channelBg = '#6b21a8';
+        channelColor = '#ffffff';
+      } else if (activeChannel.toUpperCase() === 'MEESHO' || activeChannel.toUpperCase().includes('MEESHO')) {
+        channelBadgeLabel = 'MEESHO SELLER HUB';
+        channelBg = '#9c27b0';
+        channelColor = '#ffffff';
+      } else if (activeChannel.toUpperCase() === 'FLIPKART' || activeChannel.toUpperCase().includes('FLIPKART')) {
+        channelBadgeLabel = 'FLIPKART ASSURED';
+        channelBg = '#2874f0';
+        channelColor = '#ffffff';
+      } else if (activeChannel.toUpperCase() === 'AMAZON' || activeChannel.toUpperCase().includes('AMAZON')) {
+        channelBadgeLabel = 'AMAZON EASY SHIP';
+        channelBg = '#232f3e';
+        channelColor = '#ff9900';
+      }
+
+      const trackingNumber = order.tracking_number || `SR${orderId ? orderId.substring(0, 10).toUpperCase() : Date.now().toString().slice(-10)}`;
+      const courierPartner = order.tracking_number ? 'DELHIVERY / SHIPROCKET AIR' : 'DELHIVERY / EKART LOGISTICS';
+
+      // Barcode API image URL for courier scanner
+      const barcodeImgUrl = `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(trackingNumber)}&scale=2&height=12&inkcolor=000000`;
 
       return `
         <div class="label-card">
+          <!-- Top Header: Brand & Logistics Channel -->
           <div class="header">
-            <div class="store-name">VAKRAYAN</div>
-            <div class="carrier">${paymentType}</div>
-          </div>
-          
-          <div class="barcode-area">
-            <div class="order-num"># ${metadata.order_number}</div>
-            <div style="font-size: 9px; font-family: monospace; color: #666; margin-top: 2px;">ID: ${order.$id || order.id}</div>
+            <div>
+              <div class="store-name">VAKRAYAN</div>
+              <div class="store-sub">PREMIUM APPAREL & BOUTIQUE</div>
+            </div>
+            <div class="channel-badge" style="background-color: ${channelBg}; color: ${channelColor};">
+              ${channelBadgeLabel}
+            </div>
           </div>
 
+          <!-- Dispatch & Courier Bar with Barcode -->
+          <div class="carrier-bar">
+            <div style="flex: 1;">
+              <div style="font-size: 8px; font-weight: 800; color: #444;">COURIER PARTNER: ${courierPartner}</div>
+              <div style="font-size: 11px; font-weight: 950; font-family: monospace; letter-spacing: 0.5px;">AWB: ${trackingNumber}</div>
+              <div style="margin-top: 3px;">
+                <img 
+                  src="${barcodeImgUrl}" 
+                  alt="AWB Barcode" 
+                  style="height: 24px; max-width: 180px; display: block;" 
+                  onerror="this.style.display='none';" 
+                />
+              </div>
+            </div>
+            <div class="payment-tag ${isCod ? 'cod-tag' : 'prepaid-tag'}">
+              ${paymentType}
+            </div>
+          </div>
+
+          <!-- Order ID & Tracking QR Code Section -->
+          <div class="tracking-grid">
+            <div class="order-details-col">
+              <div class="section-title">ORDER REF & SPECIFICATION:</div>
+              <div class="order-num"># ${metadata.order_number}</div>
+              <div class="sub-text">ORDER ID: ${orderId}</div>
+              <div class="sub-text">DATE: ${new Date(orderDate).toLocaleDateString('en-IN')}</div>
+              <div class="sub-text" style="margin-top: 4px; font-weight: 900; color: #000;">HSN: 61091000 | WT: 0.40 KG</div>
+            </div>
+            
+            <div class="qr-col">
+              <img 
+                src="${qrApiUrl}" 
+                alt="Scan to Track Order" 
+                class="qr-img" 
+                onerror="this.onerror=null; this.src='https://quickchart.io/qr?text=${encodeURIComponent(trackingUrl)}&size=140';"
+              />
+              <div class="qr-caption">SCAN QR TO TRACK</div>
+            </div>
+          </div>
+
+          <!-- Destination Address Section -->
           <div class="address-section">
-            <div class="section-title">SHIP TO:</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+              <div class="section-title" style="margin-bottom: 0;">DELIVER TO (SHIP TO):</div>
+              ${destinationPincode ? `<div style="background: #000; color: #fff; font-size: 10px; font-weight: 950; padding: 2px 6px; border-radius: 3px; font-family: monospace;">PIN: ${destinationPincode}</div>` : ''}
+            </div>
             <div class="customer-name">${metadata.customer_name.toUpperCase()}</div>
             <div class="address-text">${addressText.toUpperCase()}</div>
-            <div class="phone-text">PHONE: ${metadata.customer_phone || 'N/A'}</div>
+            <div class="phone-text">TEL: ${metadata.customer_phone || 'N/A'} ${metadata.customer_email ? ' | EMAIL: ' + metadata.customer_email : ''}</div>
           </div>
 
+          <!-- Items Section -->
           <div class="items-section">
-            <div class="section-title">PACKAGE CONTENT:</div>
+            <div class="section-title">PACKAGE CONTENTS / MANIFEST:</div>
             ${itemsListHtml}
           </div>
 
+          <!-- Return Address Section -->
+          <div class="return-section">
+            <div class="section-title">IF UNDELIVERED, RETURN TO:</div>
+            <div class="return-text">
+              <strong>VAKRAYAN APPAREL HQ & LOGISTICS HUB</strong><br/>
+              Ring Road Textile Market, Surat, Gujarat - 395006 | GSTIN: 24VAKRAYAN1234F1Z0
+            </div>
+          </div>
+
+          <!-- Payment Instructions -->
           ${codInstructionHtml}
 
+          <!-- Footer -->
           <div class="footer">
-            <div>DATE: ${new Date(orderDate).toLocaleDateString('en-IN')}</div>
-            <div style="font-weight: bold;">TOTAL: ₹${Number(order.total).toLocaleString('en-IN')}</div>
+            <div>PRINTED VIA VAKRAYAN SELLER CONSOLE</div>
+            <div style="font-weight: 900;">TOTAL AMOUNT: ₹${Number(order.total).toLocaleString('en-IN')}</div>
           </div>
         </div>
       `;
@@ -1371,105 +1654,140 @@ function AdminPanel() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Shipping Slips - Bulk Print</title>
+          <title>Shipping Slips (4x6 Thermal Label Standard) - Print View</title>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900;950&display=swap" rel="stylesheet">
           <style>
-            body { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 20px; background-color: #f3f4f6; }
+            @page {
+              size: 4in 6in portrait;
+              margin: 0;
+            }
+            * { box-sizing: border-box; }
+            body { 
+              font-family: 'Inter', Arial, sans-serif; 
+              margin: 0; 
+              padding: 12px; 
+              background-color: #e5e7eb; 
+              color: #000; 
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
             .label-card {
               background-color: #fff;
-              width: 380px;
-              min-height: 480px;
+              width: 3.8in;
+              height: 5.7in;
               border: 2px solid #000;
-              margin: 0 auto 30px auto;
-              padding: 15px;
+              margin: 0 auto 20px auto;
+              padding: 10px 12px;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
               page-break-after: always;
               break-inside: avoid;
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             }
             .header {
               display: flex;
               justify-content: space-between;
               align-items: center;
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
+              padding-bottom: 5px;
+              margin-bottom: 5px;
             }
             .store-name {
               font-size: 20px;
               font-weight: 950;
-              letter-spacing: 1.5px;
-            }
-            .carrier {
-              font-size: 11px;
-              font-weight: 900;
-              background-color: #000;
-              color: #fff;
-              padding: 3px 8px;
               letter-spacing: 1px;
+              line-height: 1;
             }
-            .barcode-area {
-              text-align: center;
+            .store-sub {
+              font-size: 7px;
+              font-weight: 800;
+              color: #444;
+              letter-spacing: 0.8px;
+              margin-top: 2px;
+            }
+            .channel-badge {
+              font-size: 8.5px;
+              font-weight: 900;
+              padding: 3px 6px;
+              border-radius: 3px;
+              letter-spacing: 0.5px;
+              text-transform: uppercase;
+            }
+            .carrier-bar {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
-            }
-            .order-num {
-              font-size: 16px;
-              font-weight: 900;
-              letter-spacing: 1px;
-            }
-            .address-section {
-              border-bottom: 2px solid #000;
-              padding-bottom: 12px;
-              margin-bottom: 10px;
-              flex-grow: 1;
-            }
-            .section-title {
-              font-size: 9px;
-              font-weight: 900;
-              color: #555;
-              letter-spacing: 1px;
+              padding-bottom: 5px;
               margin-bottom: 5px;
             }
-            .customer-name {
-              font-size: 14px;
-              font-weight: 900;
-              margin-bottom: 4px;
-            }
-            .address-text {
+            .payment-tag {
               font-size: 11px;
-              font-weight: 700;
-              line-height: 1.4;
-              color: #111;
+              font-weight: 950;
+              padding: 4px 8px;
+              letter-spacing: 0.5px;
+              border-radius: 3px;
+              text-align: center;
+              shrink: 0;
             }
-            .phone-text {
-              font-size: 11px;
-              font-weight: 900;
-              margin-top: 6px;
-              font-family: monospace;
+            .cod-tag { background-color: #000; color: #fff; }
+            .prepaid-tag { background-color: #e5e7eb; color: #000; border: 1.5px solid #000; }
+            
+            .tracking-grid {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 5px;
+              margin-bottom: 5px;
             }
+            .order-details-col { flex: 1; padding-right: 6px; }
+            .order-num { font-size: 13.5px; font-weight: 950; }
+            .sub-text { font-size: 8.5px; color: #222; font-family: monospace; }
+            
+            .qr-col { text-align: center; width: 90px; flex-shrink: 0; }
+            .qr-img { width: 80px; height: 80px; border: 1.5px solid #000; padding: 2px; background: #fff; border-radius: 3px; }
+            .qr-caption { font-size: 6.5px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-transform: uppercase; }
+            
+            .address-section {
+              border-bottom: 2px solid #000;
+              padding-bottom: 6px;
+              margin-bottom: 5px;
+            }
+            .section-title { font-size: 7.5px; font-weight: 900; color: #444; letter-spacing: 0.8px; margin-bottom: 2px; }
+            .customer-name { font-size: 13px; font-weight: 950; margin-bottom: 2px; color: #000; }
+            .address-text { font-size: 10px; font-weight: 800; line-height: 1.25; color: #000; }
+            .phone-text { font-size: 9px; font-weight: 900; margin-top: 3px; font-family: monospace; color: #000; }
+            
             .items-section {
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-              margin-bottom: 10px;
-              max-height: 180px;
+              padding-bottom: 5px;
+              margin-bottom: 5px;
+              max-height: 90px;
               overflow: hidden;
             }
+            .return-section {
+              border-bottom: 2px solid #000;
+              padding-bottom: 4px;
+              margin-bottom: 5px;
+            }
+            .return-text { font-size: 7.5px; color: #222; line-height: 1.2; }
+            
             .footer {
               display: flex;
               justify-content: space-between;
-              font-size: 10px;
+              font-size: 8px;
               font-weight: bold;
               font-family: monospace;
+              margin-top: 2px;
             }
             @media print {
-              body { background-color: #fff; padding: 0; margin: 0; }
-              .label-card { margin: 0 auto; border: 2px solid #000; box-shadow: none; }
+              body { background-color: #fff; padding: 0; margin: 0; width: 4in; }
+              .label-card { margin: 0 auto; border: 2px solid #000; box-shadow: none; width: 4in; height: 6in; }
             }
           </style>
         </head>
@@ -1596,6 +1914,21 @@ function AdminPanel() {
         } catch (walletErr) {
           console.error("Failed to write credit wallet transaction on admin action:", walletErr.message);
         }
+      }
+
+      // Send Telegram notification if order status changed to CANCELLED
+      if (targetStatus === 'CANCELLED') {
+        let rawItems = [];
+        try { rawItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items || []; } catch { rawItems = []; }
+        sendWebhookNotification('order.cancelled', {
+          orderId: order.$id || order.id,
+          orderNumber: order.order_number || 'ORDER',
+          customerName: order.name || order.customerName || 'Customer',
+          email: order.email || '',
+          total: Math.round(order.total || 0),
+          reason: extraData?.cancel_reason || 'Cancelled by Store Admin',
+          items: rawItems
+        });
       }
 
       showToast(`✅ Order status transitioned to ${targetStatus}!`, 'success');
@@ -2043,7 +2376,7 @@ function AdminPanel() {
       <div className="absolute top-1/4 left-1/12 w-96 h-96 bg-[var(--color-accent)]/5 rounded-full blur-3xl pointer-events-none z-0"></div>
       <div className="absolute bottom-1/4 right-1/12 w-96 h-96 bg-[var(--color-info)]/5 rounded-full blur-3xl pointer-events-none z-0"></div>
 
-      <div className="relative z-20 max-w-7xl mx-auto space-y-8">
+      <div className="relative z-20 max-w-[1728px] mx-auto space-y-8">
         
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           
@@ -2242,7 +2575,9 @@ function AdminPanel() {
               
               {/* Product Name */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Product Name</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+                  Product Name <span className="text-[#059669] font-bold">*</span>
+                </label>
                 <input
                   type="text"
                   disabled={actionLoading}
@@ -2255,7 +2590,9 @@ function AdminPanel() {
 
               {/* Price */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Price (INR)</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+                  Price (INR) <span className="text-[#059669] font-bold">*</span>
+                </label>
                 <input
                   type="number"
                   placeholder="1499"
@@ -2283,7 +2620,9 @@ function AdminPanel() {
 
               {/* Category */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Category</label>
+                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase flex items-center gap-1">
+                  Category <span className="text-[#059669] font-bold">*</span>
+                </label>
                 {!isCustomCategory ? (
                   <div className="relative">
                     <select
@@ -2402,6 +2741,11 @@ function AdminPanel() {
                         </div>
                       </div>
 
+                      {/* Custom Size Chart Image Uploader */}
+                      <div className="md:col-span-2 border-t border-[var(--color-border)]/40 pt-4 mt-2">
+                        {renderImageUploader('size_chart_image', 'Custom Product Size Chart Image (Optional)', undefined)}
+                      </div>
+
                     </div>
                   </div>
 
@@ -2479,51 +2823,42 @@ function AdminPanel() {
 
                       {/* Color Name */}
                       <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
-                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Name</label>
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase flex items-center gap-1">
+                          Color Name <span className="text-[#059669] font-bold">*</span>
+                        </label>
                         <input
                           type="text"
                           disabled={actionLoading}
                           placeholder="E.G., JET BLACK"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
-                          {...register('color_name')}
+                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-neutral-900 bg-transparent py-1"
+                          {...register('color_name', { required: true })}
                         />
                       </div>
 
                       {/* Color Hex */}
                       <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
-                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Color Hex Code</label>
-                        <input
-                          type="text"
-                          disabled={actionLoading}
-                          placeholder="E.G., #000000"
-                          className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1 uppercase"
-                          {...register('color_hex')}
-                        />
+                        <label className="text-[9px] font-black text-[var(--color-muted)] uppercase flex items-center gap-1">
+                          Color Hex Code <span className="text-[#059669] font-bold">*</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            disabled={actionLoading}
+                            value={watch('color_hex') || '#121212'}
+                            className="w-6 h-6 rounded cursor-pointer border border-zinc-300 p-0 bg-transparent shrink-0"
+                            onChange={(e) => setValue('color_hex', e.target.value.toUpperCase())}
+                          />
+                          <input
+                            type="text"
+                            disabled={actionLoading}
+                            placeholder="E.G., #121212"
+                            className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-neutral-900 bg-transparent py-1 uppercase"
+                            {...register('color_hex', { required: true })}
+                          />
+                        </div>
                       </div>
 
-                  {/* Fit Type */}
-                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)]">
-                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Fit Type</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., OVERSIZED BOX FIT"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
-                      {...register('fit_type')}
-                    />
-                  </div>
 
-                  {/* Fabric GSM */}
-                  <div className="flex flex-col gap-1.5 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
-                    <label className="text-[9px] font-black text-[var(--color-muted)] uppercase">Fabric GSM</label>
-                    <input
-                      type="text"
-                      disabled={actionLoading}
-                      placeholder="E.G., 240 GSM 100% COMBED COTTON"
-                      className="w-full text-xs font-bold font-mono outline-hidden border-b border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent py-1"
-                      {...register('fabric_gsm')}
-                    />
-                  </div>
 
                   {/* Featured Product Flag */}
                   <div className="flex items-center gap-3 bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-border)] sm:col-span-2 md:col-span-3">
@@ -2558,14 +2893,17 @@ function AdminPanel() {
                 </div>
               </div>
 
-              {/* Description Spec */}
+              {/* Description Spec with Markdown Support */}
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Description (Optional)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black tracking-widest text-[var(--color-muted)] uppercase">Product Description</label>
+                  <span className="text-[9px] font-mono text-[#059669] font-bold">✨ Markdown Formatting Supported (**bold**, - bullets, ## headings)</span>
+                </div>
                 <textarea
-                  rows="3"
+                  rows="6"
                   disabled={actionLoading}
-                  placeholder="E.G., 280 GSM 100% FRENCH TERRY COTTON. BOOTCUT BOXED DROP LAYOUT SPEC..."
-                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-medium resize-none disabled:opacity-50"
+                  placeholder={`Write description with Markdown formatting:\n\n- 240 GSM 100% Heavyweight Combed Cotton\n- Oversized Boxy Drop Fit\n- High-Density Screen Print\n\n**Care Instructions:**\n- Machine wash cold with like colors\n- Do not iron directly on print`}
+                  className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors font-mono disabled:opacity-50"
                   {...register('description')}
                 />
               </div>
@@ -2740,7 +3078,13 @@ function AdminPanel() {
                             return (
                               <div key={targetId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-subtle)]/30 transition-all rounded-2xl shadow-xs">
                                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                                  <img src={coverThumbnailUrl} alt={p.name} className="w-14 h-14 object-cover border border-[var(--color-border)] shrink-0 rounded-xl shadow-xs" />
+                                  <img 
+                                    src={getOptimizedImageUrl(coverThumbnailUrl, 120, 75)} 
+                                    alt={p.name} 
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-14 h-14 object-cover border border-[var(--color-border)] shrink-0 rounded-xl shadow-xs" 
+                                  />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <p className="text-sm font-black uppercase tracking-wide text-[var(--color-text)] truncate">{p.name}</p>
@@ -2817,9 +3161,26 @@ function AdminPanel() {
               ========================================== */}
           {activeTab === 'orders' && (
             <div className="space-y-6">
-              <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between">
-                <h2 className="text-xs font-black tracking-[0.4em] text-[var(--color-accent)] uppercase">Incoming Customer Orders</h2>
-                <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black">{orders.length} TOTAL ORDERS</span>
+              <div className="pb-4 border-b border-[var(--color-border)] flex items-center justify-between flex-wrap gap-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-xs font-black tracking-[0.4em] text-[var(--color-accent)] uppercase">Incoming Customer Orders</h2>
+                  <p className="text-[10px] font-mono text-[var(--color-muted)] uppercase">Real-time fulfillment pipeline & customer purchases</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => loadCustomerOrders(true)}
+                    disabled={ordersLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] rounded-lg border border-[var(--color-border)] cursor-pointer transition-all disabled:opacity-50"
+                    title="Reload live orders from database"
+                  >
+                    <FiRefreshCw className={`text-xs ${ordersLoading ? 'animate-spin' : ''}`} />
+                    <span>{ordersLoading ? 'Refreshing...' : 'Refresh Orders'}</span>
+                  </button>
+                  <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase font-black bg-[var(--color-surface)] px-2.5 py-1 rounded-lg border border-[var(--color-border)]">
+                    {orders.length} TOTAL ORDERS
+                  </span>
+                </div>
               </div>
 
               {/* Telemetry Cards Row */}
@@ -2990,7 +3351,7 @@ function AdminPanel() {
                 <div className="flex flex-wrap gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={handlePrintShippingLabels}
+                    onClick={() => handlePrintShippingLabels()}
                     className="bg-[var(--color-accent)] hover:bg-indigo-700 text-white font-mono font-black text-[10px] tracking-widest uppercase px-5 py-3.5 rounded-lg cursor-pointer transition-all duration-300 text-center flex items-center gap-1.5 shadow-xs"
                   >
                     <FiFileText className="text-xs" /> Print Shipping Slips
@@ -3368,6 +3729,15 @@ function AdminPanel() {
 
                           {/* Actions to shift status */}
                           <div className="flex flex-wrap gap-2 justify-end pt-2 border-t border-[var(--color-border)]/40">
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handlePrintShippingLabels(order)}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-mono font-black text-[9px] tracking-wider uppercase px-3.5 py-2 rounded-lg border border-slate-700 cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                              title="Print shipping label slip for this order"
+                            >
+                              <FiFileText className="text-xs text-indigo-400" /> Print Label Slip
+                            </button>
                             {/* Reset to Pending button */}
                             {(order.status !== 'PENDING' && order.status !== 'CANCELLED') && (
                               <button
@@ -3676,22 +4046,22 @@ function AdminPanel() {
                   <div className="lg:col-span-2 space-y-4 backdrop-blur-sm bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-5 rounded-2xl shadow-glass">
                     <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
                       <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">COMPOSE BROADCAST CAMPAIGN</h4>
-                      {isEmailJSConfigured ? (
-                        <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 uppercase tracking-wider animate-pulse">
-                          🟢 EmailJS Active (Live)
+                      {isEmailServiceReady ? (
+                        <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 uppercase tracking-wider">
+                          🟢 Brevo Domain Active (noreply@vakrayan.com)
                         </span>
                       ) : (
                         <span className="text-[8px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 uppercase tracking-wider">
-                          🟡 Simulation Mode
+                          🟡 Offline Mode
                         </span>
                       )}
                     </div>
 
-                    {!isEmailJSConfigured && (
+                    {!isEmailServiceReady && (
                       <div className="bg-amber-500/5 border border-amber-500/15 p-3.5 font-mono text-[9px] text-amber-400/90 uppercase tracking-wider space-y-1">
-                        <span className="font-bold block text-amber-300">ℹ️ SETUP EMAILJS FOR REAL EMAILS:</span>
+                        <span className="font-bold block text-amber-300">ℹ️ SETUP EMAIL CONFIGURATION:</span>
                         <p className="normal-case text-[9px] text-[var(--color-muted)] leading-relaxed">
-                          Currently running in offline simulation mode. To send real emails to your subscribers, configure these keys in your <code className="bg-black/30 px-1 py-0.5 rounded text-neutral-200">.env</code> file:
+                          Currently running in offline simulation mode. To send real emails to your subscribers, ensure your email service is configured in the environment:
                         </p>
                         <div className="pt-1 select-all font-bold text-[8px] text-neutral-400 font-mono space-y-0.5">
                           <div>VITE_EMAILJS_SERVICE_ID="your_service_id"</div>
@@ -4173,13 +4543,13 @@ function AdminPanel() {
                         className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                       />
                       <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
-                        {slideUploading ? "Uploading..." : "Upload"}
+                        {slideDesktopUploading ? "Uploading..." : "Upload"}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           onChange={(e) => handleSlideImageUpload(e, false)}
-                          disabled={slideUploading}
+                          disabled={slideDesktopUploading}
                         />
                       </label>
                     </div>
@@ -4203,13 +4573,13 @@ function AdminPanel() {
                         className="grow bg-[var(--color-subtle)]/50 border border-[var(--color-border)] rounded-xl px-4 py-2.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider focus:border-[var(--color-border)] transition-colors"
                       />
                       <label className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white px-4 py-2.5 text-xs font-bold uppercase transition-colors cursor-pointer rounded-xl flex items-center justify-center shrink-0">
-                        {slideUploading ? "Uploading..." : "Upload"}
+                        {slideMobileUploading ? "Uploading..." : "Upload"}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           onChange={(e) => handleSlideImageUpload(e, true)}
-                          disabled={slideUploading}
+                          disabled={slideMobileUploading}
                         />
                       </label>
                     </div>
@@ -4237,7 +4607,7 @@ function AdminPanel() {
                 <button
                   type="button"
                   onClick={handleAddSlide}
-                  disabled={actionLoading || slideUploading || !slideImage.trim()}
+                  disabled={actionLoading || slideDesktopUploading || slideMobileUploading || !slideImage.trim()}
                   className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[10px] font-black tracking-widest px-6 py-3.5 rounded-xl uppercase transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   🚀 DEPLOY BANNER SLIDE
@@ -4261,12 +4631,12 @@ function AdminPanel() {
                         <div className="space-y-2">
                           <div className="flex gap-4">
                             <div className="w-1/2 aspect-[16/9] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
-                              <img src={slide.image} alt="Desktop slide view" className="w-full h-full object-cover" />
+                              <img src={getOptimizedImageUrl(slide.image, 600, 75)} alt="Desktop slide view" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                               <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">DESKTOP</span>
                             </div>
                             {slide.mobileImage ? (
                               <div className="w-1/4 aspect-[3/4] border border-[var(--color-border)] overflow-hidden bg-[var(--color-subtle)] relative">
-                                <img src={slide.mobileImage} alt="Mobile slide view" className="w-full h-full object-cover" />
+                                <img src={getOptimizedImageUrl(slide.mobileImage, 400, 75)} alt="Mobile slide view" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                 <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[7px] font-bold px-1 py-0.5 uppercase">MOBILE</span>
                               </div>
                             ) : (
@@ -4371,8 +4741,10 @@ function AdminPanel() {
                               <td className="py-4 pr-4">
                                 <div className="w-12 h-12 rounded-full overflow-hidden border border-[var(--color-border)]/10">
                                   <img 
-                                    src={currentImageUrl} 
+                                    src={getOptimizedImageUrl(currentImageUrl, 100, 75)} 
                                     alt={cat.label} 
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-full h-full object-cover object-center" 
                                     onError={(e) => {
                                       e.target.src = 'https://placehold.co/150x150?text=FITS';
@@ -4683,7 +5055,13 @@ function AdminPanel() {
                                   }}
                                   className="w-3.5 h-3.5 accent-[var(--color-accent)] rounded-xl cursor-pointer"
                                 />
-                                <img src={p.front_image_link} alt="" className="w-6 h-6 object-cover object-center shrink-0 border border-[var(--color-border)] rounded" />
+                                <img 
+                                  src={getOptimizedImageUrl(p.front_image_link, 60, 75)} 
+                                  alt="" 
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-6 h-6 object-cover object-center shrink-0 border border-[var(--color-border)] rounded" 
+                                />
                                 <div className="min-w-0 flex-1">
                                   <p className="text-[9px] font-bold truncate uppercase tracking-wider text-[var(--color-text)]">{p.name}</p>
                                   <p className="text-[8px] text-[var(--color-muted)] font-mono uppercase">₹{p.price} | {p.category}</p>

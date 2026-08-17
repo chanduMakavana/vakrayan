@@ -371,42 +371,28 @@ export class CampaignService {
         return JSON.parse(localStorage.getItem('sentCampaigns')) || [];
     }
 
-    // ➡️ 10. Send individual email via EmailJS REST API
+    // ➡️ 10. Send individual email via Brevo Serverless Function
     async sendEmailViaEmailJS(email, subject, body) {
-        const serviceId = (import.meta.env.VITE_EMAILJS_SERVICE_ID || "").trim().replace(/^["']|["']$/g, '');
-        const templateId = (import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "").trim().replace(/^["']|["']$/g, '');
-        const publicKey = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "").trim().replace(/^["']|["']$/g, '');
+        return this.sendEmailViaBrevo(email, subject, body);
+    }
 
-        if (!serviceId || !templateId || !publicKey) {
-            throw new Error("EmailJS keys are missing from configuration.");
-        }
-
-        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+    async sendEmailViaBrevo(email, subject, body) {
+        const response = await fetch('/.netlify/functions/email', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                service_id: serviceId,
-                template_id: templateId,
-                user_id: publicKey,
-                template_params: {
-                    to_email: email,
-                    email: email,
-                    subject: subject,
-                    title: subject,
-                    message: body,
-                    body: body,
-                    to_name: email.split('@')[0],
-                    name: email.split('@')[0],
-                    time: new Date().toLocaleString(),
-                }
+                type: 'campaign',
+                to: email,
+                subject: subject,
+                textContent: body,
             })
         });
 
+        const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`EmailJS API error: ${errorText || response.statusText}`);
+            throw new Error(data.error || `Email delivery failed (${response.statusText})`);
         }
 
         return true;
