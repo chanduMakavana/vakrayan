@@ -577,7 +577,14 @@ function Checkout() {
   };
 
   const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
-    setCheckoutStatus('processing');
+    setCheckoutStatus('processing')
+    setProcessingStep(0)
+
+    // Restore original step-by-step processing animation (800ms per step)
+    for (let i = 0; i < steps.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      setProcessingStep(i + 1)
+    }
 
     try {
       const orderNumber = generateOrderNumber();
@@ -761,7 +768,29 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
-    return <Loader type="splash" text="CONFIRMING YOUR ORDER..." />
+    return (
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
+        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
+        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
+          <div className="w-8 h-8 border-4 border-[var(--color-accent)] border-t-[var(--color-accent)] rounded-full animate-spin" />
+          <h2 className="text-xl font-black tracking-widest uppercase text-[var(--color-text)]">
+            PROCESSING INVOICE
+          </h2>
+          <div className="space-y-1.5 w-full">
+            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse">
+              {steps[processingStep] || "Finalizing process modules..."}
+            </p>
+            {/* Custom progress bar */}
+            <div className="w-48 h-[1.5px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
+              <div 
+                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700" 
+                style={{ width: `${(processingStep / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (checkoutStatus === 'success') {
