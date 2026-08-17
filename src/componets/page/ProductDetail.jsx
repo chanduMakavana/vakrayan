@@ -78,7 +78,7 @@ function ProductDetail() {
   }, [product]);
 
   const [loading, setLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState('');
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
@@ -208,35 +208,7 @@ function ProductDetail() {
       mainIsDraggingRef.current = false;
       if (e.touches.length === 0) {
         mainIsPinchingRef.current = false;
-        
-        if (mainPhotoZoomRef.current <= 1) {
-          const diffX = swipeStartX - swipeEndX;
-          const diffY = swipeStartY - swipeEndY;
-          const threshold = 40; // minimum swipe distance in pixels
-          
-          if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > threshold) {
-            const list = galleryImagesRef.current || [];
-            if (list.length > 1) {
-              const currentIdx = list.indexOf(activeImage) !== -1 ? list.indexOf(activeImage) : 0;
-              let targetIdx = currentIdx;
-              if (diffX > 0) {
-                targetIdx = (currentIdx + 1) % list.length; // Swipe Left -> Next
-              } else {
-                targetIdx = (currentIdx - 1 + list.length) % list.length; // Swipe Right -> Prev
-              }
-              setActiveImage(list[targetIdx]);
-              
-              // Reset zoom and offsets
-              mainPhotoZoomRef.current = 1;
-              mainPhotoOffsetRef.current = { x: 0, y: 0 };
-              setMainPhotoZoom(1);
-              setMainPhotoOffset({ x: 0, y: 0 });
-              if (mainImageRef.current) {
-                mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
-              }
-            }
-          }
-        } else {
+        if (mainPhotoZoomRef.current > 1) {
           setMainPhotoZoom(mainPhotoZoomRef.current);
           setMainPhotoOffset(mainPhotoOffsetRef.current);
         }
@@ -301,7 +273,7 @@ function ProductDetail() {
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [activeImage]);
+  }, [activeImageIdx]);
 
   // Touch and wheel event handler for lightbox modal (blocking viewport zoom & reload)
   useEffect(() => {
@@ -648,7 +620,7 @@ function ProductDetail() {
          }
          if (isMounted) {
            setProduct(cachedProduct);
-           setActiveImage(cachedProduct.front_image_link || cachedProduct.image_url || cachedProduct.image);
+           setActiveImageIdx(0);
            
              let stockMap = {};
              try {
@@ -687,7 +659,7 @@ function ProductDetail() {
            return;
          }
          setProduct(mainProductData);
-         setActiveImage(mainProductData.front_image_link || mainProductData.image_url || mainProductData.image);
+         setActiveImageIdx(0);
          
            let stockMap = {};
            try {
@@ -1168,21 +1140,24 @@ function ProductDetail() {
     isAllOutOfStock = totalStock === 0;
   }
 
-  const galleryImages = activeVariant
+  const rawGalleryImages = activeVariant
     ? [activeVariant.front, activeVariant.back].filter(Boolean)
     : [
         product.front_image_link || product.image_url || product.image,
-        ...(Array.isArray(product.back_image_links) ? product.back_image_links : [product.back_image_link])
+        ...(Array.isArray(product.back_image_links) ? product.back_image_links : product.back_image_link ? [product.back_image_link] : [])
       ].filter(Boolean);
+
+  const galleryImages = Array.from(new Set(rawGalleryImages));
 
   galleryImagesRef.current = galleryImages;
 
-  const activeImageIndex = galleryImages.indexOf(activeImage) !== -1 ? galleryImages.indexOf(activeImage) : 0;
+  const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
+  const activeImage = galleryImages[activeImageIndex] || '';
 
   const handleLightboxNext = () => {
     if (galleryImages.length <= 1) return;
-    const nextIdx = (activeImageIndex + 1) % galleryImages.length;
-    setActiveImage(galleryImages[nextIdx]);
+    setImageLoaded(false);
+    setActiveImageIdx((prevIdx) => (prevIdx + 1) % galleryImages.length);
     setLightboxZoom(1);
     setLightboxOffset({ x: 0, y: 0 });
     setMainPhotoZoom(1);
@@ -1203,8 +1178,8 @@ function ProductDetail() {
 
   const handleLightboxPrev = () => {
     if (galleryImages.length <= 1) return;
-    const prevIdx = (activeImageIndex - 1 + galleryImages.length) % galleryImages.length;
-    setActiveImage(galleryImages[prevIdx]);
+    setImageLoaded(false);
+    setActiveImageIdx((prevIdx) => (prevIdx - 1 + galleryImages.length) % galleryImages.length);
     setLightboxZoom(1);
     setLightboxOffset({ x: 0, y: 0 });
     setMainPhotoZoom(1);
@@ -1268,7 +1243,7 @@ function ProductDetail() {
                     type="button"
                     onClick={() => {
                       setImageLoaded(false);
-                      setActiveImage(imgUrl);
+                      setActiveImageIdx(idx);
                       mainPhotoZoomRef.current = 1;
                       mainPhotoOffsetRef.current = { x: 0, y: 0 };
                       setMainPhotoZoom(1);
@@ -1277,7 +1252,7 @@ function ProductDetail() {
                         mainImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
                       }
                     }}
-                    className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImage === imgUrl ? 'border-neutral-950 scale-95 shadow-sm' : 'border-[var(--color-border)] hover:border-[var(--color-accent)]'}`}
+                    className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImageIndex === idx ? 'border-neutral-950 scale-95 shadow-sm' : 'border-[var(--color-border)] hover:border-[var(--color-accent)]'}`}
                   >
                     <img src={imgUrl} alt="Garment view" className="w-full h-full object-cover" />
                   </button>
@@ -1318,6 +1293,7 @@ function ProductDetail() {
                 window.addEventListener('mouseup', handleMouseUpDrag);
               }}
               onTouchStart={(e) => {
+                if (e.target.closest('button')) return;
                 touchStartRef.current = {
                   x: e.touches[0].clientX,
                   y: e.touches[0].clientY,
@@ -1325,28 +1301,25 @@ function ProductDetail() {
                 };
               }}
               onTouchEnd={(e) => {
+                if (e.target.closest('button')) return;
                 if (!touchStartRef.current) return;
                 const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
                 const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
                 const dt = Date.now() - touchStartRef.current.time;
+                touchStartRef.current = null;
                 
                 // Swipe detection
-                if (Math.abs(dx) > 40 && Math.abs(dy) < 40 && dt < 300) {
+                if (Math.abs(dx) > 30 && Math.abs(dy) < 60 && dt < 400) {
                   e.preventDefault();
-                  const currentIdx = galleryImages.indexOf(activeImage);
                   if (dx < 0) {
                     // Swipe Left: Next Image
-                    const nextIdx = (currentIdx + 1) % galleryImages.length;
-                    setImageLoaded(false);
-                    setActiveImage(galleryImages[nextIdx]);
+                    handleLightboxNext();
                   } else {
                     // Swipe Right: Prev Image
-                    const prevIdx = (currentIdx - 1 + galleryImages.length) % galleryImages.length;
-                    setImageLoaded(false);
-                    setActiveImage(galleryImages[prevIdx]);
+                    handleLightboxPrev();
                   }
                 } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 250) {
-                  // Fast Tap: Open Lightbox instantly
+                  // Fast Tap on image container: Open Lightbox instantly
                   e.preventDefault();
                   mainPhotoZoomRef.current = 1;
                   mainPhotoOffsetRef.current = { x: 0, y: 0 };
@@ -1359,9 +1332,9 @@ function ProductDetail() {
                   setLightboxZoom(1);
                   setLightboxOffset({ x: 0, y: 0 });
                 }
-                touchStartRef.current = null;
               }}
               onDoubleClick={(e) => {
+                if (e.target.closest('button')) return;
                 e.preventDefault();
                 e.stopPropagation();
                 mainPreventClickRef.current = true;
@@ -1383,7 +1356,8 @@ function ProductDetail() {
                   }
                 }
               }}
-              onClick={() => {
+              onClick={(e) => {
+                if (e.target.closest('button')) return;
                 if (mainPreventClickRef.current) {
                   mainPreventClickRef.current = false;
                   return;
@@ -1405,32 +1379,38 @@ function ProductDetail() {
                 Swipe to Browse / Tap to Zoom
               </div>
 
-              {/* Mobile Navigation Chevron Buttons overlay */}
+              {/* Navigation Chevron Buttons overlay */}
               {galleryImages.length > 1 && (
                 <>
                   <button
                     type="button"
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleLightboxPrev();
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const currentIdx = galleryImages.indexOf(activeImage);
-                      const prevIdx = (currentIdx - 1 + galleryImages.length) % galleryImages.length;
-                      setImageLoaded(false);
-                      setActiveImage(galleryImages[prevIdx]);
+                      handleLightboxPrev();
                     }}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-neutral-900 border border-neutral-200/50 shadow-xs md:hidden active:scale-90 transition-transform cursor-pointer"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-neutral-900 border border-neutral-200/50 shadow-xs active:scale-90 transition-transform cursor-pointer"
                   >
                     <FiChevronLeft className="text-base" />
                   </button>
                   <button
                     type="button"
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleLightboxNext();
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const currentIdx = galleryImages.indexOf(activeImage);
-                      const nextIdx = (currentIdx + 1) % galleryImages.length;
-                      setImageLoaded(false);
-                      setActiveImage(galleryImages[nextIdx]);
+                      handleLightboxNext();
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-neutral-900 border border-neutral-200/50 shadow-xs md:hidden active:scale-90 transition-transform cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/80 backdrop-blur-xs flex items-center justify-center text-neutral-900 border border-neutral-200/50 shadow-xs active:scale-90 transition-transform cursor-pointer"
                   >
                     <FiChevronRight className="text-base" />
                   </button>
@@ -1454,6 +1434,32 @@ function ProductDetail() {
                   className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-40 scale-[0.98]'}`}
                 />
               </div>
+
+              {/* Mobile Slide Position Dots Indicator */}
+              {galleryImages.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/20">
+                  {galleryImages.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchEnd={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setImageLoaded(false);
+                        setActiveImageIdx(idx);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImageLoaded(false);
+                        setActiveImageIdx(idx);
+                      }}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${activeImageIndex === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                      aria-label={`Go to slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -3044,7 +3050,7 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => {
-                      setActiveImage(imgUrl);
+                      setActiveImageIdx(idx);
                       setLightboxZoom(1);
                       setLightboxOffset({ x: 0, y: 0 });
                       setMainPhotoZoom(1);
@@ -3062,7 +3068,7 @@ function ProductDetail() {
                         lightboxImageRef.current.style.transform = 'translate(0px, 0px) scale(1)';
                       }
                     }}
-                    className={`w-10 h-12 border transition-all duration-300 shrink-0 ${activeImage === imgUrl ? 'border-white scale-95 shadow-lg' : 'border-white/25 opacity-60 hover:opacity-100'}`}
+                    className={`w-10 h-12 border transition-all duration-300 shrink-0 ${activeImageIndex === idx ? 'border-white scale-95 shadow-lg' : 'border-white/25 opacity-60 hover:opacity-100'}`}
                   >
                     <img src={imgUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
                   </button>

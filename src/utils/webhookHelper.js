@@ -3,7 +3,7 @@
  * Supports auto-formatting and channel routing based on event types.
  */
 const escapeHtml = (unsafe) => {
-  if (!unsafe) return '';
+  if (unsafe === null || unsafe === undefined) return '';
   return String(unsafe)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -203,28 +203,66 @@ export const sendWebhookNotification = async (event, payload) => {
         return inlineKeyboard.length > 0 ? { inline_keyboard: inlineKeyboard } : null;
       };
 
-      const telegramUrl = `https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`;
       const replyMarkup = getTelegramReplyMarkup(event, payload);
       
       const requestBody = {
-        chat_id: telegramChatId,
+        token: telegramToken.trim(),
+        chatId: telegramChatId,
         text,
-        parse_mode: 'HTML'
+        parseMode: 'HTML',
+        replyMarkup
       };
 
-      if (replyMarkup) {
-        requestBody.reply_markup = replyMarkup;
-      }
+      const directUrl = `https://api.telegram.org/bot${telegramToken.trim()}/sendMessage`;
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-      fetch(telegramUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      })
-      .then(async (res) => {
-        // Silently handle success or API errors
-      })
-      .catch(() => {});
+      if (isLocalhost) {
+        // On localhost: Send direct fetch to Telegram API so local testing works!
+        fetch(directUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: telegramChatId,
+            text,
+            parse_mode: 'HTML',
+            reply_markup: replyMarkup
+          })
+        }).catch(() => {});
+      } else {
+        // Production Netlify (https://vakrayan.netlify.app): use /.netlify/functions/telegram serverless relay
+        const serverlessUrl = '/.netlify/functions/telegram';
+        fetch(serverlessUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        })
+        .then(res => {
+          if (!res.ok) {
+            return fetch(directUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: telegramChatId,
+                text,
+                parse_mode: 'HTML',
+                reply_markup: replyMarkup
+              })
+            });
+          }
+        })
+        .catch(() => {
+          fetch(directUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: telegramChatId,
+              text,
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup
+            })
+          }).catch(() => {});
+        });
+      }
     } catch (err) {
       // Silently catch dispatcher errors
     }
