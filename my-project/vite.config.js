@@ -6,8 +6,15 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [tailwindcss(), react()],
 
-
-
+  server: {
+    proxy: {
+      '/.netlify/functions': {
+        target: 'https://vakrayan.com',
+        changeOrigin: true,
+        secure: true,
+      }
+    }
+  },
   build: {
     // Warn when a chunk exceeds 500 KB (default is 500 but making it explicit)
     chunkSizeWarningLimit: 500,
