@@ -761,7 +761,17 @@ function Checkout() {
         customerName: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        address: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`
+        address: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`,
+        items: cartItems.map(i => {
+          const matchingProd = products.find(p => p.$id === i.product_id || p.id === i.product_id);
+          return {
+            name: i.name,
+            size: i.size || 'M',
+            quantity: Number(i.quantity),
+            price: Number(i.price),
+            image: i.product_Image || i.product_image || i.image || i.front_image_link || matchingProd?.front_image_link || matchingProd?.image || ''
+          };
+        })
       });
 
       // Clean Redux cart state
@@ -783,61 +793,39 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
-    const progressPercent = Math.min(100, Math.round(((processingStep + 1) / (steps.length + 1)) * 100));
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--color-surface)_0%,var(--color-bg)_100%)] opacity-80" />
-
-        <div className="relative z-20 flex flex-col items-center space-y-8 max-w-lg w-full text-center animate-fade-in px-4">
-          {/* Vakrayan Monogram */}
-          <div className="relative flex items-center justify-center">
-            <div className="w-24 h-24 rounded-3xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 shadow-2xl flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-accent)]/15 to-transparent pointer-events-none" />
-              <img 
-                src="/vakrayan-logo-icon.png" 
-                alt="Vakrayan" 
-                className="w-14 h-14 object-contain drop-shadow-md animate-pulse"
-                style={{ animationDuration: '2s' }}
-              />
-            </div>
-            <div className="absolute -inset-3 rounded-3xl border-2 border-dashed border-[var(--color-accent)]/40 animate-spin" style={{ animationDuration: '10s' }} />
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-[10px] font-black tracking-[0.45em] uppercase text-[var(--color-accent)] block">
-              VAKRAYAN SECURE GATEWAY
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black font-brand tracking-widest uppercase text-[var(--color-text)]">
-              SECURING ORDER
-            </h2>
-            <p className="text-xs text-[var(--color-muted)] font-mono uppercase tracking-wider">
-              Please do not refresh or close this window
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in">
+        <div className="flex flex-col items-center gap-6 max-w-sm">
+          {/* Minimalist Vakrayan Monogram */}
+          <img 
+            src="/vakrayan-logo-icon.png" 
+            alt="Vakrayan" 
+            className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-sm" 
+          />
+          
+          <div className="flex flex-col items-center gap-1.5">
+            <h1 className="text-sm md:text-base font-brand font-black tracking-[0.45em] text-[var(--color-text)] uppercase">
+              VAKRAYAN
+            </h1>
+            <p className="text-[9px] font-bold tracking-[0.3em] text-[var(--color-muted)] uppercase">
+              Securing Your Order
             </p>
           </div>
 
-          {/* Progress Card */}
-          <div className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider">
-              <span className="text-[var(--color-accent)] animate-pulse flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[var(--color-accent)] animate-ping" />
-                {steps[processingStep] || "Finalizing order confirmation..."}
-              </span>
-              <span className="text-[var(--color-text)] font-bold">{progressPercent}%</span>
-            </div>
-
-            {/* Glowing progress bar */}
-            <div className="w-full h-2 bg-[var(--color-border)] rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 rounded-full shadow-[0_0_12px_var(--color-accent)]" 
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-
-            <div className="flex justify-between items-center text-[10px] text-[var(--color-muted)] font-mono uppercase tracking-widest pt-2 border-t border-[var(--color-border)]">
-              <span>🔒 256-Bit SSL Encrypted</span>
-              <span>AUTHENTIC VAKRAYAN</span>
-            </div>
+          {/* Minimalist sleek progress bar */}
+          <div className="w-36 h-[1.5px] bg-[var(--color-border)] rounded-full overflow-hidden relative mt-2">
+            <div
+              className="absolute inset-0 w-1/2 rounded-full"
+              style={{
+                background: 'var(--color-accent)',
+                animation: 'loading 0.9s infinite linear',
+              }}
+            />
           </div>
+
+          <p className="text-[10px] font-mono tracking-widest text-[var(--color-muted)] uppercase pt-2">
+            {steps[processingStep] || "Processing..."}
+          </p>
         </div>
       </div>
     )
@@ -846,210 +834,152 @@ function Checkout() {
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 animate-fade-in">
         
-        {/* Full-screen celebratory confetti canvas overlay */}
+        {/* Celebratory confetti canvas */}
         <canvas 
           ref={confettiCanvasRef}
           className="fixed inset-0 w-full h-full pointer-events-none z-50"
         />
 
-        {/* Ambient Top Background Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-96 bg-gradient-to-b from-emerald-500/10 via-[var(--color-accent)]/5 to-transparent blur-3xl pointer-events-none" />
-
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-12 relative z-20 space-y-10">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-12 relative z-20 space-y-8">
           
-          {/* Top Brand & Status Hero Header */}
-          <div className="text-center space-y-5 animate-fade-in">
-            
-            {/* Animated Luxury Check Seal */}
+          {/* Minimal Header */}
+          <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="relative flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center relative shadow-xl shadow-emerald-500/10">
-                  <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping pointer-events-none" style={{ animationDuration: '3.5s' }} />
-                  <div className="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                    <FiCheck className="text-3xl stroke-[3]" />
-                  </div>
-                </div>
+              <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500">
+                <FiCheck className="text-2xl stroke-[2.5]" />
               </div>
             </div>
 
-            <div className="space-y-2 max-w-xl mx-auto">
-              <span className="inline-flex items-center gap-2 text-[10px] tracking-[0.35em] text-emerald-600 dark:text-emerald-400 font-black uppercase px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                TRANSACTION COMPLETED // ORDER SECURED
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono font-bold tracking-[0.3em] uppercase text-emerald-600 dark:text-emerald-400 block">
+                Order Confirmed
               </span>
-              <h1 className="text-3xl sm:text-5xl font-black font-brand tracking-tight text-[var(--color-text)] uppercase">
-                ORDER CONFIRMED!
+              <h1 className="text-2xl sm:text-3xl font-black font-brand tracking-tight text-[var(--color-text)] uppercase">
+                Thank You For Your Order
               </h1>
-              <p className="text-sm text-[var(--color-muted)] leading-relaxed font-sans">
-                Thank you for your order{confirmedOrder?.customerName ? `, ${confirmedOrder.customerName}` : ''}. We have received your order details and are preparing your package for shipment.
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed font-sans max-w-md mx-auto">
+                We've received your order and our team is already preparing it with care. A confirmation has been sent to your email.
               </p>
             </div>
 
-            {/* Quick Copy Order ID Pill */}
-            <div className="inline-flex items-center justify-center gap-3 bg-[var(--color-surface)] border border-[var(--color-border)] px-5 py-3 rounded-2xl shadow-sm">
-              <div className="text-left">
-                <span className="text-[9px] uppercase tracking-widest text-[var(--color-muted)] font-black block">
-                  ORDER REFERENCE NUMBER
-                </span>
-                <span className="text-sm sm:text-base font-mono font-bold text-[var(--color-text)] tracking-wider">
-                  {confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}
-                </span>
-              </div>
-              <button 
+            {/* Clean Order Number Badge */}
+            <div className="inline-flex items-center gap-2 bg-[var(--color-surface)] border border-[var(--color-border)] px-4 py-2 rounded-xl text-xs font-mono">
+              <span className="text-[var(--color-muted)] uppercase tracking-wider text-[10px]">Order:</span>
+              <span className="font-bold text-[var(--color-text)]">{confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}</span>
+              <button
                 type="button"
                 onClick={() => {
-                  const num = confirmedOrder?.orderNumber;
-                  if (num) {
-                    navigator.clipboard.writeText(num);
+                  if (confirmedOrder?.orderNumber) {
+                    navigator.clipboard.writeText(confirmedOrder.orderNumber);
                     setCopiedOrderId(true);
-                    showToast("Order Reference Number copied!", "success");
+                    showToast("Order ID copied!", "success");
                     setTimeout(() => setCopiedOrderId(false), 2000);
                   }
                 }}
-                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-[var(--color-subtle)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-all cursor-pointer active:scale-95 ml-2"
+                className="text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors p-1 cursor-pointer"
+                title="Copy Order ID"
               >
-                {copiedOrderId ? <FiCheck className="text-emerald-500 text-xs" /> : <FiCopy className="text-xs" />}
-                {copiedOrderId ? 'COPIED' : 'COPY'}
+                {copiedOrderId ? <FiCheck className="text-emerald-500" /> : <FiCopy />}
               </button>
             </div>
-
           </div>
 
-          {/* Full Screen Information Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-scale-up">
-            
-            {/* Left Column: Order Summary & Tracking */}
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 sm:p-7 shadow-lg space-y-5">
-              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
-                <h3 className="text-xs font-black tracking-[0.25em] uppercase text-[var(--color-muted)] flex items-center gap-2">
-                  <FiPackage className="text-[var(--color-accent)] text-sm" />
-                  Order Overview
-                </h3>
-                <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase">
-                  Confirmed
-                </span>
+          {/* Purchased Items Minimalist Preview */}
+          {confirmedOrder?.items && confirmedOrder.items.length > 0 && (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs">
+              <div className="flex justify-between items-center text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">
+                <span>Items Ordered</span>
+                <span>{confirmedOrder.items.reduce((acc, curr) => acc + curr.quantity, 0)} Items</span>
               </div>
 
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px]">Payment Method</span>
-                  <span className="font-mono font-bold text-[var(--color-text)] uppercase">
-                    {confirmedOrder?.paymentMethod === 'ONLINE' ? 'Razorpay (Paid Online)' : confirmedOrder?.paymentMethod === 'WALLET' ? 'Store Wallet (Paid)' : 'Cash on Delivery (COD)'}
-                  </span>
-                </div>
-
-                {confirmedOrder?.total && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px]">Total Net Amount</span>
-                    <span className="font-mono font-black text-base text-[var(--color-text)]">
-                      ₹{confirmedOrder.total.toLocaleString('en-IN')}
+              <div className="divide-y divide-[var(--color-border)]/60">
+                {confirmedOrder.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <img 
+                      src={item.image || 'https://placehold.co/80x100'} 
+                      alt={item.name} 
+                      className="w-10 h-13 object-cover rounded-lg border border-[var(--color-border)] shrink-0 bg-[var(--color-subtle)]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-[var(--color-text)] uppercase truncate">
+                        {item.name}
+                      </h4>
+                      <p className="text-[10px] font-mono text-[var(--color-muted)] uppercase">
+                        Size: {item.size} · Qty: {item.quantity}
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-[var(--color-text)]">
+                      ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                     </span>
                   </div>
-                )}
-
-                <div className="flex justify-between items-center">
-                  <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px]">Estimated Delivery</span>
-                  <span className="font-mono font-bold text-[var(--color-accent)] flex items-center gap-1.5">
-                    <FiTruck className="text-sm" /> 3 – 5 Business Days
-                  </span>
-                </div>
-              </div>
-
-              {/* Delivery timeline tracker */}
-              <div className="pt-3 border-t border-[var(--color-border)] space-y-2.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)] block">
-                  Logistics Milestones
-                </span>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 text-xs">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0 font-bold">✓</div>
-                    <span className="font-bold text-[var(--color-text)]">Order Placed &amp; Verified</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <div className="w-5 h-5 rounded-full bg-[var(--color-accent)] text-white flex items-center justify-center text-[10px] shrink-0 font-bold animate-pulse">⟳</div>
-                    <span className="font-bold text-[var(--color-accent)]">Preparing for Dispatch</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs opacity-40">
-                    <div className="w-5 h-5 rounded-full border border-[var(--color-border)] flex items-center justify-center text-[10px] shrink-0">3</div>
-                    <span className="text-[var(--color-muted)]">Out for Delivery</span>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Right Column: Shipping Details & Policy */}
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 sm:p-7 shadow-lg space-y-5 flex flex-col justify-between">
-              <div className="space-y-5">
-                <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
-                  <h3 className="text-xs font-black tracking-[0.25em] uppercase text-[var(--color-muted)] flex items-center gap-2">
-                    <FiTruck className="text-[var(--color-accent)] text-sm" />
-                    Delivery Destination
-                  </h3>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="font-bold text-sm text-[var(--color-text)] uppercase">
-                    {confirmedOrder?.customerName || user?.name}
-                  </div>
-                  <p className="text-[var(--color-muted)] leading-relaxed font-mono text-[11px]">
-                    {confirmedOrder?.address || 'Shipping address registered with order.'}
-                  </p>
-                  {confirmedOrder?.phone && (
-                    <p className="text-[var(--color-muted)] font-mono text-[11px]">
-                      Contact: {confirmedOrder.phone}
-                    </p>
-                  )}
-                </div>
-
-                {/* Cancellation Policy Banner */}
-                <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl text-left flex items-start gap-3">
-                  <FiShield className="text-amber-500 shrink-0 mt-0.5 text-base" />
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
-                      Cancellation Policy
-                    </span>
-                    <p className="text-[11px] text-[var(--color-muted)] leading-relaxed font-sans">
-                      Orders can be cancelled while in <strong>"Pending"</strong> status directly from your profile account. Once package is dispatched, cancellations are locked.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-[10px] text-[var(--color-muted)] font-mono uppercase tracking-widest pt-3 border-t border-[var(--color-border)]">
-                Receipt sent to: <strong className="text-[var(--color-text)] font-semibold">{confirmedOrder?.email || user?.email}</strong>
-              </div>
+          {/* Minimal 3-Point Summary Card */}
+          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 shadow-xs divide-y divide-[var(--color-border)]/60 text-xs">
+            <div className="flex justify-between items-center py-2.5 first:pt-0">
+              <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px] flex items-center gap-2">
+                <FiTruck className="text-[var(--color-accent)]" /> Estimated Delivery
+              </span>
+              <span className="font-bold text-[var(--color-text)] font-mono">
+                3 – 5 Business Days
+              </span>
             </div>
 
+            <div className="flex justify-between items-center py-2.5">
+              <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px] flex items-center gap-2">
+                <FiPackage className="text-[var(--color-accent)]" /> Deliver To
+              </span>
+              <span className="font-medium text-[var(--color-text)] truncate max-w-[240px] text-right">
+                {confirmedOrder?.customerName} · {confirmedOrder?.address}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-2.5 last:pb-0">
+              <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px] flex items-center gap-2">
+                <FiShield className="text-[var(--color-accent)]" /> Payment
+              </span>
+              <span className="font-mono font-bold text-[var(--color-text)]">
+                {confirmedOrder?.paymentMethod === 'ONLINE' ? 'Online (Paid)' : confirmedOrder?.paymentMethod === 'WALLET' ? 'Wallet (Paid)' : 'Cash on Delivery'} · ₹{confirmedOrder?.total?.toLocaleString('en-IN')}
+              </span>
+            </div>
           </div>
 
-          {/* Action Navigation Bar */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          {/* Subtle Minimal Policy Note */}
+          <p className="text-[11px] text-[var(--color-muted)] text-center font-sans leading-relaxed">
+            Need to make a change? Orders can be updated or cancelled from your account before dispatch.
+          </p>
+
+          {/* Clean Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             {confirmedOrder?.id ? (
               <button 
                 onClick={() => navigate(`/order/${confirmedOrder.id}`)} 
-                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5 group"
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-bold text-xs tracking-widest uppercase py-3.5 rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <FiPackage className="text-base group-hover:scale-110 transition-transform" />
-                VIEW ORDER &amp; TRACKING &rarr;
+                <FiPackage className="text-sm" />
+                View Order &amp; Tracking
               </button>
             ) : (
               <button 
                 onClick={() => navigate('/profile')} 
-                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5"
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-bold text-xs tracking-widest uppercase py-3.5 rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <FiPackage className="text-base" />
-                MY ORDERS &rarr;
+                <FiPackage className="text-sm" />
+                My Orders
               </button>
             )}
 
             <button 
               onClick={() => navigate('/shop')} 
-              className="flex-1 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] border border-[var(--color-border)] active:scale-[0.98] font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2.5"
+              className="flex-1 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] border border-[var(--color-border)] active:scale-[0.98] font-bold text-xs tracking-widest uppercase py-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <FiShoppingBag className="text-base" />
-              CONTINUE SHOPPING
+              <FiShoppingBag className="text-sm" />
+              Continue Shopping
             </button>
           </div>
 
