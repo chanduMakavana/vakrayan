@@ -22,6 +22,7 @@ import { calculateOffersDiscount } from '../../utils/discountCalculator'
 import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelper'
 import CouponSelector from '../pageComponets/CouponSelector'
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
+import Loader from '../pageComponets/Loader'
 
 
 
