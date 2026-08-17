@@ -42,6 +42,15 @@ function Loader({ type = 'inline', text }) {
                 }}
               />
             </div>
+
+            {text && (
+              <p
+                className="text-[10px] font-mono font-bold tracking-[0.25em] uppercase animate-pulse"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                {text}
+              </p>
+            )}
           </motion.div>
         )
       case 'overlay':

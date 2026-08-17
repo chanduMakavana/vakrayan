@@ -768,55 +768,7 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
-    const progressPercent = Math.round((processingStep / steps.length) * 100);
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
-
-        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
-              <div className="w-7 h-7 border-[3px] border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
-              TRANSACTION IN PROGRESS
-            </h4>
-            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
-              Processing Invoice
-            </h1>
-          </div>
-
-          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide animate-pulse">
-            {steps[processingStep] || "Finalizing process modules..."}
-          </p>
-
-          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
-            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
-            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
-              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
-            </p>
-          </div>
-
-          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
-
-          <div className="w-full space-y-2">
-            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-emerald-600 transition-all duration-700 rounded-full" 
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <div className="flex justify-between items-center text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
-              <span>SECURING ORDER</span>
-              <span>{progressPercent}%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <Loader type="splash" text={steps[processingStep] || "CONFIRMING YOUR ORDER..."} />
   }
 
 
