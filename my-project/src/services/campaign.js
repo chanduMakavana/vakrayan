@@ -41,7 +41,7 @@ export class CampaignService {
     async getCoupons() {
         try {
             if (!conf.firebaseCouponsCollectionId) {
-                return this.getLocalCoupons();
+                return [];
             }
             const response = await this.databases.listDocuments(
                 conf.firebaseDatabaseId,
@@ -51,47 +51,28 @@ export class CampaignService {
             
             let coupons = [];
             if (response.documents && response.documents.length > 0) {
-                coupons = response.documents.map(doc => ({
-                    ...doc,
-                    isExpired: this.checkIsExpired(doc.valid_until)
-                }));
-            }
-
-            // Ensure NEW10 exists in database documents
-            const hasNew10 = coupons.some(c => String(c.code || '').toUpperCase() === 'NEW10');
-            if (!hasNew10) {
-                try {
-                    const new10Payload = {
-                        code: 'NEW10',
-                        discount: 10,
-                        min_order_value: 0,
-                        valid_until: '',
-                        coupon_usage: JSON.stringify({ min_order_value: 0, valid_until: '' })
+                coupons = response.documents.map(doc => {
+                    let showInAvailable = doc.show_in_available !== undefined ? Boolean(doc.show_in_available) : true;
+                    if (doc.coupon_usage) {
+                        try {
+                            const parsed = JSON.parse(doc.coupon_usage);
+                            if (parsed && typeof parsed.show_in_available === 'boolean') {
+                                showInAvailable = parsed.show_in_available;
+                            }
+                        } catch {}
+                    }
+                    return {
+                        ...doc,
+                        show_in_available: showInAvailable,
+                        isExpired: this.checkIsExpired(doc.valid_until)
                     };
-                    const doc = await this.databases.createDocument(
-                        conf.firebaseDatabaseId,
-                        conf.firebaseCouponsCollectionId,
-                        ID.unique(),
-                        new10Payload
-                    );
-                    coupons.unshift({ ...doc, isExpired: false });
-                } catch (seedErr) {
-                    console.warn("Auto-seeding NEW10 to Firebase DB fallback:", seedErr.message);
-                    coupons.unshift({
-                        $id: 'new10-default',
-                        code: 'NEW10',
-                        discount: 10,
-                        min_order_value: 0,
-                        description: 'Extra 10% off on your first purchase, on styles up to 40% off.*T&C',
-                        isExpired: false
-                    });
-                }
+                });
             }
 
-            return coupons.length > 0 ? coupons : this.getLocalCoupons();
+            return coupons;
         } catch (error) {
-            console.warn("⚠️ Firebase Coupons DB unavailable. Falling back to local storage.", error.message);
-            return this.getLocalCoupons();
+            console.warn("⚠️ Firebase Coupons DB unavailable:", error.message);
+            return [];
         }
     }
 
@@ -99,9 +80,11 @@ export class CampaignService {
     async createCoupon(code, discount, extraData = {}) {
         const minOrder = extraData.min_order_value ? Number(extraData.min_order_value) : 0;
         const validUntil = extraData.valid_until || '';
+        const showInAvailable = extraData.show_in_available !== undefined ? Boolean(extraData.show_in_available) : true;
         const serializedUsage = JSON.stringify({
             min_order_value: minOrder,
-            valid_until: validUntil
+            valid_until: validUntil,
+            show_in_available: showInAvailable
         });
 
         const payload = { 
@@ -109,6 +92,7 @@ export class CampaignService {
             discount: Number(discount),
             min_order_value: minOrder,
             valid_until: validUntil,
+            show_in_available: showInAvailable,
             coupon_usage: serializedUsage
         };
 
@@ -122,14 +106,14 @@ export class CampaignService {
                 ID.unique(),
                 payload
             );
-            return { ...doc, isExpired: this.checkIsExpired(doc.valid_until) };
+            return { ...doc, show_in_available: showInAvailable, isExpired: this.checkIsExpired(doc.valid_until) };
         } catch (error) {
             console.warn("⚠️ Firebase Coupons offline. Saving coupon locally.", error.message);
             const local = this.getLocalCoupons();
             const newCoupon = { id: 'local-' + Date.now(), $id: 'local-' + Date.now(), ...payload };
             local.push(newCoupon);
             localStorage.setItem('campaignCoupons', JSON.stringify(local));
-            return { ...newCoupon, isExpired: this.checkIsExpired(newCoupon.valid_until) };
+            return { ...newCoupon, show_in_available: showInAvailable, isExpired: this.checkIsExpired(newCoupon.valid_until) };
         }
     }
 
@@ -137,9 +121,11 @@ export class CampaignService {
     async updateCoupon(documentId, code, discount, extraData = {}) {
         const minOrder = extraData.min_order_value ? Number(extraData.min_order_value) : 0;
         const validUntil = extraData.valid_until || '';
+        const showInAvailable = extraData.show_in_available !== undefined ? Boolean(extraData.show_in_available) : true;
         const serializedUsage = JSON.stringify({
             min_order_value: minOrder,
-            valid_until: validUntil
+            valid_until: validUntil,
+            show_in_available: showInAvailable
         });
 
         const payload = { 
@@ -147,6 +133,7 @@ export class CampaignService {
             discount: Number(discount),
             min_order_value: minOrder,
             valid_until: validUntil,
+            show_in_available: showInAvailable,
             coupon_usage: serializedUsage
         };
 
@@ -160,7 +147,7 @@ export class CampaignService {
                 documentId,
                 payload
             );
-            return { ...doc, isExpired: this.checkIsExpired(doc.valid_until) };
+            return { ...doc, show_in_available: showInAvailable, isExpired: this.checkIsExpired(doc.valid_until) };
         } catch (error) {
             console.warn("⚠️ Firebase Coupons offline. Updating coupon locally.", error.message);
             const local = this.getLocalCoupons();
@@ -168,7 +155,7 @@ export class CampaignService {
             if (idx !== -1) {
                 local[idx] = { ...local[idx], ...payload };
                 localStorage.setItem('campaignCoupons', JSON.stringify(local));
-                return { ...local[idx], isExpired: this.checkIsExpired(local[idx].valid_until) };
+                return { ...local[idx], show_in_available: showInAvailable, isExpired: this.checkIsExpired(local[idx].valid_until) };
             }
             throw error;
         }

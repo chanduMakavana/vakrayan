@@ -14,7 +14,7 @@ import slidesService from '../../services/slides';
 import offersService from '../../services/offers';
 import walletService from '../../services/wallet';
 import categoryService from '../../services/category';
-import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders, FiRefreshCw } from 'react-icons/fi';
+import { FiFileText, FiPackage, FiTruck, FiMail, FiImage, FiActivity, FiLayers, FiTag, FiHome, FiTrendingUp, FiExternalLink, FiX, FiCheck, FiInfo, FiTrash2, FiPlus, FiEdit2, FiFolderPlus, FiMenu, FiSliders, FiRefreshCw, FiCamera } from 'react-icons/fi';
 import AdminAnalytics from '../pageComponets/AdminAnalytics';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import { getStoredShiprocketConfig, saveShiprocketConfig, authenticateShiprocket, createShiprocketShipment, fetchShiprocketOfficialLabel } from '../../services/shiprocket';
@@ -113,6 +113,7 @@ function AdminPanel() {
   const [newCouponDiscount, setNewCouponDiscount] = useState(10);
   const [newCouponMinOrderValue, setNewCouponMinOrderValue] = useState('');
   const [newCouponValidUntil, setNewCouponValidUntil] = useState('');
+  const [newCouponShowInAvailable, setNewCouponShowInAvailable] = useState(true);
   const [editingCouponId, setEditingCouponId] = useState(null);
   const [isEditingCoupon, setIsEditingCoupon] = useState(false);
 
@@ -2256,18 +2257,22 @@ function AdminPanel() {
     }
 
     try {
-      await campaignService.createCoupon(cleanCode, Number(newCouponDiscount), {
+      await campaignService.createCoupon(cleanCode, Number(newCouponDiscount) || 10, {
         min_order_value: newCouponMinOrderValue ? Number(newCouponMinOrderValue) : 0,
-        valid_until: newCouponValidUntil || ''
+        valid_until: newCouponValidUntil || '',
+        show_in_available: Boolean(newCouponShowInAvailable)
       });
       const response = await campaignService.getCoupons();
       setCampaignCoupons(response || []);
       showToast(`🎟️ Coupon ${cleanCode} activated successfully!`, 'success');
       setNewCouponCode('');
+      setNewCouponDiscount(10);
       setNewCouponMinOrderValue('');
       setNewCouponValidUntil('');
+      setNewCouponShowInAvailable(true);
     } catch (err) {
       console.error("Failed to add coupon:", err);
+      showToast("Failed to create coupon.", "error");
     }
   };
 
@@ -2276,6 +2281,7 @@ function AdminPanel() {
     setNewCouponDiscount(Number(coupon.discount));
     setNewCouponMinOrderValue(coupon.min_order_value !== undefined ? String(coupon.min_order_value) : '');
     setNewCouponValidUntil(coupon.valid_until || '');
+    setNewCouponShowInAvailable(coupon.show_in_available !== false);
     setEditingCouponId(coupon.$id || coupon.id);
     setIsEditingCoupon(true);
   };
@@ -2285,6 +2291,7 @@ function AdminPanel() {
     setNewCouponDiscount(10);
     setNewCouponMinOrderValue('');
     setNewCouponValidUntil('');
+    setNewCouponShowInAvailable(true);
     setEditingCouponId(null);
     setIsEditingCoupon(false);
   };
@@ -2299,9 +2306,10 @@ function AdminPanel() {
     }
 
     try {
-      await campaignService.updateCoupon(editingCouponId, cleanCode, Number(newCouponDiscount), {
+      await campaignService.updateCoupon(editingCouponId, cleanCode, Number(newCouponDiscount) || 10, {
         min_order_value: newCouponMinOrderValue ? Number(newCouponMinOrderValue) : 0,
-        valid_until: newCouponValidUntil || ''
+        valid_until: newCouponValidUntil || '',
+        show_in_available: Boolean(newCouponShowInAvailable)
       });
       const response = await campaignService.getCoupons();
       setCampaignCoupons(response || []);
@@ -2310,6 +2318,25 @@ function AdminPanel() {
     } catch (err) {
       console.error("Failed to update coupon:", err);
       showToast("Failed to update coupon.", "error");
+    }
+  };
+
+  const handleToggleCouponVisibility = async (coupon) => {
+    const docId = coupon.$id || coupon.id;
+    if (!docId) return;
+    const newStatus = coupon.show_in_available === false ? true : false;
+    try {
+      await campaignService.updateCoupon(docId, coupon.code, Number(coupon.discount) || 10, {
+        min_order_value: coupon.min_order_value ? Number(coupon.min_order_value) : 0,
+        valid_until: coupon.valid_until || '',
+        show_in_available: newStatus
+      });
+      const response = await campaignService.getCoupons();
+      setCampaignCoupons(response || []);
+      showToast(newStatus ? `👁️ Coupon ${coupon.code} is now visible in Checkout Offers!` : `🔒 Coupon ${coupon.code} hidden from Checkout Offers list.`, 'success');
+    } catch (err) {
+      console.error("Failed to toggle coupon visibility:", err);
+      showToast("Failed to update coupon visibility.", "error");
     }
   };
 
@@ -3619,7 +3646,10 @@ function AdminPanel() {
                                       {/* Uploaded Condition Verification Photos */}
                                       {Array.isArray(request.images) && request.images.length > 0 && (
                                         <div className="pt-1.5 pb-1 pl-[42px]">
-                                          <span className="text-[9px] text-[var(--color-muted)] font-mono block mb-1">📷 Verification Images:</span>
+                                          <span className="text-[9px] text-[var(--color-muted)] font-mono flex items-center gap-1 mb-1">
+                                            <FiCamera className="text-xs text-[var(--color-accent)] shrink-0" />
+                                            Verification Images:
+                                          </span>
                                           <div className="flex flex-wrap gap-1.5">
                                             {request.images.map((imgUrl, imgIdx) => (
                                               <a href={imgUrl} target="_blank" rel="noopener noreferrer" key={imgIdx} className="block hover:opacity-90 transition-opacity">
@@ -3924,18 +3954,19 @@ function AdminPanel() {
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-[8px] font-black text-neutral-550 block tracking-widest uppercase">DISCOUNT %</span>
-                    <select
-                      value={newCouponDiscount}
-                      onChange={(e) => setNewCouponDiscount(Number(e.target.value))}
-                      className="bg-[var(--color-subtle)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-xs font-mono font-black uppercase tracking-wider w-full outline-hidden cursor-pointer"
-                    >
-                      <option value="10">10% OFF</option>
-                      <option value="20">20% OFF</option>
-                      <option value="30">30% OFF</option>
-                      <option value="50">50% OFF</option>
-                      <option value="75">75% OFF</option>
-                    </select>
+                    <span className="text-[8px] font-black text-neutral-550 block tracking-widest uppercase">DISCOUNT % (TYPE VALUE)</span>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={newCouponDiscount}
+                        onChange={(e) => setNewCouponDiscount(e.target.value === '' ? '' : Math.max(1, Math.min(100, Number(e.target.value))))}
+                        placeholder="e.g. 15"
+                        className="bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-3 py-2 pr-8 text-xs font-mono font-black w-full outline-hidden"
+                      />
+                      <span className="absolute right-3 text-xs font-bold text-[var(--color-muted)] font-mono pointer-events-none">%</span>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[8px] font-black text-neutral-550 block tracking-widest uppercase">MIN ORDER VALUE (INR, OPTIONAL)</span>
@@ -3974,6 +4005,20 @@ function AdminPanel() {
                       </button>
                     )}
                   </div>
+
+                  {/* Show in Available Offers on Checkout Checkbox */}
+                  <div className="flex items-center gap-2 md:col-span-2 lg:col-span-5 bg-[var(--color-subtle)] p-2.5 rounded-xl border border-[var(--color-border)]">
+                    <input
+                      type="checkbox"
+                      id="showInAvailableCheckbox"
+                      checked={newCouponShowInAvailable}
+                      onChange={(e) => setNewCouponShowInAvailable(e.target.checked)}
+                      className="w-4 h-4 accent-[var(--color-accent)] cursor-pointer"
+                    />
+                    <label htmlFor="showInAvailableCheckbox" className="text-[10px] font-bold text-[var(--color-text)] uppercase tracking-wider cursor-pointer select-none">
+                      Show in "Available Coupons & Offers" list on Checkout (Uncheck if secret/VIP code)
+                    </label>
+                  </div>
                 </div>
 
                 {/* Active Coupons List */}
@@ -3984,6 +4029,8 @@ function AdminPanel() {
                       const minVal = coupon.min_order_value ? Number(coupon.min_order_value) : 0;
                       const validDate = coupon.valid_until || '';
                       const isExpired = coupon.isExpired;
+                      const isVisibleInOffers = coupon.show_in_available !== false;
+
                       return (
                         <div key={idx} className={`flex flex-col justify-between bg-[var(--color-surface)] p-4 rounded-xl border space-y-3 shadow-2xs hover:shadow-xs transition-shadow ${isExpired ? 'opacity-65 border-rose-200' : 'border-[var(--color-border)]'}`}>
                           <div className="flex justify-between items-start">
@@ -3994,13 +4041,33 @@ function AdminPanel() {
                               <span className="text-[10px] font-black text-emerald-655 tracking-wider uppercase">
                                 {coupon.discount}% SAVINGS
                               </span>
+                              {isVisibleInOffers ? (
+                                <span className="text-[8px] bg-emerald-100 text-emerald-800 font-mono uppercase px-1.5 py-0.5 font-bold rounded select-none">
+                                  👁️ PUBLIC OFFER
+                                </span>
+                              ) : (
+                                <span className="text-[8px] bg-zinc-200 text-zinc-700 font-mono uppercase px-1.5 py-0.5 font-bold rounded select-none">
+                                  🔒 HIDDEN CODE
+                                </span>
+                              )}
                               {isExpired && (
                                 <span className="text-[8px] bg-rose-600 text-white font-mono uppercase px-1.5 py-0.5 font-bold rounded select-none">
                                   EXPIRED
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 flex-wrap justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleCouponVisibility(coupon)}
+                                className={`text-[8.5px] font-mono font-bold uppercase cursor-pointer px-2 py-0.5 rounded border transition-colors ${
+                                  isVisibleInOffers
+                                    ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                                    : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {isVisibleInOffers ? 'Hide from Offers' : 'Show in Offers'}
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleStartEditCoupon(coupon)}
