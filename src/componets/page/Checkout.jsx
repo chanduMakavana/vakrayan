@@ -794,20 +794,26 @@ function Checkout() {
 
   if (checkoutStatus === 'processing') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in relative">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in relative font-sans">
         <div className="flex flex-col items-center space-y-6 max-w-sm w-full">
           <div className="w-9 h-9 border-3 border-[var(--color-accent)]/25 border-t-[var(--color-accent)] rounded-full animate-spin" />
           
-          <h2 className="text-xl font-black font-brand tracking-widest uppercase text-[var(--color-text)]">
+          <h2 
+            className="text-xl sm:text-2xl font-black tracking-widest uppercase text-[var(--color-text)]"
+            style={{ fontFamily: "'Jost', sans-serif" }}
+          >
             PROCESSING INVOICE
           </h2>
           
           <div className="space-y-2 w-full">
-            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-bold animate-pulse">
+            <p 
+              className="text-xs font-semibold tracking-wider text-[var(--color-accent)] uppercase animate-pulse"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
               {steps[processingStep] || "Finalizing process modules..."}
             </p>
             {/* Custom progress bar */}
-            <div className="w-56 h-[1.5px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
+            <div className="w-56 h-[2px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
               <div 
                 className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700 rounded-full" 
                 style={{ width: `${(processingStep / steps.length) * 100}%` }}
@@ -822,7 +828,7 @@ function Checkout() {
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] flex flex-col items-center justify-center p-6 sm:p-10 text-center relative overflow-hidden animate-fade-in select-none">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] flex flex-col items-center justify-center p-6 sm:p-10 text-center relative overflow-hidden animate-fade-in select-none font-sans">
         
         {/* Full-screen celebratory confetti canvas overlay */}
         <canvas 
@@ -833,31 +839,46 @@ function Checkout() {
         <div className="relative z-20 w-full max-w-xl flex flex-col items-center space-y-7 mx-auto">
           
           {/* Green Check Circle Icon */}
-          <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500">
+          <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-sm">
             <FiCheckCircle className="text-3xl" />
           </div>
 
           {/* Heading Section */}
           <div className="space-y-2">
-            <span className="text-[11px] font-black tracking-[0.35em] text-emerald-600 dark:text-emerald-400 uppercase block">
+            <span 
+              className="text-xs font-bold tracking-[0.35em] text-emerald-600 dark:text-emerald-400 uppercase block"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
               TRANSACTION COMPLETED
             </span>
-            <h1 className="text-3xl sm:text-4xl font-black font-brand tracking-widest text-[var(--color-text)] uppercase">
+            <h1 
+              className="text-3xl sm:text-5xl font-black tracking-wide text-[var(--color-text)] uppercase"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
               ORDER PLACED
             </h1>
           </div>
 
           {/* Subtitle */}
-          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wider max-w-md mx-auto">
+          <p 
+            className="text-xs sm:text-sm text-[var(--color-muted)] font-medium leading-relaxed max-w-md mx-auto uppercase tracking-wide"
+            style={{ fontFamily: "'Jost', sans-serif" }}
+          >
             YOUR ORDER DETAILS HAVE BEEN SAVED IN OUR SYSTEM. WE ARE PREPARING TO SHIP YOUR ORDER SOON.
           </p>
 
           {/* Cancellation Policy Banner */}
           <div className="w-full bg-rose-500/10 border border-rose-500/25 p-4 sm:p-5 rounded-2xl text-center space-y-1.5">
-            <span className="text-[10px] font-black text-rose-600 dark:text-rose-400 tracking-widest block uppercase">
+            <span 
+              className="text-[11px] font-bold text-rose-600 dark:text-rose-400 tracking-wider block uppercase"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
               ⚠️ CANCELLATION POLICY
             </span>
-            <p className="text-[10px] sm:text-[11px] text-rose-600/90 dark:text-rose-300/90 leading-relaxed font-mono uppercase">
+            <p 
+              className="text-xs text-rose-700/90 dark:text-rose-300/90 leading-relaxed font-medium uppercase tracking-wide"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
               ORDERS CAN ONLY BE CANCELLED WHILE IN "PENDING" OR "PROCESSING" STATUS. ONCE YOUR PACKAGE IS SHIPPED OR DISPATCHED, CANCELLATION IS NOT POSSIBLE.
             </p>
           </div>
@@ -868,7 +889,8 @@ function Checkout() {
           {/* Continue Shopping Button */}
           <button 
             onClick={() => navigate('/')} 
-            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-md transition-all cursor-pointer"
+            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 rounded-2xl shadow-md transition-all cursor-pointer"
+            style={{ fontFamily: "'Jost', sans-serif" }}
           >
             CONTINUE SHOPPING &rarr;
           </button>
