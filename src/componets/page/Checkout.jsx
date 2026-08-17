@@ -21,6 +21,7 @@ import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal'
 import { calculateOffersDiscount } from '../../utils/discountCalculator'
 import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelper'
 import CouponSelector from '../pageComponets/CouponSelector'
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
 
 
@@ -66,7 +67,7 @@ function Checkout() {
   const [checkoutStatus, setCheckoutStatus] = useState('idle') // idle | processing | success
 
   // ✅ SEO: Dynamic page title
-  useEffect(() => { document.title = 'Checkout — Vakrayan' }, [])
+  useEffect(() => { document.title = 'Checkout | Vakrayan' }, [])
 
   useEffect(() => {
     if (checkoutStatus === 'success') {
@@ -405,6 +406,7 @@ function Checkout() {
     const pin = (data.pincode || '').trim();
     if (!/^[1-9][0-9]{5}$/.test(pin)) {
       showToast("Please enter a valid 6-digit Indian PIN code.", "error");
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -414,6 +416,7 @@ function Checkout() {
       const pinData = await pinResponse.json();
       if (pinData && pinData[0] && pinData[0].Status === 'Error') {
         showToast(`Sorry, PIN code ${pin} is invalid or not serviceable. Please enter a valid deliverable PIN code.`, "error");
+        isSubmittingRef.current = false;
         return;
       }
       if (pinData && pinData[0] && pinData[0].PostOffice && pinData[0].PostOffice.length > 0) {
@@ -428,43 +431,29 @@ function Checkout() {
       const isCodAllowed = isCodAvailableForPincode(pin, resolvedState);
       if (!isCodAllowed) {
         showToast("Cash on Delivery (COD) is not serviceable for this remote route. Please use Online Payment.", "error");
+        isSubmittingRef.current = false;
         return;
       }
     }
 
-    // 0. Live Stock Validation — fetch fresh product data from Firebase at submit time
-    // This eliminates the TOCTOU race condition where two users could both pass
-    // a stale Redux cache check and oversell the last unit.
-    for (const cartItem of cartItems) {
-      try {
-        const liveProduct = await productsService.getProductById(cartItem.product_id);
-        if (liveProduct) {
-          let stocks;
-          try {
-            stocks = JSON.parse(liveProduct.sizes_stock || '{}');
-          } catch {
-            stocks = {};
-          }
-          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
-          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
-          if (Number(cartItem.quantity) > availableStock) {
-            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
-            return;
-          }
-        }
-      } catch (stockErr) {
-        console.warn(`Live stock check failed for ${cartItem.name}, proceeding with cached data:`, stockErr.message);
-        // Fallback to Redux cache if live fetch fails
-        const cachedProd = products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
-        if (cachedProd) {
-          let stocks;
-          try { stocks = JSON.parse(cachedProd.sizes_stock || '{}'); } catch { stocks = {}; }
-          const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
-          const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
-          if (Number(cartItem.quantity) > availableStock) {
-            showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left.`, "error");
-            return;
-          }
+    // 0. Live Stock Validation — fetch all products in parallel to eliminate sequential N+1 waterfall
+    const stockResults = await Promise.allSettled(
+      cartItems.map(cartItem => productsService.getProductById(cartItem.product_id))
+    );
+    for (let idx = 0; idx < cartItems.length; idx++) {
+      const cartItem = cartItems[idx];
+      const result = stockResults[idx];
+      const liveProduct = result.status === 'fulfilled' ? result.value : null;
+      const productToCheck = liveProduct || products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
+      if (productToCheck) {
+        let stocks;
+        try { stocks = JSON.parse(productToCheck.sizes_stock || '{}'); } catch { stocks = {}; }
+        const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+        const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
+        if (Number(cartItem.quantity) > availableStock) {
+          showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
+          isSubmittingRef.current = false;
+          return;
         }
       }
     }
@@ -476,80 +465,102 @@ function Checkout() {
       setMockOrderId(currentMockId);
       setSubmittedFormData(data);
 
-      if (window.Razorpay && liveKey) {
-        // Launch REAL Razorpay Standard Payment Gateway Popup
-        try {
+      if (liveKey) {
+        // ✅ FIX: Wait for Razorpay SDK to finish loading (handles slow connections)
+        // Previously, if the button was clicked before the script tag finished loading,
+        // window.Razorpay would be undefined and the popup would silently not open.
+        const razorpayReady = await new Promise((resolve) => {
+          if (window.Razorpay) { resolve(true); return; }
+          let attempts = 0;
+          const interval = setInterval(() => {
+            attempts++;
+            if (window.Razorpay) { clearInterval(interval); resolve(true); }
+            else if (attempts >= 30) { clearInterval(interval); resolve(false); } // 3s timeout
+          }, 100);
+        });
+
+        if (razorpayReady) {
+          try {
             const options = {
               key: liveKey,
               amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
-              currency: "INR",
-              name: "Vakrayan",
-              description: "Vakrayan Secure Transaction Gateway",
+              currency: 'INR',
+              name: 'Vakrayan',
+              description: 'Vakrayan Secure Transaction Gateway',
               prefill: {
-              name: data.name,
-              email: data.email,
-              contact: data.phone
-            },
-            notes: {
-              address: `${data.address}, ${data.city} - ${data.pincode}`,
-              merchant_order_id: currentMockId
-            },
-            retry: {
-              enabled: true,
-              max_count: 4
-            },
-            theme: {
-              color: "#00B7B5" // Matching website accent Teal/Cyan color
-            },
-            handler: async function (response) {
-              const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-              const ordId = response.razorpay_order_id || currentMockId;
-              const sig = response.razorpay_signature;
+                name: data.name,
+                email: data.email,
+                contact: data.phone
+              },
+              notes: {
+                address: `${data.address}, ${data.city} - ${data.pincode}`,
+                merchant_order_id: currentMockId
+              },
+              retry: {
+                enabled: true,
+                max_count: 4
+              },
+              theme: {
+                color: '#00B7B5'
+              },
+              handler: async function (response) {
+                const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+                const ordId = response.razorpay_order_id || currentMockId;
+                const sig = response.razorpay_signature;
 
-              // ✅ SECURITY FIX: Verify payment signature server-side BEFORE creating order.
-              // Without this, any user could call processFinalizeOrder() from browser console
-              // without actually paying. The Cloudflare Worker verifies HMAC-SHA256 signature.
-              const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
-              if (verifyUrl && ordId && payId && sig) {
-                try {
-                  const verifyResp = await fetch(verifyUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      razorpay_order_id: ordId,
-                      razorpay_payment_id: payId,
-                      razorpay_signature: sig,
-                    }),
-                  });
-                  const verifyData = await verifyResp.json();
-                  if (!verifyData.success) {
-                    showToast('Payment verification failed. Please contact support.', 'error');
+                // ✅ SECURITY: Verify payment signature server-side BEFORE creating order.
+                const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
+                if (verifyUrl && ordId && payId && sig) {
+                  try {
+                    const verifyResp = await fetch(verifyUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'verify_payment',
+                        razorpay_order_id: ordId,
+                        razorpay_payment_id: payId,
+                        razorpay_signature: sig,
+                      }),
+                    });
+                    const verifyData = await verifyResp.json();
+                    if (!verifyData.success) {
+                      showToast('Payment verification failed! Order was not placed.', 'error');
+                      isSubmittingRef.current = false;
+                      return;
+                    }
+                  } catch (verifyErr) {
+                    console.error('❌ Payment verification error:', verifyErr.message);
+                    showToast('Payment verification unreachable. Order cancelled for security.', 'error');
+                    isSubmittingRef.current = false;
                     return;
                   }
-                } catch (verifyErr) {
-                  console.warn('⚠️ Payment verification endpoint unreachable:', verifyErr.message);
-                  // Allow to proceed if verification endpoint is not configured yet
+                } else if (verifyUrl) {
+                  showToast('Missing payment signature or details. Payment rejected.', 'error');
+                  isSubmittingRef.current = false;
+                  return;
+                }
+
+                processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
+              },
+              modal: {
+                ondismiss: function () {
+                  showToast('Payment window closed by customer.', 'info');
+                  isSubmittingRef.current = false;
                 }
               }
-
-              processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
-            },
-            modal: {
-              ondismiss: function () {
-                showToast("Payment window closed by customer.", "info");
-              }
-            }
-          };
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-          return;
-        } catch (err) {
-          console.warn("Real Razorpay initiation issue, falling back to sandbox simulator:", err.message);
+            };
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+            return;
+          } catch (err) {
+            console.warn('Razorpay initiation issue, falling back to sandbox simulator:', err.message);
+          }
+        } else {
+          console.warn('Razorpay SDK did not load in time, falling back to sandbox simulator.');
         }
       }
 
-      // Launch custom Razorpay secured simulator fallback
-      setSubmittedFormData(data);
+      // Fallback: custom sandbox simulator
       setRazorpayModalOpen(true);
       return;
     }
@@ -564,14 +575,7 @@ function Checkout() {
   };
 
   const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
-    setCheckoutStatus('processing')
-    setProcessingStep(0)
-
-    // Simulate smooth processing steps
-    for (let i = 0; i < steps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      setProcessingStep(i + 1)
-    }
+    setCheckoutStatus('processing');
 
     try {
       const orderNumber = generateOrderNumber();
@@ -597,7 +601,7 @@ function Checkout() {
         }
       });
 
-      // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Firebase compatibility)
+      // 1. Build the Order Payload
       const orderPayload = {
         userId: user.$id,
         customerName: formData.name.trim(),
@@ -629,8 +633,6 @@ function Checkout() {
         razorpay_order_id: ordId,
         razorpayPaymentId: payId,
         razorpay_payment_id: payId,
-
-        // Dynamic additions for blueprint compatibility
         order_number: orderNumber,
         subtotal: Math.round(cartTotalAmount),
         tax_amount: Math.round(calculatedTax),
@@ -639,15 +641,11 @@ function Checkout() {
         tracking_url: ''
       };
 
-      // 2. Perform Stock Depletion size-wise on Catalog & update total_sold
+      // 2. Compute stock updates
       const stockUpdatePromises = [];
       const updatedProducts = products.map(prod => {
         let stocks = {};
-        try {
-          stocks = JSON.parse(prod.sizes_stock || '{}');
-        } catch {
-          stocks = {};
-        }
+        try { stocks = JSON.parse(prod.sizes_stock || '{}'); } catch { stocks = {}; }
 
         let stocksMutated = false;
         let quantitySold = 0;
@@ -664,52 +662,35 @@ function Checkout() {
         if (stocksMutated) {
           const serializedStock = JSON.stringify(stocks);
           const newTotalSold = Number(prod.total_sold || 0) + quantitySold;
-          
-          // Save stock update promise
           const promise = productsService.updateProduct(prod.$id || prod.id, { 
             sizes_stock: serializedStock,
             total_sold: newTotalSold
-          })
-          .catch(e => console.warn("Stock update on cloud ignored:", e.message));
-          
+          }).catch(e => console.warn("Stock update on cloud ignored:", e.message));
           stockUpdatePromises.push(promise);
-          
           return { ...prod, sizes_stock: serializedStock, total_sold: newTotalSold };
         }
         return prod;
       });
 
-      // Update Redux Products Cache instantly
+      // Update Redux state immediately
       dispatch(setProducts(updatedProducts));
 
-      // Await all stock updates before proceeding to save order
-      if (stockUpdatePromises.length > 0) {
-        await Promise.all(stockUpdatePromises);
-      }
+      // 3. Save Order into Firebase Database in parallel with critical operations
+      const orderItemIds = cartItems.map(i => i.$id);
+      const [response] = await Promise.all([
+        ordersService.createOrder(orderPayload),
+        ...stockUpdatePromises,
+        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {})
+      ]);
 
-      // 3. Save Order into Firebase Database
-      const response = await ordersService.createOrder(orderPayload);
       if (!response) {
         throw new Error("Order creation returned null — check Firebase collection configuration.");
       }
 
-      // If paid via Wallet, deduct balance in wallet collection
-      if (method === 'WALLET') {
-        try {
-          await walletService.createWalletTransaction({
-            userId: user.$id,
-            amount: calculatedFinalAmount,
-            type: 'debit',
-            title: `Payment for Order ${orderNumber}`,
-            referenceId: response.$id || response.id
-          });
-        } catch (walletErr) {
-          console.error("Failed to write debit wallet transaction:", walletErr.message);
-        }
-      }
-
-      // 3.1. Send Order Notification Webhook (Make.com, Zapier, Discord, Telegram, etc.)
+      // 4. Background tasks (Non-blocking for lightning fast UI transition)
       const rawItems = JSON.parse(orderPayload.items || '[]');
+      
+      // Dispatch Webhooks, Telegram & Customer Email
       sendWebhookNotification('order.created', {
         orderId: response.$id || response.id,
         orderNumber: orderNumber,
@@ -722,99 +703,63 @@ function Checkout() {
         shippingAddress: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`
       });
 
-      // 3.5. Save Address Profile in Background for Future Checkouts
-      try {
-        // Check if this exact address already exists
-        const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
-        const existingAddr = savedAddresses.find(a => {
-          const existingKey = `${(a.addressLine || a.address || '').trim()}_${a.city.trim()}_${a.pincode.trim()}`;
-          return existingKey === addressKey;
-        });
-
-        await addressService.saveAddress(user.$id, {
-          ...formData,
-          $id: existingAddr?.$id || existingAddr?.id, // Update if exists
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          pincode: formData.pincode,
-          state: formData.state || '',
-          country: formData.country || 'India',
-          is_default: savedAddresses.length === 0 && !existingAddr // Only set as default if new
-        });
-      } catch (addrErr) {
-        console.warn("⚠️ Address profile auto-save ignored on cloud database:", addrErr.message);
+      // Background Wallet Debit if applicable
+      if (method === 'WALLET') {
+        walletService.createWalletTransaction({
+          userId: user.$id,
+          amount: calculatedFinalAmount,
+          type: 'debit',
+          title: `Payment for Order ${orderNumber}`,
+          referenceId: response.$id || response.id
+        }).catch(walletErr => console.error("Wallet debit failed:", walletErr.message));
       }
 
-      // 4. Log coupon usage in database if coupon was applied
+      // Background Auto-Save Address
+      const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
+      const existingAddr = savedAddresses.find(a => {
+        const existingKey = `${(a.addressLine || a.address || '').trim()}_${a.city.trim()}_${a.pincode.trim()}`;
+        return existingKey === addressKey;
+      });
+      addressService.saveAddress(user.$id, {
+        ...formData,
+        $id: existingAddr?.$id || existingAddr?.id,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        pincode: formData.pincode,
+        state: formData.state || '',
+        country: formData.country || 'India',
+        is_default: savedAddresses.length === 0 && !existingAddr
+      }).catch(() => {});
+
+      // Background Coupon logging & Cart conversion tracking
       if (couponApplied && couponApplied !== 'NONE') {
-        try {
-          await couponUsageService.logCouponUsage(user.$id, couponApplied);
-        } catch (couponErr) {
-          console.warn("⚠️ Coupon usage tracking write failed:", couponErr.message);
-        }
+        couponUsageService.logCouponUsage(user.$id, couponApplied).catch(() => {});
       }
+      cartService.convertCartItems(user.$id, orderItemIds).catch(() => {});
 
-      // 4.1. Mark cart items as converted before clearing (for abandonment analytics)
-      try {
-        await cartService.convertCartItems(user.$id, cartItems.map(i => i.$id));
-      } catch (cartErr) {
-        console.warn("⚠️ Cart abandonment status conversion failed:", cartErr.message);
-      }
-
-      // 4.2. Clear Cart globally on Firebase database & Redux state & Clear Coupon
-      const orderItemIds = cartItems.map(i => i.$id);
-      await cartService.clearUserCart(user.$id, orderItemIds);
-      
-      try {
-        const freshItems = await cartService.getCartItems(user.$id);
-        dispatch(setCartItemsAction(freshItems));
-      } catch (reduxErr) {
-        console.warn("Failed to sync Redux with remaining cart items:", reduxErr);
-        dispatch(clearCartState());
-      }
+      // Clean Redux cart state
+      dispatch(clearCartState());
       
       sessionStorage.removeItem('checkout_coupon');
       sessionStorage.removeItem('checkout_discount');
       sessionStorage.removeItem('selected_cart_item_ids');
       sessionStorage.removeItem('deselected_cart_item_ids');
       
-      setCheckoutStatus('success')
+      // Instantly show success screen
+      setCheckoutStatus('success');
     } catch (error) {
-      console.error("Billing pipeline crash:", error)
-      showToast("Logistics error. Transaction aborted.", "error")
-      setCheckoutStatus('idle')
-      // ✅ Reset the double-submit lock on failure so user can retry
-      isSubmittingRef.current = false
+      console.error("Billing pipeline crash:", error);
+      showToast("Logistics error. Transaction aborted.", "error");
+      setCheckoutStatus('idle');
+      isSubmittingRef.current = false;
     }
   };
 
   if (checkoutStatus === 'processing') {
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
-        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
-          <div className="w-8 h-8 border-4 border-[var(--color-accent)] border-t-[var(--color-accent)] rounded-full animate-spin" />
-          <h2 className="text-xl font-black tracking-widest uppercase text-[var(--color-text)]">
-            PROCESSING INVOICE
-          </h2>
-          <div className="space-y-1.5 w-full">
-            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse">
-              {steps[processingStep] || "Finalizing process modules..."}
-            </p>
-            {/* Custom progress bar */}
-            <div className="w-48 h-[1.5px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700" 
-                style={{ width: `${(processingStep / steps.length) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <Loader type="splash" text="CONFIRMING YOUR ORDER..." />
   }
 
   if (checkoutStatus === 'success') {
@@ -874,7 +819,7 @@ function Checkout() {
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
         <div className="absolute inset-0 bg-[var(--color-bg)]/96 backdrop-blur-xs z-10" />
 
-        <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
+        <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
@@ -941,12 +886,12 @@ function Checkout() {
                 
                 {/* Full name */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Full Name</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Full Name</label>
                   <input
                     type="text"
                     defaultValue={user?.name || ''}
                     placeholder="ENTER YOUR NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.name ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.name ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('name', { required: 'Name is required' })}
                   />
                   {errors.name && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.name.message}</span>}
@@ -954,12 +899,12 @@ function Checkout() {
 
                 {/* Email address */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Email Address</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Email Address</label>
                   <input
                     type="text"
                     defaultValue={user?.email || ''}
                     placeholder="YOU@EXAMPLE.COM"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.email ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.email ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('email', { 
                       required: 'Email is required',
                       pattern: {
@@ -973,11 +918,11 @@ function Checkout() {
 
                 {/* Mobile number */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Contact Phone</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Contact Phone</label>
                   <input
                     type="tel"
                     placeholder="9876543210"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.phone ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.phone ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('phone', { 
                       required: 'Phone is required',
                       pattern: {
@@ -991,11 +936,11 @@ function Checkout() {
 
                 {/* Street address */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Street Address</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Street Address</label>
                   <input
                     type="text"
                     placeholder="HOUSE NO, APARTMENT, STREET NAME"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.address ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.address ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('address', { required: 'Street address is required' })}
                   />
                   {errors.address && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.address.message}</span>}
@@ -1003,11 +948,11 @@ function Checkout() {
 
                 {/* City */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">City</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">City</label>
                   <input
                     type="text"
                     placeholder="MUMBAI"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.city ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.city ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('city', { required: 'City is required' })}
                   />
                   {errors.city && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.city.message}</span>}
@@ -1015,11 +960,11 @@ function Checkout() {
 
                 {/* Pin Code */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">PIN Code</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">PIN Code</label>
                   <input
                     type="text"
                     placeholder="400001"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.pincode ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.pincode ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('pincode', { 
                       required: 'Pin code is required',
                       pattern: {
@@ -1034,11 +979,11 @@ function Checkout() {
 
                 {/* State */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">State</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">State</label>
                   <input
                     type="text"
                     placeholder="MAHARASHTRA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.state ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.state ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('state', { required: 'State is required' })}
                   />
                   {errors.state && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.state.message}</span>}
@@ -1046,12 +991,12 @@ function Checkout() {
 
                 {/* Country */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Country</label>
+                  <label className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase">Country</label>
                   <input
                     type="text"
                     placeholder="INDIA"
                     defaultValue="INDIA"
-                    className={`w-full bg-[var(--color-subtle)] border ${errors.country ? 'border-rose-300 focus:border-rose-500' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'} rounded-xl px-4 py-3.5 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden tracking-wider transition-colors font-medium`}
+                    className={`w-full bg-white border ${errors.country ? 'border-rose-400 focus:border-rose-500' : 'border-zinc-200 focus:border-zinc-900'} rounded-xl px-4 py-3.5 text-xs text-zinc-900 placeholder:text-zinc-400 outline-hidden tracking-wider transition-colors font-medium shadow-2xs`}
                     {...register('country', { required: 'Country is required' })}
                   />
                   {errors.country && <span className="text-[9px] text-rose-600 font-bold uppercase tracking-wider">{errors.country.message}</span>}
@@ -1200,8 +1145,10 @@ function Checkout() {
                   return (
                     <div key={item.$id} className="flex gap-3 items-center">
                       <img 
-                        src={imgUrl} 
+                        src={getOptimizedImageUrl(imgUrl, 160, 75)} 
                         alt={item.name} 
+                        loading="lazy"
+                        decoding="async"
                         className="w-12 h-16 object-cover border border-[var(--color-border)] rounded-lg shrink-0" 
                       />
                       <div className="flex-1 min-w-0">
