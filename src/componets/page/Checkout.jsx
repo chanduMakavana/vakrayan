@@ -769,21 +769,21 @@ function Checkout() {
 
   if (checkoutStatus === 'processing') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
-        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
-          <div className="w-8 h-8 border-4 border-[var(--color-accent)] border-t-[var(--color-accent)] rounded-full animate-spin" />
-          <h2 className="text-xl font-black tracking-widest uppercase text-[var(--color-text)]">
+      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
+        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center animate-fade-in">
+          <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin" />
+          <h2 className="text-2xl font-black tracking-widest uppercase text-emerald-950 font-brand">
             PROCESSING INVOICE
           </h2>
-          <div className="space-y-1.5 w-full">
-            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse">
+          <div className="space-y-2 w-full">
+            <p className="text-[11px] font-mono tracking-widest text-emerald-600 uppercase font-black animate-pulse">
               {steps[processingStep] || "Finalizing process modules..."}
             </p>
             {/* Custom progress bar */}
-            <div className="w-48 h-[1.5px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
+            <div className="w-52 h-1.5 bg-emerald-100 mx-auto rounded-full overflow-hidden relative">
               <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700" 
+                className="absolute left-0 top-0 h-full bg-emerald-600 transition-all duration-700" 
                 style={{ width: `${(processingStep / steps.length) * 100}%` }}
               />
             </div>
@@ -793,11 +793,10 @@ function Checkout() {
     )
   }
 
-
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
+      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
         
         {/* Full-screen celebratory confetti canvas overlay */}
         <canvas 
@@ -805,40 +804,40 @@ function Checkout() {
           className="absolute inset-0 w-full h-full pointer-events-none z-15"
         />
         
-        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
+        <div className="relative z-20 w-full max-w-md bg-white p-8 md:p-10 rounded-3xl border border-emerald-100/80 shadow-2xl text-center space-y-6 animate-scale-up">
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
-              <FiCheckCircle className="text-3xl" />
+            <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
+              <FiCheckCircle className="text-4xl" />
             </div>
           </div>
 
-          <div>
-            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
+          <div className="space-y-1">
+            <h4 className="text-[11px] tracking-[0.4em] text-emerald-600 font-black uppercase">
               TRANSACTION COMPLETED
             </h4>
-            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
-              Order Placed
+            <h1 className="text-3xl md:text-4xl font-black tracking-widest text-emerald-950 uppercase font-brand">
+              ORDER PLACED
             </h1>
           </div>
 
-          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide">
-            Your order details have been saved in our system. We are preparing to ship your order soon.
+          <p className="text-xs text-zinc-500 leading-relaxed font-mono uppercase tracking-wider">
+            YOUR ORDER DETAILS HAVE BEEN SAVED IN OUR SYSTEM. WE ARE PREPARING TO SHIP YOUR ORDER SOON.
           </p>
 
-          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
-            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
-            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
-              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
+          <div className="bg-rose-50/80 border border-rose-200/80 p-4 rounded-2xl text-center space-y-1.5 animate-fade-in">
+            <span className="text-[10px] font-black text-rose-600 tracking-widest block uppercase">⚠️ CANCELLATION POLICY</span>
+            <p className="text-[9.5px] text-rose-700 leading-relaxed font-mono uppercase">
+              ORDERS CAN ONLY BE CANCELLED WHILE IN "PENDING" OR "PROCESSING" STATUS. ONCE YOUR PACKAGE IS SHIPPED OR DISPATCHED, CANCELLATION IS NOT POSSIBLE.
             </p>
           </div>
 
-          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
+          <div className="w-14 h-[1.5px] bg-emerald-200/60 mx-auto rounded-full" />
 
           <button 
             onClick={() => navigate('/')} 
-            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-lg transition-all cursor-pointer"
           >
-            Continue Shopping &rarr;
+            CONTINUE SHOPPING &rarr;
           </button>
         </div>
       </div>
