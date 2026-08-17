@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useRazorpaySDK } from '../../hooks/useRazorpaySDK'
+import { useRazorpaySDK, loadRazorpaySDK } from '../../hooks/useRazorpaySDK'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
@@ -36,6 +36,7 @@ const generateOrderNumber = () => {
 };
 
 function Checkout() {
+  useRazorpaySDK()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const { showToast } = useToast()

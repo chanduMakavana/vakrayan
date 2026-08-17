@@ -191,7 +191,12 @@ export class Account {
                     const user = result.user;
                     const sessionId = crypto.randomUUID();
                     localStorage.setItem('current_session_id', sessionId);
-                    localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
+
+                    // Set expiration to 12:00 AM (midnight) of the next day
+                    const nextMidnight = new Date();
+                    nextMidnight.setDate(nextMidnight.getDate() + 1);
+                    nextMidnight.setHours(0, 0, 0, 0);
+                    localStorage.setItem('google_session_expiry', String(nextMidnight.getTime()));
 
                     const docRef = doc(firestore, 'users', user.uid);
                     try {
