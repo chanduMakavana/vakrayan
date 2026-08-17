@@ -470,16 +470,21 @@ function Checkout() {
       setSubmittedFormData(data);
 
       if (liveKey) {
-        const isSdkLoaded = await loadRazorpaySDK();
-        if (isSdkLoaded) {
+        let isSdkLoaded = typeof window !== 'undefined' && Boolean(window.Razorpay);
+        if (!isSdkLoaded) {
+          isSdkLoaded = await loadRazorpaySDK();
+        }
+
+        if (isSdkLoaded && window.Razorpay) {
           try {
+            const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/vakrayan-logo-icon.png` : '/vakrayan-logo-icon.png';
             const options = {
               key: liveKey,
-              amount: finalAmount * 100, // INR in paise
+              amount: Math.round(finalAmount * 100), // INR in paise integer
               currency: 'INR',
               name: 'Vakrayan Apparel',
-              description: `Order Payment (${cartItems.length} items)`,
-              image: '/vakrayan-logo-icon.png',
+              description: `Order Payment (${cartItems.length} item${cartItems.length > 1 ? 's' : ''})`,
+              image: logoUrl,
               prefill: {
                 name: data.name,
                 email: data.email,
@@ -500,21 +505,27 @@ function Checkout() {
               modal: {
                 ondismiss: function () {
                   isSubmittingRef.current = false;
-                  showToast("Payment process cancelled by user.", "info");
+                  showToast("Payment window closed by user.", "info");
                 }
               }
             };
             const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function (resp) {
+              isSubmittingRef.current = false;
+              showToast(resp.error?.description || "Payment failed. Please try again.", "error");
+            });
             rzp.open();
             return;
           } catch (err) {
             console.warn("Real Razorpay checkout failed to open, switching to simulation modal:", err.message);
+            isSubmittingRef.current = false;
           }
         }
       }
 
       // Fallback: custom sandbox simulator
       setRazorpayModalOpen(true);
+      isSubmittingRef.current = false;
       return;
     }
 
