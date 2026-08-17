@@ -465,87 +465,102 @@ function Checkout() {
       setMockOrderId(currentMockId);
       setSubmittedFormData(data);
 
-      if (window.Razorpay && liveKey) {
-        // Launch REAL Razorpay Standard Payment Gateway Popup
-        try {
+      if (liveKey) {
+        // ✅ FIX: Wait for Razorpay SDK to finish loading (handles slow connections)
+        // Previously, if the button was clicked before the script tag finished loading,
+        // window.Razorpay would be undefined and the popup would silently not open.
+        const razorpayReady = await new Promise((resolve) => {
+          if (window.Razorpay) { resolve(true); return; }
+          let attempts = 0;
+          const interval = setInterval(() => {
+            attempts++;
+            if (window.Razorpay) { clearInterval(interval); resolve(true); }
+            else if (attempts >= 30) { clearInterval(interval); resolve(false); } // 3s timeout
+          }, 100);
+        });
+
+        if (razorpayReady) {
+          try {
             const options = {
               key: liveKey,
               amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
-              currency: "INR",
-              name: "Vakrayan",
-              description: "Vakrayan Secure Transaction Gateway",
+              currency: 'INR',
+              name: 'Vakrayan',
+              description: 'Vakrayan Secure Transaction Gateway',
               prefill: {
-              name: data.name,
-              email: data.email,
-              contact: data.phone
-            },
-            notes: {
-              address: `${data.address}, ${data.city} - ${data.pincode}`,
-              merchant_order_id: currentMockId
-            },
-            retry: {
-              enabled: true,
-              max_count: 4
-            },
-            theme: {
-              color: "#00B7B5" // Matching website accent Teal/Cyan color
-            },
-            handler: async function (response) {
-              const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-              const ordId = response.razorpay_order_id || currentMockId;
-              const sig = response.razorpay_signature;
+                name: data.name,
+                email: data.email,
+                contact: data.phone
+              },
+              notes: {
+                address: `${data.address}, ${data.city} - ${data.pincode}`,
+                merchant_order_id: currentMockId
+              },
+              retry: {
+                enabled: true,
+                max_count: 4
+              },
+              theme: {
+                color: '#00B7B5'
+              },
+              handler: async function (response) {
+                const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+                const ordId = response.razorpay_order_id || currentMockId;
+                const sig = response.razorpay_signature;
 
-              // ✅ SECURITY FIX: Verify payment signature server-side BEFORE creating order.
-              // Without this, any user could call processFinalizeOrder() from browser console
-              // without actually paying. The Cloudflare Worker verifies HMAC-SHA256 signature.
-              const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
-              if (verifyUrl && ordId && payId && sig) {
-                try {
-                  const verifyResp = await fetch(verifyUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      razorpay_order_id: ordId,
-                      razorpay_payment_id: payId,
-                      razorpay_signature: sig,
-                    }),
-                  });
-                  const verifyData = await verifyResp.json();
-                  if (!verifyData.success) {
-                    showToast('Payment verification failed! Order was not placed.', 'error');
+                // ✅ SECURITY: Verify payment signature server-side BEFORE creating order.
+                const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
+                if (verifyUrl && ordId && payId && sig) {
+                  try {
+                    const verifyResp = await fetch(verifyUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'verify_payment',
+                        razorpay_order_id: ordId,
+                        razorpay_payment_id: payId,
+                        razorpay_signature: sig,
+                      }),
+                    });
+                    const verifyData = await verifyResp.json();
+                    if (!verifyData.success) {
+                      showToast('Payment verification failed! Order was not placed.', 'error');
+                      isSubmittingRef.current = false;
+                      return;
+                    }
+                  } catch (verifyErr) {
+                    console.error('❌ Payment verification error:', verifyErr.message);
+                    showToast('Payment verification unreachable. Order cancelled for security.', 'error');
                     isSubmittingRef.current = false;
                     return;
                   }
-                } catch (verifyErr) {
-                  console.error('❌ Payment verification error:', verifyErr.message);
-                  showToast('Payment verification unreachable. Order cancelled for security.', 'error');
+                } else if (verifyUrl) {
+                  showToast('Missing payment signature or details. Payment rejected.', 'error');
                   isSubmittingRef.current = false;
                   return;
                 }
-              } else if (verifyUrl) {
-                showToast('Missing payment signature or details. Payment rejected.', 'error');
-                isSubmittingRef.current = false;
-                return;
-              }
 
-              processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
-            },
-            modal: {
-              ondismiss: function () {
-                showToast("Payment window closed by customer.", "info");
+                processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
+              },
+              modal: {
+                ondismiss: function () {
+                  showToast('Payment window closed by customer.', 'info');
+                  isSubmittingRef.current = false;
+                }
               }
-            }
-          };
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-          return;
-        } catch (err) {
-          console.warn("Real Razorpay initiation issue, falling back to sandbox simulator:", err.message);
+            };
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+            return;
+          } catch (err) {
+            console.warn('Razorpay initiation issue, falling back to sandbox simulator:', err.message);
+          }
+        } else {
+          console.warn('Razorpay SDK did not load in time, falling back to sandbox simulator.');
         }
       }
 
-      // Launch custom Razorpay secured simulator fallback
-      setSubmittedFormData(data);
+      // Fallback: custom sandbox simulator
       setRazorpayModalOpen(true);
       return;
     }
