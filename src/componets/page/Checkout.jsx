@@ -785,54 +785,57 @@ function Checkout() {
   if (checkoutStatus === 'processing') {
     const progressPercent = Math.min(100, Math.round(((processingStep + 1) / (steps.length + 1)) * 100));
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--color-surface)_0%,var(--color-bg)_100%)] opacity-80" />
 
-        <div className="relative z-20 flex flex-col items-center space-y-7 max-w-sm w-full text-center animate-fade-in">
-          {/* Vakrayan Official Monogram Emblem */}
+        <div className="relative z-20 flex flex-col items-center space-y-8 max-w-lg w-full text-center animate-fade-in px-4">
+          {/* Vakrayan Monogram */}
           <div className="relative flex items-center justify-center">
-            <div className="w-20 h-20 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3 shadow-xl flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-accent)]/10 to-transparent pointer-events-none" />
+            <div className="w-24 h-24 rounded-3xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 shadow-2xl flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-accent)]/15 to-transparent pointer-events-none" />
               <img 
                 src="/vakrayan-logo-icon.png" 
                 alt="Vakrayan" 
-                className="w-12 h-12 object-contain drop-shadow-md animate-pulse"
+                className="w-14 h-14 object-contain drop-shadow-md animate-pulse"
                 style={{ animationDuration: '2s' }}
               />
             </div>
-            {/* Outer spinning ring */}
-            <div className="absolute -inset-2 rounded-2xl border-2 border-dashed border-[var(--color-accent)]/40 animate-spin" style={{ animationDuration: '8s' }} />
+            <div className="absolute -inset-3 rounded-3xl border-2 border-dashed border-[var(--color-accent)]/40 animate-spin" style={{ animationDuration: '10s' }} />
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-[9px] font-black tracking-[0.4em] uppercase text-[var(--color-accent)] block">
-              SECURE ENCRYPTED CHANNEL
+          <div className="space-y-2">
+            <span className="text-[10px] font-black tracking-[0.45em] uppercase text-[var(--color-accent)] block">
+              VAKRAYAN SECURE GATEWAY
             </span>
-            <h2 className="text-2xl font-black font-brand tracking-widest uppercase text-[var(--color-text)]">
+            <h2 className="text-3xl sm:text-4xl font-black font-brand tracking-widest uppercase text-[var(--color-text)]">
               SECURING ORDER
             </h2>
+            <p className="text-xs text-[var(--color-muted)] font-mono uppercase tracking-wider">
+              Please do not refresh or close this window
+            </p>
           </div>
 
-          {/* Step progression indicators */}
-          <div className="space-y-3 w-full bg-[var(--color-surface)]/80 backdrop-blur-md border border-[var(--color-border)] rounded-2xl p-4 shadow-md">
-            <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider">
-              <span className="text-[var(--color-accent)] animate-pulse">
+          {/* Progress Card */}
+          <div className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider">
+              <span className="text-[var(--color-accent)] animate-pulse flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[var(--color-accent)] animate-ping" />
                 {steps[processingStep] || "Finalizing order confirmation..."}
               </span>
-              <span className="text-[var(--color-muted)]">{progressPercent}%</span>
+              <span className="text-[var(--color-text)] font-bold">{progressPercent}%</span>
             </div>
 
             {/* Glowing progress bar */}
-            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden relative">
+            <div className="w-full h-2 bg-[var(--color-border)] rounded-full overflow-hidden relative">
               <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 rounded-full shadow-[0_0_8px_var(--color-accent)]" 
+                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 rounded-full shadow-[0_0_12px_var(--color-accent)]" 
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            <div className="flex justify-between items-center text-[9px] text-[var(--color-muted)] font-mono uppercase tracking-widest pt-1 border-t border-[var(--color-border)]/50">
+            <div className="flex justify-between items-center text-[10px] text-[var(--color-muted)] font-mono uppercase tracking-widest pt-2 border-t border-[var(--color-border)]">
               <span>🔒 256-Bit SSL Encrypted</span>
-              <span>VAKRAYAN HQ</span>
+              <span>AUTHENTIC VAKRAYAN</span>
             </div>
           </div>
         </div>
@@ -843,127 +846,216 @@ function Checkout() {
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4 sm:p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20">
         
         {/* Full-screen celebratory confetti canvas overlay */}
         <canvas 
           ref={confettiCanvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none z-15"
+          className="fixed inset-0 w-full h-full pointer-events-none z-50"
         />
-        
-        <div className="relative z-20 w-full max-w-lg bg-[var(--color-surface)] p-6 sm:p-9 rounded-3xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
+
+        {/* Ambient Top Background Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-96 bg-gradient-to-b from-emerald-500/10 via-[var(--color-accent)]/5 to-transparent blur-3xl pointer-events-none" />
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-12 relative z-20 space-y-10">
           
-          {/* Animated Luxury Check Seal */}
-          <div className="flex justify-center">
-            <div className="relative flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center relative">
-                <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping pointer-events-none" style={{ animationDuration: '3s' }} />
-                <div className="w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                  <FiCheck className="text-2xl stroke-[3]" />
+          {/* Top Brand & Status Hero Header */}
+          <div className="text-center space-y-5 animate-fade-in">
+            
+            {/* Animated Luxury Check Seal */}
+            <div className="flex justify-center">
+              <div className="relative flex items-center justify-center">
+                <div className="w-24 h-24 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center relative shadow-xl shadow-emerald-500/10">
+                  <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping pointer-events-none" style={{ animationDuration: '3.5s' }} />
+                  <div className="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                    <FiCheck className="text-3xl stroke-[3]" />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Heading */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] tracking-[0.35em] text-emerald-600 dark:text-emerald-400 font-black uppercase block">
-              TRANSACTION VERIFIED • RECEIPT GENERATED
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black font-brand tracking-widest text-[var(--color-text)] uppercase">
-              ORDER CONFIRMED!
-            </h1>
-            <p className="text-xs text-[var(--color-muted)] leading-relaxed font-sans max-w-sm mx-auto">
-              Thank you for shopping with <strong className="text-[var(--color-text)] font-semibold">Vakrayan</strong>. Your order has been placed into our logistics stream.
-            </p>
-          </div>
-
-          {/* Order ID Box with 1-Click Copy */}
-          <div className="flex items-center justify-between gap-3 bg-[var(--color-subtle)] border border-[var(--color-border)] px-4 py-3 rounded-2xl">
-            <div className="text-left">
-              <span className="text-[9px] uppercase tracking-widest text-[var(--color-muted)] font-black block">
-                ORDER REFERENCE
+            <div className="space-y-2 max-w-xl mx-auto">
+              <span className="inline-flex items-center gap-2 text-[10px] tracking-[0.35em] text-emerald-600 dark:text-emerald-400 font-black uppercase px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                TRANSACTION COMPLETED // ORDER SECURED
               </span>
-              <span className="text-xs sm:text-sm font-mono font-bold text-[var(--color-text)] tracking-wider">
-                {confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}
-              </span>
+              <h1 className="text-3xl sm:text-5xl font-black font-brand tracking-tight text-[var(--color-text)] uppercase">
+                ORDER CONFIRMED!
+              </h1>
+              <p className="text-sm text-[var(--color-muted)] leading-relaxed font-sans">
+                Thank you for your order{confirmedOrder?.customerName ? `, ${confirmedOrder.customerName}` : ''}. We have received your order details and are preparing your package for shipment.
+              </p>
             </div>
-            <button 
-              type="button"
-              onClick={() => {
-                const num = confirmedOrder?.orderNumber;
-                if (num) {
-                  navigator.clipboard.writeText(num);
-                  setCopiedOrderId(true);
-                  showToast("Order Number copied to clipboard!", "success");
-                  setTimeout(() => setCopiedOrderId(false), 2000);
-                }
-              }}
-              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-all cursor-pointer shadow-xs active:scale-95"
-            >
-              {copiedOrderId ? <FiCheck className="text-emerald-500" /> : <FiCopy />}
-              {copiedOrderId ? 'COPIED' : 'COPY'}
-            </button>
-          </div>
 
-          {/* Quick Snapshot Details Grid */}
-          <div className="grid grid-cols-2 gap-3 text-left">
-            <div className="p-3.5 rounded-2xl bg-[var(--color-subtle)]/60 border border-[var(--color-border)] space-y-1">
-              <div className="flex items-center gap-1.5 text-[var(--color-accent)]">
-                <FiTruck className="text-sm" />
-                <span className="text-[9px] font-black uppercase tracking-wider">ESTIMATED DELIVERY</span>
+            {/* Quick Copy Order ID Pill */}
+            <div className="inline-flex items-center justify-center gap-3 bg-[var(--color-surface)] border border-[var(--color-border)] px-5 py-3 rounded-2xl shadow-sm">
+              <div className="text-left">
+                <span className="text-[9px] uppercase tracking-widest text-[var(--color-muted)] font-black block">
+                  ORDER REFERENCE NUMBER
+                </span>
+                <span className="text-sm sm:text-base font-mono font-bold text-[var(--color-text)] tracking-wider">
+                  {confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}
+                </span>
               </div>
-              <p className="text-xs font-bold text-[var(--color-text)] font-mono">
-                3 – 5 Business Days
-              </p>
+              <button 
+                type="button"
+                onClick={() => {
+                  const num = confirmedOrder?.orderNumber;
+                  if (num) {
+                    navigator.clipboard.writeText(num);
+                    setCopiedOrderId(true);
+                    showToast("Order Reference Number copied!", "success");
+                    setTimeout(() => setCopiedOrderId(false), 2000);
+                  }
+                }}
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-xl bg-[var(--color-subtle)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-all cursor-pointer active:scale-95 ml-2"
+              >
+                {copiedOrderId ? <FiCheck className="text-emerald-500 text-xs" /> : <FiCopy className="text-xs" />}
+                {copiedOrderId ? 'COPIED' : 'COPY'}
+              </button>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[var(--color-subtle)]/60 border border-[var(--color-border)] space-y-1">
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                <FiPackage className="text-sm" />
-                <span className="text-[9px] font-black uppercase tracking-wider">ORDER UPDATES</span>
+          </div>
+
+          {/* Full Screen Information Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-scale-up">
+            
+            {/* Left Column: Order Summary & Tracking */}
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 sm:p-7 shadow-lg space-y-5">
+              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
+                <h3 className="text-xs font-black tracking-[0.25em] uppercase text-[var(--color-muted)] flex items-center gap-2">
+                  <FiPackage className="text-[var(--color-accent)] text-sm" />
+                  Order Overview
+                </h3>
+                <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase">
+                  Confirmed
+                </span>
               </div>
-              <p className="text-xs font-bold text-[var(--color-text)] truncate">
-                Dispatched to Email &amp; SMS
-              </p>
+
+              <div className="space-y-3 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px]">Payment Method</span>
+                  <span className="font-mono font-bold text-[var(--color-text)] uppercase">
+                    {confirmedOrder?.paymentMethod === 'ONLINE' ? 'Razorpay (Paid Online)' : confirmedOrder?.paymentMethod === 'WALLET' ? 'Store Wallet (Paid)' : 'Cash on Delivery (COD)'}
+                  </span>
+                </div>
+
+                {confirmedOrder?.total && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px]">Total Net Amount</span>
+                    <span className="font-mono font-black text-base text-[var(--color-text)]">
+                      ₹{confirmedOrder.total.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <span className="text-[var(--color-muted)] uppercase tracking-wider text-[11px]">Estimated Delivery</span>
+                  <span className="font-mono font-bold text-[var(--color-accent)] flex items-center gap-1.5">
+                    <FiTruck className="text-sm" /> 3 – 5 Business Days
+                  </span>
+                </div>
+              </div>
+
+              {/* Delivery timeline tracker */}
+              <div className="pt-3 border-t border-[var(--color-border)] space-y-2.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[var(--color-muted)] block">
+                  Logistics Milestones
+                </span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0 font-bold">✓</div>
+                    <span className="font-bold text-[var(--color-text)]">Order Placed &amp; Verified</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="w-5 h-5 rounded-full bg-[var(--color-accent)] text-white flex items-center justify-center text-[10px] shrink-0 font-bold animate-pulse">⟳</div>
+                    <span className="font-bold text-[var(--color-accent)]">Preparing for Dispatch</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs opacity-40">
+                    <div className="w-5 h-5 rounded-full border border-[var(--color-border)] flex items-center justify-center text-[10px] shrink-0">3</div>
+                    <span className="text-[var(--color-muted)]">Out for Delivery</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Right Column: Shipping Details & Policy */}
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-3xl p-6 sm:p-7 shadow-lg space-y-5 flex flex-col justify-between">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
+                  <h3 className="text-xs font-black tracking-[0.25em] uppercase text-[var(--color-muted)] flex items-center gap-2">
+                    <FiTruck className="text-[var(--color-accent)] text-sm" />
+                    Delivery Destination
+                  </h3>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="font-bold text-sm text-[var(--color-text)] uppercase">
+                    {confirmedOrder?.customerName || user?.name}
+                  </div>
+                  <p className="text-[var(--color-muted)] leading-relaxed font-mono text-[11px]">
+                    {confirmedOrder?.address || 'Shipping address registered with order.'}
+                  </p>
+                  {confirmedOrder?.phone && (
+                    <p className="text-[var(--color-muted)] font-mono text-[11px]">
+                      Contact: {confirmedOrder.phone}
+                    </p>
+                  )}
+                </div>
+
+                {/* Cancellation Policy Banner */}
+                <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl text-left flex items-start gap-3">
+                  <FiShield className="text-amber-500 shrink-0 mt-0.5 text-base" />
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
+                      Cancellation Policy
+                    </span>
+                    <p className="text-[11px] text-[var(--color-muted)] leading-relaxed font-sans">
+                      Orders can be cancelled while in <strong>"Pending"</strong> status directly from your profile account. Once package is dispatched, cancellations are locked.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-[var(--color-muted)] font-mono uppercase tracking-widest pt-3 border-t border-[var(--color-border)]">
+                Receipt sent to: <strong className="text-[var(--color-text)] font-semibold">{confirmedOrder?.email || user?.email}</strong>
+              </div>
+            </div>
+
           </div>
 
-          {/* Elegant Cancellation Policy Banner */}
-          <div className="bg-amber-500/5 border border-amber-500/20 p-3.5 rounded-2xl text-left flex items-start gap-3">
-            <FiShield className="text-amber-500 shrink-0 mt-0.5 text-sm" />
-            <div className="space-y-0.5">
-              <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
-                CANCELLATION POLICY
-              </span>
-              <p className="text-[10px] text-[var(--color-muted)] leading-relaxed font-sans">
-                Orders can be cancelled while in <strong>"Pending"</strong> status from your account. Once your parcel is shipped or dispatched, cancellations cannot be processed.
-              </p>
-            </div>
-          </div>
-
-          {/* Dual Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            {confirmedOrder?.id && (
+          {/* Action Navigation Bar */}
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            {confirmedOrder?.id ? (
               <button 
                 onClick={() => navigate(`/order/${confirmedOrder.id}`)} 
-                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5 group"
               >
-                <FiPackage className="text-sm" />
-                TRACK ORDER &rarr;
+                <FiPackage className="text-base group-hover:scale-110 transition-transform" />
+                VIEW ORDER &amp; TRACKING &rarr;
+              </button>
+            ) : (
+              <button 
+                onClick={() => navigate('/profile')} 
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5"
+              >
+                <FiPackage className="text-base" />
+                MY ORDERS &rarr;
               </button>
             )}
+
             <button 
               onClick={() => navigate('/shop')} 
-              className={`flex-1 ${confirmedOrder?.id ? 'bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] border border-[var(--color-border)]' : 'bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white'} active:scale-[0.98] font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2`}
+              className="flex-1 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] border border-[var(--color-border)] active:scale-[0.98] font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2.5"
             >
-              <FiShoppingBag className="text-sm" />
+              <FiShoppingBag className="text-base" />
               CONTINUE SHOPPING
             </button>
           </div>
 
         </div>
+
+        <Footer />
       </div>
     )
   }
