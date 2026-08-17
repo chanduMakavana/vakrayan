@@ -309,7 +309,7 @@ export async function handler(event) {
     const brevoPayload = {
       sender: {
         name: 'Vakrayan',
-        email: 'noreply@vakrayan.com'
+        email: 'support@vakrayan.com'
       },
       to: [
         {
