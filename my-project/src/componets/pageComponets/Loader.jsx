@@ -29,7 +29,7 @@ function Loader({ type = 'inline', text }) {
                 className="text-[9px] font-bold tracking-[0.3em] uppercase"
                 style={{ color: 'var(--color-muted)', fontFamily: 'Jost, sans-serif' }}
               >
-                Premium Apparel
+                {text || 'Premium Apparel'}
               </p>
             </div>
 

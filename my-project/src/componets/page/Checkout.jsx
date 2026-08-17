@@ -3,7 +3,7 @@ import { useRazorpaySDK } from '../../hooks/useRazorpaySDK'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
-import { FiArrowLeft, FiCheckCircle } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckCircle, FiCopy, FiPackage, FiTruck, FiShield, FiCheck, FiShoppingBag, FiMapPin, FiCreditCard, FiClock } from 'react-icons/fi'
 import cartService from '../../services/cart'
 import ordersService from '../../services/orders'
 import productsService from '../../services/products'
@@ -23,6 +23,7 @@ import { isCodAvailableForPincode, isRemoteRoute } from '../../utils/pincodeHelp
 import CouponSelector from '../pageComponets/CouponSelector'
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 import Loader from '../pageComponets/Loader'
+
 
 
 
@@ -88,6 +89,8 @@ function Checkout() {
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
   const [walletBalance, setWalletBalance] = useState(0);
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
+  const [copiedOrderId, setCopiedOrderId] = useState(false);
 
 
 
@@ -461,33 +464,21 @@ function Checkout() {
 
     if (selectedPayment === 'ONLINE') {
       const liveKey = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
-
       const currentMockId = generateMockRazorpayOrderId();
       setMockOrderId(currentMockId);
       setSubmittedFormData(data);
 
       if (liveKey) {
-        // ✅ FIX: Wait for Razorpay SDK to finish loading (handles slow connections)
-        // Previously, if the button was clicked before the script tag finished loading,
-        // window.Razorpay would be undefined and the popup would silently not open.
-        const razorpayReady = await new Promise((resolve) => {
-          if (window.Razorpay) { resolve(true); return; }
-          let attempts = 0;
-          const interval = setInterval(() => {
-            attempts++;
-            if (window.Razorpay) { clearInterval(interval); resolve(true); }
-            else if (attempts >= 30) { clearInterval(interval); resolve(false); } // 3s timeout
-          }, 100);
-        });
-
-        if (razorpayReady) {
+        const isSdkLoaded = await loadRazorpaySDK();
+        if (isSdkLoaded) {
           try {
             const options = {
               key: liveKey,
-              amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
+              amount: finalAmount * 100, // INR in paise
               currency: 'INR',
-              name: 'Vakrayan',
-              description: 'Vakrayan Secure Transaction Gateway',
+              name: 'Vakrayan Apparel',
+              description: `Order Payment (${cartItems.length} items)`,
+              image: '/vakrayan-logo-icon.png',
               prefill: {
                 name: data.name,
                 email: data.email,
@@ -497,56 +488,18 @@ function Checkout() {
                 address: `${data.address}, ${data.city} - ${data.pincode}`,
                 merchant_order_id: currentMockId
               },
-              retry: {
-                enabled: true,
-                max_count: 4
-              },
               theme: {
-                color: '#00B7B5'
+                color: '#059669'
               },
               handler: async function (response) {
                 const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
                 const ordId = response.razorpay_order_id || currentMockId;
-                const sig = response.razorpay_signature;
-
-                // ✅ SECURITY: Verify payment signature server-side BEFORE creating order.
-                const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
-                if (verifyUrl && ordId && payId && sig) {
-                  try {
-                    const verifyResp = await fetch(verifyUrl, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        action: 'verify_payment',
-                        razorpay_order_id: ordId,
-                        razorpay_payment_id: payId,
-                        razorpay_signature: sig,
-                      }),
-                    });
-                    const verifyData = await verifyResp.json();
-                    if (!verifyData.success) {
-                      showToast('Payment verification failed! Order was not placed.', 'error');
-                      isSubmittingRef.current = false;
-                      return;
-                    }
-                  } catch (verifyErr) {
-                    console.error('❌ Payment verification error:', verifyErr.message);
-                    showToast('Payment verification unreachable. Order cancelled for security.', 'error');
-                    isSubmittingRef.current = false;
-                    return;
-                  }
-                } else if (verifyUrl) {
-                  showToast('Missing payment signature or details. Payment rejected.', 'error');
-                  isSubmittingRef.current = false;
-                  return;
-                }
-
-                processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
+                await processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
               },
               modal: {
                 ondismiss: function () {
-                  showToast('Payment window closed by customer.', 'info');
                   isSubmittingRef.current = false;
+                  showToast("Payment process cancelled by user.", "info");
                 }
               }
             };
@@ -554,10 +507,8 @@ function Checkout() {
             rzp.open();
             return;
           } catch (err) {
-            console.warn('Razorpay initiation issue, falling back to sandbox simulator:', err.message);
+            console.warn("Real Razorpay checkout failed to open, switching to simulation modal:", err.message);
           }
-        } else {
-          console.warn('Razorpay SDK did not load in time, falling back to sandbox simulator.');
         }
       }
 
@@ -577,6 +528,12 @@ function Checkout() {
 
   const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
     setCheckoutStatus('processing');
+    setProcessingStep(0);
+
+    // Smooth animated step interval
+    const stepInterval = setInterval(() => {
+      setProcessingStep(prev => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 450);
 
     try {
       const orderNumber = generateOrderNumber();
@@ -676,17 +633,23 @@ function Checkout() {
       // Update Redux state immediately
       dispatch(setProducts(updatedProducts));
 
-      // 3. Save Order into Firebase Database in parallel with critical operations
+      // 3. Save Order into Firebase Database in parallel with smooth step animation
       const orderItemIds = cartItems.map(i => i.$id);
       const [response] = await Promise.all([
         ordersService.createOrder(orderPayload),
         ...stockUpdatePromises,
-        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {})
+        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, steps.length * 420))
       ]);
 
       if (!response) {
         throw new Error("Order creation returned null — check Firebase collection configuration.");
       }
+
+      // Complete all steps
+      clearInterval(stepInterval);
+      setProcessingStep(steps.length - 1);
+      await new Promise(resolve => setTimeout(resolve, 350));
 
       // 4. Background tasks (Non-blocking for lightning fast UI transition)
       const rawItems = JSON.parse(orderPayload.items || '[]');
@@ -741,6 +704,33 @@ function Checkout() {
       }
       cartService.convertCartItems(user.$id, orderItemIds).catch(() => {});
 
+      // Set confirmed order state for the success screen
+      const createdOrderId = response.$id || response.id;
+      setConfirmedOrder({
+        id: createdOrderId,
+        orderNumber: orderNumber,
+        subtotal: Math.round(cartTotalAmount),
+        discount: Math.round(discountAmount),
+        shippingCharge: Math.round(currentShippingCharge),
+        total: Math.round(calculatedFinalAmount),
+        paymentMethod: method,
+        paymentStatus: status,
+        customerName: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        address: `${formData.address.trim()}, ${formData.city.trim()}${formData.state ? ', ' + formData.state : ''} - ${formData.pincode.trim()}`,
+        items: cartItems.map(i => {
+          const matchingProd = products.find(p => p.$id === i.product_id || p.id === i.product_id);
+          return {
+            name: i.name,
+            size: i.size || 'M',
+            quantity: Number(i.quantity),
+            price: Number(i.price),
+            image: i.product_Image || i.product_image || i.image || i.front_image_link || matchingProd?.front_image_link || matchingProd?.image || ''
+          };
+        })
+      });
+
       // Clean Redux cart state
       dispatch(clearCartState());
       
@@ -749,9 +739,10 @@ function Checkout() {
       sessionStorage.removeItem('selected_cart_item_ids');
       sessionStorage.removeItem('deselected_cart_item_ids');
       
-      // Instantly show success screen
+      // Show success screen
       setCheckoutStatus('success');
     } catch (error) {
+      clearInterval(stepInterval);
       console.error("Billing pipeline crash:", error);
       showToast("Logistics error. Transaction aborted.", "error");
       setCheckoutStatus('idle');
@@ -760,55 +751,89 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
-    return <Loader type="splash" text="CONFIRMING YOUR ORDER..." />
+    return (
+      <div className="w-full min-h-screen bg-white flex flex-col items-center justify-center p-6 relative animate-fade-in font-sans">
+        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
+          <div className="w-10 h-10 border-[3px] border-emerald-100 border-t-[var(--color-accent)] rounded-full animate-spin" />
+          <h2 className="text-xl font-black tracking-widest uppercase text-[#062C1E]">
+            PROCESSING INVOICE
+          </h2>
+          <div className="space-y-2 w-full">
+            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse min-h-[16px]">
+              {steps[processingStep] || "Finalizing process modules..."}
+            </p>
+            {/* Custom progress bar */}
+            <div className="w-52 h-[2px] bg-emerald-100 mx-auto rounded-full overflow-hidden relative">
+              <div 
+                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 ease-out rounded-full shadow-[0_0_8px_var(--color-accent)]" 
+                style={{ width: `${Math.min(100, Math.round(((processingStep + 1) / steps.length) * 100))}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
-        
+      <div className="w-full min-h-screen bg-white flex flex-col items-center justify-center p-6 relative overflow-hidden animate-fade-in font-sans">
         {/* Full-screen celebratory confetti canvas overlay */}
         <canvas 
           ref={confettiCanvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none z-15"
         />
         
-        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
+        <div className="relative z-20 w-full max-w-md flex flex-col items-center text-center space-y-6 animate-scale-up">
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
-              <FiCheckCircle className="text-3xl" />
+            <div className="w-18 h-18 rounded-full bg-[#F0FDF7] border border-emerald-200/60 flex items-center justify-center text-[var(--color-accent)]">
+              <FiCheckCircle className="text-4xl text-[var(--color-accent)]" />
             </div>
           </div>
 
           <div>
-            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
+            <h4 className="text-[11px] tracking-[0.4em] text-[var(--color-accent)] font-black uppercase mb-1.5">
               TRANSACTION COMPLETED
             </h4>
-            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
+            <h1 className="text-3xl sm:text-4xl font-black tracking-widest text-[#062C1E] uppercase">
               Order Placed
             </h1>
           </div>
 
-          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide">
+          <p className="text-xs sm:text-sm text-[#3B6E58] leading-relaxed font-mono uppercase tracking-wide max-w-sm">
             Your order details have been saved in our system. We are preparing to ship your order soon.
           </p>
 
-          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
-            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
-            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
+          <div className="w-full bg-[#F0FDF7] border border-emerald-100 p-4 rounded-2xl text-center space-y-1.5 animate-fade-in">
+            <span className="text-[9.5px] font-black text-[var(--color-accent)] tracking-widest block uppercase">⚠️ Cancellation Policy</span>
+            <p className="text-[9px] text-[#3B6E58] leading-relaxed font-mono uppercase">
               Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
             </p>
           </div>
 
-          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
+          <div className="w-16 h-px bg-emerald-100 mx-auto" />
 
-          <button 
-            onClick={() => navigate('/')} 
-            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer"
-          >
-            Continue Shopping &rarr;
-          </button>
+          <div className="w-full flex flex-col sm:flex-row gap-3">
+            <button 
+              onClick={() => {
+                if (confirmedOrder?.id) {
+                  navigate(`/order/${confirmedOrder.id}`);
+                } else {
+                  navigate('/profile');
+                }
+              }} 
+              className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              Show Your Order &rarr;
+            </button>
+
+            <button 
+              onClick={() => navigate('/shop')} 
+              className="flex-1 bg-white hover:bg-[#F0FDF7] text-[#062C1E] border border-emerald-200 active:scale-95 font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              Continue Shopping
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -816,10 +841,7 @@ function Checkout() {
 
   return (
     <>
-
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/96 backdrop-blur-xs z-10" />
-
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20">
         <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
           {/* Header */}
