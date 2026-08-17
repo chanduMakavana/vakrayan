@@ -2181,7 +2181,7 @@ function AdminPanel() {
     const subjectText = campaignSubject.trim();
     const bodyText = campaignBody.trim();
 
-    if (isEmailJSConfigured) {
+    if (isEmailServiceReady) {
       let successCount = 0;
       let failCount = 0;
 
