@@ -796,29 +796,52 @@ function Checkout() {
     return (
       <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in relative font-sans">
         <div className="flex flex-col items-center space-y-6 max-w-sm w-full">
-          <div className="w-9 h-9 border-3 border-[var(--color-accent)]/25 border-t-[var(--color-accent)] rounded-full animate-spin" />
-          
-          <h2 
-            className="text-xl sm:text-2xl font-black tracking-widest uppercase text-[var(--color-text)]"
-            style={{ fontFamily: "'Jost', sans-serif" }}
-          >
-            PROCESSING INVOICE
-          </h2>
-          
-          <div className="space-y-2 w-full">
-            <p 
-              className="text-xs font-semibold tracking-wider text-[var(--color-accent)] uppercase animate-pulse"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              {steps[processingStep] || "Finalizing process modules..."}
-            </p>
-            {/* Custom progress bar */}
-            <div className="w-56 h-[2px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700 rounded-full" 
-                style={{ width: `${(processingStep / steps.length) * 100}%` }}
+          {/* Brand Monogram */}
+          <div className="relative flex items-center justify-center">
+            <div className="w-20 h-20 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3 shadow-md flex items-center justify-center">
+              <img 
+                src="/vakrayan-logo-icon.png" 
+                alt="Vakrayan" 
+                className="w-12 h-12 object-contain" 
               />
             </div>
+            <div className="absolute -inset-2 rounded-2xl border border-dashed border-[var(--color-accent)]/40 animate-spin" style={{ animationDuration: '12s' }} />
+          </div>
+
+          <div className="space-y-1">
+            <h2 
+              className="text-lg font-black tracking-[0.35em] uppercase text-[var(--color-text)]"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
+              VAKRAYAN
+            </h2>
+            <p 
+              className="text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
+              Securing Your Order
+            </p>
+          </div>
+          
+          <div className="space-y-2 w-full max-w-xs">
+            {/* Custom progress bar */}
+            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden relative">
+              <div 
+                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 rounded-full shadow-[0_0_8px_var(--color-accent)]" 
+                style={{ width: `${((processingStep + 1) / (steps.length + 1)) * 100}%` }}
+              />
+            </div>
+
+            <p 
+              className="text-[11px] font-medium tracking-wider text-[var(--color-accent)] uppercase animate-pulse pt-1"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
+              {steps[processingStep] || "Finalizing order confirmation..."}
+            </p>
+          </div>
+
+          <div className="text-[10px] text-[var(--color-muted)] tracking-widest uppercase font-medium pt-2">
+            🔒 256-Bit SSL Encrypted Gateway
           </div>
         </div>
       </div>
@@ -828,74 +851,209 @@ function Checkout() {
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] flex flex-col items-center justify-center p-6 sm:p-10 text-center relative overflow-hidden animate-fade-in select-none font-sans">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 animate-fade-in">
         
-        {/* Full-screen celebratory confetti canvas overlay */}
+        {/* Full-screen celebratory confetti canvas */}
         <canvas 
           ref={confettiCanvasRef}
           className="fixed inset-0 w-full h-full pointer-events-none z-50"
         />
 
-        <div className="relative z-20 w-full max-w-xl flex flex-col items-center space-y-7 mx-auto">
+        {/* Ambient Top Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 bg-gradient-to-b from-emerald-500/10 to-transparent blur-3xl pointer-events-none" />
+
+        <div className="max-w-xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-12 relative z-20 space-y-6">
           
-          {/* Green Check Circle Icon */}
-          <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-sm">
-            <FiCheckCircle className="text-3xl" />
+          {/* Hero Header */}
+          <div className="text-center space-y-3">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-sm relative">
+                <FiCheck className="text-3xl stroke-[2.5]" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <span 
+                className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.25em] text-emerald-600 dark:text-emerald-400 uppercase px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20"
+                style={{ fontFamily: "'Jost', sans-serif" }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Order Confirmed
+              </span>
+              <h1 
+                className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--color-text)] uppercase"
+                style={{ fontFamily: "'Jost', sans-serif" }}
+              >
+                Thank You For Your Order!
+              </h1>
+              <p 
+                className="text-xs sm:text-sm text-[var(--color-muted)] font-normal leading-relaxed max-w-md mx-auto"
+                style={{ fontFamily: "'Jost', sans-serif" }}
+              >
+                Your order has been verified and registered. We are preparing your bespoke package for dispatch.
+              </p>
+            </div>
           </div>
 
-          {/* Heading Section */}
-          <div className="space-y-2">
-            <span 
-              className="text-xs font-bold tracking-[0.35em] text-emerald-600 dark:text-emerald-400 uppercase block"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              TRANSACTION COMPLETED
-            </span>
-            <h1 
-              className="text-3xl sm:text-5xl font-black tracking-wide text-[var(--color-text)] uppercase"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              ORDER PLACED
-            </h1>
+          {/* Structured Receipt Card */}
+          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 text-left">
+            
+            {/* Order Reference Top Bar */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
+              <div>
+                <span className="text-[9px] uppercase tracking-widest text-[var(--color-muted)] font-bold block" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  ORDER REFERENCE
+                </span>
+                <span className="text-sm sm:text-base font-mono font-bold text-[var(--color-text)]">
+                  {confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}
+                </span>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmedOrder?.orderNumber) {
+                    navigator.clipboard.writeText(confirmedOrder.orderNumber);
+                    setCopiedOrderId(true);
+                    showToast("Order Reference Number copied!", "success");
+                    setTimeout(() => setCopiedOrderId(false), 2000);
+                  }
+                }}
+                className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider px-3 py-1.5 rounded-lg bg-[var(--color-subtle)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-all cursor-pointer active:scale-95 uppercase"
+                style={{ fontFamily: "'Jost', sans-serif" }}
+              >
+                {copiedOrderId ? <FiCheck className="text-emerald-500 text-xs" /> : <FiCopy className="text-xs" />}
+                {copiedOrderId ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+
+            {/* Quick Key-Value Rows */}
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[var(--color-muted)] flex items-center gap-1.5" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  <FiTruck className="text-[var(--color-accent)] text-sm" /> Estimated Delivery:
+                </span>
+                <span className="font-bold text-[var(--color-text)]" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  3 – 5 Business Days
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-[var(--color-muted)] flex items-center gap-1.5" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  <FiPackage className="text-[var(--color-accent)] text-sm" /> Payment Method:
+                </span>
+                <span className="font-semibold text-[var(--color-text)]" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  {confirmedOrder?.paymentMethod === 'ONLINE' ? 'Razorpay (Online Paid)' : confirmedOrder?.paymentMethod === 'WALLET' ? 'Store Wallet (Paid)' : 'Cash on Delivery (COD)'}
+                </span>
+              </div>
+
+              {confirmedOrder?.total && (
+                <div className="flex justify-between items-center pt-2 border-t border-[var(--color-border)]/60">
+                  <span className="text-[var(--color-muted)] font-medium" style={{ fontFamily: "'Jost', sans-serif" }}>
+                    Total Amount:
+                  </span>
+                  <span className="font-black text-sm sm:text-base text-[var(--color-text)] font-mono">
+                    ₹{confirmedOrder.total.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Delivery address snapshot */}
+            {confirmedOrder?.address && (
+              <div className="pt-3 border-t border-[var(--color-border)] text-xs space-y-1">
+                <span className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-wider block" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  Delivery Destination
+                </span>
+                <p className="text-[var(--color-text)] font-medium leading-relaxed" style={{ fontFamily: "'Jost', sans-serif" }}>
+                  {confirmedOrder.customerName} · {confirmedOrder.address}
+                </p>
+              </div>
+            )}
+
           </div>
 
-          {/* Subtitle */}
-          <p 
-            className="text-xs sm:text-sm text-[var(--color-muted)] font-medium leading-relaxed max-w-md mx-auto uppercase tracking-wide"
-            style={{ fontFamily: "'Jost', sans-serif" }}
-          >
-            YOUR ORDER DETAILS HAVE BEEN SAVED IN OUR SYSTEM. WE ARE PREPARING TO SHIP YOUR ORDER SOON.
-          </p>
+          {/* Purchased Items Minimalist Strip */}
+          {confirmedOrder?.items && confirmedOrder.items.length > 0 && (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs text-left">
+              <div className="flex justify-between items-center text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase" style={{ fontFamily: "'Jost', sans-serif" }}>
+                <span>Ordered Items</span>
+                <span>{confirmedOrder.items.reduce((acc, curr) => acc + curr.quantity, 0)} Pcs</span>
+              </div>
 
-          {/* Cancellation Policy Banner */}
-          <div className="w-full bg-rose-500/10 border border-rose-500/25 p-4 sm:p-5 rounded-2xl text-center space-y-1.5">
-            <span 
-              className="text-[11px] font-bold text-rose-600 dark:text-rose-400 tracking-wider block uppercase"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              ⚠️ CANCELLATION POLICY
-            </span>
-            <p 
-              className="text-xs text-rose-700/90 dark:text-rose-300/90 leading-relaxed font-medium uppercase tracking-wide"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              ORDERS CAN ONLY BE CANCELLED WHILE IN "PENDING" OR "PROCESSING" STATUS. ONCE YOUR PACKAGE IS SHIPPED OR DISPATCHED, CANCELLATION IS NOT POSSIBLE.
-            </p>
+              <div className="divide-y divide-[var(--color-border)]/60">
+                {confirmedOrder.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <img 
+                      src={item.image || 'https://placehold.co/80x100'} 
+                      alt={item.name} 
+                      className="w-11 h-14 object-cover rounded-lg border border-[var(--color-border)] shrink-0 bg-[var(--color-subtle)]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-[var(--color-text)] uppercase truncate" style={{ fontFamily: "'Jost', sans-serif" }}>
+                        {item.name}
+                      </h4>
+                      <p className="text-[11px] text-[var(--color-muted)] font-medium" style={{ fontFamily: "'Jost', sans-serif" }}>
+                        Size: {item.size} · Qty: {item.quantity}
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-[var(--color-text)]">
+                      ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Clean Policy & Guarantee Note */}
+          <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-4 rounded-xl text-left flex items-start gap-3">
+            <FiShield className="text-[var(--color-accent)] shrink-0 mt-0.5 text-base" />
+            <div className="space-y-0.5 text-xs">
+              <span className="font-bold text-[var(--color-text)] block" style={{ fontFamily: "'Jost', sans-serif" }}>
+                Order Modification &amp; Cancellation
+              </span>
+              <p className="text-[11px] text-[var(--color-muted)] leading-relaxed" style={{ fontFamily: "'Jost', sans-serif" }}>
+                Orders can be cancelled while in <strong>"Pending"</strong> status from your account. Once dispatched for delivery, cancellations cannot be processed.
+              </p>
+            </div>
           </div>
 
-          {/* Divider line */}
-          <div className="w-16 h-px bg-[var(--color-border)] mx-auto" />
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-1">
+            {confirmedOrder?.id ? (
+              <button 
+                onClick={() => navigate(`/order/${confirmedOrder.id}`)} 
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-bold text-xs tracking-wider uppercase py-3.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                style={{ fontFamily: "'Jost', sans-serif" }}
+              >
+                <FiPackage className="text-sm" />
+                Track Order &amp; Details &rarr;
+              </button>
+            ) : (
+              <button 
+                onClick={() => navigate('/profile')} 
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-bold text-xs tracking-wider uppercase py-3.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                style={{ fontFamily: "'Jost', sans-serif" }}
+              >
+                <FiPackage className="text-sm" />
+                View My Orders &rarr;
+              </button>
+            )}
 
-          {/* Continue Shopping Button */}
-          <button 
-            onClick={() => navigate('/')} 
-            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 rounded-2xl shadow-md transition-all cursor-pointer"
-            style={{ fontFamily: "'Jost', sans-serif" }}
-          >
-            CONTINUE SHOPPING &rarr;
-          </button>
+            <button 
+              onClick={() => navigate('/shop')} 
+              className="flex-1 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] border border-[var(--color-border)] active:scale-[0.98] font-bold text-xs tracking-wider uppercase py-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+              style={{ fontFamily: "'Jost', sans-serif" }}
+            >
+              <FiShoppingBag className="text-sm" />
+              Continue Shopping
+            </button>
+          </div>
 
         </div>
+
+        <Footer />
       </div>
     )
   }
