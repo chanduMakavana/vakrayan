@@ -768,30 +768,85 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
+    const progressPct = Math.round((processingStep / steps.length) * 100);
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
-        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
-          <div className="w-8 h-8 border-4 border-[var(--color-accent)] border-t-[var(--color-accent)] rounded-full animate-spin" />
-          <h2 className="text-xl font-black tracking-widest uppercase text-[var(--color-text)]">
-            PROCESSING INVOICE
-          </h2>
-          <div className="space-y-1.5 w-full">
-            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse">
-              {steps[processingStep] || "Finalizing process modules..."}
-            </p>
-            {/* Custom progress bar */}
-            <div className="w-48 h-[1.5px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700" 
-                style={{ width: `${(processingStep / steps.length) * 100}%` }}
+      <div
+        className="w-full min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden"
+        style={{ backgroundImage: "url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)", backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
+        <div className="absolute inset-0 z-0" style={{ background: 'var(--color-bg)', opacity: 0.97 }} />
+
+        <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-xs text-center">
+
+          {/* Brand Logo */}
+          <div className="flex flex-col items-center gap-1.5">
+            <img src="/vakrayan-logo-icon.png" alt="Vakrayan" className="w-14 h-14 object-contain drop-shadow-md" />
+            <span className="text-[9px] tracking-[0.35em] font-black uppercase" style={{ color: 'var(--color-muted)', fontFamily: 'Jost, sans-serif' }}>PREMIUM APPAREL</span>
+          </div>
+
+          {/* Title */}
+          <div className="flex flex-col items-center gap-1">
+            <h1 className="text-[9px] tracking-[0.4em] font-black uppercase" style={{ color: 'var(--color-accent)' }}>SECURING ORDER</h1>
+            <h2 className="text-2xl font-black tracking-widest uppercase" style={{ color: 'var(--color-text)' }}>PROCESSING INVOICE</h2>
+          </div>
+
+          {/* Step indicators */}
+          <div className="w-full flex flex-col gap-2">
+            {steps.map((step, idx) => {
+              const done = processingStep > idx;
+              const active = processingStep === idx;
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-500 ${
+                    done
+                      ? 'border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5'
+                      : active
+                      ? 'border-[var(--color-accent)]/60 bg-[var(--color-accent)]/10'
+                      : 'border-[var(--color-border)]/40 opacity-30'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-black transition-all duration-500 ${
+                    done
+                      ? 'bg-[var(--color-accent)] text-white'
+                      : active
+                      ? 'border-2 border-[var(--color-accent)] text-[var(--color-accent)]'
+                      : 'border border-[var(--color-border)] text-[var(--color-muted)]'
+                  }`}>
+                    {done ? '✓' : idx + 1}
+                  </div>
+                  <span className={`text-[10px] font-mono tracking-widest uppercase font-black ${
+                    done || active ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)]'
+                  } ${active ? 'animate-pulse' : ''}`}>
+                    {step}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Glowing gradient progress bar */}
+          <div className="w-full flex flex-col gap-1.5">
+            <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${progressPct}%`,
+                  background: 'linear-gradient(90deg, var(--color-accent), var(--color-accent-hover, var(--color-accent)))',
+                  boxShadow: '0 0 10px var(--color-accent), 0 0 20px var(--color-accent)'
+                }}
               />
             </div>
+            <span className="text-[9px] font-mono tracking-widest text-right" style={{ color: 'var(--color-muted)' }}>
+              {progressPct}%
+            </span>
           </div>
+
         </div>
       </div>
     )
   }
+
 
   if (checkoutStatus === 'success') {
     return (
