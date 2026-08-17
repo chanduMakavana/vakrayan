@@ -768,66 +768,62 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
-    const progressPercent = Math.min(100, Math.round(((processingStep + 1) / steps.length) * 100));
+    const progressPercent = Math.round((processingStep / steps.length) * 100);
     return (
-      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
-        
-        <div className="relative z-20 w-full max-w-md bg-white p-8 md:p-10 rounded-3xl border border-emerald-100/80 shadow-2xl text-center space-y-6 animate-scale-up">
-          {/* Spinner circle */}
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
+
+        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-              <div className="w-9 h-9 border-[3.5px] border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+              <div className="w-7 h-7 border-[3px] border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <h4 className="text-[11px] tracking-[0.4em] text-emerald-600 font-black uppercase">
-              SECURING ORDER
+          <div>
+            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
+              TRANSACTION IN PROGRESS
             </h4>
-            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-emerald-950 uppercase font-brand">
-              PROCESSING INVOICE
+            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
+              Processing Invoice
             </h1>
           </div>
 
-          {/* Active step box */}
-          <div className="bg-emerald-50/70 border border-emerald-200/70 py-3.5 px-4 rounded-2xl text-center space-y-1">
-            <span className="text-[9px] font-mono font-bold text-emerald-600 tracking-widest block uppercase">
-              STEP {Math.min(steps.length, processingStep + 1)} OF {steps.length}
-            </span>
-            <p className="text-xs font-mono font-bold text-emerald-800 uppercase tracking-wider animate-pulse">
-              {steps[processingStep] || "Finalizing process modules..."}
+          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide animate-pulse">
+            {steps[processingStep] || "Finalizing process modules..."}
+          </p>
+
+          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
+            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
+            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
+              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
             </p>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="w-full h-2 bg-emerald-100/80 rounded-full overflow-hidden relative">
+          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
+
+          <div className="w-full space-y-2">
+            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden relative">
               <div 
                 className="absolute left-0 top-0 h-full bg-emerald-600 transition-all duration-700 rounded-full" 
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 uppercase tracking-widest px-0.5">
-              <span>SYSTEM DISPATCH</span>
-              <span className="text-emerald-600 font-bold">{progressPercent}%</span>
+            <div className="flex justify-between items-center text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
+              <span>SECURING ORDER</span>
+              <span>{progressPercent}%</span>
             </div>
           </div>
-
-          <div className="w-14 h-[1.5px] bg-emerald-200/60 mx-auto rounded-full" />
-
-          <p className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
-            PLEASE DO NOT REFRESH OR CLOSE THIS WINDOW
-          </p>
         </div>
       </div>
     )
   }
 
+
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
         
         {/* Full-screen celebratory confetti canvas overlay */}
         <canvas 
@@ -835,40 +831,40 @@ function Checkout() {
           className="absolute inset-0 w-full h-full pointer-events-none z-15"
         />
         
-        <div className="relative z-20 w-full max-w-md bg-white p-8 md:p-10 rounded-3xl border border-emerald-100/80 shadow-2xl text-center space-y-6 animate-scale-up">
+        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
-              <FiCheckCircle className="text-4xl" />
+            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
+              <FiCheckCircle className="text-3xl" />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <h4 className="text-[11px] tracking-[0.4em] text-emerald-600 font-black uppercase">
+          <div>
+            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
               TRANSACTION COMPLETED
             </h4>
-            <h1 className="text-3xl md:text-4xl font-black tracking-widest text-emerald-950 uppercase font-brand">
-              ORDER PLACED
+            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
+              Order Placed
             </h1>
           </div>
 
-          <p className="text-xs text-zinc-500 leading-relaxed font-mono uppercase tracking-wider">
-            YOUR ORDER DETAILS HAVE BEEN SAVED IN OUR SYSTEM. WE ARE PREPARING TO SHIP YOUR ORDER SOON.
+          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide">
+            Your order details have been saved in our system. We are preparing to ship your order soon.
           </p>
 
-          <div className="bg-rose-50/80 border border-rose-200/80 p-4 rounded-2xl text-center space-y-1.5 animate-fade-in">
-            <span className="text-[10px] font-black text-rose-600 tracking-widest block uppercase">⚠️ CANCELLATION POLICY</span>
-            <p className="text-[9.5px] text-rose-700 leading-relaxed font-mono uppercase">
-              ORDERS CAN ONLY BE CANCELLED WHILE IN "PENDING" OR "PROCESSING" STATUS. ONCE YOUR PACKAGE IS SHIPPED OR DISPATCHED, CANCELLATION IS NOT POSSIBLE.
+          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
+            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
+            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
+              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
             </p>
           </div>
 
-          <div className="w-14 h-[1.5px] bg-emerald-200/60 mx-auto rounded-full" />
+          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
 
           <button 
             onClick={() => navigate('/')} 
-            className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-xs tracking-widest uppercase py-4 rounded-2xl shadow-lg transition-all cursor-pointer"
+            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer"
           >
-            CONTINUE SHOPPING &rarr;
+            Continue Shopping &rarr;
           </button>
         </div>
       </div>
