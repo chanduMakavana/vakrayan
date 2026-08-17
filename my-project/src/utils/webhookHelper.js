@@ -208,4 +208,35 @@ export const sendWebhookNotification = async (event, payload) => {
   } catch (err) {
     // Silently catch dispatcher errors
   }
+
+  // 3. Send Customer Email via Brevo Serverless Netlify Function
+  if (event === 'order.created' && payload && payload.email) {
+    try {
+      fetch('/.netlify/functions/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'order_confirmation',
+          to: {
+            email: payload.email,
+            name: payload.customerName || 'Valued Customer'
+          },
+          data: {
+            orderNumber: payload.orderNumber,
+            orderId: payload.orderId,
+            customerName: payload.customerName,
+            items: payload.items || [],
+            total: payload.total || 0,
+            paymentMethod: payload.paymentMethod || 'Online Payment',
+            shippingAddress: payload.shippingAddress || ''
+          }
+        })
+      }).catch((emailErr) => {
+        console.warn('⚠️ Order confirmation email dispatch failed:', emailErr.message);
+      });
+    } catch (err) {
+      // Non-blocking
+    }
+  }
 };
+

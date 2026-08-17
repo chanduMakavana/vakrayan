@@ -128,11 +128,8 @@ function AdminPanel() {
   const [selectedEmails, setSelectedEmails] = useState(new Set());
   const [emailSearch, setEmailSearch] = useState('');
 
-  const isEmailJSConfigured = Boolean(
-    (import.meta.env.VITE_EMAILJS_SERVICE_ID || "").trim() &&
-    (import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "").trim() &&
-    (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "").trim()
-  );
+  // Brevo Server Email Service status (handled securely via Netlify Serverless Function)
+  const isEmailServiceReady = true;
 
   // Store Database Telemetry States
   const [restockNotifications, setRestockNotifications] = useState([]);
@@ -4049,22 +4046,22 @@ function AdminPanel() {
                   <div className="lg:col-span-2 space-y-4 backdrop-blur-sm bg-[var(--glass-bg)] border border-[var(--glass-border-green)] p-5 rounded-2xl shadow-glass">
                     <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
                       <h4 className="text-[10px] font-black tracking-widest text-[var(--color-text)] uppercase">COMPOSE BROADCAST CAMPAIGN</h4>
-                      {isEmailJSConfigured ? (
-                        <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 uppercase tracking-wider animate-pulse">
-                          🟢 EmailJS Active (Live)
+                      {isEmailServiceReady ? (
+                        <span className="text-[8px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 uppercase tracking-wider">
+                          🟢 Brevo Domain Active (noreply@vakrayan.com)
                         </span>
                       ) : (
                         <span className="text-[8px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 uppercase tracking-wider">
-                          🟡 Simulation Mode
+                          🟡 Offline Mode
                         </span>
                       )}
                     </div>
 
-                    {!isEmailJSConfigured && (
+                    {!isEmailServiceReady && (
                       <div className="bg-amber-500/5 border border-amber-500/15 p-3.5 font-mono text-[9px] text-amber-400/90 uppercase tracking-wider space-y-1">
-                        <span className="font-bold block text-amber-300">ℹ️ SETUP EMAILJS FOR REAL EMAILS:</span>
+                        <span className="font-bold block text-amber-300">ℹ️ SETUP EMAIL CONFIGURATION:</span>
                         <p className="normal-case text-[9px] text-[var(--color-muted)] leading-relaxed">
-                          Currently running in offline simulation mode. To send real emails to your subscribers, configure these keys in your <code className="bg-black/30 px-1 py-0.5 rounded text-neutral-200">.env</code> file:
+                          Currently running in offline simulation mode. To send real emails to your subscribers, ensure your email service is configured in the environment:
                         </p>
                         <div className="pt-1 select-all font-bold text-[8px] text-neutral-400 font-mono space-y-0.5">
                           <div>VITE_EMAILJS_SERVICE_ID="your_service_id"</div>

@@ -220,7 +220,16 @@ export class Account {
 
 
     async createRecovery(email, url) {
-        return await sendPasswordResetEmail(auth, email, { url: url || window.location.origin });
+        try {
+            if (url && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+                return await sendPasswordResetEmail(auth, email, { url });
+            }
+            return await sendPasswordResetEmail(auth, email);
+        } catch (error) {
+            console.warn("⚠️ Firebase createRecovery url-based send failed, falling back to default:", error.message);
+            // Fallback without actionCodeSettings (guaranteed to work in localhost & prod)
+            return await sendPasswordResetEmail(auth, email);
+        }
     }
     
     // In Firebase, userId is ignored. secret maps to oobCode.
