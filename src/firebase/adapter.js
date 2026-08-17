@@ -2,7 +2,8 @@ import { auth, db as firestore, storage as firebaseStorage, googleProvider } fro
 import { 
   createUserWithEmailAndPassword, signInWithEmailAndPassword, 
   signOut, onAuthStateChanged, updateProfile, signInWithPopup,
-  sendPasswordResetEmail, confirmPasswordReset
+  sendPasswordResetEmail, confirmPasswordReset, updatePassword as updateAuthPassword,
+  EmailAuthProvider, reauthenticateWithCredential
 } from 'firebase/auth';
 import { 
   collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, arrayUnion, arrayRemove
@@ -23,7 +24,7 @@ export class Account {
     async create(userId, email, password, name) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: name });
-        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const sessionId = crypto.randomUUID();
         localStorage.setItem('current_session_id', sessionId);
         localStorage.removeItem('google_session_expiry');
         // Store preferences in a user document
@@ -33,7 +34,7 @@ export class Account {
 
     async createEmailPasswordSession(email, password) {
         const cred = await signInWithEmailAndPassword(auth, email, password);
-        const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        const sessionId = crypto.randomUUID();
         localStorage.setItem('current_session_id', sessionId);
         localStorage.removeItem('google_session_expiry');
         const userDocRef = doc(firestore, 'users', cred.user.uid);
@@ -67,12 +68,12 @@ export class Account {
                         const docSnap = await getDoc(doc(firestore, 'users', user.uid));
                         const data = docSnap.exists() ? docSnap.data() : { prefs: {} };
                         
-                        // Check if session has been invalidated
-                        const activeSessions = data.activeSessions || [];
+                        // Check if session has been invalidated (only if activeSessions array is explicitly maintained)
+                        const activeSessions = data.activeSessions;
                         const currentSessionId = localStorage.getItem('current_session_id');
                         
-                        // If current session is no longer in activeSessions (meaning user logged out all devices), sign out
-                        if (currentSessionId && !activeSessions.includes(currentSessionId)) {
+                        // Only sign out if activeSessions is explicitly populated and currentSessionId is missing from it
+                        if (currentSessionId && Array.isArray(activeSessions) && activeSessions.length > 0 && !activeSessions.includes(currentSessionId)) {
                             await signOut(auth);
                             localStorage.removeItem('current_session_id');
                             localStorage.removeItem('remember_me');
@@ -172,6 +173,13 @@ export class Account {
     }
 
     async updatePassword(password, oldPassword) {
+        if (!auth.currentUser) throw new Error("No user is currently signed in.");
+        // Re-authenticate before password change (required by Firebase for sessions older than ~5 min)
+        if (oldPassword && auth.currentUser.email) {
+            const credential = EmailAuthProvider.credential(auth.currentUser.email, oldPassword);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+        }
+        await updateAuthPassword(auth.currentUser, password);
         return true;
     }
 
@@ -181,7 +189,7 @@ export class Account {
             return signInWithPopup(auth, googleProvider)
                 .then(async (result) => {
                     const user = result.user;
-                    const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                    const sessionId = crypto.randomUUID();
                     localStorage.setItem('current_session_id', sessionId);
                     localStorage.setItem('google_session_expiry', String(Date.now() + 60 * 60 * 1000));
 
@@ -212,7 +220,16 @@ export class Account {
 
 
     async createRecovery(email, url) {
-        return await sendPasswordResetEmail(auth, email, { url: url || window.location.origin });
+        try {
+            if (url && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+                return await sendPasswordResetEmail(auth, email, { url });
+            }
+            return await sendPasswordResetEmail(auth, email);
+        } catch (error) {
+            console.warn("⚠️ Firebase createRecovery url-based send failed, falling back to default:", error.message);
+            // Fallback without actionCodeSettings (guaranteed to work in localhost & prod)
+            return await sendPasswordResetEmail(auth, email);
+        }
     }
     
     // In Firebase, userId is ignored. secret maps to oobCode.
@@ -270,64 +287,73 @@ export class Databases {
 
         // 1. Build optimal query (with server-side orderBy + limit)
         let mainQuery = q;
-        filterWheres.forEach(w => { mainQuery = query(mainQuery, w); });
-        sortOrders.forEach(s => { mainQuery = query(mainQuery, orderBy(s.key, s.dir)); });
+        filterWheres.forEach(clause => { mainQuery = query(mainQuery, clause); });
+        sortOrders.forEach(sort => { mainQuery = query(mainQuery, orderBy(sort.key, sort.dir)); });
         if (limitVal !== null) { mainQuery = query(mainQuery, limit(limitVal)); }
 
         let querySnapshot;
         try {
             querySnapshot = await getDocs(mainQuery);
         } catch (err) {
-            // Check if error is due to missing index or sorting constraints
-            const errorMsg = err.message || '';
-            if (sortOrders.length > 0 && (errorMsg.includes('index') || errorMsg.includes('FAILED_PRECONDITION') || errorMsg.includes('orderBy'))) {
-                console.warn(`⚠️ Firestore composite index missing for collection "${collectionId}". Falling back to client-side sorting & limit.`, err.message);
-                
-                // 2. Build fallback query (where clauses ONLY — never require composite indexes)
+            console.warn(`⚠️ Firestore query error for collection "${collectionId}". Falling back to client-side sorting & limit. Reason:`, err.message);
+            
+            // 2. Build fallback query (where clauses ONLY — never require composite indexes or complex sorting)
+            try {
                 let fallbackQuery = q;
-                filterWheres.forEach(w => { fallbackQuery = query(fallbackQuery, w); });
-                
+                filterWheres.forEach(clause => { fallbackQuery = query(fallbackQuery, clause); });
                 querySnapshot = await getDocs(fallbackQuery);
-                
-                // Map documents
-                let documents = querySnapshot.docs.map(d => ({
-                    $id: d.id,
-                    $collectionId: collectionId,
-                    ...d.data()
-                }));
+            } catch (fallbackErr) {
+                console.warn(`⚠️ Filtered query fallback failed, reading base collection "${collectionId}":`, fallbackErr.message);
+                querySnapshot = await getDocs(q);
+            }
+            
+            // Map documents
+            let documents = querySnapshot.docs.map(d => ({
+                $id: d.id,
+                $collectionId: collectionId,
+                ...d.data()
+            }));
 
-                // Apply client-side sorting
+            // Apply client-side sorting
+            if (sortOrders.length > 0) {
                 sortOrders.forEach(s => {
                     documents.sort((a, b) => {
                         let valA = a[s.key];
                         let valB = b[s.key];
-                        // Handle date parsing if sorting by date fields like $createdAt
-                        if (s.key === '$createdAt' || s.key === 'createdAt' || s.key === '$updatedAt' || s.key === 'updatedAt') {
-                            valA = new Date(valA || 0).getTime();
-                            valB = new Date(valB || 0).getTime();
+                        // Handle date parsing if sorting by date fields
+                        if (s.key === '$createdAt' || s.key === 'createdAt' || s.key === '$updatedAt' || s.key === 'updatedAt' || s.key === 'created_at') {
+                            valA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.updatedAt || a.date || 0).getTime();
+                            valB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || b.updatedAt || b.date || 0).getTime();
                         }
                         if (valA < valB) return s.dir === 'desc' ? 1 : -1;
                         if (valA > valB) return s.dir === 'desc' ? -1 : 1;
                         return 0;
                     });
                 });
-
-                // Apply client-side limit
-                if (limitVal !== null) {
-                    documents = documents.slice(0, limitVal);
-                }
-
-                return { total: documents.length, documents };
-            } else {
-                throw err; // Re-throw other unexpected errors
             }
+
+            // Apply client-side limit
+            if (limitVal !== null) {
+                documents = documents.slice(0, limitVal);
+            }
+
+            return { total: documents.length, documents };
         }
 
-        const documents = querySnapshot.docs.map(d => ({
+        let documents = querySnapshot.docs.map(d => ({
             $id: d.id,
             $collectionId: collectionId,
             ...d.data()
         }));
+
+        // In case documents were missing $createdAt and weren't ordered properly, ensure safe descending order if orderDesc was requested
+        if (sortOrders.some(s => s.key === '$createdAt' || s.key === 'createdAt')) {
+            documents.sort((a, b) => {
+                const valA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.date || 0).getTime();
+                const valB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || b.date || 0).getTime();
+                return valB - valA;
+            });
+        }
 
         return { total: documents.length, documents };
     }
@@ -361,41 +387,63 @@ export class Storage {
     constructor(client) { this.client = client; }
 
     async createFile(bucketId, fileId, file) {
-        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://b2-upload-gateway.chandumakavana61.workers.dev/";
+        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "";
         
         // If Backblaze/Cloudflare Worker is configured, route uploads there!
         if (workerUrl) {
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const response = await fetch(workerUrl, {
-                method: 'POST',
-                body: formData,
-            });
-            
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(`Cloudflare/Backblaze Upload Error: ${text}`);
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch(workerUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.url) {
+                        return { $id: data.url };
+                    }
+                }
+                console.warn("Cloudflare Worker in adapter returned non-ok status or missing URL, falling back to Firebase Storage.");
+            } catch (err) {
+                console.warn("Cloudflare Worker upload in adapter failed, falling back to Firebase Storage:", err.message);
             }
-            
-            const data = await response.json();
-            // Worker returns { url: "https://..." }
-            return { $id: data.url };
         }
 
         // Fallback to Firebase Storage
         const uniqueId = fileId === 'unique()' ? Date.now().toString() : fileId;
         const storageRef = ref(firebaseStorage, `${bucketId}/${uniqueId}_${file.name}`);
         await uploadBytes(storageRef, file);
-        return { $id: storageRef.fullPath };
+        try {
+            const downloadUrl = await getDownloadURL(storageRef);
+            return { $id: downloadUrl };
+        } catch {
+            const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'vakrayan-9ce25.firebasestorage.app';
+            return { $id: `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(storageRef.fullPath)}?alt=media` };
+        }
     }
 
     getFileView(fileId, bucketId) {
-        // If fileId is already a full URL (like from Backblaze), just return it
-        if (fileId && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+        if (!fileId) return '';
+        if (typeof fileId === 'object' && fileId !== null) {
+            fileId = fileId.$id || fileId.url || fileId.id || fileId.href || '';
+        }
+        if (typeof fileId !== 'string') return '';
+        fileId = fileId.trim();
+
+        // If fileId is already a full URL (like from Backblaze or Firebase Storage getDownloadURL), just return it
+        if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+            if (fileId.includes('chandumakavana61.workers.dev')) {
+                return fileId.replace(/b2-upload-gateway\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/vakrayan-data\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/chandumakavana61\.workers\.dev/g, 'vakrayan.workers.dev');
+            }
             return fileId;
         }
-        return `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;
+        const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '';
+        return `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;
     }
     
     async deleteFile(bucketId, fileId) {
