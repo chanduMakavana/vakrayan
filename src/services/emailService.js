@@ -98,9 +98,8 @@ export const emailService = {
                 <tr><td align="center">
                   <table width="100%" style="max-width:600px;background-color:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
                     <tr>
-                      <td style="padding:32px 24px 20px;text-align:center;border-bottom:1px solid #F1F5F9;background-color:#FAFAFA;">
-                        <img src="https://vakrayan.com/vakrayan-merged-logo.png" alt="Vakrayan" style="max-height:46px;width:auto;display:block;margin:0 auto;border:0;" />
-                        <p style="margin:8px 0 0;font-size:11px;letter-spacing:2px;color:#059669;text-transform:uppercase;font-weight:800;">PREMIUM APPAREL</p>
+                      <td style="padding:28px 24px;text-align:center;border-bottom:1px solid #F1F5F9;background-color:#FAFAFA;">
+                        <img src="https://vakrayan.com/vakrayan-merged-logo.png" alt="Vakrayan" style="max-height:50px;width:auto;display:block;margin:0 auto;border:0;" />
                       </td>
                     </tr>
                     <tr>

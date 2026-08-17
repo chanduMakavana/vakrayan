@@ -65,13 +65,10 @@ const getOrderConfirmationHtml = (payload, origin) => {
             
             <!-- Brand Header with Merged Logo -->
             <tr>
-              <td style="padding: 32px 30px 24px; text-align: center; border-bottom: 1px solid #F1F5F9; background-color: #FAFAFA;">
+              <td style="padding: 28px 30px; text-align: center; border-bottom: 1px solid #F1F5F9; background-color: #FAFAFA;">
                 <a href="${origin}" style="text-decoration: none; display: inline-block;">
-                  <img src="${logoUrl}" alt="Vakrayan" style="max-height: 48px; width: auto; display: block; margin: 0 auto; border: 0;" />
+                  <img src="${logoUrl}" alt="Vakrayan" style="max-height: 52px; width: auto; display: block; margin: 0 auto; border: 0;" />
                 </a>
-                <p style="margin: 8px 0 0; font-size: 11px; letter-spacing: 2.5px; color: #059669; text-transform: uppercase; font-weight: 800;">
-                  PREMIUM APPAREL
-                </p>
               </td>
             </tr>
 
@@ -185,13 +182,10 @@ const getPasswordResetHtml = (payload, origin) => {
             
             <!-- Header with Merged Logo -->
             <tr>
-              <td style="padding: 32px 30px 24px; text-align: center; border-bottom: 1px solid #F1F5F9; background-color: #FAFAFA;">
+              <td style="padding: 28px 30px; text-align: center; border-bottom: 1px solid #F1F5F9; background-color: #FAFAFA;">
                 <a href="${origin}" style="text-decoration: none; display: inline-block;">
-                  <img src="${logoUrl}" alt="Vakrayan" style="max-height: 48px; width: auto; display: block; margin: 0 auto; border: 0;" />
+                  <img src="${logoUrl}" alt="Vakrayan" style="max-height: 52px; width: auto; display: block; margin: 0 auto; border: 0;" />
                 </a>
-                <p style="margin: 8px 0 0; font-size: 11px; letter-spacing: 2px; color: #059669; text-transform: uppercase; font-weight: 800;">
-                  SECURITY &amp; RECOVERY
-                </p>
               </td>
             </tr>
 
