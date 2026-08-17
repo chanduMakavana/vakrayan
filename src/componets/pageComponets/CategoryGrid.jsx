@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import categoryService from '../../services/category'
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -62,18 +63,26 @@ function CategoryGrid() {
   })
 
   const getCategoryImage = (catValue) => {
+    // 1. Admin Panel Override (if admin explicitly set custom category image)
     const overrides = {};
     categoryConfigs.forEach(c => {
       if (c.imageUrl) overrides[c.category] = c.imageUrl;
     });
     if (overrides[catValue]) return overrides[catValue];
-    if (catValue === 'printed-tshirt') return 'https://i.pinimg.com/736x/3b/e5/24/3be52487e4fcb982569c68fff31eae86.jpg'
-    if (catValue === 'oversized-tshirt') return 'https://cdn1.ozone.ru/s3/multimedia-4/6643972660.jpg'
-    if (catValue === 'shirts') return 'https://i.pinimg.com/originals/02/14/ef/0214efe3a76a76cbe65988be1e3315de.jpg'
-    if (catValue === 'hoodies') return 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=300&q=80'
-    const firstProd = products.find(p => p.category === catValue)
-    return firstProd?.front_image_link || firstProd?.image_url || firstProd?.image || 'https://placehold.co/300x400?text=Vakrayan'
-  }
+
+    // 2. Real Product from that category (Vakrayan live product catalog)
+    const firstProd = products.find(p => p.category === catValue);
+    if (firstProd?.front_image_link || firstProd?.image_url || firstProd?.image) {
+      return firstProd.front_image_link || firstProd.image_url || firstProd.image;
+    }
+
+    // 3. Original Vakrayan Brand Fallbacks
+    if (catValue === 'printed-tshirt') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1785234981143_chnage_hair_like_2nd_image_202607281602.jpeg';
+    if (catValue === 'oversized-tshirt') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1784959032194_A_professional_studio_fashion_photoshoot_202606161943.jpeg';
+    if (catValue === 'shirts') return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1784959058811_no_change_this_image_2K_202607241900__1_.jpeg';
+
+    return 'https://b2-upload-gateway.vakrayan.workers.dev/file/1785234981143_chnage_hair_like_2nd_image_202607281602.jpeg';
+  };
 
   const visibleCategories = categoriesList.filter(c => {
     const deleted = categoryConfigs.filter(cfg => cfg.isDeleted).map(cfg => cfg.category);
@@ -83,12 +92,12 @@ function CategoryGrid() {
   return (
     <section
       id="categories-section"
-      style={{ background: 'var(--color-bg)', padding: '72px 0', borderBottom: '1px solid var(--color-border)' }}
+      style={{ background: '#FFFFFF', padding: '36px 0 48px 0', borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)' }}
     >
-      <div className="max-w-7xl mx-auto px-4 md:px-12">
+      <div className="max-w-[1728px] mx-auto px-4 md:px-12">
 
         {/* Section header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
             <div className="accent-line" />
           </div>
@@ -125,8 +134,12 @@ function CategoryGrid() {
                 >
                   {/* Image - smooth scale */}
                   <img
-                    src={img}
+                    src={getOptimizedImageUrl(img, 400, 75)}
                     alt={c.label}
+                    loading="lazy"
+                    decoding="async"
+                    width={300}
+                    height={400}
                     className="w-full h-full object-cover object-center transition-transform duration-700 ease-[0.16,1,0.3,1] group-hover:scale-106"
                   />
 
@@ -146,11 +159,6 @@ function CategoryGrid() {
 
                   {/* Luxury Editorial Label Details */}
                   <div className="absolute inset-0 p-5 flex flex-col justify-end select-none">
-                    <span 
-                      className="text-[11px] font-mono tracking-widest text-[#34D399] uppercase mb-1 font-bold block opacity-85 transition-opacity duration-500 ease-[0.16,1,0.3,1] group-hover:opacity-100"
-                    >
-                      COLLECTION 0{idx + 1}
-                    </span>
                     <h3 
                       style={{
                         fontFamily: "'Barlow Condensed', 'Jost', sans-serif",

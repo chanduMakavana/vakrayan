@@ -86,7 +86,7 @@ function MobileBottomNav() {
                 key={to}
                 to={to}
                 end={to === "/"}
-                className="flex flex-col items-center gap-1 flex-1 py-1 relative select-none"
+                className="flex flex-col items-center justify-center gap-1 flex-1 py-1.5 min-h-[48px] relative select-none"
                 style={({ isActive }) => ({
                   color: isActive ? "var(--color-accent)" : "var(--color-muted)",
                 })}

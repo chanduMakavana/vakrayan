@@ -2,9 +2,12 @@ import { createSlice } from "@reduxjs/toolkit";
 
 // ✅ CODE QUALITY: Helper to normalize is_live to boolean at ingestion.
 // Firebase schema inconsistency sends is_live as: true | 'true' | 1 | '1'.
-// Normalizing once here avoids 4-way comparisons throughout the codebase.
-const normalizeIsLive = (val) =>
-    val === true || val === 'true' || val === 1 || val === '1';
+// If omitted or undefined in database document, default to true (live) unless explicitly set to false.
+const normalizeIsLive = (val) => {
+    if (val === undefined || val === null) return true;
+    if (val === false || val === 'false' || val === 0 || val === '0') return false;
+    return val === true || val === 'true' || val === 1 || val === '1';
+};
 
 const initialState = {
     allItems: [], // Store all raw products fetched from database

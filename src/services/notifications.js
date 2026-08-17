@@ -94,7 +94,7 @@ export const listenForForegroundMessages = async () => {
     if (!messaging) return;
 
     onMessage(messaging, (payload) => {
-      console.log("Foreground notification received:", payload);
+      // Foreground notification received — payload logging removed for production security
       
       const title = payload.notification?.title || "Vakrayan";
       const body = payload.notification?.body || "New update!";

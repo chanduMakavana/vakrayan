@@ -5,10 +5,14 @@
  * npm install firebase-admin @aws-sdk/client-s3
  */
 
-const admin = require("firebase-admin");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
-const fs = require("fs");
-const path = require("path");
+import admin from "firebase-admin";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load local .env if it exists (for local testing without pushing to GitHub)
 try {
@@ -38,11 +42,18 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 } else {
   try {
-    serviceAccount = require("../serviceAccountKey.json");
+    const keyPath = path.join(__dirname, "../serviceAccountKey.json");
+    if (fs.existsSync(keyPath)) {
+      serviceAccount = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
+    }
   } catch (err) {
-    console.error("❌ Firebase service account key not found. Put 'serviceAccountKey.json' in the root or set FIREBASE_SERVICE_ACCOUNT env var.");
-    process.exit(1);
+    // ...
   }
+}
+
+if (!serviceAccount) {
+  console.error("❌ Firebase service account key not found. Put 'serviceAccountKey.json' in the root or set FIREBASE_SERVICE_ACCOUNT env var.");
+  process.exit(1);
 }
 
 admin.initializeApp({
@@ -93,8 +104,26 @@ async function uploadToB2(localFilePath, remoteFileName) {
 // 3. Backup Firestore Collections
 async function backupFirestore() {
   console.log("🔄 Starting Firestore Backup...");
-  const collections = ["users", "orders", "products"]; // Add any other collections you want to back up
   const backupData = {};
+  // Get all collections dynamically from Firestore
+  let collectionNames = [];
+  try {
+    const collectionsRef = await db.listCollections();
+    collectionNames = collectionsRef.map(col => col.id);
+  } catch (err) {
+    console.warn("⚠️ Could not dynamically list collections, using comprehensive default list:", err.message);
+  }
+
+  // Fallback / default comprehensive collection list from the application schema
+  const knownCollections = [
+    "users", "orders", "products", "addresses", "cart", "coupons",
+    "coupon_usage", "reviews", "wishlist", "restock_notifications",
+    "wallet", "settings", "category_configs", "slides", "offers",
+    "newsletter", "search_logs"
+  ];
+
+  const collections = Array.from(new Set([...collectionNames, ...knownCollections]));
+  console.log(`📁 Collections to backup (${collections.length}):`, collections.join(", "));
 
   for (const collectionName of collections) {
     const snapshot = await db.collection(collectionName).get();
@@ -103,6 +132,7 @@ async function backupFirestore() {
       collectionData[doc.id] = doc.data();
     });
     backupData[collectionName] = collectionData;
+    console.log(`   - ${collectionName}: ${Object.keys(collectionData).length} documents backed up.`);
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");

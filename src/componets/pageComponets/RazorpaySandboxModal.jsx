@@ -306,7 +306,9 @@ const RazorpaySandboxModal = ({
                 : 'text-[var(--color-muted)] hover:bg-neutral-100/50 hover:text-[var(--color-text)]'
               }`}
             >
-              <span className="text-xs">⚡</span>
+              <svg className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" viewBox="0 0 24 24">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
               <span className="truncate">{t.upi}</span>
             </button>
 

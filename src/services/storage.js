@@ -10,33 +10,37 @@ export class StorageService {
     }
 
     async uploadFile(file, bucketId = conf.firebaseBucketId || 'images') {
-        // If a Cloudflare Worker URL is configured, use it to upload to Backblaze B2.
-        // Otherwise, fall back to standard Firebase Storage.
+        // Automatically compress raw heavy images (e.g. 5MB-10MB 4K PNGs) down to crisp ~120KB WebP before upload
+        let fileToUpload = file;
+        if (file && file.type && file.type.startsWith('image/')) {
+            try {
+                fileToUpload = await compressImage(file, 1600, 2000, 0.82);
+            } catch (compErr) {
+                console.warn("Auto-compression skipped, using original file:", compErr.message);
+            }
+        }
+
+        // If a Cloudflare Worker URL is configured, try uploading to Backblaze B2.
+        // If worker fails, fall back gracefully to standard Firebase Storage.
         if (conf.firebaseCloudflareWorkerUrl) {
             try {
                 const formData = new FormData();
-                formData.append('file', file);
+                formData.append('file', fileToUpload);
 
                 const response = await fetch(conf.firebaseCloudflareWorkerUrl, {
                     method: 'POST',
                     body: formData,
                 });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Worker upload failed: ${response.status} - ${errorText}`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result && result.url) {
+                        return { $id: result.url };
+                    }
                 }
-
-                const result = await response.json();
-                if (result && result.success && result.url) {
-                    // Return the URL as $id so that direct references in components load it instantly.
-                    return { $id: result.url };
-                } else {
-                    throw new Error(result?.error || 'Invalid response from upload gateway');
-                }
+                console.warn("Cloudflare Worker upload response not OK or missing url, falling back to Firebase Storage.");
             } catch (error) {
-                console.error("Cloudflare Worker B2 Upload :: error", error.message);
-                throw error;
+                console.warn("Cloudflare Worker B2 Upload error, falling back to Firebase Storage:", error.message);
             }
         }
 
@@ -44,7 +48,7 @@ export class StorageService {
             const response = await this.storage.createFile(
                 bucketId,
                 ID.unique(),
-                file
+                fileToUpload
             );
             return response;
         } catch (error) {
@@ -54,25 +58,45 @@ export class StorageService {
     }
 
     getFileView(fileId, bucketId = conf.firebaseBucketId || 'images') {
-        // If the fileId is a full URL (e.g. from Backblaze B2), return it directly.
-        if (fileId && (fileId.startsWith('http://') || fileId.startsWith('https://'))) {
+        if (!fileId) return '';
+        if (typeof fileId === 'object' && fileId !== null) {
+            fileId = fileId.$id || fileId.url || fileId.id || fileId.href || '';
+        }
+        if (typeof fileId !== 'string') return '';
+        fileId = fileId.trim();
+
+        // If the fileId is already a full HTTP/HTTPS URL, sanitize legacy subdomains and return directly.
+        if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+            if (fileId.includes('chandumakavana61.workers.dev')) {
+                return fileId.replace(/b2-upload-gateway\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/vakrayan-data\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
+                             .replace(/chandumakavana61\.workers\.dev/g, 'vakrayan.workers.dev');
+            }
             return fileId;
         }
 
         try {
-            // getFileView returns a URL string (or object that can be converted to string)
-            const result = this.storage.getFileView(bucketId, fileId);
+            const result = this.storage.getFileView(fileId, bucketId);
             return typeof result === 'string' ? result : result.toString();
         } catch (error) {
             console.error("Firebase service :: getFileView :: error", error.message);
-            return `${conf.firebaseurl}/storage/buckets/${bucketId}/files/${fileId}/view?project=${conf.firebaseProjectId}`;
+            return fileId;
         }
     }
 }
 
 
-export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+export const compressImage = (file, maxWidth = 1600, maxHeight = 2000, quality = 0.82) => {
   return new Promise((resolve) => {
+    if (!file || !(file instanceof Blob) || !file.type || !file.type.startsWith('image/')) {
+      return resolve(file);
+    }
+
+    // Do not compress SVG vectors or GIF animations
+    if (file.type === 'image/svg+xml' || file.type === 'image/gif') {
+      return resolve(file);
+    }
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -83,41 +107,54 @@ export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0
         let width = img.width;
         let height = img.height;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
         }
 
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+
+        const targetFormat = 'image/webp';
+        const cleanName = (file.name || 'image').replace(/\.[^/.]+$/, "") + '.webp';
 
         canvas.toBlob(
           (blob) => {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
+            if (blob) {
+              const compressedFile = new File([blob], cleanName, {
+                type: targetFormat,
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              // Fallback to JPEG
+              canvas.toBlob((jpgBlob) => {
+                if (jpgBlob) {
+                  const jpgName = (file.name || 'image').replace(/\.[^/.]+$/, "") + '.jpg';
+                  resolve(new File([jpgBlob], jpgName, { type: 'image/jpeg', lastModified: Date.now() }));
+                } else {
+                  resolve(file);
+                }
+              }, 'image/jpeg', quality);
+            }
           },
-          'image/jpeg',
+          targetFormat,
           quality
         );
       };
       img.onerror = () => {
-        resolve(file); // fallback to original file if loading image fails
+        resolve(file);
       };
     };
     reader.onerror = () => {
-      resolve(file); // fallback to original file if reader fails
+      resolve(file);
     };
   });
 };

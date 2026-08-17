@@ -7,6 +7,7 @@ import productsService from '../../services/products';
 import reviewsService from '../../services/reviews';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 function ProductReviews() {
   const { idOrSlug } = useParams();
@@ -151,7 +152,7 @@ function ProductReviews() {
   return (
     <>
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative pb-20">
-        <div className="max-w-6xl mx-auto px-6 md:px-12 py-10 space-y-8 relative z-20">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-12 py-10 space-y-8 relative z-20">
           
           {/* Header Action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]/40">
@@ -176,8 +177,10 @@ function ProductReviews() {
               {/* Product Card */}
               <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-5 rounded-2xl shadow-sm flex items-center gap-4">
                 <img 
-                  src={product.front_image_link || product.image_url || product.image} 
+                  src={getOptimizedImageUrl(product.front_image_link || product.image_url || product.image, 200, 75)} 
                   alt={product.name} 
+                  loading="lazy"
+                  decoding="async"
                   className="w-16 h-20 object-cover border border-[var(--color-border)] rounded-lg bg-[var(--color-subtle)]"
                 />
                 <div className="space-y-1 min-w-0">
@@ -426,8 +429,10 @@ function ProductReviews() {
                                 className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-zoom-in shadow-xs bg-[var(--color-surface)]/20"
                               >
                                 <img
-                                  src={img}
+                                  src={getOptimizedImageUrl(img, 180, 75)}
                                   alt={`Customer image ${idx + 1}`}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />

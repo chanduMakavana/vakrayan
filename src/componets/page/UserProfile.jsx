@@ -2,13 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell, FiRefreshCw } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../services/auth';
 import addressService from '../../services/address';
 import ordersService from '../../services/orders';
 import reviewsService from '../../services/reviews';
 import productsService from '../../services/products';
+import cartService from '../../services/cart';
+import { addCartItemState } from '../../features/addToCart';
 import { setProducts } from '../../features/productsSlice';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
@@ -19,6 +21,7 @@ import walletService from '../../services/wallet';
 import PageSkeleton from '../pageComponets/PageSkeleton';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import { requestNotificationPermission } from '../../services/notifications';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -26,6 +29,7 @@ function UserProfile() {
   const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
+  const cartItems = useSelector(state => state.cart);
   const { items: products, fetched: productsFetched } = useSelector(state => state.products);
 
   const [orders, setOrders] = useState([]);
@@ -37,7 +41,7 @@ function UserProfile() {
   // ✅ SEO: Dynamic page title — shows user's name in the browser tab
   useEffect(() => {
     const name = user?.name ? `${user.name}'s Profile` : 'My Profile'
-    document.title = `${name} — Vakrayan`
+    document.title = `${name} | Vakrayan`
   }, [user?.name])
 
   const [activeProfileTab, setActiveProfileTab] = useState(() => {
@@ -55,6 +59,7 @@ function UserProfile() {
     typeof window !== 'undefined' && window.Notification ? window.Notification.permission : 'default'
   );
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [reorderConfirmOrder, setReorderConfirmOrder] = useState(null);
 
   const handleEnableNotifications = async () => {
     setNotificationLoading(true);
@@ -243,8 +248,33 @@ function UserProfile() {
         },
         handler: async (response) => {
           try {
-            const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-            await handleTopUpSuccess(payId);
+            const payId = response.razorpay_payment_id;
+            const ordId = response.razorpay_order_id;
+            const sig = response.razorpay_signature;
+
+            const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
+            if (verifyUrl && ordId && payId && sig) {
+              const verifyResp = await fetch(verifyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: ordId,
+                  razorpay_payment_id: payId,
+                  razorpay_signature: sig,
+                }),
+              });
+              const verifyData = await verifyResp.json();
+              if (!verifyData.success) {
+                showToast('Top-up payment verification failed!', 'error');
+                return;
+              }
+            } else if (verifyUrl && !sig) {
+              showToast('Missing payment verification parameters.', 'error');
+              return;
+            }
+
+            const finalPayId = payId || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+            await handleTopUpSuccess(finalPayId);
           } catch (err) {
             console.error("Top-up processing issue:", err);
             showToast("Failed to complete top-up transaction.", "error");
@@ -503,16 +533,74 @@ function UserProfile() {
       } else {
         await authService.logout();
       }
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
       localStorage.removeItem('remember_me');
       sessionStorage.removeItem('session_active');
       dispatch(logoutAction());
+      showToast("Signed out of your account", "info");
       navigate('/');
-    } catch (err) {
-      console.error("Logout failed:", err);
     }
   };
 
-  // handleVipSuccess has been moved above to resolve hoisting issues
+  // Helper to check if cancelled order occurred within 24 hours (1 day)
+  const isWithin1DayOfCancellation = (ord) => {
+    if (!ord) return false;
+    const status = (ord?.status || ord?.order_status || '').toUpperCase();
+    if (!status.includes('CANCEL')) {
+      return false;
+    }
+    const cancelTimeStr = ord.cancelledAt || ord.metadata?.cancelled_at || ord.$updatedAt || ord.updatedAt || ord.$createdAt || ord.createdAt;
+    if (!cancelTimeStr) return true;
+    
+    const cancelTime = new Date(cancelTimeStr).getTime();
+    if (isNaN(cancelTime)) return true;
+    
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    return (now - cancelTime) <= twentyFourHours;
+  };
+
+  // Reactivate / Restore cancelled order back to PENDING status within 24 hours
+  const handleReorderOrder = async (orderToReorder, e) => {
+    if (e) e.stopPropagation();
+    try {
+      const orderId = orderToReorder.$id || orderToReorder.id;
+      const orderNumber = orderToReorder.order_number || `ORD-${orderId.substring(0, 6).toUpperCase()}`;
+
+      const updated = await ordersService.updateOrderStatus(orderId, 'PENDING', {
+        uncancelled_at: new Date().toISOString(),
+        reactivated_by: 'customer'
+      });
+
+      if (updated) {
+        showToast(`✓ Order #${orderNumber} reactivated successfully!`, "success");
+
+        let itemsList = [];
+        try { itemsList = typeof orderToReorder.items === 'string' ? JSON.parse(orderToReorder.items) : orderToReorder.items || []; } catch { itemsList = []; }
+
+        sendWebhookNotification('order.reactivated', {
+          orderId: orderId,
+          orderNumber: orderNumber,
+          customerName: user?.name || orderToReorder.name || 'Customer',
+          email: user?.email || orderToReorder.email || '',
+          total: Math.round(orderToReorder.total || 0),
+          paymentMethod: orderToReorder.paymentMethod || 'COD',
+          items: itemsList,
+          note: 'Order reactivated by customer within 24 hours'
+        });
+
+        if (user && user.$id) {
+          const userOrders = await ordersService.getOrdersByUser(user.$id);
+          setOrders(userOrders || []);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to reactivate order:", err);
+      showToast("Could not reactivate order. Please try again.", "error");
+    }
+  };
 
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
@@ -569,30 +657,30 @@ function UserProfile() {
   const showSkeleton = useDelayedLoading(loading, 300);
 
   if (loading) {
-    return showSkeleton ? <PageSkeleton /> : null;
+    return showSkeleton ? <PageSkeleton path="/profile" /> : null;
   }
 
   return (
     <>
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20 pt-6">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 space-y-8">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-8 space-y-8">
           
           {/* Main Layout Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* LEFT SIDEBAR: Navigation Menu */}
-            <div className={`lg:col-span-3 bg-[var(--color-surface)] lg:border border-[var(--color-border)] lg:rounded-xl p-2 lg:p-4 shadow-sm ${activeProfileTab === 'overview' ? 'hidden lg:block' : 'flex'} flex-row lg:flex-col overflow-x-auto scrollbar-none gap-2 pb-2 mb-4 lg:mb-0 lg:pb-0 lg:space-y-1`}>
-              <span className="hidden lg:block text-[9px] font-bold text-[var(--color-muted)] tracking-widest uppercase px-3 pb-2 border-b border-[var(--color-border)] mb-2">
+            {/* LEFT SIDEBAR: Navigation Menu (Desktop Only) */}
+            <div className="hidden lg:flex lg:col-span-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 shadow-sm flex-col gap-1.5 mb-6 lg:mb-0">
+              <span className="text-[10px] font-bold text-[var(--color-muted)] tracking-widest uppercase px-3 pb-2.5 border-b border-[var(--color-border)] mb-1">
                 ACCOUNT DASHBOARD
               </span>
               
               <button
                 type="button"
                 onClick={() => { switchTab('overview'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'overview'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiCompass className="text-sm shrink-0" />
@@ -602,24 +690,23 @@ function UserProfile() {
               <button
                 type="button"
                 onClick={() => { switchTab('orders'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'orders'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiShoppingBag className="text-sm shrink-0" />
                 My Orders
               </button>
 
-              
               <button
                 type="button"
                 onClick={() => { switchTab('wallet'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'wallet'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FaWallet className="text-sm shrink-0" />
@@ -629,10 +716,10 @@ function UserProfile() {
               <button
                 type="button"
                 onClick={() => { switchTab('addresses'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'addresses'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiMapPin className="text-sm shrink-0" />
@@ -642,21 +729,21 @@ function UserProfile() {
               <button
                 type="button"
                 onClick={() => { switchTab('profile'); setEditingAddress(null); }}
-                className={`shrink-0 w-auto lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left transition-all cursor-pointer ${
                   activeProfileTab === 'profile'
-                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] lg:border-l-4 lg:border-[var(--color-accent)] font-black border border-[var(--color-border)] lg:border-0'
-                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] bg-[var(--color-bg)] lg:bg-transparent'
+                    ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)] font-black'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-subtle)] hover:text-[var(--color-text)] border-l-4 border-transparent'
                 }`}
               >
                 <FiUser className="text-sm shrink-0" />
                 My Profile
               </button>
               
-              <div className="hidden lg:block pt-2 mt-2 border-t border-[var(--color-border)]">
+              <div className="pt-2 mt-2 border-t border-[var(--color-border)]">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-left text-rose-600 hover:bg-rose-50 transition-all cursor-pointer border-l-4 border-transparent"
                 >
                   <FiLogOut className="text-sm shrink-0" />
                   Logout
@@ -665,7 +752,73 @@ function UserProfile() {
             </div>
 
             {/* RIGHT CONTENT WORKSPACE */}
-            <div className="lg:col-span-9 space-y-6">
+            <div className="w-full lg:col-span-9 space-y-6">
+              
+              {/* MOBILE SUB-TAB NAVIGATION BAR (Only shown on mobile when inside sub-tabs) */}
+              {activeProfileTab !== 'overview' && (
+                <div className="flex lg:hidden overflow-x-auto gap-2 pb-2.5 mb-4 scrollbar-none border-b border-[var(--color-border)] shrink-0 animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('overview'); setEditingAddress(null); }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)] shrink-0"
+                  >
+                    <FiCompass className="text-sm shrink-0" />
+                    Overview
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('orders'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'orders'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FiShoppingBag className="text-sm shrink-0" />
+                    Orders
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('wallet'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'wallet'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FaWallet className="text-sm shrink-0" />
+                    Wallet
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('addresses'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'addresses'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FiMapPin className="text-sm shrink-0" />
+                    Addresses
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { switchTab('profile'); setEditingAddress(null); }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      activeProfileTab === 'profile'
+                        ? 'bg-[var(--color-accent)] text-white font-black shadow-xs'
+                        : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    <FiUser className="text-sm shrink-0" />
+                    Profile
+                  </button>
+                </div>
+              )}
               
               {/* TAB 1: OVERVIEW */}
               {activeProfileTab === 'overview' && (
@@ -765,7 +918,18 @@ function UserProfile() {
                       <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">Reach Out To Us</p>
                     </div>
 
+                  </div>
 
+                  {/* Sleek Compact Logout Button (Mobile Only — PC already has left sidebar logout) */}
+                  <div className="pt-2 flex justify-center lg:hidden">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 py-2.5 px-6 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 font-mono font-bold text-xs tracking-wider uppercase transition-all cursor-pointer shadow-2xs"
+                    >
+                      <FiLogOut className="text-sm shrink-0" />
+                      Logout of Account
+                    </button>
                   </div>
                 </div>
               )}
@@ -829,8 +993,10 @@ function UserProfile() {
                                 return (
                                   <img 
                                     key={itemIdx}
-                                    src={imgUrl}
+                                    src={getOptimizedImageUrl(imgUrl, 120, 75)}
                                     alt={item.name}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-10 h-14 object-cover rounded-md border border-[var(--color-surface)] shadow-xs"
                                   />
                                 );
@@ -906,6 +1072,25 @@ function UserProfile() {
                                   </div>
                                 </div>
                               )}
+
+                              {isWithin1DayOfCancellation(order) && (
+                                <div className="mt-3 pt-2.5 border-t border-[var(--color-border)] flex items-center justify-between flex-wrap gap-2">
+                                  <span className="text-[10px] font-mono text-emerald-600 font-bold uppercase tracking-wider">
+                                    ⏰ Cancelled within 24h — eligible to restore
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReorderConfirmOrder(order);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-[10px] tracking-wider px-3 py-1.5 rounded-lg uppercase transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <FiRefreshCw className="text-xs shrink-0" />
+                                    <span>Reactivate & Restore Order</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-4 justify-end shrink-0">
@@ -962,7 +1147,7 @@ function UserProfile() {
                         <input
                           type="text"
                           placeholder="ENTER GIFT VOUCHER CODE..."
-                          className="flex-1 bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-lg px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider outline-hidden"
+                          className="flex-1 bg-white border border-zinc-300 focus:border-zinc-900 text-zinc-900 placeholder:text-zinc-400 rounded-lg px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider outline-hidden shadow-xs"
                         />
                         <button
                           onClick={() => showToast("Voucher code verified. simulated gift voucher redeemed!", "success")}
@@ -1350,57 +1535,7 @@ function UserProfile() {
                     </div>
                   </div>
 
-                  {/* Push Notifications */}
-                  <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 space-y-4">
-                    <h3 className="text-[10px] font-black text-[var(--color-text)] tracking-wider uppercase border-b border-[var(--color-border)] pb-2 flex items-center gap-2">
-                      <FiBell className="text-xs text-[var(--color-accent)]" /> Push Notifications
-                    </h3>
-                    <p className="text-[11px] text-[var(--color-muted)] font-medium leading-relaxed max-w-xl">
-                      Get real-time updates for your orders, wallet top-ups, transaction receipts, and exclusive early product drop announcements.
-                    </p>
-                    
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-[var(--color-border)]">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)]">Status:</span>
-                        {notificationStatus === 'granted' ? (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded-md uppercase tracking-wider">
-                            Active
-                          </span>
-                        ) : notificationStatus === 'denied' ? (
-                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-[9px] font-black rounded-md uppercase tracking-wider">
-                            Blocked
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-neutral-200 text-neutral-800 text-[9px] font-black rounded-md uppercase tracking-wider">
-                            Disabled
-                          </span>
-                        )}
-                      </div>
 
-                      <div className="flex flex-wrap gap-3">
-                        {notificationStatus !== 'granted' && (
-                          <button
-                            type="button"
-                            disabled={notificationLoading || notificationStatus === 'denied'}
-                            onClick={handleEnableNotifications}
-                            className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] font-mono font-black text-[10px] tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                          >
-                            {notificationLoading ? 'ENABLING...' : 'ENABLE NOTIFICATIONS'}
-                          </button>
-                        )}
-
-                        {notificationStatus === 'granted' && (
-                          <button
-                            type="button"
-                            onClick={handleSendTestNotification}
-                            className="px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 font-mono font-black text-[10px] tracking-widest uppercase text-white rounded-lg transition-colors cursor-pointer shadow-md"
-                          >
-                            SEND TEST PUSH
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
                 </div>
               )}
@@ -1565,40 +1700,46 @@ function UserProfile() {
 
       {/* Logout Confirmation Modal */}
       {isLogoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/60 backdrop-blur-xs" 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
             onClick={() => setIsLogoutModalOpen(false)}
           />
-          <div className="relative z-50 w-full max-w-sm bg-[var(--color-surface)] p-8 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
-            <div>
-              <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">LOGOUT CONFIRMATION</span>
-              <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
-                Confirm Log Out
+          <div className="relative z-[101] w-full max-w-sm bg-[var(--color-surface)] p-6 sm:p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-xs">
+                <FiLogOut />
+              </div>
+              <h2 className="text-base font-black tracking-wider uppercase text-[var(--color-text)] mt-3">
+                Log Out of Account?
               </h2>
-              <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
-                Are you sure you want to log out? You will need to sign in again to place orders or view your profile.
+              <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                Are you sure you want to log out? You will need to sign in again to view orders or profile details.
               </p>
             </div>
+            
             <div className="flex flex-col gap-2.5 pt-2 border-t border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => confirmLogout(false)}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md text-center"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider text-white rounded-xl cursor-pointer shadow-sm text-center flex items-center justify-center gap-2"
               >
-                Log Out Current Device
+                <FiLogOut className="text-sm" />
+                Log Out
               </button>
+              
               <button
                 type="button"
                 onClick={() => confirmLogout(true)}
-                className="w-full py-3 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md text-center"
+                className="w-full py-2.5 bg-transparent hover:bg-[var(--color-subtle)] text-[11px] font-bold uppercase tracking-wider text-rose-600 rounded-xl cursor-pointer transition-all text-center"
               >
                 Log Out from All Devices
               </button>
+
               <button
                 type="button"
                 onClick={() => setIsLogoutModalOpen(false)}
-                className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer text-center"
+                className="w-full py-2.5 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider text-[var(--color-text)] rounded-xl cursor-pointer text-center"
               >
                 Cancel
               </button>
@@ -1730,6 +1871,52 @@ function UserProfile() {
           handleTopUpSuccess(generatedPayId);
         }}
       />
+
+      {/* Reorder / Restore Order Confirmation Warning Modal */}
+      {reorderConfirmOrder && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border border-neutral-200 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-neutral-900">
+                Reactivate order?
+              </h3>
+              <p className="text-xs text-neutral-500 font-mono">
+                Order #{reorderConfirmOrder.order_number || (reorderConfirmOrder.$id || reorderConfirmOrder.id || '').substring(0, 6).toUpperCase()}
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs text-neutral-600 leading-relaxed">
+              <p>
+                Are you sure you want to reactivate this order? It will be placed back into our shipping queue immediately.
+              </p>
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 font-medium leading-relaxed">
+                Please note: Once reactivated, this order cannot be cancelled again.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setReorderConfirmOrder(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-neutral-300 text-xs font-semibold hover:bg-neutral-50 transition-all cursor-pointer text-neutral-700"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetOrd = reorderConfirmOrder;
+                  setReorderConfirmOrder(null);
+                  handleReorderOrder(targetOrd);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              >
+                Reactivate Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </>

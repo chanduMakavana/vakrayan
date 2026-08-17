@@ -1,6 +1,7 @@
 import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
+import { fixLegacyWorkerUrl } from "../utils/imageOptimizer.js";
 
 export class CategoryService {
     databases;
@@ -20,7 +21,10 @@ export class CategoryService {
                 conf.firebaseCategoryConfigsCollectionId,
                 [Query.limit(100)]
             );
-            return response.documents || [];
+            return (response.documents || []).map(cfg => {
+                if (cfg.imageUrl) cfg.imageUrl = fixLegacyWorkerUrl(cfg.imageUrl);
+                return cfg;
+            });
         } catch (error) {
             console.error("Firebase service :: getCategoryConfigs :: error", error.message);
             return [];
@@ -40,7 +44,9 @@ export class CategoryService {
                 [Query.equal("category", cleanCategory), Query.limit(1)]
             );
             if (response.documents && response.documents.length > 0) {
-                return response.documents[0];
+                const cfg = response.documents[0];
+                if (cfg.imageUrl) cfg.imageUrl = fixLegacyWorkerUrl(cfg.imageUrl);
+                return cfg;
             }
             return null;
         } catch (error) {
@@ -148,14 +154,16 @@ export class CategoryService {
             }
             const configs = await this.getCategoryConfigs();
             const deletedConfigs = configs.filter(c => c.isDeleted);
-            for (const doc of deletedConfigs) {
-                await this.databases.updateDocument(
-                    conf.firebaseDatabaseId,
-                    conf.firebaseCategoryConfigsCollectionId,
-                    doc.$id,
-                    { isDeleted: false }
-                );
-            }
+            await Promise.all(
+                deletedConfigs.map(doc =>
+                    this.databases.updateDocument(
+                        conf.firebaseDatabaseId,
+                        conf.firebaseCategoryConfigsCollectionId,
+                        doc.$id,
+                        { isDeleted: false }
+                    )
+                )
+            );
             return true;
         } catch (error) {
             console.error("Firebase service :: restoreAllCategories :: error", error.message);

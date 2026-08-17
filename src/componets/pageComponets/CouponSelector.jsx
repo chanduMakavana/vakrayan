@@ -136,7 +136,7 @@ export default function CouponSelector({
           value={promoInput}
           onChange={(e) => setPromoInput(e.target.value)}
           placeholder="Discount code or gift card"
-          className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-accent)] rounded-xl px-4 py-3 text-xs text-[var(--color-text)] placeholder-[var(--color-muted)] outline-hidden transition-all shadow-2xs"
+          className="flex-1 bg-white border border-zinc-200 focus:border-zinc-900 text-zinc-900 placeholder:text-zinc-400 rounded-xl px-4 py-3 text-xs outline-hidden transition-all shadow-2xs"
         />
         <button
           type="submit"

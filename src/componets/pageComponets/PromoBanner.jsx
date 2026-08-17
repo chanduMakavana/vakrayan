@@ -13,8 +13,8 @@ const childVariants = {
 }
 
 const statsData = [
-  { value: '500+', label: 'Happy Customers' },
-  { value: '50+', label: 'Premium Styles' },
+  { value: '100+', label: 'Happy Customers' },
+  { value: '10+', label: 'Premium Styles' },
   { value: '7 Days', label: 'Easy Returns' },
   { value: '100%', label: 'Quality Assured' },
 ]
@@ -56,13 +56,13 @@ function PromoBanner() {
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: '-80px' }}
-        className="relative z-10 max-w-5xl mx-auto px-6 py-20 text-center"
+        className="relative z-10 max-w-[1728px] mx-auto px-6 py-10 md:py-12 text-center"
       >
-        <motion.div variants={childVariants} className="flex justify-center mb-5">
+        <motion.div variants={childVariants} className="flex justify-center mb-3">
           <div className="accent-line" />
         </motion.div>
 
-        <motion.p variants={childVariants} className="eyebrow mb-4">
+        <motion.p variants={childVariants} className="eyebrow mb-2">
           Our Philosophy
         </motion.p>
 
@@ -70,13 +70,13 @@ function PromoBanner() {
           variants={childVariants}
           style={{
             fontFamily: "'Barlow Condensed', 'Impact', sans-serif",
-            fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+            fontSize: 'clamp(2.2rem, 5vw, 4rem)',
             fontWeight: 900,
             textTransform: 'uppercase',
             letterSpacing: '0.01em',
             color: 'var(--color-text)',
             lineHeight: 1.0,
-            marginBottom: 20
+            marginBottom: 12
           }}
         >
           Raw Aesthetics.
@@ -88,10 +88,10 @@ function PromoBanner() {
           variants={childVariants}
           style={{
             color: 'var(--color-muted)',
-            fontSize: 16,
-            lineHeight: 1.75,
+            fontSize: 15,
+            lineHeight: 1.6,
             maxWidth: 520,
-            margin: '0 auto 40px',
+            margin: '0 auto 20px',
             fontFamily: "'Jost', sans-serif"
           }}
         >
@@ -101,16 +101,15 @@ function PromoBanner() {
         {/* Stats row */}
         <motion.div
           variants={childVariants}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"
         >
           {statsData.map(({ value, label }) => (
             <div
               key={label}
-              className="glass-card p-5 text-center"
-              style={{ borderRadius: 16 }}
+              className="glass-card p-5 text-center transition-all duration-300 hover:shadow-md"
+              style={{ borderRadius: 16, border: '1px solid var(--color-border-hard)' }}
             >
               <p style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 30, fontWeight: 900, color: 'var(--color-accent)', lineHeight: 1, marginBottom: 6 }}>
-
                 {value}
               </p>
               <p style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

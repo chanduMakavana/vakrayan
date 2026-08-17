@@ -1,7 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck, FiCopy, FiShare2 } from 'react-icons/fi';
+
+const RulerIcon = ({ className = "w-4 h-4 text-zinc-500 shrink-0 mt-0.5" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.3 15.3l-7.6-7.6c-.4-.4-1-.4-1.4 0l-7 7c-.4.4-.4 1 0 1.4l7.6 7.6c.4.4 1 .4 1.4 0l7-7c.4-.4.4-1 0-1.4z"/>
+    <line x1="14.5" y1="9.5" x2="16" y2="11"/>
+    <line x1="11.5" y1="12.5" x2="14" y2="15"/>
+    <line x1="8.5" y1="15.5" x2="10" y2="17"/>
+  </svg>
+);
+
+const ShieldCheckIcon = ({ className = "w-4 h-4 text-zinc-500 shrink-0 mt-0.5" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <polyline points="9 12 11 14 15 10"/>
+  </svg>
+);
 import { useSelector, useDispatch } from 'react-redux';
 import productsService from '../../services/products';
 import reviewsService from '../../services/reviews';
@@ -11,12 +27,14 @@ import { addWishlistItemState, removeWishlistItemState } from '../../features/wi
 import AddToCartButton from '../pageComponets/AddToCartButton';
 import Footer from '../pageComponets/Footer';
 import restockService from '../../services/restock';
-import { FaStar } from 'react-icons/fa';
+import { FaStar, FaWhatsapp } from 'react-icons/fa';
 import { useToast } from '../../context/ToastContext';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
+import Loader from '../pageComponets/Loader';
+import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
 
 
 function ProductDetail() {
@@ -39,11 +57,11 @@ function ProductDetail() {
   // Fires whenever product loads (cached or API). Each product gets a unique <title>.
   useEffect(() => {
     if (!product) {
-      document.title = 'Loading... — Vakrayan';
+      document.title = 'Loading... | Vakrayan';
       return;
     }
     const productName = product.name || 'Product';
-    document.title = `${productName} — Vakrayan`;
+    document.title = `${productName} | Vakrayan`;
 
     // Remove any existing product schema
     const existing = document.getElementById('product-jsonld');
@@ -84,6 +102,7 @@ function ProductDetail() {
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [activeVariant, setActiveVariant] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     setQuantity(1);
@@ -94,6 +113,7 @@ function ProductDetail() {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [lightboxOffset, setLightboxOffset] = useState({ x: 0, y: 0 });
+  const [lightboxImageLoaded, setLightboxImageLoaded] = useState(true);
   const touchStartRef = useRef(null);
 
   const [mainPhotoZoom, setMainPhotoZoom] = useState(1);
@@ -273,6 +293,13 @@ function ProductDetail() {
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('wheel', handleWheel);
     };
+  }, [activeImageIdx]);
+
+  // Auto-sync imageLoaded state if active image is already cached / completed
+  useEffect(() => {
+    if (mainImageRef.current && mainImageRef.current.complete) {
+      setImageLoaded(true);
+    }
   }, [activeImageIdx]);
 
   // Touch and wheel event handler for lightbox modal (blocking viewport zoom & reload)
@@ -465,6 +492,7 @@ function ProductDetail() {
 
   const [sizeAdvisorOpen, setSizeAdvisorOpen] = useState(false);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
+  const [sizeUnit, setSizeUnit] = useState('IN'); // 'IN' | 'CM'
   const [advHeight, setAdvHeight] = useState('');
   const [advWeight, setAdvWeight] = useState('');
   const [advRecommendation, setAdvRecommendation] = useState('');
@@ -720,6 +748,17 @@ function ProductDetail() {
       return () => clearTimeout(timer);
     }
   }, [product, products]);
+
+  useEffect(() => {
+    if (!product) return;
+    const rawImgs = [
+      product.front_image_link || product.image_url || product.image,
+      ...(Array.isArray(product.back_image_links) ? product.back_image_links : product.back_image_link ? [product.back_image_link] : [])
+    ].filter(Boolean);
+    rawImgs.forEach((imgUrl, idx) => {
+      preloadImage(getOptimizedImageUrl(imgUrl, 1000, 80), idx === 0);
+    });
+  }, [product]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1020,13 +1059,107 @@ function ProductDetail() {
     }
   };
 
+  const rawGalleryImages = activeVariant
+    ? [activeVariant.front, activeVariant.back].filter(Boolean)
+    : [
+        product?.front_image_link || product?.image_url || product?.image,
+        ...(Array.isArray(product?.back_image_links) ? product?.back_image_links : product?.back_image_link ? [product?.back_image_link] : [])
+      ].filter(Boolean);
+
+  const galleryImages = Array.from(new Set(rawGalleryImages));
+  galleryImagesRef.current = galleryImages;
+
+  // Background preload all product gallery images into browser RAM cache for 0ms instant lightbox switching
+  useEffect(() => {
+    if (galleryImages && galleryImages.length > 0) {
+      galleryImages.forEach(imgUrl => {
+        if (imgUrl) {
+          const img = new Image();
+          img.src = getOptimizedImageUrl(imgUrl, 1200, 80);
+        }
+      });
+    }
+  }, [galleryImages]);
+
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans">
-        <div className="flex flex-col items-center justify-center gap-4 py-32">
-          <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-none animate-spin" />
-          <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-mono font-bold uppercase">
-            Loading product details...
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20 select-none">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-6 space-y-6">
+          {/* Top Header Bar: Back to Shop + Breadcrumb */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 pb-4">
+            <div className="w-32 h-5 skeleton rounded-none" />
+            <div className="w-64 h-5 skeleton rounded-none" />
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Desktop 2-Column Product Image Grid Skeleton */}
+            <div className="hidden lg:grid grid-cols-2 gap-3.5 lg:col-span-7 items-start">
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+              <div className="aspect-3/4 w-full skeleton rounded-none border border-neutral-200/80" />
+            </div>
+
+            {/* Mobile Single Photo Skeleton */}
+            <div className="lg:hidden col-span-1">
+              <div className="w-full aspect-3/4 skeleton rounded-none border border-neutral-200/80" />
+            </div>
+
+            {/* Right Column: Product Detail Form Skeleton */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Badges & Title */}
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <div className="w-28 h-6 skeleton rounded-none" />
+                  <div className="w-20 h-6 skeleton rounded-none" />
+                </div>
+                <div className="w-4/5 h-9 skeleton rounded-none" />
+                <div className="w-40 h-5 skeleton rounded-none" />
+                <div className="w-32 h-7 skeleton rounded-none" />
+              </div>
+
+              {/* Share buttons line */}
+              <div className="flex items-center gap-3 pt-1">
+                <div className="w-24 h-5 skeleton rounded-none" />
+                <div className="w-24 h-8 skeleton rounded-none" />
+                <div className="w-36 h-8 skeleton rounded-none" />
+              </div>
+
+              <div className="h-[1px] bg-neutral-200/80 w-full" />
+
+              {/* Color Section */}
+              <div className="space-y-2">
+                <div className="w-28 h-4 skeleton rounded-none" />
+                <div className="w-14 h-14 skeleton rounded-none" />
+              </div>
+
+              {/* Size Section */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="w-24 h-4 skeleton rounded-none" />
+                  <div className="w-20 h-4 skeleton rounded-none" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                  <div className="w-14 h-12 skeleton rounded-none" />
+                </div>
+              </div>
+
+              {/* CTA Buttons */}
+              <div className="space-y-3 pt-2">
+                <div className="w-full h-12 skeleton rounded-none" />
+                <div className="w-full h-12 skeleton rounded-none" />
+              </div>
+
+              {/* Description Accordion */}
+              <div className="pt-4 border-t border-neutral-200/80">
+                <div className="w-full h-12 skeleton rounded-none" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1140,23 +1273,13 @@ function ProductDetail() {
     isAllOutOfStock = totalStock === 0;
   }
 
-  const rawGalleryImages = activeVariant
-    ? [activeVariant.front, activeVariant.back].filter(Boolean)
-    : [
-        product.front_image_link || product.image_url || product.image,
-        ...(Array.isArray(product.back_image_links) ? product.back_image_links : product.back_image_link ? [product.back_image_link] : [])
-      ].filter(Boolean);
-
-  const galleryImages = Array.from(new Set(rawGalleryImages));
-
-  galleryImagesRef.current = galleryImages;
-
   const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
   const activeImage = galleryImages[activeImageIndex] || '';
 
   const handleLightboxNext = () => {
     if (galleryImages.length <= 1) return;
     setImageLoaded(false);
+    setLightboxImageLoaded(false);
     setActiveImageIdx((prevIdx) => (prevIdx + 1) % galleryImages.length);
     setLightboxZoom(1);
     setLightboxOffset({ x: 0, y: 0 });
@@ -1179,6 +1302,7 @@ function ProductDetail() {
   const handleLightboxPrev = () => {
     if (galleryImages.length <= 1) return;
     setImageLoaded(false);
+    setLightboxImageLoaded(false);
     setActiveImageIdx((prevIdx) => (prevIdx - 1 + galleryImages.length) % galleryImages.length);
     setLightboxZoom(1);
     setLightboxOffset({ x: 0, y: 0 });
@@ -1198,16 +1322,292 @@ function ProductDetail() {
     }
   };
 
+  // Image Component with Smooth Surface Placeholder
+  const ImageWithSkeleton = ({ src, alt, className = "", loading = "lazy", onClick }) => {
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    return (
+      <div
+        onClick={onClick}
+        className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group transition-all duration-300 hover:border-neutral-900 ${className}`}
+      >
+        {/* Subtle Surface Loading Pulse */}
+        {!isLoaded && (
+          <div className="absolute inset-0 z-10 skeleton flex items-center justify-center">
+            <div className="w-5 h-5 rounded-full border-2 border-neutral-300 border-t-neutral-800 animate-spin opacity-40" />
+          </div>
+        )}
+
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setIsLoaded(true)}
+          className={`w-full h-full object-cover object-center transition-opacity duration-300 ease-out ${
+            isLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      </div>
+    );
+  };
+
+  // 100% Full Markdown & GFM Parser Component
+  const RenderMarkdown = ({ content }) => {
+    if (!content) return null;
+
+    const rawText = String(content);
+
+    // Helper to parse inline markdown (bold, italic, strikethrough, inline code, links, images)
+    const parseInlineMarkdown = (text) => {
+      if (!text) return null;
+
+      const regex = /(!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)|`[^`]+`|\*\*.*?\*\*|__.*?__|~~.*?~~|\*.*?\*|_.*?_)/g;
+      const parts = text.split(regex);
+
+      return parts.map((part, index) => {
+        if (!part) return null;
+
+        // Image: ![alt](url)
+        if (part.startsWith('![') && part.includes('](') && part.endsWith(')')) {
+          const alt = part.slice(2, part.indexOf(']('));
+          const url = part.slice(part.indexOf('](') + 2, -1);
+          return (
+            <img
+              key={index}
+              src={url}
+              alt={alt}
+              className="max-w-full h-auto rounded-lg my-2 border border-zinc-200 shadow-xs block"
+            />
+          );
+        }
+
+        // Link: [text](url)
+        if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+          const linkText = part.slice(1, part.indexOf(']('));
+          const rawUrl = part.slice(part.indexOf('](') + 2, -1).trim();
+          const isSafeUrl = /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(rawUrl);
+          const safeUrl = isSafeUrl ? rawUrl : '#';
+          return (
+            <a
+              key={index}
+              href={safeUrl}
+              target={safeUrl.startsWith('http') ? "_blank" : undefined}
+              rel={safeUrl.startsWith('http') ? "noopener noreferrer" : undefined}
+              className="text-[#059669] font-bold underline hover:text-[#047857] transition-colors"
+            >
+              {linkText}
+            </a>
+          );
+        }
+
+        // Inline Code: `code`
+        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+          return (
+            <code key={index} className="bg-zinc-100 text-zinc-900 px-1.5 py-0.5 rounded font-mono text-[11px] border border-zinc-200 font-bold">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+
+        // Bold: **text** or __text__
+        if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+          return <strong key={index} className="font-extrabold text-[var(--color-text)]">{part.slice(2, -2)}</strong>;
+        }
+
+        // Strikethrough: ~~text~~
+        if (part.startsWith('~~') && part.endsWith('~~')) {
+          return <del key={index} className="line-through text-zinc-400">{part.slice(2, -2)}</del>;
+        }
+
+        // Italic: *text* or _text_
+        if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+          return <em key={index} className="italic text-zinc-800">{part.slice(1, -1)}</em>;
+        }
+
+        return part;
+      });
+    };
+
+    const lines = rawText.split(/\r?\n/);
+    const elements = [];
+
+    let inCodeBlock = false;
+    let codeBlockLang = '';
+    let codeBlockLines = [];
+
+    let currentList = [];
+    let currentListType = null; // 'ul' | 'ol' | 'task'
+
+    const flushList = () => {
+      if (currentList.length > 0) {
+        const listKey = `list-${elements.length}`;
+        if (currentListType === 'task') {
+          elements.push(
+            <ul key={listKey} className="space-y-1.5 my-2 pl-1 font-medium text-[var(--color-text)]">
+              {currentList.map((item, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    readOnly
+                    className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#059669] cursor-pointer"
+                  />
+                  <span className={item.checked ? 'line-through text-zinc-400' : ''}>
+                    {parseInlineMarkdown(item.text)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          );
+        } else if (currentListType === 'ul') {
+          elements.push(
+            <ul key={listKey} className="list-disc list-inside space-y-1 my-2 pl-1 font-medium text-[var(--color-text)]">
+              {currentList.map((item, i) => (
+                <li key={i}>{parseInlineMarkdown(item)}</li>
+              ))}
+            </ul>
+          );
+        } else if (currentListType === 'ol') {
+          elements.push(
+            <ol key={listKey} className="list-decimal list-inside space-y-1 my-2 pl-1 font-medium text-[var(--color-text)]">
+              {currentList.map((item, i) => (
+                <li key={i}>{parseInlineMarkdown(item)}</li>
+              ))}
+            </ol>
+          );
+        }
+        currentList = [];
+        currentListType = null;
+      }
+    };
+
+    lines.forEach((line, idx) => {
+      // 1. Code block handling: ```javascript or ```
+      if (line.trim().startsWith('```')) {
+        if (inCodeBlock) {
+          // End of code block
+          elements.push(
+            <div key={`code-${idx}`} className="my-3 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 text-emerald-400 font-mono text-xs">
+              {codeBlockLang && (
+                <div className="bg-zinc-900 text-zinc-400 px-3 py-1 text-[10px] uppercase font-bold tracking-wider border-b border-zinc-800">
+                  {codeBlockLang}
+                </div>
+              )}
+              <pre className="p-3.5 overflow-x-auto leading-relaxed">
+                <code>{codeBlockLines.join('\n')}</code>
+              </pre>
+            </div>
+          );
+          inCodeBlock = false;
+          codeBlockLang = '';
+          codeBlockLines = [];
+        } else {
+          // Start of code block
+          flushList();
+          inCodeBlock = true;
+          codeBlockLang = line.trim().slice(3).trim();
+          codeBlockLines = [];
+        }
+        return;
+      }
+
+      if (inCodeBlock) {
+        codeBlockLines.push(line);
+        return;
+      }
+
+      const trimmed = line.trim();
+
+      // 2. Empty line
+      if (!trimmed) {
+        flushList();
+        return;
+      }
+
+      // 3. Horizontal Rule: --- or *** or ___
+      if (/^([*_-]\s*){3,}$/.test(trimmed)) {
+        flushList();
+        elements.push(<hr key={`hr-${idx}`} className="my-4 border-t border-zinc-200 dark:border-zinc-800" />);
+        return;
+      }
+
+      // 4. Headings H1 to H6
+      if (/^#{1,6}\s+/.test(trimmed)) {
+        flushList();
+        const level = trimmed.match(/^#{1,6}/)[0].length;
+        const text = trimmed.replace(/^#{1,6}\s+/, '');
+        const inline = parseInlineMarkdown(text);
+
+        if (level === 1) {
+          elements.push(<h1 key={`h1-${idx}`} className="text-base md:text-lg font-mono font-black uppercase tracking-wider text-[var(--color-text)] mt-4 mb-2 border-b pb-1 border-zinc-200">{inline}</h1>);
+        } else if (level === 2) {
+          elements.push(<h2 key={`h2-${idx}`} className="text-sm md:text-base font-mono font-black uppercase tracking-wider text-[var(--color-text)] mt-3.5 mb-1.5">{inline}</h2>);
+        } else if (level === 3) {
+          elements.push(<h3 key={`h3-${idx}`} className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--color-text)] mt-3 mb-1">{inline}</h3>);
+        } else {
+          elements.push(<h4 key={`h4-${idx}`} className="text-xs font-mono font-bold uppercase tracking-wide text-[var(--color-text)] mt-2.5 mb-1">{inline}</h4>);
+        }
+        return;
+      }
+
+      // 5. Task List: - [x] task or - [ ] task
+      if (/^[-*•]\s+\[([ xX])\]\s+/.test(trimmed)) {
+        const match = trimmed.match(/^[-*•]\s+\[([ xX])\]\s+(.+)/);
+        if (match) {
+          if (currentListType && currentListType !== 'task') flushList();
+          currentListType = 'task';
+          const isChecked = match[1].toLowerCase() === 'x';
+          currentList.push({ checked: isChecked, text: match[2] });
+          return;
+        }
+      }
+
+      // 6. Unordered List Bullet: - Item or * Item or • Item
+      if (/^[-*•]\s+/.test(trimmed)) {
+        if (currentListType && currentListType !== 'ul') flushList();
+        currentListType = 'ul';
+        currentList.push(trimmed.replace(/^[-*•]\s+/, ''));
+        return;
+      }
+
+      // 7. Ordered List: 1. Item
+      if (/^\d+\.\s+/.test(trimmed)) {
+        if (currentListType && currentListType !== 'ol') flushList();
+        currentListType = 'ol';
+        currentList.push(trimmed.replace(/^\d+\.\s+/, ''));
+        return;
+      }
+
+      // 8. Regular paragraph
+      flushList();
+      elements.push(
+        <p key={`p-${idx}`} className="leading-relaxed text-[var(--color-muted)] my-1 font-medium">
+          {parseInlineMarkdown(trimmed)}
+        </p>
+      );
+    });
+
+    flushList();
+
+    return <div className="space-y-1 text-xs font-mono">{elements}</div>;
+  };
+
   const rawDescription = product?.description || "";
   const returnPolicyMatch = rawDescription.match(/\[RETURN_POLICY\]:\s*(.+)/);
   const returnPolicy = product?.return_policy || (returnPolicyMatch ? returnPolicyMatch[1].trim() : "7 Day Return");
-  const displayDescription = rawDescription.replace(/\[RETURN_POLICY\]:\s*(.+)/, "").trim();
+  const sizeChartMatch = rawDescription.match(/\[SIZE_CHART\]:\s*(.+)/);
+  const customSizeChartImage = product?.size_chart_image || product?.size_chart || (sizeChartMatch ? sizeChartMatch[1].trim() : "");
+  const displayDescription = rawDescription
+    .replace(/\[RETURN_POLICY\]:\s*(.+)/, "")
+    .replace(/\[SIZE_CHART\]:\s*(.+)/, "")
+    .trim();
 
   return (
     <>
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans pb-20">
 
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 space-y-8">
+      <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-10 space-y-8">
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--color-border)]">
           <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors uppercase group">
@@ -1233,7 +1633,26 @@ function ProductDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:col-span-7">
+          {/* Desktop 2-Column Product Image Grid Gallery (Matching Luxury E-Commerce Layout with Skeletons) */}
+          <div className="hidden lg:grid grid-cols-2 gap-3.5 lg:col-span-7 items-start">
+            {galleryImages.map((imgUrl, idx) => (
+              <ImageWithSkeleton
+                key={idx}
+                src={imgUrl}
+                alt={`${product.name} view ${idx + 1}`}
+                loading={idx < 2 ? "eager" : "lazy"}
+                onClick={() => {
+                  setActiveImageIdx(idx);
+                  setIsLightboxOpen(true);
+                  setLightboxZoom(1);
+                  setLightboxOffset({ x: 0, y: 0 });
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Mobile & Tablet Product Image Gallery Viewer */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:hidden col-span-1">
 
              {galleryImages.length > 1 && (
               <div className="md:col-span-2 order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
@@ -1242,8 +1661,12 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => {
-                      setImageLoaded(false);
-                      setActiveImageIdx(idx);
+                      if (activeImageIdx !== idx) {
+                        setImageLoaded(false);
+                        setActiveImageIdx(idx);
+                      } else {
+                        setImageLoaded(true);
+                      }
                       mainPhotoZoomRef.current = 1;
                       mainPhotoOffsetRef.current = { x: 0, y: 0 };
                       setMainPhotoZoom(1);
@@ -1254,15 +1677,13 @@ function ProductDetail() {
                     }}
                     className={`w-14 h-18 md:w-full md:aspect-3/4 rounded-none overflow-hidden bg-neutral-100 border shrink-0 transition-all duration-300 ${activeImageIndex === idx ? 'border-neutral-950 scale-95 shadow-sm' : 'border-[var(--color-border)] hover:border-[var(--color-accent)]'}`}
                   >
-                    <img src={imgUrl} alt="Garment view" className="w-full h-full object-cover" />
+                    <img src={getOptimizedImageUrl(imgUrl, 160, 75)} alt="Garment view" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
             )}
 
             <div
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
               ref={mainContainerRef}
               onMouseDown={(e) => {
                 if (e.button !== 0) return; // Only left click
@@ -1373,11 +1794,8 @@ function ProductDetail() {
                 setLightboxZoom(1);
                 setLightboxOffset({ x: 0, y: 0 });
               }}
-              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+              className={`w-full ${galleryImages.length > 1 ? 'md:col-span-10' : 'md:col-span-12'} order-1 md:order-2 rounded-none overflow-hidden bg-[var(--color-surface)] border border-neutral-950/10 relative group ${mainPhotoZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
             >
-              <div className="absolute top-4 right-4 bg-[var(--color-surface)] border border-neutral-950/15 text-[var(--color-text)] font-mono text-[9px] tracking-wider px-2 py-1 rounded-none z-10 pointer-events-none uppercase">
-                Swipe to Browse / Tap to Zoom
-              </div>
 
               {/* Navigation Chevron Buttons overlay */}
               {galleryImages.length > 1 && (
@@ -1420,18 +1838,18 @@ function ProductDetail() {
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
                   ref={mainImageRef}
-                  src={activeImage}
+                  src={getOptimizedImageUrl(activeImage, 1000, 80)}
                   alt={product.name}
                   fetchPriority="high"
                   decoding="sync"
                   onLoad={() => setImageLoaded(true)}
                   style={{
-                    transformOrigin: mainPhotoZoom > 1 ? 'center center' : zoomStyle.transformOrigin,
+                    transformOrigin: 'center center',
                     transform: mainPhotoZoom > 1 
                       ? `translate(${mainPhotoOffset.x}px, ${mainPhotoOffset.y}px) scale(${mainPhotoZoom})`
-                      : `scale(${zoomStyle.scale})`
+                      : 'none'
                   }}
-                  className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-40 scale-[0.98]'}`}
+                  className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-40'}`}
                 />
               </div>
 
@@ -1463,47 +1881,49 @@ function ProductDetail() {
             </div>
           </div>
 
-          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+          <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-24">
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1.5 rounded-none whitespace-nowrap">
+                <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1 rounded-none whitespace-nowrap">
                   {product.category?.replace('-', ' ')}
                 </span>
                 {product.tag && (
-                  <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1.5 rounded-none border border-neutral-950 whitespace-nowrap">
+                  <span className="text-[10px] bg-neutral-950 text-white font-mono font-bold tracking-wider uppercase px-3 py-1 rounded-none border border-neutral-950 whitespace-nowrap">
                     {product.tag}
                   </span>
                 )}
                 {isAllOutOfStock ? (
-                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-3 py-1.5 rounded-none border border-rose-100 whitespace-nowrap">
+                  <span className="flex items-center gap-1.5 text-[10px] text-rose-600 font-mono font-semibold uppercase tracking-wider bg-rose-50 px-3 py-1 rounded-none border border-rose-100 whitespace-nowrap">
                     <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-rose-500 animate-pulse" />
                     SOLD OUT
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-none whitespace-nowrap">
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-mono font-semibold uppercase tracking-wider bg-emerald-50 px-3 py-1 rounded-none whitespace-nowrap">
                     <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-emerald-500 animate-ping" />
                     IN STOCK
                   </span>
                 )}
                 {adminMode && (
                   <button
-                    onClick={() => navigate('/admin', { state: { editProductId: product.$id || product.id } })}
-                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1.5 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
+                    onClick={() => {
+                      const targetId = product.$id || product.id;
+                      navigate(`/admin?edit=${targetId}`, { state: { editProductId: targetId } });
+                    }}
+                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
                   >
                     Edit Drop
                   </button>
-
                 )}
               </div>
 
-              <div className="space-y-1">
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-neutral-950 uppercase">
+              <div className="space-y-0.5">
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-950 uppercase">
                   {product.name}
                 </h1>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-0.5">
                 <div className="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map((star) => {
                     const sum = reviews.reduce((acc, r) => {
@@ -1543,7 +1963,7 @@ function ProductDetail() {
                   : product.discount_percent;
 
                 return (
-                  <div className="flex items-baseline gap-3 pt-1 flex-wrap">
+                  <div className="flex items-baseline gap-3 pt-0.5 flex-wrap">
                     <span className="text-2xl font-mono font-bold text-neutral-950">
                       ₹{priceNum.toLocaleString('en-IN')}
                     </span>
@@ -1565,39 +1985,45 @@ function ProductDetail() {
               })()}
             </div>
 
-            <div className="flex items-center gap-3 pt-2 pb-4">
+            <div className="flex items-center gap-2.5 pt-1 pb-1 flex-wrap">
               <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest font-bold">Share Drop:</span>
               <button
+                type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
+                  setCopiedLink(true);
                   showToast("Link copied to clipboard!", "success");
-
+                  setTimeout(() => setCopiedLink(false), 2000);
                 }}
-                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--color-text)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] px-2.5 py-1 transition-all cursor-pointer font-sans"
+                className={`inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider border px-2.5 py-1 transition-all cursor-pointer rounded-xs ${
+                  copiedLink
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                    : 'text-[var(--color-text)] border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]'
+                }`}
               >
-                Copy Link
+                {copiedLink ? <FiCheck className="text-xs text-emerald-600" /> : <FiCopy className="text-xs" />}
+                <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
               </button>
               <a
                 href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out this vakrayan fit drop: ${product.name} at ${window.location.href}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 border border-emerald-200 bg-emerald-50 hover:border-emerald-600 hover:bg-emerald-100/50 px-2.5 py-1 transition-all cursor-pointer font-sans no-underline"
+                className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 border border-emerald-300/80 bg-emerald-50 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 px-2.5 py-1 transition-all cursor-pointer rounded-xs no-underline group"
               >
-                Share to WhatsApp
+                <FaWhatsapp className="text-xs text-[#25D366] group-hover:text-white transition-colors" />
+                <span>Share to WhatsApp</span>
               </a>
             </div>
-
-            <div className="border-t border-[var(--color-border)]/50" />
 
             {(() => {
 
               if (product.color_group_id && groupProducts.length > 1) {
                 return (
-                  <div className="space-y-3 pb-4">
+                  <div className="space-y-2 pb-1">
                     <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name || 'ORIGINAL'}</span>
                     </h4>
-                    <div className="flex gap-3 flex-wrap">
+                    <div className="flex gap-2.5 flex-wrap">
                       {groupProducts.map((sibling) => {
                         const siblingId = sibling.$id || sibling.id;
                         const isCurrent = siblingId === (product.$id || product.id);
@@ -1611,7 +2037,7 @@ function ProductDetail() {
                                 navigate(`/product/${sibling.slug || siblingId}`, { replace: true });
                               }
                             }}
-                            className={`w-16 h-20 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
+                            className={`w-14 h-18 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
                               isCurrent
                                 ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 scale-105 shadow-md'
                                 : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102'
@@ -1619,10 +2045,11 @@ function ProductDetail() {
                             title={sibling.color_name}
                           >
                             <img 
-                              src={siblingImage} 
+                              src={getOptimizedImageUrl(siblingImage, 120, 75)} 
                               alt={sibling.color_name} 
                               className="w-full h-full object-cover"
                               loading="lazy"
+                              decoding="async"
                             />
                           </button>
                         );
@@ -1635,15 +2062,17 @@ function ProductDetail() {
               if (product.color_name) {
                 const img = product.front_image_link || product.image_url || product.image || 'https://placehold.co/100x125';
                 return (
-                  <div className="space-y-3 pb-4">
+                  <div className="space-y-2 pb-1">
                     <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name}</span>
                     </h4>
-                    <div className="flex gap-3">
-                      <div className="w-16 h-20 rounded-lg border-2 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 overflow-hidden shadow-md">
+                    <div className="flex gap-2.5">
+                      <div className="w-14 h-18 rounded-lg border-2 border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 overflow-hidden shadow-md">
                         <img
-                          src={img}
+                          src={getOptimizedImageUrl(img, 120, 75)}
                           alt={product.color_name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                           title={product.color_name}
                         />
@@ -1665,7 +2094,7 @@ function ProductDetail() {
               }
 
               return (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-bold text-[var(--color-text)]">Select Size</h4>
                     <div className="flex gap-4">
@@ -1685,7 +2114,7 @@ function ProductDetail() {
                           key={size}
                           type="button"
                           onClick={() => setSelectedSize(size)}
-                          className={`py-2.5 rounded-none font-bold text-xs tracking-wider transition-all duration-200 cursor-pointer border ${
+                          className={`py-2 rounded-none font-bold text-xs tracking-wider transition-all duration-200 cursor-pointer border ${
                             isSoldOut && selectedSize === size
                             ? 'bg-neutral-200 text-[var(--color-muted)] border-neutral-400 line-through font-extrabold'
                             : isSoldOut 
@@ -1709,7 +2138,7 @@ function ProductDetail() {
                     if (stockVal < 5) {
                       const fillPercent = (stockVal / 5) * 100;
                       return (
-                        <div className="space-y-2 mt-2.5 animate-fade-in">
+                        <div className="space-y-1.5 mt-1.5 animate-fade-in">
                           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-rose-600 animate-pulse">
                             <span className="flex items-center gap-1.5">
                               <svg className="w-3 h-3 fill-rose-500" viewBox="0 0 24 24"><path d="M12 2l11 19H1L12 2zM12 6l-7 12h14L12 6zm0 2l5.5 9.5H6.5L12 8z"/></svg>
@@ -1727,7 +2156,7 @@ function ProductDetail() {
                       );
                     }
                     return (
-                      <div className="p-3 bg-emerald-50/50 border border-emerald-100/60 rounded-none flex items-center gap-2 mt-2 animate-fade-in">
+                      <div className="p-2.5 bg-emerald-50/50 border border-emerald-100/60 rounded-none flex items-center gap-2 mt-1.5 animate-fade-in">
                         <svg className="w-3 h-3 fill-emerald-500 animate-pulse" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                         <p className="text-[10px] text-emerald-700 font-mono font-bold uppercase tracking-wider">
                           Size {selectedSize} is In Stock - Ready for immediate drop
@@ -1740,7 +2169,7 @@ function ProductDetail() {
             })()}
 
              {/* Quantity Selector Section — Always Visible */}
-             <div className="space-y-2 mt-4 pt-4 border-t border-[var(--color-border)]">
+             <div className="space-y-1.5 mt-2 pt-2 border-t border-[var(--color-border)]/40">
                <div className="flex justify-between items-center">
                  <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider">
                    Quantity
@@ -1761,11 +2190,11 @@ function ProductDetail() {
                      type="button"
                      disabled={quantity <= 1}
                      onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                     className="w-9 h-9 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 disabled:opacity-30 cursor-pointer select-none transition-colors text-neutral-950 border-r border-[var(--color-border)]"
+                     className="w-8 h-8 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 disabled:opacity-30 cursor-pointer select-none transition-colors text-neutral-950 border-r border-[var(--color-border)]"
                    >
                      <FiMinus size={13} strokeWidth={2.5} />
                    </button>
-                   <span className="w-12 text-center font-mono font-bold text-sm select-none text-neutral-950 border-r border-[var(--color-border)] py-1.5">
+                   <span className="w-10 text-center font-mono font-bold text-xs select-none text-neutral-950 border-r border-[var(--color-border)] py-1">
                      {quantity}
                    </span>
                    <button
@@ -1779,7 +2208,7 @@ function ProductDetail() {
                        }
                        setQuantity(prev => prev + 1);
                      }}
-                     className="w-9 h-9 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 cursor-pointer select-none transition-colors text-neutral-950"
+                     className="w-8 h-8 flex items-center justify-center font-bold text-sm hover:bg-neutral-100 cursor-pointer select-none transition-colors text-neutral-950"
                    >
                      <FiPlus size={13} strokeWidth={2.5} />
                    </button>
@@ -1788,10 +2217,23 @@ function ProductDetail() {
              </div>
 
 
-            {/* Extra bottom padding on mobile so content isn't hidden behind sticky bar */}
-            <div className="h-24 lg:hidden" aria-hidden="true" />
+            {/* Return Policy Banner (Mobile Only - Compact flow) */}
+            <div className="md:hidden flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-2.5 rounded-none mt-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
+                returnPolicy === "No Return" ? "bg-rose-500" :
+                returnPolicy === "Exchange Only" ? "bg-amber-500" :
+                returnPolicy === "Return Only" ? "bg-blue-500" : "bg-emerald-500"
+              }`} />
+              <p className="font-mono text-[10px] uppercase tracking-wide">
+                {returnPolicy === "No Return" ? "No return or exchange active." :
+                 returnPolicy === "Exchange Only" ? "7-Day exchange only active." :
+                 returnPolicy === "Return Only" ? "7-Day return only active." :
+                 "7-Day returns & exchanges active."}
+              </p>
+            </div>
 
-            <div className="hidden md:block space-y-4 pt-2 border-t border-neutral-150">
+            {/* Desktop Action Buttons (Hidden on mobile where sticky bottom bar handles actions) */}
+            <div className="hidden md:block space-y-2.5 pt-2 border-t border-neutral-150">
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex gap-3 w-full sm:w-auto sm:flex-1">
@@ -1859,12 +2301,16 @@ function ProductDetail() {
                       disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
                       className="w-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 px-2 sm:px-4 md:px-6 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : 'Buy Now'}
+                      {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : (
+                        <span className="flex items-center gap-1.5 justify-center">
+                          <FiZap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" /> Buy Now
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
+                <div className="hidden md:flex items-center gap-2 text-[var(--color-muted)] text-xs bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-none">
                   <span className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
                     returnPolicy === "No Return" ? "bg-rose-500" :
                     returnPolicy === "Exchange Only" ? "bg-amber-500" :
@@ -1945,7 +2391,7 @@ function ProductDetail() {
                       }
                     }}
                     placeholder="ENTER 6-DIGIT PINCODE"
-                    className="w-full bg-[var(--color-subtle)] border border-[var(--color-border)] focus:border-[var(--color-accent)] focus:bg-[var(--color-surface)] rounded-none pl-8 pr-4 py-2 text-xs font-mono text-[var(--color-text)] placeholder-[var(--color-muted)] outline-none tracking-widest transition-all"
+                    className="w-full bg-white border border-zinc-300 focus:border-zinc-900 rounded-none pl-8 pr-4 py-2 text-xs font-mono text-zinc-900 placeholder:text-zinc-400 outline-none tracking-widest transition-all"
                   />
                 </div>
                 <button
@@ -2013,21 +2459,21 @@ function ProductDetail() {
               )}
             </div>
 
-            <div className="border-t border-b border-[var(--color-border)] divide-y divide-neutral-200">
+            <div className="border-t border-b border-[var(--color-border)] divide-y divide-neutral-200 mt-4">
 
               {displayDescription && (
                 <div className="py-3.5">
                   <button
                     onClick={() => setDescExpanded(!descExpanded)}
-                    className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none"
+                    className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none cursor-pointer"
                   >
-                    <span>Description</span>
+                    <span>DESCRIPTION & SPECIFICATIONS</span>
                     {descExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                   </button>
-                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-40 mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <p className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] p-4 rounded-none border border-neutral-950/10">
-                      {displayDescription}
-                    </p>
+                  <div className={`transition-all duration-300 overflow-hidden ${descExpanded ? 'max-h-[800px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-xl">
+                      <RenderMarkdown content={displayDescription} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -2037,34 +2483,70 @@ function ProductDetail() {
                   onClick={() => setShippingExpanded(!shippingExpanded)}
                   className="w-full flex items-center justify-between text-left text-xs font-mono font-bold tracking-wider text-[var(--color-text)] uppercase focus:outline-none cursor-pointer"
                 >
-                  <span><FiTruck className="inline mr-2 text-sm" /> Returns & Exchanges</span>
+                  <span>RETURNS & EXCHANGES</span>
                   {shippingExpanded ? <FiChevronUp className="text-base" /> : <FiChevronDown className="text-base" />}
                 </button>
-                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-[350px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)]/40 border border-white/20 backdrop-blur-md p-4 rounded-xl shadow-2xs space-y-2.5">
+                <div className={`transition-all duration-300 overflow-hidden ${shippingExpanded ? 'max-h-[400px] mt-2.5 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="text-xs text-[var(--color-muted)] leading-relaxed bg-[var(--color-surface)] border border-[var(--color-border)] p-4 space-y-3 font-medium">
                     {returnPolicy === "No Return" || returnPolicy.toLowerCase().includes("no return") ? (
                       <>
-                        <p className="text-rose-600 font-bold">&bull; Return policy: All sales are final. No returns or exchanges accepted.</p>
-                        <p>&bull; Please refer to the size chart carefully before placing your order.</p>
-                        <p>&bull; Replacement or refund is only applicable if you receive a damaged or wrong product (with unboxing video proof).</p>
+                        <p className="text-rose-600 font-bold flex items-start gap-2">
+                          <FiAlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <span><strong>Non-Returnable Item Policy:</strong> Final sale — standard returns or size exchanges are not accepted for this item.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <RulerIcon className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>Please check the size chart carefully before placing your order.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <FiVideo className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span><strong>Damaged or Wrong Item:</strong> Replacement is only provided if you receive a damaged or incorrect product (unboxing video proof required).</span>
+                        </p>
                       </>
                     ) : returnPolicy === "Return Only" || returnPolicy.toLowerCase().includes("return only") || returnPolicy.toLowerCase().includes("no exchange") ? (
                       <>
-                        <p className="text-amber-700 font-semibold">&bull; Return policy: Easy 7-day return guarantee for a full refund.</p>
-                        <p>&bull; No direct exchanges available; please return the item and place a new order.</p>
-                        <p>&bull; Items must be kept in original condition with tags to process the return.</p>
+                        <p className="text-amber-700 dark:text-amber-400 font-bold flex items-start gap-2">
+                          <FiPackage className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <span><strong>Return Only Policy:</strong> Easy 7-day return guarantee for refund.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <FiRefreshCw className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>Direct size exchanges are not offered for this product; please return for a refund and place a new order.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <FiTag className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>Items must be unused, unwashed, and with all original brand tags intact.</span>
+                        </p>
                       </>
                     ) : returnPolicy === "Exchange Only" || returnPolicy.toLowerCase().includes("exchange only") ? (
                       <>
-                        <p className="text-amber-700 font-semibold">&bull; Exchange policy: Easy 7-day size or defect exchanges.</p>
-                        <p>&bull; All sales are final; no monetary refunds are processed.</p>
-                        <p>&bull; Exchange request must be created within 7 days of delivery with original tags.</p>
+                        <p className="text-amber-700 dark:text-amber-400 font-bold flex items-start gap-2">
+                          <FiRefreshCw className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <span><strong>Exchange Only Policy:</strong> Easy 7-day size or defect exchange available.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <FiSlash className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>Monetary refunds are not processed for this item; only size/color replacements are accepted.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <FiTag className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>Request an exchange within 7 days of delivery with original tags intact.</span>
+                        </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-emerald-700 font-semibold">&bull; Return & Exchange policy: Easy 7-day hassle-free returns and exchanges.</p>
-                        <p>&bull; In case of sizing issues or defects, request an exchange within 7 days of delivery.</p>
-                        <p>&bull; Items must be unused, unwashed, and with original tags intact.</p>
+                        <p className="text-emerald-600 dark:text-emerald-400 font-bold flex items-start gap-2">
+                          <FiCheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <span><strong>7-Day Return & Exchange Policy:</strong> Easy 7-day hassle-free returns and size exchanges.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <ShieldCheckIcon className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>In case of sizing issues or defects, request a return or size exchange within 7 days of delivery.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <FiTag className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                          <span>Items must be unused, unwashed, and with all original brand tags intact.</span>
+                        </p>
                       </>
                     )}
                   </div>
@@ -2113,15 +2595,17 @@ function ProductDetail() {
 
                       <div className="w-full h-full relative overflow-hidden">
                         <img
-                          src={frontView}
+                          src={getOptimizedImageUrl(frontView, 500, 75)}
                           alt={item.name}
                           loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
                         />
                         <img  
-                          src={backView}
+                          src={getOptimizedImageUrl(backView, 500, 75)}
                           alt={item.name}
                           loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
                         />
                       </div>
@@ -2155,107 +2639,6 @@ function ProductDetail() {
             </div>
           </div>
         )}
-
-        {/* Recently Viewed Products */}
-        {(() => {
-          const saved = localStorage.getItem('recently_viewed');
-          let viewedIds = [];
-          if (saved) {
-            try {
-              viewedIds = JSON.parse(saved);
-            } catch {
-              viewedIds = [];
-            }
-          }
-          const currentId = product?.$id || product?.id;
-          const filteredIds = viewedIds.filter(id => id !== currentId);
-          
-          const viewedProducts = filteredIds
-            .map(id => products.find(p => p.$id === id || p.id === id))
-            .filter(Boolean)
-            .slice(0, 4);
-
-          if (viewedProducts.length === 0) return null;
-
-          return (
-            <div className="pt-12 border-t border-[var(--color-border)] space-y-6">
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--color-text)] font-display uppercase">
-                  Recently Viewed
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-                {viewedProducts.map((item) => {
-                  const uniqueId = item.$id || item.id;
-                  const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';
-                  const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
-                  const activeTag = item.tag || (item.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
-
-                  return (
-                    <div 
-                      key={uniqueId} 
-                      onClick={() => {
-                        navigate(`/product/${item.slug || uniqueId}`);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} 
-                      className="group relative flex flex-col bg-[var(--color-surface)] rounded-none p-2 border border-neutral-955/10 hover:border-[var(--color-accent)] transition-all duration-300 cursor-pointer overflow-hidden rounded-xl hover:shadow-md"
-                    >
-                      <div className="w-full aspect-[3/4] overflow-hidden bg-neutral-100 relative border border-[var(--color-border)]/50 rounded-xl">
-                        
-                        {activeTag ? (
-                          <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
-                            <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
-                              {activeTag}
-                            </span>
-                          </div>
-                        ) : null}
-
-                        <div className="w-full h-full relative overflow-hidden">
-                          <img
-                            src={frontView}
-                            alt={item.name}
-                            loading="lazy"
-                            className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
-                          />
-                          <img  
-                            src={backView}
-                            alt={`${item.name} alternate frame`}
-                            loading="lazy"
-                            className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-3 px-1 flex flex-col justify-between grow">
-                        <div>
-                          <span className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider block mb-0.5">
-                            {item.category?.replace('-', ' ') || "Collection"}
-                          </span>
-                          <h3 className="text-xs font-bold text-neutral-950 uppercase group-hover:text-[var(--color-muted)] transition-colors truncate">
-                            {item.name}
-                          </h3>
-                        </div>
-                        
-                        <div className="mt-3 pt-2 border-t border-neutral-950/10 flex items-center justify-between gap-4">
-                          <div className="flex items-baseline gap-1.5 font-mono">
-                            <span className="text-sm font-bold text-neutral-950">
-                              ₹{Number(item.price).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                          <span className="text-[9px] font-sans font-bold uppercase tracking-wide text-[var(--color-muted)] whitespace-nowrap">
-                            INCL. TAXES
-                          </span>
-                        </div>
-                      </div>
-
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
 
         <div id="reviews-section" className="pt-16 border-t border-[var(--color-border)] space-y-8">
           <div>
@@ -2456,12 +2839,13 @@ function ProductDetail() {
                     </button>
                   </form>
                 ) : (
-                  <div className="text-center py-6 px-4 border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 rounded-none space-y-3">
-                    <p className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider leading-relaxed">
-                      Review Lock Active
-                    </p>
-                    <p className="text-xs text-[var(--color-muted)] leading-relaxed font-sans">
-                      Reviews are restricted to verified purchasers of this item. To submit a review, you must have an order for this product marked as <strong className="text-neutral-950 font-bold">Delivered</strong> in your profile history.
+                  <div className="p-5 border border-dashed border-amber-500/30 bg-amber-500/5 rounded-xl space-y-2 text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 text-amber-600 font-bold text-xs uppercase tracking-wider">
+                      <span className="text-base">🔒</span>
+                      <span>Verified Buyers Only</span>
+                    </div>
+                    <p className="text-xs text-[var(--color-muted)] leading-relaxed font-medium">
+                      Reviews can only be submitted by customers who have purchased and received this product. Once your order status is marked as <strong className="text-[var(--color-text)] font-bold uppercase">Delivered</strong> in your profile history, the review form will unlock automatically!
                     </p>
                   </div>
                 )}
@@ -2569,11 +2953,13 @@ function ProductDetail() {
                                   key={idx}
                                   type="button"
                                   onClick={() => setActiveReviewImage(img)}
-                                  className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-zoom-in shadow-xs bg-[var(--color-surface)]/20"
+                                  className="group relative w-20 h-20 overflow-hidden rounded-xl border border-[var(--color-border)] hover:border-[var(--color-accent)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-xs bg-[var(--color-surface)]/20"
                                 >
                                   <img
-                                    src={img}
+                                    src={getOptimizedImageUrl(img, 180, 75)}
                                     alt={`Customer image ${idx + 1}`}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                     onError={(e) => { e.target.style.display = 'none'; }}
                                   />
@@ -2611,19 +2997,20 @@ function ProductDetail() {
             onClick={() => setIsSizeChartOpen(false)}
           />
 
-          <div className="relative bg-[var(--color-surface)] rounded-none max-w-md w-full shadow-2xl p-6 border border-neutral-950 z-10 animate-scale-up space-y-6 text-[var(--color-text)]">
+          <div className="relative bg-[var(--color-surface)] rounded-2xl max-w-lg w-full shadow-2xl p-6 border border-[var(--color-border)] z-10 animate-scale-up space-y-5 text-[var(--color-text)] max-h-[90vh] overflow-y-auto scrollbar-none">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
               <div>
-                <h3 className="text-sm font-mono font-bold uppercase tracking-[0.2em] text-neutral-950">
-                  📏 VAKRAYAN SIZE GUIDE
+                <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--color-text)] flex items-center gap-2">
+                  <span>📏</span>
+                  <span>VAKRAYAN SIZE GUIDE</span>
                 </h3>
-                <p className="text-[10px] text-[var(--color-muted)] font-mono font-bold uppercase tracking-wider mt-0.5">
-                  Size chart for boxy and oversized fits
+                <p className="text-[11px] text-[var(--color-muted)] tracking-wide mt-0.5">
+                  Measurements for boxy & oversized fits
                 </p>
               </div>
               <button 
                 onClick={() => setIsSizeChartOpen(false)}
-                className="text-[var(--color-muted)] hover:text-neutral-950 p-2 transition-colors cursor-pointer"
+                className="text-[var(--color-muted)] hover:text-[var(--color-text)] p-2 transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -2631,52 +3018,103 @@ function ProductDetail() {
               </button>
             </div>
 
-            <div className="overflow-hidden border border-neutral-950">
+            {/* Custom Uploaded Size Chart Image (If Available) */}
+            {customSizeChartImage && (
+              <div className="space-y-2 border border-[var(--color-border)] p-2 rounded-xl bg-[var(--color-bg)]">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] block px-1">
+                  Product Specific Size Chart:
+                </span>
+                <img 
+                  src={getOptimizedImageUrl(customSizeChartImage, 800, 80)} 
+                  alt="Product Size Chart" 
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-auto rounded-lg object-contain max-h-72 border border-[var(--color-border)]/50"
+                />
+              </div>
+            )}
+
+            {/* Unit Toggle Switcher (IN vs CM) */}
+            <div className="flex items-center justify-between bg-[var(--color-bg)] p-2.5 rounded-xl border border-[var(--color-border)]">
+              <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-wider">
+                MEASUREMENT UNIT:
+              </span>
+              <div className="inline-flex rounded-lg p-0.5 bg-[var(--color-surface)] border border-[var(--color-border)]">
+                <button
+                  type="button"
+                  onClick={() => setSizeUnit('IN')}
+                  className={`px-3 py-1 text-[11px] font-mono font-bold rounded-md transition-all cursor-pointer ${
+                    sizeUnit === 'IN' 
+                      ? 'bg-neutral-900 text-white shadow-xs' 
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  INCHES (IN)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSizeUnit('CM')}
+                  className={`px-3 py-1 text-[11px] font-mono font-bold rounded-md transition-all cursor-pointer ${
+                    sizeUnit === 'CM' 
+                      ? 'bg-neutral-900 text-white shadow-xs' 
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  CENTIMETERS (CM)
+                </button>
+              </div>
+            </div>
+
+            {/* Size Table */}
+            <div className="overflow-x-auto border border-[var(--color-border)] rounded-xl">
               <table className="w-full text-left text-xs font-mono uppercase font-bold">
                 <thead>
-                  <tr className="bg-[var(--color-surface)] border-b border-neutral-955 text-[10px] font-black text-[var(--color-muted)]">
+                  <tr className="bg-[var(--color-bg)] border-b border-[var(--color-border)] text-[10px] font-black text-[var(--color-muted)]">
                     <th className="p-3">SIZE</th>
-                    <th className="p-3">CHEST (IN)</th>
-                    <th className="p-3">SHOULDER (IN)</th>
-                    <th className="p-3">LENGTH (IN)</th>
+                    <th className="p-3">CHEST ({sizeUnit})</th>
+                    <th className="p-3">SHOULDER ({sizeUnit})</th>
+                    <th className="p-3">LENGTH ({sizeUnit})</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-100 font-bold text-[var(--color-text)]">
+                <tbody className="divide-y divide-[var(--color-border)] font-bold text-[var(--color-text)]">
                   {[
-                    { size: 'XS', chest: '42', shoulder: '19', length: '27.5' },
-                    { size: 'S', chest: '44', shoulder: '20', length: '28' },
-                    { size: 'M', chest: '46', shoulder: '21', length: '29' },
-                    { size: 'L', chest: '48', shoulder: '22', length: '30' },
-                    { size: 'XL', chest: '50', shoulder: '23', length: '31' },
-                    { size: 'XXL', chest: '52', shoulder: '24', length: '32' }
-                  ].map((row) => (
-                    <tr 
-                      key={row.size} 
-                      className={`hover:bg-[var(--color-surface)] transition-colors ${
-                        selectedSize === row.size ? 'bg-[var(--color-surface)] font-black text-neutral-950' : ''
-                      }`}
-                    >
-                      <td className="p-3 font-sans font-black">{row.size} {selectedSize === row.size && '•'}</td>
-                      <td className="p-3">{row.chest}</td>
-                      <td className="p-3">{row.shoulder}</td>
-                      <td className="p-3">{row.length}</td>
-                    </tr>
-                  ))}
+                    { size: 'XS', chest: 42, shoulder: 19, length: 27.5 },
+                    { size: 'S', chest: 44, shoulder: 20, length: 28 },
+                    { size: 'M', chest: 46, shoulder: 21, length: 29 },
+                    { size: 'L', chest: 48, shoulder: 22, length: 30 },
+                    { size: 'XL', chest: 50, shoulder: 23, length: 31 },
+                    { size: 'XXL', chest: 52, shoulder: 24, length: 32 }
+                  ].map((row) => {
+                    const formatVal = (val) => sizeUnit === 'CM' ? (val * 2.54).toFixed(1) : val.toString();
+                    return (
+                      <tr 
+                        key={row.size} 
+                        className={`hover:bg-[var(--color-bg)] transition-colors ${
+                          selectedSize === row.size ? 'bg-amber-500/10 font-black text-amber-900 dark:text-amber-300' : ''
+                        }`}
+                      >
+                        <td className="p-3 font-sans font-black">{row.size} {selectedSize === row.size && '•'}</td>
+                        <td className="p-3">{formatVal(row.chest)}</td>
+                        <td className="p-3">{formatVal(row.shoulder)}</td>
+                        <td className="p-3">{formatVal(row.length)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-[10px] uppercase font-bold text-[var(--color-muted)] tracking-wide leading-relaxed">
-              <span className="font-black text-[var(--color-text)] block mb-0.5">💡 VAKRAYAN FIT MEMENTO</span>
-              Our cuts are designed for a relaxed, slightly boxy drop-shoulder aesthetic. For a fitted standard silhouette, we recommend choosing one size smaller.
+            <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl text-xs font-medium text-amber-900 leading-relaxed">
+              <span className="font-bold block mb-0.5 text-amber-950">💡 Fit Recommendation:</span>
+              Our cuts are designed for a relaxed, slightly boxy drop-shoulder aesthetic. If you prefer a regular fitted silhouette, select one size smaller.
             </div>
 
             <button
               type="button"
               onClick={() => setIsSizeChartOpen(false)}
-              className="w-full py-3 bg-neutral-950 hover:bg-neutral-850 transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-white rounded-none cursor-pointer text-center"
+              className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 transition-all text-xs font-semibold uppercase tracking-wider text-white rounded-xl cursor-pointer text-center shadow-xs"
             >
-              Close Guide
+              Close Size Guide
             </button>
           </div>
         </div>
@@ -2900,7 +3338,11 @@ function ProductDetail() {
               disabled={isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0)}
               className="w-full h-full flex items-center justify-center gap-2 font-bold text-xs tracking-widest uppercase py-4 rounded-none transition-all select-none cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white border border-neutral-950 disabled:bg-neutral-200 disabled:text-[var(--color-muted)] disabled:border-neutral-300 disabled:cursor-not-allowed whitespace-nowrap"
             >
-              {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? '✕ Sold Out' : '⚡ Buy Now'}
+              {isAllOutOfStock || (selectedSize && stocks[selectedSize] === 0) ? 'Sold Out' : (
+                <span className="flex items-center gap-1.5">
+                  <FiZap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" /> Buy Now
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -3014,11 +3456,18 @@ function ProductDetail() {
               ref={lightboxContainerRef}
               className={`relative max-w-full max-h-[75vh] w-auto h-auto flex items-center justify-center ${lightboxZoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
             >
+              {/* Spinner while high-res image resolves */}
+              {!lightboxImageLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-9 h-9 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                </div>
+              )}
               <img
                 ref={lightboxImageRef}
-                src={activeImage}
+                src={getOptimizedImageUrl(activeImage, 1200, 80)}
                 alt="Product Detail Expanded"
-                className="max-w-full max-h-[75vh] object-contain transition-transform duration-100 ease-out select-none pointer-events-none"
+                onLoad={() => setLightboxImageLoaded(true)}
+                className={`max-w-full max-h-[75vh] object-contain transition-opacity duration-150 select-none pointer-events-none ${lightboxImageLoaded ? 'opacity-100' : 'opacity-30'}`}
                 style={{
                   transform: `translate(${lightboxOffset.x}px, ${lightboxOffset.y}px) scale(${lightboxZoom})`,
                 }}
@@ -3050,6 +3499,9 @@ function ProductDetail() {
                     key={idx}
                     type="button"
                     onClick={() => {
+                      if (activeImageIndex !== idx) {
+                        setLightboxImageLoaded(false);
+                      }
                       setActiveImageIdx(idx);
                       setLightboxZoom(1);
                       setLightboxOffset({ x: 0, y: 0 });
@@ -3070,7 +3522,13 @@ function ProductDetail() {
                     }}
                     className={`w-10 h-12 border transition-all duration-300 shrink-0 ${activeImageIndex === idx ? 'border-white scale-95 shadow-lg' : 'border-white/25 opacity-60 hover:opacity-100'}`}
                   >
-                    <img src={imgUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                    <img 
+                      src={getOptimizedImageUrl(imgUrl, 100, 75)} 
+                      alt="Thumbnail preview" 
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover" 
+                    />
                   </button>
                 ))}
               </div>

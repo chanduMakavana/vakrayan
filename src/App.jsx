@@ -11,6 +11,10 @@ import { setCartItems } from './features/addToCart'
 import { sendWebhookNotification } from './utils/webhookHelper'
 import { hydrateCartFromDb } from './utils/cartMergeHelper'
 import { loadGuestCartItems } from './utils/guestCartHelper'
+import slidesService from './services/slides'
+import categoryService from './services/category'
+import campaignService from './services/campaign'
+import { preloadProductBatch, preloadImage, getOptimizedImageUrl } from './utils/imageOptimizer'
 
 // Static imports — always needed immediately
 import ProtectedRoute from './componets/ProtectedRoute'
@@ -53,8 +57,8 @@ const lazyWithRetry = (importFn) =>
 
 const shopImporter = () => import('./componets/page/Shop')
 const productDetailImporter = () => import('./componets/page/ProductDetail')
+import Home from './componets/page/Home'
 
-const Home          = lazyWithRetry(() => import('./componets/page/Home'))
 const SignUp        = lazyWithRetry(() => import('./componets/page/SignUp'))
 const Login         = lazyWithRetry(() => import('./componets/page/Login'))
 const ResetPassword = lazyWithRetry(() => import('./componets/page/ResetPassword'))
@@ -88,7 +92,9 @@ function PageWrapper({ children }) {
       exit="exit"
       style={{ width: '100%' }}
     >
-      {children}
+      <main id="main-content" className="flex-1 w-full" tabIndex="-1">
+        {children}
+      </main>
     </motion.div>
   )
 }
@@ -240,191 +246,233 @@ function AppContent() {
     }
   }, [currentUser])
 
-  // ✅ PERFORMANCE FIX: criticalImagesLoaded was removed as a loading blocker.
-  // Images loading (especially slow Unsplash URLs on mobile) was blocking the entire
-  // app render for 5-10 seconds. Images now load progressively in the background.
-  // Auth + fonts resolve quickly, and products are fetched in parallel.
+  // Initial loading gate — holds splash screen until background assets & data resolve
   const loading = authLoading || !fontsLoaded
-  // ✅ PERFORMANCE FIX: Removed !productsFetched from loading gate.
-  // Products now load in the background — Shop/Home show skeleton loaders instead.
-  // Previously, a slow Firebase products fetch blocked the ENTIRE app for 3-10 seconds.
 
   useEffect(() => {
-    // Initialize foreground push notification listener
-    listenForForegroundMessages();
+    let mounted = true
+    listenForForegroundMessages()
 
-    // Check if Google login session has expired (1 hour limit)
-    const googleSessionExpiry = localStorage.getItem('google_session_expiry');
-    if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
-      console.warn('Google session expired (1 hour limit reached). Logging out.');
-      localStorage.removeItem('google_session_expiry');
-      localStorage.removeItem('remember_me');
-      sessionStorage.removeItem('session_active');
-      authService.logout()
-        .then(() => {
-          dispatch(logoutAction());
-          const guestItems = loadGuestCartItems();
-          dispatch(setCartItems(guestItems));
-          showToast('Google session expired. Please log in again.', 'warning');
-        })
-        .finally(() => {
-          dispatch(setLoading(false));
-        });
-      return;
+    const warmupApp = async () => {
+      const startTime = Date.now()
+
+      // 1. Auth check & session recovery
+      const authTask = (async () => {
+        try {
+          const googleSessionExpiry = localStorage.getItem('google_session_expiry')
+          if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
+            localStorage.removeItem('google_session_expiry')
+            localStorage.removeItem('remember_me')
+            sessionStorage.removeItem('session_active')
+            await authService.logout().catch(() => {})
+            dispatch(logoutAction())
+            const guestItems = loadGuestCartItems()
+            dispatch(setCartItems(guestItems))
+            return
+          }
+
+          const userData = await authService.getCurrentUser()
+          if (userData) {
+            const rememberMe = localStorage.getItem('remember_me') === 'true'
+            const sessionActive = sessionStorage.getItem('session_active') === 'true'
+
+            if (!rememberMe && !sessionActive) {
+              await authService.logout()
+              localStorage.removeItem('remember_me')
+              sessionStorage.removeItem('session_active')
+              dispatch(logoutAction())
+              const guestItems = loadGuestCartItems()
+              dispatch(setCartItems(guestItems))
+              return
+            }
+
+            sessionStorage.setItem('session_active', 'true')
+            dispatch(loginAction({ user: userData }))
+
+            if (typeof window !== "undefined" && Notification.permission === "granted") {
+              requestNotificationPermission(userData.$id)
+            }
+
+            // Webhook trigger for fresh signups
+            const createdAtStr = userData.$createdAt || userData.registration
+            if (createdAtStr) {
+              const createdAtTime = new Date(createdAtStr).getTime()
+              const timeDiff = Math.abs(Date.now() - createdAtTime)
+              const hasSentKey = `sent_signup_${userData.$id || userData.id}`
+              const prefs = userData.prefs || {}
+              if (timeDiff < 600000 && !localStorage.getItem(hasSentKey) && !prefs.signup_notified) {
+                localStorage.setItem(hasSentKey, 'true')
+                authService.updatePreferences({ ...prefs, signup_notified: true })
+                  .catch(err => console.warn('Failed to update signup preference:', err.message))
+                sendWebhookNotification('user.signup', {
+                  name: userData.name || 'Anonymous',
+                  email: userData.email,
+                  userId: userData.$id || userData.id,
+                })
+              }
+            }
+
+            await hydrateCartFromDb(userData.$id, dispatch)
+          } else {
+            dispatch(logoutAction())
+            const guestItems = loadGuestCartItems()
+            dispatch(setCartItems(guestItems))
+          }
+        } catch (err) {
+          console.error("Session recovery error on mount:", err)
+          dispatch(logoutAction())
+        }
+      })()
+
+      // 2. Products Catalog & Image Cache Warmup
+      const productsTask = (async () => {
+        try {
+          const prods = await productsService.getProducts()
+          const list = Array.isArray(prods) ? prods : []
+          dispatch(setProducts(list))
+          // Preload product front & back images in browser memory cache
+          if (list.length > 0) {
+            preloadProductBatch(list, 8)
+          }
+        } catch (prodErr) {
+          console.error("Failed to preload products:", prodErr)
+          dispatch(setProducts([]))
+        }
+      })()
+
+      // 3. Hero Slides & Banner Images
+      const slidesTask = (async () => {
+        try {
+          const slides = await slidesService.getSlides()
+          if (Array.isArray(slides) && slides.length > 0) {
+            slides.forEach(s => {
+              if (s.image) preloadImage(getOptimizedImageUrl(s.image, 1600, 75), true)
+              if (s.mobileImage) preloadImage(getOptimizedImageUrl(s.mobileImage, 800, 75), true)
+            })
+          }
+        } catch (slideErr) {
+          console.error("Failed to preload slides:", slideErr)
+        }
+      })()
+
+      // 4. Offers & Bundle Discounts
+      const offersTask = (async () => {
+        try {
+          const loadedOffers = await offersService.getOffers()
+          dispatch(setOffers(Array.isArray(loadedOffers) ? loadedOffers : []))
+        } catch (offersErr) {
+          dispatch(setOffers([]))
+        }
+      })()
+
+      // 5. Category Configs & Promo Texts
+      const metaTask = (async () => {
+        try {
+          await Promise.allSettled([
+            categoryService.getCategoryConfigs(),
+            campaignService.getPromoText()
+          ])
+        } catch (metaErr) {
+          // Meta tasks failing is non-critical — log in dev only
+          if (import.meta.env.DEV) {
+            console.warn('[App] metaTask error (non-critical):', metaErr)
+          }
+        }
+      })()
+
+      // 6. Google Web Fonts Loading
+      const fontsTask = (async () => {
+        if (typeof document !== 'undefined' && document.fonts) {
+          await document.fonts.ready.catch(() => {})
+        }
+      })()
+
+      // Wait for all critical background tasks concurrently
+      await Promise.allSettled([
+        authTask,
+        productsTask,
+        slidesTask,
+        offersTask,
+        metaTask,
+        fontsTask
+      ])
+
+      if (mounted) {
+        setFontsLoaded(true)
+        dispatch(setLoading(false))
+      }
     }
 
-    // ── AUTH: Restore session ─────────────────────────────────────────────────
-    authService.getCurrentUser()
-      .then(async (userData) => {
-        if (userData) {
-          const rememberMe = localStorage.getItem('remember_me') === 'true';
-          const sessionActive = sessionStorage.getItem('session_active') === 'true';
+    warmupApp()
 
-          if (!rememberMe && !sessionActive) {
-            // Log out immediately from Firebase since the user didn't request remember me
-            // and this is a new browser/tab session.
-            await authService.logout();
-            localStorage.removeItem('remember_me');
-            sessionStorage.removeItem('session_active');
-            dispatch(logoutAction());
-            const guestItems = loadGuestCartItems();
-            dispatch(setCartItems(guestItems));
-            return;
-          }
-
-          // Mark session active for the duration of this tab/browser session
-          sessionStorage.setItem('session_active', 'true');
-          dispatch(loginAction({ user: userData }))
-
-          if (typeof window !== "undefined" && Notification.permission === "granted") {
-            requestNotificationPermission(userData.$id);
-          }
-
-          // Check for new user signups (within 10 min) to trigger webhook
-          const createdAtStr = userData.$createdAt || userData.registration
-          if (createdAtStr) {
-            const createdAtTime = new Date(createdAtStr).getTime()
-            const timeDiff = Math.abs(Date.now() - createdAtTime)
-            const hasSentKey = `sent_signup_${userData.$id || userData.id}`
-            const prefs = userData.prefs || {}
-            if (timeDiff < 600000 && !localStorage.getItem(hasSentKey) && !prefs.signup_notified) {
-              localStorage.setItem(hasSentKey, 'true')
-              authService.updatePreferences({ ...prefs, signup_notified: true })
-                .catch(err => console.warn('Failed to update signup_notified preference:', err.message))
-              sendWebhookNotification('user.signup', {
-                name: userData.name || 'Anonymous',
-                email: userData.email,
-                userId: userData.$id || userData.id,
-              })
-            }
-          }
-
-          // ✅ DEDUP FIX: hydrateCartFromDb replaces the duplicated merge+fetch+dispatch
-          // pattern that existed in both App.jsx and Login.jsx.
-          await hydrateCartFromDb(userData.$id, dispatch)
-        } else {
-          dispatch(logoutAction())
-
-          // Hydrate guest cart from localStorage for unauthenticated users
-          const guestItems = loadGuestCartItems()
-          dispatch(setCartItems(guestItems))
-        }
-      })
-      .catch((error) => {
-        console.error('Session recovery failed on mount:', error)
-        dispatch(logoutAction())
-      })
-      .finally(() => {
+    // Global Fail-Safe: Dismiss loader after max 2.8s even on ultra-slow connection
+    const maxTimer = setTimeout(() => {
+      if (mounted) {
+        setFontsLoaded(true)
         dispatch(setLoading(false))
-      })
+      }
+    }, 2800)
 
-    // ── PRODUCTS: Fetch catalog in parallel with auth ─────────────────────────
-    productsService.getProducts()
-      .then((loadedProducts) => {
-        const normalized = Array.isArray(loadedProducts) ? loadedProducts : []
-        dispatch(setProducts(normalized))
-      })
-      .catch((prodError) => {
-        console.error('Failed to preload products:', prodError)
-        dispatch(setProducts([]))
-      })
+    return () => {
+      mounted = false
+      clearTimeout(maxTimer)
+    }
+  }, [dispatch]) // eslint-disable-line react-hooks/exhaustive-deps
+  // showToast is intentionally excluded: it is created with useCallback([], []) and
+  // is guaranteed stable. Including it would re-trigger the entire app warmup
+  // (auth check, product fetch) on every parent re-render.
 
-    // ── OFFERS: Fetch bundle offers in parallel ───────────────────────────────
-    offersService.getOffers()
-      .then((loadedOffers) => {
-        const normalized = Array.isArray(loadedOffers) ? loadedOffers : []
-        dispatch(setOffers(normalized))
-      })
-      .catch((offersError) => {
-        console.error('Failed to preload offers:', offersError)
-        dispatch(setOffers([]))
-      })
-  }, [dispatch, showToast])
-
-  // Enforce Google session expiration check (runs on route change AND periodically every 10s)
+  // Periodic Google session expiration check (every 60s)
   useEffect(() => {
     const checkExpiry = () => {
-      const googleSessionExpiry = localStorage.getItem('google_session_expiry');
+      const googleSessionExpiry = localStorage.getItem('google_session_expiry')
       if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
-        console.warn('Google session expired (1 hour limit). Logging out.');
-        localStorage.removeItem('google_session_expiry');
-        localStorage.removeItem('remember_me');
-        sessionStorage.removeItem('session_active');
-        localStorage.removeItem('current_session_id');
+        localStorage.removeItem('google_session_expiry')
+        localStorage.removeItem('remember_me')
+        sessionStorage.removeItem('session_active')
+        localStorage.removeItem('current_session_id')
         authService.logout()
           .then(() => {
-            dispatch(logoutAction());
-            const guestItems = loadGuestCartItems();
-            dispatch(setCartItems(guestItems));
-            showToast('Google session expired (1 hour limit). Please log in again.', 'warning');
+            dispatch(logoutAction())
+            const guestItems = loadGuestCartItems()
+            dispatch(setCartItems(guestItems))
+            showToast('Google session expired. Please log in again.', 'warning')
           })
-          .catch(err => console.error('Failed to log out expired Google session:', err));
+          .catch(err => console.error('Failed to log out expired session:', err))
       }
-    };
+    }
 
-    checkExpiry();
-    const intervalId = setInterval(checkExpiry, 10000);
-    return () => clearInterval(intervalId);
-  }, [location.pathname, dispatch, showToast]);
+    checkExpiry()
+    const intervalId = setInterval(checkExpiry, 60000)
+    return () => clearInterval(intervalId)
+  }, [dispatch, showToast]) // eslint-disable-line react-hooks/exhaustive-deps
+  // location.pathname intentionally excluded: the interval must not be torn down
+  // and recreated on every navigation — only on mount/unmount.
 
-  // ✅ FIX: Re-filter products when adminMode changes (replaces the localStorage read inside reducer)
+  // Re-filter products when adminMode changes
   useEffect(() => {
     dispatch(filterProductsForMode(adminMode))
   }, [adminMode, dispatch])
 
-  // Background preloading of critical route chunks after initial page mount (idle time)
+  // Background preloading of critical route chunks during browser idle time
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const load = () => {
       shopImporter()
       productDetailImporter()
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [])
-
-  // Fonts: wait for Google Fonts with a strict 500ms safety timeout
-  useEffect(() => {
-    let mounted = true
-    const timeout = setTimeout(() => {
-      if (mounted) setFontsLoaded(true)
-    }, 500)
-
-    if (typeof document !== 'undefined' && document.fonts) {
-      document.fonts.ready
-        .then(() => { if (mounted) setFontsLoaded(true) })
-        .catch(() => { if (mounted) setFontsLoaded(true) })
-        .finally(() => clearTimeout(timeout))
+    }
+    // requestIdleCallback defers until browser is idle, preventing competition
+    // with the critical auth+product warmup sequence on initial load.
+    if ('requestIdleCallback' in window) {
+      const id = requestIdleCallback(load, { timeout: 3000 })
+      return () => cancelIdleCallback(id)
     } else {
-      setFontsLoaded(true)
-      clearTimeout(timeout)
-    }
-
-    return () => {
-      mounted = false
-      clearTimeout(timeout)
+      // Safari fallback
+      const timer = setTimeout(load, 2000)
+      return () => clearTimeout(timer)
     }
   }, [])
 
-  // Handle Chrome tab background/visibility restore — ensures splash screen unmounts when returning to app
+  // Handle Chrome tab background/visibility restore
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -436,16 +484,7 @@ function AppContent() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [dispatch])
 
-  // Global Fail-Safe Timeout: Force dismiss splash loader after max 2 seconds no matter what
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setFontsLoaded(true)
-      dispatch(setLoading(false))
-    }, 2000)
-    return () => clearTimeout(timer)
-  }, [dispatch])
-
-  // Premium loading splash screen — shown only while auth resolves
+  // Premium brand splash screen — rendered while initial session and assets resolve
   if (loading) {
     return <Loader type="splash" />
   }

@@ -1,9 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiBell, FiCheck, FiX } from 'react-icons/fi';
+import { FiBell, FiZap, FiTag, FiX } from 'react-icons/fi';
 
 /**
- * Premium Custom Pre-Permission Prompt Modal for Web Push Notifications.
- * Matched to Vakrayan Light Mint & Emerald Theme (#F4FAF7).
+ * Premium Streetwear Push Notification Permission Prompt Modal.
+ * Ultra-clean, modern UX with authentic notification visual cues.
  */
 function NotificationPromptModal({ isOpen, onClose, onAccept }) {
   return (
@@ -16,95 +16,102 @@ function NotificationPromptModal({ isOpen, onClose, onAccept }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+            className="absolute inset-0 bg-neutral-950/70 backdrop-blur-sm"
           />
 
-          {/* Modal Container — Light Mint (#F4FAF7) Theme */}
+          {/* Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 15 }}
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 15 }}
-            transition={{ type: 'spring', duration: 0.4 }}
-            className="relative w-full max-w-md bg-[#F4FAF7] border-2 border-[var(--color-accent)]/20 text-[#0D1A14] rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden z-10"
+            exit={{ opacity: 0, scale: 0.92, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="relative w-full max-w-[400px] bg-[var(--color-surface,#ffffff)] border border-[var(--color-border,#e5e7eb)] text-[var(--color-text,#111827)] rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden z-10"
           >
-            {/* Top Accent Line */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-[var(--color-accent)]" />
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Close button */}
+            {/* Close Button */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 text-[#527060] hover:text-[#0D1A14] transition-colors cursor-pointer p-1.5 rounded-full hover:bg-black/5"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[var(--color-subtle,#f3f4f6)] hover:bg-[var(--color-border,#e5e7eb)] text-[var(--color-muted,#6b7280)] hover:text-[var(--color-text,#111827)] flex items-center justify-center transition-colors cursor-pointer text-sm"
+              aria-label="Close notification modal"
             >
-              <FiX className="text-base" />
+              <FiX />
             </button>
 
             {/* Content */}
-            <div className="flex flex-col items-center text-center space-y-4 pt-1">
-              {/* Vakrayan Brand Logo Badge */}
-              <div className="flex items-center gap-2 mb-0.5">
-                <div className="w-9 h-9 rounded-xl bg-[var(--color-accent)] text-white flex items-center justify-center shadow-xs">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 5L12 19L21 5" stroke="#FFFFFF" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+            <div className="flex flex-col items-center text-center">
+              
+              {/* Notification Bell Animated Icon Badge */}
+              <div className="relative mb-4 mt-1">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-500 text-2xl shadow-sm">
+                  <FiBell className="animate-bounce" style={{ animationDuration: '2s' }} />
                 </div>
-                <div className="text-left">
-                  <span className="text-sm font-black tracking-[0.18em] text-[#0D1A14] uppercase block leading-none font-brand">
-                    VAKRAYAN
-                  </span>
-                  <span className="text-[8px] font-mono tracking-[0.25em] text-[var(--color-accent)] uppercase block mt-0.5 font-bold">
-                    PREMIUM APPAREL
-                  </span>
-                </div>
-              </div>
-
-              {/* Eyebrow & Headline */}
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-[9px] font-mono font-black uppercase tracking-widest border border-[var(--color-accent)]/20">
-                  <FiBell className="animate-pulse" /> NOTIFICATION ALERTS
+                {/* Active Notification Indicator Dot */}
+                <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-[var(--color-surface,#ffffff)]"></span>
                 </span>
-                <h2 className="text-xl sm:text-2xl font-black tracking-wider uppercase font-mono text-[#0D1A14] pt-1">
-                  STAY IN THE LOOP
-                </h2>
               </div>
 
-              {/* Description */}
-              <p className="text-xs text-[#527060] font-sans leading-relaxed max-w-sm font-medium">
-                Subscribe to real-time alerts and get instant order tracking, drop releases, and member updates.
+              {/* Tag */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-bold uppercase tracking-wider mb-2">
+                Push Notifications
+              </span>
+
+              {/* Headline */}
+              <h2 className="text-xl font-black tracking-tight text-[var(--color-text,#111827)] uppercase font-sans">
+                Enable Notifications
+              </h2>
+
+              {/* Subtitle */}
+              <p className="text-xs text-[var(--color-muted,#6b7280)] font-sans leading-relaxed mt-1.5 mb-5 max-w-[320px]">
+                Stay updated with exclusive drops, member perks, and flash sales.
               </p>
 
-              {/* Benefits Box */}
-              <div className="w-full text-left bg-white border border-[#E0EDE8] rounded-2xl p-4 space-y-2.5 shadow-2xs font-sans">
-                <div className="flex items-center gap-2.5 text-xs text-[#0D1A14] font-medium">
-                  <div className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center shrink-0">
-                    <FiCheck className="text-xs" />
+              {/* Value Points (Without Live Order Tracking) */}
+              <div className="w-full text-left bg-[var(--color-subtle,#f9fafb)] border border-[var(--color-border,#e5e7eb)] rounded-2xl p-3.5 space-y-2.5 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 text-xs">
+                    <FiZap />
                   </div>
-                  <span>Instant order shipment & tracking updates</span>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[var(--color-text,#111827)] leading-none">VIP Drop Announcements</p>
+                    <p className="text-[10px] text-[var(--color-muted,#6b7280)] mt-0.5">First access before limited pieces sell out</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2.5 text-xs text-[#0D1A14] font-medium">
-                  <div className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] flex items-center justify-center shrink-0">
-                    <FiCheck className="text-xs" />
+
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 text-xs">
+                    <FiTag />
                   </div>
-                  <span>Exclusive drop announcements & flash sales</span>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-[var(--color-text,#111827)] leading-none">Exclusive Flash Discounts</p>
+                    <p className="text-[10px] text-[var(--color-muted,#6b7280)] mt-0.5">Secret coupons & subscriber savings</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Actions Grid */}
-              <div className="grid grid-cols-2 gap-3 w-full pt-2">
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 w-full">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full py-3.5 bg-white border border-[#E0EDE8] hover:bg-neutral-100 font-mono font-bold text-[10px] tracking-wider uppercase text-[#527060] rounded-xl transition-all cursor-pointer"
+                  className="w-full py-3 bg-[var(--color-subtle,#f3f4f6)] hover:bg-[var(--color-border,#e5e7eb)] font-sans font-bold text-[11px] tracking-wider uppercase text-[var(--color-muted,#6b7280)] hover:text-[var(--color-text,#111827)] rounded-xl transition-all cursor-pointer border border-[var(--color-border,#e5e7eb)]"
                 >
-                  LATER
+                  Maybe Later
                 </button>
                 <button
                   type="button"
                   onClick={onAccept}
-                  className="w-full py-3.5 bg-[#0D1A14] hover:bg-neutral-800 font-mono font-black text-[10px] tracking-wider uppercase text-white rounded-xl transition-all cursor-pointer shadow-md"
+                  className="w-full py-3 bg-neutral-950 hover:bg-neutral-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 font-sans font-bold text-[11px] tracking-wider uppercase text-white rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5"
                 >
-                  ENABLE NOW
+                  <FiBell className="text-xs" />
+                  Allow Alerts
                 </button>
               </div>
+
             </div>
           </motion.div>
         </div>

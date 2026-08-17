@@ -1,16 +1,16 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { initializeFirestore, getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC2L5K6zkTT7m153YqtT7kiYwO4TEGh4gA",
-  authDomain: "vakrayan-9ce25.firebaseapp.com",
-  projectId: "vakrayan-9ce25",
-  storageBucket: "vakrayan-9ce25.firebasestorage.app",
-  messagingSenderId: "1024899978871",
-  appId: "1:1024899978871:web:acad41a79f19bb65a2d872",
-  measurementId: "G-T0E6LN63BC"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC2L5K6zkTT7m153YqtT7kiYwO4TEGh4gA",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vakrayan-9ce25.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "vakrayan-9ce25",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "vakrayan-9ce25.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1024899978871",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1024899978871:web:acad41a79f19bb65a2d872",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-T0E6LN63BC"
 };
 
 // Initialize Firebase safely to prevent dual-initialization in HMR
@@ -22,6 +22,7 @@ let dbInstance;
 try {
   dbInstance = initializeFirestore(app, {
     experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
 } catch (e) {
   // If already initialized (e.g. during Hot Module Replacement), retrieve the existing instance
@@ -30,25 +31,20 @@ try {
 
 export const db = dbInstance;
 
-// Enable offline persistence for Firestore
-if (typeof window !== "undefined") {
-  enableIndexedDbPersistence(dbInstance).catch((err) => {
-    if (err.code === "failed-precondition") {
-      console.warn("Firestore offline persistence failed (multiple tabs open).");
-    } else if (err.code === "unimplemented") {
-      console.warn("Firestore offline persistence not supported in this browser.");
-    }
-  });
-}
-
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Safe Messaging Initialization Helper
-import { getMessaging, isSupported } from "firebase/messaging";
+// Safe Messaging Initialization Helper with Dynamic Import
 export const getMessagingInstance = async () => {
-  if (typeof window !== "undefined" && await isSupported()) {
-    return getMessaging(app);
+  if (typeof window !== "undefined") {
+    try {
+      const { getMessaging, isSupported } = await import("firebase/messaging");
+      if (await isSupported()) {
+        return getMessaging(app);
+      }
+    } catch {
+      return null;
+    }
   }
   return null;
 };

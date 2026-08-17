@@ -47,40 +47,45 @@ function Footer() {
   return (
     <footer
       style={{
-        background: 'linear-gradient(160deg, #0D1A14 0%, #0A1510 60%, #031008 100%)',
-        borderTop: '1px solid rgba(5,150,105,0.20)'
+        background: 'linear-gradient(160deg, #062C1E 0%, #031F14 60%, #02140D 100%)',
+        borderTop: '1px solid rgba(5,150,105,0.30)'
       }}
     >
       {/* Top green glow line */}
       <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, #059669, #34D399, #059669, transparent)' }} />
 
-      <div className="max-w-7xl mx-auto px-6 md:px-12 pt-16 pb-10">
+      <div className="max-w-[1728px] mx-auto px-6 md:px-12 pt-10 pb-8">
         
         {/* Giant Brand Logo Title */}
-        <div className="w-full flex flex-col items-center mb-16 px-4 text-center">
+        <div className="w-full flex flex-col items-center mb-8 px-4 text-center">
           <img 
             src="/vakrayan-text.png"
             alt="Vakrayan"
-            className="w-full max-w-[900px] h-auto object-contain"
+            loading="lazy"
+            decoding="async"
+            width={700}
+            height={150}
+            className="w-full max-w-[700px] h-auto object-contain"
             style={{
               filter: 'brightness(0) invert(1)',
               opacity: 0.95
             }}
           />
-          <p className="mt-6 max-w-md" style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, fontFamily: "'Jost', sans-serif" }}>
+          <p className="mt-3 max-w-md" style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.6, fontFamily: "'Jost', sans-serif" }}>
             Premium heavyweight drops crafted carefully to define contemporary street culture.
           </p>
           {/* Social icons — proper SVGs */}
-          <div className="flex gap-4 mt-6">
+          <div className="flex gap-4 mt-4">
             {[
-              { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/' },
-              { Icon: PinterestIcon, label: 'Pinterest', href: '#' },
-              { Icon: XIcon, label: 'X (Twitter)', href: '#' },
-            ].map(({ Icon, label, href }) => (
+              { Icon: InstagramIcon, label: 'Instagram', href: 'https://www.instagram.com/vakrayan_official/', rel: 'noopener noreferrer' },
+              { Icon: PinterestIcon, label: 'Pinterest', href: 'https://in.pinterest.com/vakrayan_official', rel: 'noopener noreferrer' },
+              { Icon: XIcon, label: 'X (Twitter)', href: 'https://x.com/vakrayan_official', rel: 'noopener noreferrer' },
+            ].map(({ Icon, label, href, rel }) => (
               <a
                 key={label}
                 target='_blank'
                 href={href}
+                rel={rel || 'noopener noreferrer'}
                 aria-label={label}
                 className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer"
                 style={{
@@ -101,9 +106,9 @@ function Footer() {
 
           {/* Navigation */}
           <div className="flex flex-col gap-4">
-            <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               NAVIGATION
-            </h4>
+            </h3>
             {[
               { to: '/', label: 'Home' },
               { to: '/shop', label: 'All Products' },
@@ -123,9 +128,9 @@ function Footer() {
 
           {/* Follow */}
           <div className="flex flex-col gap-4">
-            <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               FOLLOW US
-            </h4>
+            </h3>
             {[
               { label: 'Instagram ↗', href: 'https://www.instagram.com/vakrayan_official/' },
               { label: 'Pinterest ↗', href: 'https://www.pinterest.com/' },
@@ -146,9 +151,9 @@ function Footer() {
 
           {/* Newsletter */}
           <div className="flex flex-col gap-4">
-            <h4 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: "'Jost', sans-serif", fontSize: 12, fontWeight: 900, letterSpacing: '0.14em', color: '#059669', textTransform: 'uppercase' }}>
               GET THE INTEL
-            </h4>
+            </h3>
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.6, fontFamily: "'Jost', sans-serif" }}>
               Early drops, secret discounts & exclusive access.
             </p>
@@ -216,7 +221,7 @@ function Footer() {
           style={{ borderTop: '1px solid rgba(5,150,105,0.15)' }}
         >
           <span style={{ color: 'rgba(255,255,255,0.30)', fontSize: 12, fontFamily: "'Jost', sans-serif" }}>
-            © 2026 Vakrayan Co. All rights reserved.
+            © {new Date().getFullYear()} Vakrayan. All rights reserved.
           </span>
           <div className="flex gap-6">
             <Link

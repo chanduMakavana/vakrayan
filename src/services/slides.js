@@ -1,6 +1,7 @@
 import { ID, Databases, Query } from "../firebase/adapter.js";
 import { client } from "./client";
 import { conf } from "./conf/conf";
+import { fixLegacyWorkerUrl } from "../utils/imageOptimizer.js";
 
 export class SlidesService {
     databases;
@@ -18,7 +19,11 @@ export class SlidesService {
                 conf.firebaseSlidesCollectionId,
                 [Query.orderDesc("$createdAt")]
             );
-            return response.documents || [];
+            return (response.documents || []).map(slide => {
+                if (slide.image) slide.image = fixLegacyWorkerUrl(slide.image);
+                if (slide.mobileImage) slide.mobileImage = fixLegacyWorkerUrl(slide.mobileImage);
+                return slide;
+            });
         } catch (error) {
             console.error("Firebase service :: getSlides :: error", error.message);
             return [];

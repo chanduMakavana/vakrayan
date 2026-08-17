@@ -12,6 +12,40 @@ import { setProducts } from '../../features/productsSlice'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import Fuse from 'fuse.js'
 import { scatterProducts } from '../../utils/colorHelper'
+import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer'
+
+// Clean SVG Icons for Filters & Search (replacing emojis)
+const SlidersIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+    <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+    <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+    <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
+    <line x1="17" y1="16" x2="23" y2="16"/>
+  </svg>
+);
+
+const SearchIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+  </svg>
+);
+
+const TagIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+    <line x1="7" y1="7" x2="7.01" y2="7"/>
+  </svg>
+);
+
+const PackageIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  </svg>
+);
 
 function Shop() {
   const navigate = useNavigate()
@@ -26,14 +60,44 @@ function Shop() {
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
   const reduxFetched = useSelector(state => state.products.fetched)
 
+  // ✅ Dynamic category list extracted from actual products + fallback defaults
+  const dynamicCategories = useMemo(() => {
+    const categoryMap = new Map();
+    categoryMap.set('all', 'All Categories');
+
+    const defaults = [
+      { value: 'oversized-tshirt', label: 'Oversized Tees' },
+      { value: 'printed-tshirt', label: 'Printed Tees' },
+      { value: 'shirts', label: 'Shirts' },
+      { value: 'hoodies', label: 'Hoodies' }
+    ];
+    defaults.forEach(d => categoryMap.set(d.value, d.label));
+
+    // Dynamically extract all unique categories present in products
+    products.forEach(p => {
+      if (p.category) {
+        const slug = String(p.category).trim();
+        if (!categoryMap.has(slug)) {
+          const formattedLabel = slug
+            .split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          categoryMap.set(slug, formattedLabel);
+        }
+      }
+    });
+
+    return Array.from(categoryMap.entries()).map(([value, label]) => ({ value, label }));
+  }, [products]);
+
   // ✅ SEO: Dynamic page title — updates when category URL changes
   useEffect(() => {
     const label = urlCategory
       ? urlCategory.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
       : null
     document.title = label
-      ? `${label} — Vakrayan`
-      : 'Shop All Drops — Vakrayan'
+      ? `${label} | Vakrayan`
+      : 'Shop All Drops | Vakrayan'
   }, [urlCategory])
 
   
@@ -99,24 +163,116 @@ function Shop() {
 
   const maxPriceLimit = products.length > 0 ? Math.ceil(Math.max(...products.map(p => Number(p.price || 0))) / 500) * 500 : 3000
 
-  const availableColors = [
-    { name: 'Black', hex: '#121212', darkText: false },
-    { name: 'White', hex: '#FFFFFF', border: true, darkText: true },
-    { name: 'Beige', hex: '#F5E6D3', border: true, darkText: true },
-    { name: 'Cream', hex: '#FFFDD0', border: true, darkText: true },
-    { name: 'Navy', hex: '#0F172A', darkText: false },
-    { name: 'Blue', hex: '#2563EB', darkText: false },
-    { name: 'Grey', hex: '#64748B', darkText: false },
-    { name: 'Green', hex: '#059669', darkText: false },
-    { name: 'Olive', hex: '#4B5320', darkText: false },
-    { name: 'Brown', hex: '#5C3A21', darkText: false },
-    { name: 'Maroon', hex: '#6B1D2F', darkText: false },
-    { name: 'Red', hex: '#DC2626', darkText: false },
-    { name: 'Purple', hex: '#7C3AED', darkText: false },
-    { name: 'Lavender', hex: '#D8B4FE', darkText: true },
-    { name: 'Pink', hex: '#F472B6', darkText: false },
-    { name: 'Yellow', hex: '#FACC15', darkText: true }
-  ]
+  // Helper to map color name to hex color
+  const getColorHex = (colorName) => {
+    const nameLower = String(colorName || '').toLowerCase().trim();
+    const hexMap = {
+      'black': '#121212',
+      'white': '#FFFFFF',
+      'off white': '#FAF9F6',
+      'off-white': '#FAF9F6',
+      'beige': '#F5E6D3',
+      'cream': '#FFFDD0',
+      'navy': '#0F172A',
+      'navy blue': '#0F172A',
+      'blue': '#2563EB',
+      'sky blue': '#38BDF8',
+      'light blue': '#BAE6FD',
+      'grey': '#64748B',
+      'gray': '#64748B',
+      'light grey': '#E2E8F0',
+      'dark grey': '#334155',
+      'green': '#059669',
+      'olive': '#556B2F',
+      'olive green': '#556B2F',
+      'brown': '#5C3A21',
+      'maroon': '#6B1D2F',
+      'red': '#DC2626',
+      'purple': '#7C3AED',
+      'lavender': '#D8B4FE',
+      'pink': '#F472B6',
+      'yellow': '#FACC15',
+      'orange': '#F97316',
+      'charcoal': '#27272A',
+      'sand': '#E5D3B3',
+      'tan': '#D2B48C',
+      'khaki': '#C3B091',
+      'teal': '#0D9488',
+      'cyan': '#06B6D4'
+    };
+
+    if (hexMap[nameLower]) return hexMap[nameLower];
+    if (colorName && colorName.startsWith('#')) return colorName;
+    return '#94A3B8';
+  };
+
+  // ✅ Dynamic color list extracted from actual products + standard fallback defaults
+  // ✅ Dynamic color list extracted STRICTLY from actual products in store
+  const dynamicColors = useMemo(() => {
+    const colorMap = new Map();
+
+    const knownColorKeywords = [
+      'black', 'white', 'off white', 'beige', 'cream', 'navy', 'blue', 'sky blue',
+      'grey', 'gray', 'green', 'olive', 'brown', 'maroon', 'red', 'purple',
+      'lavender', 'pink', 'yellow', 'orange', 'charcoal', 'sand', 'tan', 'khaki', 'teal'
+    ];
+
+    products.forEach(p => {
+      const extractedColors = [];
+      
+      // 1. Explicit color fields
+      if (typeof p.color === 'string' && p.color.trim()) {
+        extractedColors.push(p.color.trim());
+      } else if (Array.isArray(p.color)) {
+        p.color.forEach(c => typeof c === 'string' ? extractedColors.push(c) : (c?.name && extractedColors.push(c.name)));
+      }
+
+      if (Array.isArray(p.colors)) {
+        p.colors.forEach(c => typeof c === 'string' ? extractedColors.push(c) : (c?.name && extractedColors.push(c.name)));
+      }
+
+      if (p.color_name && typeof p.color_name === 'string') {
+        extractedColors.push(p.color_name.trim());
+      }
+
+      if (Array.isArray(p.variants)) {
+        p.variants.forEach(v => {
+          if (v.color) extractedColors.push(typeof v.color === 'string' ? v.color : v.color?.name);
+          if (v.color_name) extractedColors.push(v.color_name);
+        });
+      }
+
+      // 2. Search product title / tags for known color keywords if explicit color fields are empty
+      if (extractedColors.length === 0) {
+        const textToSearch = `${p.name || ''} ${Array.isArray(p.tags) ? p.tags.join(' ') : (p.tag || '')}`.toLowerCase();
+        knownColorKeywords.forEach(kw => {
+          const regex = new RegExp(`\\b${kw}\\b`, 'i');
+          if (regex.test(textToSearch)) {
+            extractedColors.push(kw);
+          }
+        });
+      }
+
+      extractedColors.forEach(rawColor => {
+        if (!rawColor) return;
+        const trimmed = String(rawColor).trim();
+        const key = trimmed.toLowerCase();
+        if (!colorMap.has(key)) {
+          const hex = getColorHex(trimmed);
+          const formattedName = trimmed.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          const isLight = key.includes('white') || key.includes('cream') || key.includes('beige') || key.includes('yellow') || key.includes('light');
+          colorMap.set(key, {
+            name: formattedName,
+            hex: hex,
+            border: isLight,
+            darkText: isLight
+          });
+        }
+      });
+    });
+
+    return Array.from(colorMap.values());
+  }, [products]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -391,7 +547,7 @@ function Shop() {
       if (sortBy === 'price-high') return Number(b.price) - Number(a.price)
       return 0;
     })
-  }, [products, selectedCategory, selectedTag, offers, minPriceFilter, maxPriceFilter, selectedSizes, inStockOnly, searchQuery, sortBy])
+  }, [products, selectedCategory, selectedTag, offers, minPriceFilter, maxPriceFilter, selectedSizes, selectedColors, inStockOnly, searchQuery, sortBy])
 
   const drawerPreviewCount = useMemo(() => {
     if (!filterDrawerOpen) return filteredProducts.length
@@ -527,7 +683,7 @@ function Shop() {
     <>
       
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-16">
-        <div className="max-w-7xl mx-auto px-4 md:px-12 py-5 md:py-10 relative z-20 space-y-4 md:space-y-8">
+        <div className="max-w-[1728px] mx-auto px-4 md:px-12 py-5 md:py-10 relative z-20 space-y-4 md:space-y-8">
           
           {/* Headline Title */}
           <div className="text-center md:text-left space-y-1 border-b border-[var(--color-border)] pb-3 md:pb-5">
@@ -548,8 +704,10 @@ function Shop() {
           >
             {/* Background Image */}
             <img
-              src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80"
+              src={getOptimizedImageUrl("https://images.unsplash.com/photo-1441986300917-64674bd600d8", 1200, 80)}
               alt="Explore Categories Banner"
+              loading="lazy"
+              decoding="async"
               className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 brightness-75"
             />
             {/* Heavy Dark Gradient Overlay for Maximum Text Contrast */}
@@ -569,40 +727,13 @@ function Shop() {
             </div>
           </div>
 
-          {/* Mobile Quick Filters (Horizontal Scroll) */}
-          <div className="flex lg:hidden overflow-x-auto gap-2.5 pb-2 pt-1 scrollbar-none snap-x items-center w-full">
-            {[
-              { value: 'all', label: 'All Fits' },
-              { value: 'oversized-tshirt', label: 'Oversized' },
-              { value: 'printed-tshirt', label: 'Printed' },
-              { value: 'shirts', label: 'Shirts' },
-              { value: 'hoodies', label: 'Hoodies' }
-            ].map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => setSelectedCategory(cat.value)}
-                className={`snap-start shrink-0 text-xs font-mono px-4 py-2 border transition-all rounded-xl shadow-xs font-bold uppercase cursor-pointer ${
-                  selectedCategory === cat.value
-                    ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)]'
-                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)]'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-            <button
-               onClick={openFilterDrawer}
-               className="snap-start shrink-0 text-xs font-mono px-4 py-2 border rounded-xl bg-[var(--color-accent)]/10 text-[var(--color-accent)] border-[var(--color-accent)]/30 flex items-center gap-1.5 font-bold uppercase shadow-xs cursor-pointer"
-            >
-               Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''} ⚙️
-            </button>
-          </div>
+
 
           {/* Filtering Controller Unit (Desktop) */}
-          <div className="hidden lg:flex bg-[var(--color-surface)]/40 backdrop-blur-md border border-[var(--color-border)] p-6 rounded-2xl flex-col gap-5 shadow-xs relative z-40">
+          <div className="hidden lg:flex bg-white border border-zinc-200 p-6 rounded-2xl flex-col gap-5 shadow-xs relative z-40">
             {/* Tags Select Pills Row */}
             <div className="flex items-center gap-3">
-              <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-widest shrink-0 font-bold">DROPS:</span>
+              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest shrink-0 font-bold">DROPS:</span>
               <div className="flex flex-wrap gap-2 flex-1">
                 {[
                   { value: 'all', label: 'ALL DROPS' },
@@ -616,8 +747,8 @@ function Shop() {
                     onClick={() => setSelectedTag(t.value)}
                     className={`text-[9px] font-mono tracking-wider uppercase px-3.5 py-1.5 border transition-all duration-200 cursor-pointer rounded-lg ${
                       selectedTag === t.value
-                        ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs font-bold'
-                        : 'bg-[var(--color-surface)]/40 text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]'
+                        ? 'bg-[#059669] text-white border-[#059669] shadow-xs font-bold'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400 hover:text-zinc-900'
                     }`}
                   >
                     {t.label}
@@ -720,7 +851,13 @@ function Shop() {
                                     }}
                                     className="w-full flex items-center gap-3 py-2.5 hover:bg-[var(--color-bg)] transition-all text-left border-b border-zinc-50/10 last:border-0 first:pt-0"
                                   >
-                                    <img src={img} alt={p.name} className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" />
+                                    <img 
+                                      src={getOptimizedImageUrl(img, 100, 75)} 
+                                      alt={p.name} 
+                                      loading="lazy" 
+                                      decoding="async" 
+                                      className="w-8 h-10 object-cover rounded-md bg-[var(--color-subtle)] shrink-0" 
+                                    />
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[11px] font-semibold text-[var(--color-text)] truncate">{p.name}</p>
                                       <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider">{p.category?.replace(/-/g, ' ')}</p>
@@ -886,37 +1023,39 @@ function Shop() {
           )}
 
           {/* Mobile Sticky Action Bar */}
-          <div className="sticky top-[80px] left-0 right-0 z-40 bg-[var(--color-bg)] border-y border-[var(--color-border)] lg:hidden shadow-[0_4px_12px_rgba(0,0,0,0.06)] mb-4">
+          <div className="sticky top-[80px] left-0 right-0 z-40 bg-white border-y border-zinc-200 lg:hidden shadow-xs mb-4">
             <div className="flex h-12 relative items-center">
               <button 
                 onClick={() => setMobileSortOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 active:bg-[var(--color-subtle)] transition-colors cursor-pointer py-1"
+                className="flex-1 flex items-center justify-center gap-2 active:bg-zinc-50 transition-colors cursor-pointer py-1"
               >
                 <div className="flex items-center justify-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <svg className="w-4 h-4 text-[var(--color-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-900"></span>
+                    <svg className="w-4 h-4 text-zinc-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
                   </div>
                   <div className="flex flex-col items-start leading-none mt-0.5">
-                    <span className="font-bold text-[12px] text-[var(--color-text)] uppercase tracking-wider">Sort</span>
-                    <span className="text-[9px] text-[var(--color-muted)]">{sortBy === 'newest' ? 'Newest' : sortBy === 'popularity' ? 'Popularity' : sortBy === 'price-low' ? 'Price: Low' : 'Price: High'}</span>
+                    <span className="font-bold text-[12px] text-zinc-900 uppercase tracking-wider font-mono">Sort</span>
+                    <span className="text-[9px] text-zinc-500 font-mono">{sortBy === 'newest' ? 'Newest' : sortBy === 'popularity' ? 'Popularity' : sortBy === 'price-low' ? 'Price: Low' : 'Price: High'}</span>
                   </div>
                 </div>
               </button>
               
-              <div className="w-[1px] h-6 bg-[var(--color-border)] absolute left-1/2 top-1/2 -translate-y-1/2" />
+              <div className="w-[1px] h-6 bg-zinc-200 absolute left-1/2 top-1/2 -translate-y-1/2" />
 
               <button 
                 onClick={openFilterDrawer}
-                className="flex-1 flex items-center justify-center gap-2 active:bg-[var(--color-subtle)] transition-colors cursor-pointer py-1"
+                className="flex-1 flex items-center justify-center gap-2 active:bg-zinc-50 transition-colors cursor-pointer py-1"
               >
                 <div className="flex items-center justify-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]"></span>
-                    <svg className="w-4 h-4 text-[var(--color-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                    <span className={`w-1.5 h-1.5 rounded-full ${activeFilterCount > 0 ? 'bg-[#059669]' : 'bg-zinc-400'}`}></span>
+                    <svg className="w-4 h-4 text-zinc-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
                   </div>
                   <div className="flex flex-col items-start leading-none mt-0.5">
-                    <span className="font-bold text-[12px] text-[var(--color-text)] uppercase tracking-wider">Filter</span>
+                    <span className="font-bold text-[12px] text-zinc-900 uppercase tracking-wider font-mono">
+                      Filter {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+                    </span>
                   </div>
                 </div>
               </button>
@@ -983,127 +1122,121 @@ function Shop() {
                       isAllOutOfStock = totalStock === 0;
                     }
 
-                   return (
-                     <div 
-                       key={uniqueId} 
-                       onClick={() => navigate(clickPath)} 
-                       className="group relative flex flex-col bg-transparent cursor-pointer transition-all duration-300 ease-out pb-4 border-b border-transparent hover:border-[var(--color-border)] rounded-xl hover:shadow-lg"
-                     >
-                       {/* Image Aspect Ratio Canvas */}
-                       <div className="w-full aspect-[3/4] overflow-hidden rounded-xl bg-[var(--color-subtle)] relative transition-transform duration-700 ease-out">
-                         
-                         {/* Floating Heart Button */}
-                         <button
-                           onClick={async (e) => {
-                             e.stopPropagation();
-                             const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
-                             let updated;
-                             if (exists) {
-                               dispatch(removeWishlistItemState(parentId));
-                               const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                               updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
-                               localStorage.setItem('wishlist', JSON.stringify(updated));
-                               if (isAuthenticated && user) {
-                                 try {
-                                   await wishlistService.removeFromWishlist(user.$id, parentId);
-                                 } catch (err) {
-                                   console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
-                                 }
-                               }
-                             } else {
-                                dispatch(addWishlistItemState(product));
+                    return (
+                      <div 
+                        key={uniqueId} 
+                        onClick={() => navigate(clickPath)} 
+                        className="group relative flex flex-col bg-white border border-emerald-900/15 hover:border-emerald-600 transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer rounded-none overflow-hidden"
+                      >
+                        {/* Image Aspect Ratio Canvas */}
+                        <div className="w-full aspect-[3/4] overflow-hidden bg-[#F0F7F3] relative transition-transform duration-700 ease-out border-b border-emerald-900/15">
+                          
+                          {/* Floating Heart Button */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
+                              let updated;
+                              if (exists) {
+                                dispatch(removeWishlistItemState(parentId));
                                 const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
-                                updated = [...saved, product];
-                               localStorage.setItem('wishlist', JSON.stringify(updated));
-                               if (isAuthenticated && user) {
-                                 try {
-                                   await wishlistService.addToWishlist(user.$id, parentId);
-                                 } catch (err) {
-                                   console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
-                                 }
-                               }
-                             }
-                           }}
-                           aria-label={wishlist.some(item => item.$id === parentId || item.id === parentId) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
-                           className="absolute top-4 right-4 z-20 bg-[var(--color-surface)] border border-neutral-950/10 p-2.5 rounded-none hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-all duration-300 shadow-xs hover:shadow-sm cursor-pointer"
-                         >
-                           {wishlist.some(item => item.$id === parentId || item.id === parentId) ? (
-                             <svg className="w-3.5 h-3.5 text-neutral-950 fill-current" viewBox="0 0 24 24">
-                               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                             </svg>
-                           ) : (
-                             <svg className="w-3.5 h-3.5 text-[var(--color-muted)] group-hover:text-neutral-950 stroke-current fill-none stroke-2" viewBox="0 0 24 24">
-                               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                             </svg>
-                           )}
-                         </button>
- 
-                         {/* Edit Button for Admin Mode */}
-                         {adminMode && (
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               navigate('/admin', { state: { editProductId: parentId } });
-                             }}
-                             className="absolute bottom-4 left-4 z-20 bg-neutral-950 hover:bg-neutral-800 text-white text-[9px] font-mono font-bold uppercase tracking-wider py-1.5 px-3 border border-neutral-950 transition-all shadow-md cursor-pointer"
-                           >
-                             ✏️ EDIT
-                           </button>
-                         )}
- 
+                                updated = saved.filter(item => item.$id !== parentId && item.id !== parentId);
+                                localStorage.setItem('wishlist', JSON.stringify(updated));
+                                if (isAuthenticated && user) {
+                                  try {
+                                    await wishlistService.removeFromWishlist(user.$id, parentId);
+                                  } catch (err) {
+                                    console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
+                                  }
+                                }
+                              } else {
+                                 dispatch(addWishlistItemState(product));
+                                 const saved = JSON.parse(localStorage.getItem('wishlist')) || [];
+                                 updated = [...saved, product];
+                                localStorage.setItem('wishlist', JSON.stringify(updated));
+                                if (isAuthenticated && user) {
+                                  try {
+                                    await wishlistService.addToWishlist(user.$id, parentId);
+                                  } catch (err) {
+                                    console.warn("⚠️ Firebase wishlist cloud sync failed:", err.message);
+                                  }
+                                }
+                              }
+                            }}
+                            aria-label={wishlist.some(item => item.$id === parentId || item.id === parentId) ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+                            className={`absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center cursor-pointer transition-all duration-200 border rounded-none shadow-xs ${
+                              wishlist.some(item => item.$id === parentId || item.id === parentId)
+                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                : 'bg-white/95 border-emerald-900/20 text-emerald-800 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                            }`}
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill={wishlist.some(item => item.$id === parentId || item.id === parentId) ? '#fff' : 'none'} stroke="currentColor" strokeWidth="2">
+                              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                          </button>
+  
+                          {/* Edit Button for Admin Mode */}
+                          {adminMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } });
+                              }}
+                              className="absolute bottom-3 left-3 z-30 px-3 py-1.5 cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[10px] uppercase tracking-wider bg-emerald-700 hover:bg-emerald-800 rounded-none border-none shadow-xs"
+                            >
+                              Edit
+                            </button>
+                          )}
+  
                           {activeTag && (
-                            <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
-                              <span className="text-neutral-900 font-sans text-[11px] tracking-widest uppercase font-bold">
+                            <div className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-emerald-700 text-white rounded-none shadow-xs">
+                              <span className="text-[10px] font-mono font-bold tracking-widest uppercase">
                                 {activeTag}
                               </span>
                             </div>
                           )}
- 
-                         {/* Out of Stock Overlay */}
-                         {isAllOutOfStock && (
-                           <div className="absolute inset-0 bg-[var(--color-surface)]/20 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">
-                             <span className="bg-[var(--color-surface)]/95 text-neutral-950 border border-neutral-950 text-[10px] font-mono font-black tracking-[0.3em] uppercase py-2.5 px-5 shadow-xs">
-                               SOLD OUT
-                             </span>
-                           </div>
-                         )}
- 
-                         {/* Image Flip */}
-                         <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
-                           <img
-                             src={frontView}
-                             alt={product.name}
-                             loading="lazy"
-                             decoding="async"
-                             className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
-                           />
-                           <img  
-                             src={backView}
-                             alt={`${product.name} alternate frame`}
-                             loading="lazy"
-                             decoding="async"
-                             className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
-                           />
-                         </div>
-                       </div>
- 
-                       {/* Metadata Content */}
-                       <div className="mt-3 px-1 flex flex-col justify-between grow">
-                         <div>
-                           <div className="flex items-center justify-between gap-2 mb-1">
-                             <span className="text-[11px] font-mono text-[var(--color-muted)] tracking-wider uppercase">
-                               {product.category?.replace('-', ' ') || "HQ MERCH"}
-                             </span>
-                           </div>
-                           
-                           <h3 className="text-[11px] md:text-xs font-bold tracking-[0.05em] text-neutral-950 uppercase truncate">
-                             {product.name}
-                           </h3>
-                         </div>
-                        
-                        <div className="mt-2 pt-2 border-t border-[var(--color-border)] flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-xs md:text-sm font-mono font-black text-neutral-950">
+  
+                          {/* Out of Stock Overlay */}
+                          {isAllOutOfStock && (
+                            <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-xs z-10 flex items-center justify-center pointer-events-none">
+                              <span className="px-3.5 py-1.5 bg-white border border-emerald-900/20 font-mono text-[10px] font-black tracking-widest uppercase text-emerald-950 rounded-none shadow-xs">
+                                SOLD OUT
+                              </span>
+                            </div>
+                          )}
+  
+                          {/* Image Flip */}
+                          <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`} onMouseEnter={() => preloadImage(getOptimizedImageUrl(backView, 600, 75))}>
+                            <img
+                              src={getOptimizedImageUrl(frontView, 600, 75)}
+                              alt={product.name}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
+                            />
+                            <img  
+                              src={getOptimizedImageUrl(backView, 600, 75)}
+                              alt={`${product.name} alternate frame`}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
+                            />
+                          </div>
+                        </div>
+  
+                        {/* Metadata Content */}
+                        <div className="p-2.5 md:p-3 flex flex-col justify-between bg-white">
+                          <div className="mb-1.5">
+                            <p className="text-[9.5px] font-mono font-bold tracking-widest uppercase text-emerald-700 mb-0.5">
+                              {product.category?.replace('-', ' ') || "HQ MERCH"}
+                            </p>
+                            <h3 className="text-xs font-black tracking-wide text-[#0D1A14] uppercase truncate font-sans">
+                              {product.name}
+                            </h3>
+                          </div>
+                         
+                          <div className="flex items-baseline gap-1.5 pt-1.5 border-t border-emerald-900/15">
+                            <span className="text-sm font-black text-[#0D1A14] font-sans">
                               ₹{Number(product.price).toLocaleString('en-IN')}
                             </span>
                             {(() => {
@@ -1116,21 +1249,17 @@ function Shop() {
                                     ? Math.round(priceNum / (1 - product.discount_percent / 100))
                                     : null);
                               return compareDisplay ? (
-                                <span className="text-[9px] font-mono text-[var(--color-muted)] line-through">
+                                <span className="text-[11px] text-[#527060] line-through font-sans">
                                   ₹{compareDisplay.toLocaleString('en-IN')}
                                 </span>
                               ) : null;
                             })()}
                           </div>
-                          <span className="text-[8px] text-[var(--color-muted)] font-sans tracking-wide uppercase font-bold">
-                            incl. taxes
-                          </span>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    );
+                  })}
+                </div>
 
               {/* ── Load More Button ── */}
               {hasMore && (
@@ -1175,8 +1304,9 @@ function Shop() {
           {/* Header */}
           <div className="p-6 border-b border-[var(--color-border)] bg-[var(--color-surface)]/60 backdrop-blur-md flex items-center justify-between">
             <div className="flex items-center gap-2.5">
+              <SlidersIcon className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
               <h3 className="text-sm font-mono font-black uppercase tracking-[0.2em] text-[var(--color-text)]">
-                ⚙️ FILTERS
+                FILTERS
               </h3>
               {activeFilterCount > 0 && (
                 <span className="bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/30 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full">
@@ -1200,20 +1330,14 @@ function Shop() {
                 CATEGORY
               </label>
               <div className="flex flex-wrap gap-2 pt-1">
-                {[
-                  { value: 'all', label: 'All Categories' },
-                  { value: 'oversized-tshirt', label: 'Oversized Tees' },
-                  { value: 'printed-tshirt', label: 'Printed Tees' },
-                  { value: 'shirts', label: 'Shirts' },
-                  { value: 'hoodies', label: 'Hoodies' }
-                ].map(cat => (
+                {dynamicCategories.map(cat => (
                   <button
                     key={cat.value}
                     onClick={() => setDraftCategory(cat.value)}
                     className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer rounded-xl uppercase ${
                       draftCategory === cat.value
-                        ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
-                        : 'bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-accent)]/60'
+                        ? 'bg-[#059669] text-white border-[#059669] shadow-xs'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400'
                     }`}
                   >
                     {cat.label}
@@ -1238,7 +1362,7 @@ function Shop() {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2.5 pt-1">
-                {availableColors.map((col) => {
+                {dynamicColors.map((col) => {
                   const isSelected = draftColors.includes(col.name);
                   return (
                     <button
@@ -1252,8 +1376,8 @@ function Shop() {
                       }}
                       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all cursor-pointer select-none ${
                         isSelected
-                          ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/12 text-[var(--color-accent)] shadow-xs font-bold'
-                          : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-accent)]/50'
+                          ? 'border-[#059669] bg-[#059669] text-white shadow-xs font-bold'
+                          : 'border-zinc-200 bg-white text-zinc-800 hover:border-zinc-400'
                       }`}
                     >
                       <span
@@ -1268,11 +1392,11 @@ function Shop() {
                           </svg>
                         )}
                       </span>
-                      <span className={`text-[10px] font-mono uppercase tracking-wider truncate flex-1 text-left ${isSelected ? 'text-[var(--color-accent)] font-bold' : 'text-[var(--color-text)] font-semibold'}`}>
+                      <span className={`text-[10px] font-mono uppercase tracking-wider truncate flex-1 text-left ${isSelected ? 'text-white font-bold' : 'text-zinc-800 font-semibold'}`}>
                         {col.name}
                       </span>
                       {isSelected && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                       )}
                     </button>
                   );
@@ -1304,8 +1428,8 @@ function Shop() {
                       }}
                       className={`text-[9px] font-mono font-bold px-2.5 py-1.5 border transition-all rounded-lg cursor-pointer ${
                         isActive
-                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
-                          : 'bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-accent)]/60'
+                          ? 'bg-[#059669] text-white border-[#059669] shadow-xs'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400'
                       }`}
                     >
                       {preset.label}
@@ -1419,8 +1543,8 @@ function Shop() {
                       }}
                       className={`text-[9.5px] font-mono font-bold px-3.5 py-2 border transition-all duration-200 cursor-pointer rounded-xl ${
                         isSelected
-                          ? 'bg-[var(--color-accent)] text-white border-[var(--color-accent)] shadow-xs'
-                          : 'bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-accent)]/60'
+                          ? 'bg-[#059669] text-white border-[#059669] shadow-xs'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400'
                       }`}
                     >
                       {size}
@@ -1457,7 +1581,7 @@ function Shop() {
           <div className="p-6 border-t border-[var(--color-border)] bg-[var(--color-surface)]/80 backdrop-blur-xl shadow-lg space-y-3">
             <button
               onClick={handleApplyDrawerFilters}
-              className="w-full py-3.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-[11px] font-mono font-bold uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-md active:scale-[0.99]"
+              className="w-full py-3.5 bg-[#059669] hover:bg-[#047857] text-white text-[11px] font-mono font-bold uppercase tracking-[0.15em] rounded-xl text-center transition-all cursor-pointer shadow-md active:scale-[0.99]"
             >
               Apply Filters ({drawerPreviewCount} Results)
             </button>

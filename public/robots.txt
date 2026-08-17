@@ -1,0 +1,31 @@
+# Vakrayan — Robots.txt
+# https://vakrayan.com
+
+User-agent: *
+Allow: /
+
+# Private and non-indexable paths
+Disallow: /admin
+Disallow: /checkout
+Disallow: /profile
+Disallow: /order/
+Disallow: /cart
+Disallow: /signup
+Disallow: /login
+Disallow: /reset-password
+
+# AI Search & Browsing Agents
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+# Sitemap
+Sitemap: https://vakrayan.com/sitemap.xml

@@ -55,6 +55,17 @@ function SignUp() {
   const [showPass,     setShowPass]     = useState(false)
   const [focused,      setFocused]      = useState(null)
 
+  useEffect(() => {
+    document.title = 'Create Account | Vakrayan'
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => {
+      try { document.head.removeChild(meta) } catch {}
+    }
+  }, [])
+
   const onSubmit = async (data) => {
     setServerError(''); setLoading(true)
     try {
@@ -128,8 +139,10 @@ function SignUp() {
 
         {/* Vakrayan model hero image */}
         <img
-          src="/vakrayan-hero.png"
+          src="/vakrayan-signup-hero.jpg"
           alt="Vakrayan Premium Apparel"
+          loading="eager"
+          decoding="async"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
         {/* light black overlay — no green tint */}
@@ -141,13 +154,11 @@ function SignUp() {
 
           {/* logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 5L12 19L21 5" stroke="#34D399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.14em', textTransform: 'uppercase', lineHeight: 1, fontFamily: "'VakrayanFont', sans-serif" }}>Vakrayan</div>
-              <div style={{ fontSize: 9, color: 'rgba(52,211,153,0.80)', letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 600 }}>Premium Apparel</div>
-            </div>
+            <img
+              src="/vakrayan-merged-logo-white.png"
+              alt="Vakrayan Logo"
+              style={{ height: 44, width: 'auto', objectFit: 'contain' }}
+            />
           </div>
 
           {/* hero text */}
@@ -156,7 +167,7 @@ function SignUp() {
             <h1 style={{ fontFamily: "'Barlow Condensed', 'Impact', sans-serif", fontSize: 'clamp(2.6rem, 4.5vw, 4rem)', fontWeight: 900, color: '#fff', lineHeight: 1.0, textTransform: 'uppercase', letterSpacing: '-0.01em', marginBottom: 20 }}>
               Dress Bold.<br />
               Live<br />
-              <span style={{ color: '#34D399', fontFamily: "'VakrayanFont', sans-serif" }}>Vakrayan.</span>
+              <span style={{ color: '#34D399', fontFamily: "'VakrayanFont', sans-serif", fontSize: '0.88em', letterSpacing: '0.20em', display: 'inline-block' }}>Vakrayan.</span>
             </h1>
             <div style={{ width: 40, height: 3, background: 'linear-gradient(90deg, #34D399, #059669)', borderRadius: 99, marginBottom: 20 }} />
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 1.70, maxWidth: 300 }}>

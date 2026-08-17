@@ -1,10 +1,13 @@
 [
   {
     "origin": [
+      "https://vakrayan.com",
+      "https://www.vakrayan.com",
+      "https://vakrayan.in",
+      "https://www.vakrayan.in",
       "https://vakrayan.netlify.app",
       "http://localhost:5173",
-      "http://localhost:3000",
-      "*"
+      "http://localhost:3000"
     ],
     "method": [
       "GET",

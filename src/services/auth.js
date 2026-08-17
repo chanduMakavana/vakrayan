@@ -40,7 +40,7 @@ export class AuthService {
             return user ?? null;
         } catch (error) {
             // No active session is a normal state on initial mount, do not throw
-            console.log("Firebase service :: getCurrentUser :: Not Logged In", error.message);
+            console.warn("Firebase service :: getCurrentUser :: Not Logged In");
             return null;
         }
     }
@@ -50,7 +50,7 @@ export class AuthService {
         try {
             return await this.account.deleteSession('current');
         } catch (error) {
-            console.log("Firebase service :: logout :: No active session found or already logged out", error.message);
+            console.warn("Firebase service :: logout :: No active session found or already logged out");
             return null;
         }
     }

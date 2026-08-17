@@ -15,18 +15,19 @@ function Loader({ type = 'inline', text }) {
             <img 
               src="/vakrayan-logo-icon.png" 
               alt="Vakrayan Logo" 
+              fetchPriority="high"
               className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-md" 
             />
             <div className="flex flex-col items-center gap-1">
               <h1
-                className="text-2xl md:text-3xl font-brand font-black tracking-[0.35em] text-[var(--color-text)] uppercase"
+                className="text-lg md:text-xl font-brand font-black tracking-[0.45em] text-[var(--color-text)] uppercase"
                 style={{ fontFamily: "'VakrayanFont', sans-serif" }}
               >
                 VAKRAYAN
               </h1>
               <p
                 className="text-[9px] font-bold tracking-[0.3em] uppercase"
-                style={{ color: 'var(--color-muted)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                style={{ color: 'var(--color-muted)', fontFamily: 'Jost, sans-serif' }}
               >
                 Premium Apparel
               </p>

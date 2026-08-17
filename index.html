@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png?v=2" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2" />
@@ -9,41 +10,171 @@
     <link rel="shortcut icon" href="/favicon.ico?v=2" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#121212" />
-    <meta name="description" content="Premium streetwear and apparel — heavyweight drops crafted for contemporary street culture. Shop Vakrayan." />
-    <meta name="keywords" content="Vakrayan, streetwear, premium apparel, oversized tshirt, printed tshirt, hoodies" />
+    <meta name="description" content="Vakrayan - Premium Indian streetwear & heavy-duty apparel. Shop oversized t-shirts, printed graphic tees, heavyweight hoodies & contemporary street culture drops." />
+    <meta name="keywords" content="Vakrayan, vakrayan.com, streetwear brand India, premium apparel, oversized tshirt, printed tshirt, graphic tees, heavyweight hoodies, shirts, urban streetwear, luxury streetwear India, anime streetwear, oversized clothing" />
     <meta name="robots" content="index, follow" />
 
     <!-- Open Graph (Facebook, WhatsApp, Instagram Link Previews) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Vakrayan" />
-    <meta property="og:title" content="Vakrayan — Premium Apparel" />
-    <meta property="og:description" content="Premium streetwear and apparel — heavyweight drops crafted for contemporary street culture." />
-    <meta property="og:image" content="https://vakrayan.in/vakrayan-logo.png" />
-    <meta property="og:url" content="https://vakrayan.in" />
+    <meta property="og:title" content="Vakrayan | Premium Apparel" />
+    <meta property="og:description" content="Premium streetwear and apparel | Heavyweight drops crafted for contemporary street culture." />
+    <meta property="og:image" content="https://vakrayan.com/vakrayan-logo.png" />
+    <meta property="og:url" content="https://vakrayan.com" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Vakrayan — Premium Apparel" />
-    <meta name="twitter:description" content="Premium streetwear — heavyweight drops crafted for street culture." />
-    <meta name="twitter:image" content="https://vakrayan.in/vakrayan-logo.png" />
+    <meta name="twitter:title" content="Vakrayan | Premium Apparel" />
+    <meta name="twitter:description" content="Premium streetwear | Heavyweight drops crafted for street culture." />
+    <meta name="twitter:image" content="https://vakrayan.com/vakrayan-logo.png" />
 
     <!-- ✅ SEO: Canonical URL to prevent duplicate content indexing -->
-    <link rel="canonical" href="https://vakrayan.in/" />
+    <link rel="canonical" href="https://vakrayan.com/" />
 
-    <!-- Google Fonts: preconnect + stylesheet link (faster than CSS @import) -->
+    <!-- High-Performance Cloudflare, Unsplash & Google Fonts Preconnects -->
+    <link rel="preconnect" href="https://b2-upload-gateway.vakrayan.workers.dev" crossorigin />
+    <link rel="dns-prefetch" href="https://b2-upload-gateway.vakrayan.workers.dev" />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
 
-    <!-- Razorpay Checkout SDK — Async preloaded for instant payment popup launch -->
+    <!-- ⚡ LCP Hero Banner Early Preload: Starts downloading at 0.1s in parallel with HTML/JS -->
+    <link rel="preload" as="image" href="https://b2-upload-gateway.vakrayan.workers.dev/file/1786854633429_Create_image_ratio_version_2K_202608152012-processed_lightpdf.com_.png?w=800&dpr=2&q=75" fetchpriority="high" media="(max-width: 767px)" />
+    <link rel="preload" as="image" href="https://b2-upload-gateway.vakrayan.workers.dev/file/1786854633429_Create_image_ratio_version_2K_202608152012-processed_lightpdf.com_.png?w=1600&dpr=2&q=75" fetchpriority="high" media="(min-width: 768px)" />
+    <!-- Preload splash screen logo (LCP-critical — shown on every first visit) -->
+    <link rel="preload" as="image" href="/vakrayan-logo-icon.png" fetchpriority="high" />
+
+    <!-- Google Fonts: Asynchronously loaded to prevent render-blocking -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Syne:wght@600;700;800&family=Jost:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" />
+    </noscript>
+
+    <!-- Razorpay Checkout SDK DNS prefetch -->
     <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
-    <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin />
-    <script id="razorpay-sdk" src="https://checkout.razorpay.com/v1/checkout.js" async></script>
 
-    <title>Vakrayan — Premium Apparel</title>
+    <!-- JSON-LD Structured Data for Search Engine Rich Snippets & Sitelinks -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://vakrayan.com/#organization",
+          "name": "Vakrayan",
+          "url": "https://vakrayan.com",
+          "logo": "https://vakrayan.com/vakrayan-logo.png",
+          "sameAs": [
+            "https://www.instagram.com/vakrayan_official/",
+            "https://in.pinterest.com/vakrayan_official",
+            "https://x.com/vakrayan_official"
+          ],
+          "description": "Vakrayan | Premium streetwear and heavyweight apparel crafted for contemporary street culture."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://vakrayan.com/#website",
+          "url": "https://vakrayan.com",
+          "name": "Vakrayan",
+          "publisher": {
+            "@id": "https://vakrayan.com/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://vakrayan.com/shop?search={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "ItemList",
+          "@id": "https://vakrayan.com/#sitelinks",
+          "name": "Vakrayan Navigation",
+          "itemListElement": [
+            {
+              "@type": "SiteNavigationElement",
+              "position": 1,
+              "name": "Home",
+              "description": "Official Vakrayan Store - Heavyweight Streetwear drops",
+              "url": "https://vakrayan.com/"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 2,
+              "name": "Shop All",
+              "description": "Explore all contemporary oversized t-shirts, printed tees, and heavyweight apparel",
+              "url": "https://vakrayan.com/shop"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 3,
+              "name": "Oversized T-Shirts",
+              "description": "Shop 240+ GSM premium heavyweight oversized streetwear tees",
+              "url": "https://vakrayan.com/category/oversized-tshirt"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 4,
+              "name": "Printed T-Shirts",
+              "description": "High-density screen printed & graphic streetwear drops",
+              "url": "https://vakrayan.com/category/printed-tshirt"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 5,
+              "name": "Shirts & Layering",
+              "description": "Premium casual shirts and streetwear overshirts",
+              "url": "https://vakrayan.com/category/shirts"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+
+    <style>
+      .skip-to-content {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      }
+      .skip-to-content:focus {
+        top: 12px;
+        left: 12px;
+        width: auto;
+        height: auto;
+        clip: auto;
+        z-index: 99999;
+        padding: 8px 16px;
+        background: #0D1A14;
+        color: #34D399;
+        border: 1px solid #059669;
+        border-radius: 8px;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      }
+    </style>
+
+    <title>Vakrayan | Premium Apparel</title>
   </head>
   <body>
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
     <div id="root"></div>
+    <noscript>
+      <div style="text-align:center;padding:2rem;font-family:system-ui">
+        <h1>Vakrayan | Premium Apparel</h1>
+        <p>Please enable JavaScript to browse the Vakrayan store.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

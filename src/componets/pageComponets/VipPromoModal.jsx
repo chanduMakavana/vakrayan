@@ -64,7 +64,7 @@ function VipPromoModal({ isOpen, onClose }) {
               <FiZap className="text-base" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">🔒 Unlock VIP Early Access Drops</h4>
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Unlock VIP Early Access Drops</h4>
               <p className="text-[11px] text-neutral-400 mt-0.5">Shop limited-edition releases, custom vakrayan, and hyped drops before they sell out.</p>
             </div>
           </div>
@@ -74,7 +74,7 @@ function VipPromoModal({ isOpen, onClose }) {
               <FiTruck className="text-base" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">📦 Free Express Shipping</h4>
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Free Express Shipping</h4>
               <p className="text-[11px] text-neutral-400 mt-0.5">Enjoy free premium express shipping on all orders with zero minimum purchase required.</p>
             </div>
           </div>
@@ -84,7 +84,7 @@ function VipPromoModal({ isOpen, onClose }) {
               <FiMail className="text-base" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">🎟️ Member-Only Collections & Invites</h4>
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Member-Only Collections & Invites</h4>
               <p className="text-[11px] text-neutral-400 mt-0.5">Get exclusive access to premium collections and private community drop links.</p>
             </div>
           </div>

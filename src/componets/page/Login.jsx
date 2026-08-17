@@ -33,12 +33,7 @@ const LockIcon = () => (
   </svg>
 )
 
-const features = [
-  { icon: '🛡️', text: 'Secure Firebase Authentication' },
-  { icon: '🚚', text: 'Fast Nationwide Delivery' },
-  { icon: '🔁', text: '7-Day Easy Returns' },
-  { icon: '✨', text: 'Premium Quality Apparel' },
-]
+
 
 function Login() {
   const { register, handleSubmit, formState: { errors }, reset } = useForm()
@@ -56,7 +51,16 @@ function Login() {
 
   const showOverlay = useDelayedLoading(loading, 1500)
 
-  useEffect(() => { document.title = 'Login — Vakrayan' }, [])
+  useEffect(() => {
+    document.title = 'Login | Vakrayan'
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => {
+      try { document.head.removeChild(meta) } catch {}
+    }
+  }, [])
 
   const onSubmit = async (data) => {
     setServerError(''); setLoading(true)
@@ -148,8 +152,10 @@ function Login() {
 
         {/* Vakrayan model hero image */}
         <img
-          src="/vakrayan-hero.png"
+          src="/vakrayan-signup-hero.jpg"
           alt="Vakrayan Premium Apparel"
+          loading="eager"
+          decoding="async"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
 
@@ -193,28 +199,16 @@ function Login() {
             {/* gold separator */}
             <div style={{ width: 40, height: 3, background: 'linear-gradient(90deg, #34D399, #059669)', borderRadius: 99, marginBottom: 20 }} />
 
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 1.70, maxWidth: 300, marginBottom: 40 }}>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', lineHeight: 1.70, maxWidth: 300 }}>
               Sign in to access exclusive drops, track your orders, and manage your wardrobe all in one place.
             </p>
-
-            {/* features */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {features.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
-                    {f.icon}
-                  </div>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 500 }}>{f.text}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* trust badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'rgba(0,0,0,0.28)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', backdropFilter: 'blur(8px)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.50)" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>
-              Trusted by <span style={{ color: '#34D399', fontWeight: 700 }}>10,000+</span> customers across India
+              Trusted by <span style={{ color: '#34D399', fontWeight: 700 }}>100+</span> customers across India
             </span>
           </div>
         </div>
