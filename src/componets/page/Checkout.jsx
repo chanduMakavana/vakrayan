@@ -3,7 +3,7 @@ import { useRazorpaySDK } from '../../hooks/useRazorpaySDK'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
-import { FiArrowLeft, FiCheckCircle } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckCircle, FiCopy, FiPackage, FiTruck, FiShield, FiCheck, FiShoppingBag } from 'react-icons/fi'
 import cartService from '../../services/cart'
 import ordersService from '../../services/orders'
 import productsService from '../../services/products'
@@ -89,6 +89,8 @@ function Checkout() {
   const [submittedFormData, setSubmittedFormData] = useState(null)
   const [mockOrderId, setMockOrderId] = useState('')
   const [walletBalance, setWalletBalance] = useState(0);
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
+  const [copiedOrderId, setCopiedOrderId] = useState(false);
 
 
 
@@ -580,9 +582,9 @@ function Checkout() {
     setCheckoutStatus('processing')
     setProcessingStep(0)
 
-    // Restore original step-by-step processing animation (800ms per step)
+    // Smooth luxury step animation (approx 550ms per step = ~2.2s total smooth timing)
     for (let i = 0; i < steps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 800))
+      await new Promise(resolve => setTimeout(resolve, 550))
       setProcessingStep(i + 1)
     }
 
@@ -749,6 +751,19 @@ function Checkout() {
       }
       cartService.convertCartItems(user.$id, orderItemIds).catch(() => {});
 
+      // Set confirmed order state for the success screen
+      const createdOrderId = response.$id || response.id;
+      setConfirmedOrder({
+        id: createdOrderId,
+        orderNumber: orderNumber,
+        total: Math.round(calculatedFinalAmount),
+        paymentMethod: method,
+        customerName: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        address: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`
+      });
+
       // Clean Redux cart state
       dispatch(clearCartState());
       
@@ -768,13 +783,67 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
-    return <Loader type="splash" text={steps[processingStep] || "CONFIRMING YOUR ORDER..."} />
+    const progressPercent = Math.min(100, Math.round(((processingStep + 1) / (steps.length + 1)) * 100));
+    return (
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
+
+        <div className="relative z-20 flex flex-col items-center space-y-7 max-w-sm w-full text-center animate-fade-in">
+          {/* Vakrayan Official Monogram Emblem */}
+          <div className="relative flex items-center justify-center">
+            <div className="w-20 h-20 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3 shadow-xl flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-accent)]/10 to-transparent pointer-events-none" />
+              <img 
+                src="/vakrayan-logo-icon.png" 
+                alt="Vakrayan" 
+                className="w-12 h-12 object-contain drop-shadow-md animate-pulse"
+                style={{ animationDuration: '2s' }}
+              />
+            </div>
+            {/* Outer spinning ring */}
+            <div className="absolute -inset-2 rounded-2xl border-2 border-dashed border-[var(--color-accent)]/40 animate-spin" style={{ animationDuration: '8s' }} />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-[9px] font-black tracking-[0.4em] uppercase text-[var(--color-accent)] block">
+              SECURE ENCRYPTED CHANNEL
+            </span>
+            <h2 className="text-2xl font-black font-brand tracking-widest uppercase text-[var(--color-text)]">
+              SECURING ORDER
+            </h2>
+          </div>
+
+          {/* Step progression indicators */}
+          <div className="space-y-3 w-full bg-[var(--color-surface)]/80 backdrop-blur-md border border-[var(--color-border)] rounded-2xl p-4 shadow-md">
+            <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider">
+              <span className="text-[var(--color-accent)] animate-pulse">
+                {steps[processingStep] || "Finalizing order confirmation..."}
+              </span>
+              <span className="text-[var(--color-muted)]">{progressPercent}%</span>
+            </div>
+
+            {/* Glowing progress bar */}
+            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden relative">
+              <div 
+                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 rounded-full shadow-[0_0_8px_var(--color-accent)]" 
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-[9px] text-[var(--color-muted)] font-mono uppercase tracking-widest pt-1 border-t border-[var(--color-border)]/50">
+              <span>🔒 256-Bit SSL Encrypted</span>
+              <span>VAKRAYAN HQ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
 
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4 sm:p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
         <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
         
         {/* Full-screen celebratory confetti canvas overlay */}
@@ -783,41 +852,117 @@ function Checkout() {
           className="absolute inset-0 w-full h-full pointer-events-none z-15"
         />
         
-        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
+        <div className="relative z-20 w-full max-w-lg bg-[var(--color-surface)] p-6 sm:p-9 rounded-3xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
+          
+          {/* Animated Luxury Check Seal */}
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-500">
-              <FiCheckCircle className="text-3xl" />
+            <div className="relative flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center relative">
+                <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping pointer-events-none" style={{ animationDuration: '3s' }} />
+                <div className="w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                  <FiCheck className="text-2xl stroke-[3]" />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div>
-            <h4 className="text-[10px] tracking-[0.4em] text-emerald-600 font-black uppercase mb-1">
-              TRANSACTION COMPLETED
-            </h4>
-            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
-              Order Placed
+          {/* Heading */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] tracking-[0.35em] text-emerald-600 dark:text-emerald-400 font-black uppercase block">
+              TRANSACTION VERIFIED • RECEIPT GENERATED
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black font-brand tracking-widest text-[var(--color-text)] uppercase">
+              ORDER CONFIRMED!
             </h1>
-          </div>
-
-          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide">
-            Your order details have been saved in our system. We are preparing to ship your order soon.
-          </p>
-
-          <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200/60 p-4 rounded-xl text-center space-y-1.5 animate-fade-in">
-            <span className="text-[9px] font-black text-rose-600 tracking-widest block uppercase">⚠️ Cancellation Policy</span>
-            <p className="text-[9px] text-rose-700 leading-relaxed font-mono uppercase">
-              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
+            <p className="text-xs text-[var(--color-muted)] leading-relaxed font-sans max-w-sm mx-auto">
+              Thank you for shopping with <strong className="text-[var(--color-text)] font-semibold">Vakrayan</strong>. Your order has been placed into our logistics stream.
             </p>
           </div>
 
-          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
+          {/* Order ID Box with 1-Click Copy */}
+          <div className="flex items-center justify-between gap-3 bg-[var(--color-subtle)] border border-[var(--color-border)] px-4 py-3 rounded-2xl">
+            <div className="text-left">
+              <span className="text-[9px] uppercase tracking-widest text-[var(--color-muted)] font-black block">
+                ORDER REFERENCE
+              </span>
+              <span className="text-xs sm:text-sm font-mono font-bold text-[var(--color-text)] tracking-wider">
+                {confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}
+              </span>
+            </div>
+            <button 
+              type="button"
+              onClick={() => {
+                const num = confirmedOrder?.orderNumber;
+                if (num) {
+                  navigator.clipboard.writeText(num);
+                  setCopiedOrderId(true);
+                  showToast("Order Number copied to clipboard!", "success");
+                  setTimeout(() => setCopiedOrderId(false), 2000);
+                }
+              }}
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              {copiedOrderId ? <FiCheck className="text-emerald-500" /> : <FiCopy />}
+              {copiedOrderId ? 'COPIED' : 'COPY'}
+            </button>
+          </div>
 
-          <button 
-            onClick={() => navigate('/')} 
-            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer"
-          >
-            Continue Shopping &rarr;
-          </button>
+          {/* Quick Snapshot Details Grid */}
+          <div className="grid grid-cols-2 gap-3 text-left">
+            <div className="p-3.5 rounded-2xl bg-[var(--color-subtle)]/60 border border-[var(--color-border)] space-y-1">
+              <div className="flex items-center gap-1.5 text-[var(--color-accent)]">
+                <FiTruck className="text-sm" />
+                <span className="text-[9px] font-black uppercase tracking-wider">ESTIMATED DELIVERY</span>
+              </div>
+              <p className="text-xs font-bold text-[var(--color-text)] font-mono">
+                3 – 5 Business Days
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[var(--color-subtle)]/60 border border-[var(--color-border)] space-y-1">
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <FiPackage className="text-sm" />
+                <span className="text-[9px] font-black uppercase tracking-wider">ORDER UPDATES</span>
+              </div>
+              <p className="text-xs font-bold text-[var(--color-text)] truncate">
+                Dispatched to Email &amp; SMS
+              </p>
+            </div>
+          </div>
+
+          {/* Elegant Cancellation Policy Banner */}
+          <div className="bg-amber-500/5 border border-amber-500/20 p-3.5 rounded-2xl text-left flex items-start gap-3">
+            <FiShield className="text-amber-500 shrink-0 mt-0.5 text-sm" />
+            <div className="space-y-0.5">
+              <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
+                CANCELLATION POLICY
+              </span>
+              <p className="text-[10px] text-[var(--color-muted)] leading-relaxed font-sans">
+                Orders can be cancelled while in <strong>"Pending"</strong> status from your account. Once your parcel is shipped or dispatched, cancellations cannot be processed.
+              </p>
+            </div>
+          </div>
+
+          {/* Dual Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {confirmedOrder?.id && (
+              <button 
+                onClick={() => navigate(`/order/${confirmedOrder.id}`)} 
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <FiPackage className="text-sm" />
+                TRACK ORDER &rarr;
+              </button>
+            )}
+            <button 
+              onClick={() => navigate('/shop')} 
+              className={`flex-1 ${confirmedOrder?.id ? 'bg-[var(--color-subtle)] hover:bg-[var(--color-border)] text-[var(--color-text)] border border-[var(--color-border)]' : 'bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white'} active:scale-[0.98] font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2`}
+            >
+              <FiShoppingBag className="text-sm" />
+              CONTINUE SHOPPING
+            </button>
+          </div>
+
         </div>
       </div>
     )
