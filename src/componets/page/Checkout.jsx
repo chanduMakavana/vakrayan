@@ -770,54 +770,52 @@ function Checkout() {
   if (checkoutStatus === 'processing') {
     const progressPct = Math.round((processingStep / steps.length) * 100);
     return (
-      <div
-        className="w-full min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden"
-        style={{ backgroundImage: "url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)", backgroundSize: 'cover', backgroundPosition: 'center' }}
-      >
-        <div className="absolute inset-0 z-0" style={{ background: 'var(--color-bg)', opacity: 0.97 }} />
+      <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
 
-        <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-xs text-center">
+        <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-10 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-6 animate-scale-up">
 
-          {/* Brand Logo */}
-          <div className="flex flex-col items-center gap-1.5">
-            <img src="/vakrayan-logo-icon.png" alt="Vakrayan" className="w-14 h-14 object-contain drop-shadow-md" />
-            <span className="text-[9px] tracking-[0.35em] font-black uppercase" style={{ color: 'var(--color-muted)', fontFamily: 'Jost, sans-serif' }}>PREMIUM APPAREL</span>
+          {/* Spinner icon */}
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30 flex items-center justify-center">
+              <div className="w-7 h-7 border-[3px] border-[var(--color-accent)]/30 border-t-[var(--color-accent)] rounded-full animate-spin" />
+            </div>
           </div>
 
           {/* Title */}
-          <div className="flex flex-col items-center gap-1">
-            <h1 className="text-[9px] tracking-[0.4em] font-black uppercase" style={{ color: 'var(--color-accent)' }}>SECURING ORDER</h1>
-            <h2 className="text-2xl font-black tracking-widest uppercase" style={{ color: 'var(--color-text)' }}>PROCESSING INVOICE</h2>
+          <div>
+            <h4 className="text-[10px] tracking-[0.4em] text-[var(--color-accent)] font-black uppercase mb-1">
+              SECURING ORDER
+            </h4>
+            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-[var(--color-text)] uppercase">
+              Processing Invoice
+            </h1>
           </div>
 
+          {/* Active step text */}
+          <p className="text-xs text-[var(--color-muted)] leading-relaxed font-mono uppercase tracking-wide animate-pulse">
+            {steps[processingStep] || 'Finalizing process modules...'}
+          </p>
+
           {/* Step indicators */}
-          <div className="w-full flex flex-col gap-2">
+          <div className="w-full flex flex-col gap-2 text-left">
             {steps.map((step, idx) => {
               const done = processingStep > idx;
               const active = processingStep === idx;
               return (
-                <div
-                  key={idx}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-500 ${
-                    done
-                      ? 'border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5'
-                      : active
-                      ? 'border-[var(--color-accent)]/60 bg-[var(--color-accent)]/10'
-                      : 'border-[var(--color-border)]/40 opacity-30'
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-black transition-all duration-500 ${
-                    done
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : active
-                      ? 'border-2 border-[var(--color-accent)] text-[var(--color-accent)]'
-                      : 'border border-[var(--color-border)] text-[var(--color-muted)]'
+                <div key={idx} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-500 ${
+                  done ? 'opacity-100' : active ? 'opacity-100' : 'opacity-30'
+                }`}>
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[8px] font-black transition-all duration-500 ${
+                    done ? 'bg-[var(--color-accent)] text-white'
+                    : active ? 'border-2 border-[var(--color-accent)]'
+                    : 'border border-[var(--color-border)]'
                   }`}>
-                    {done ? '✓' : idx + 1}
+                    {done ? '✓' : ''}
                   </div>
                   <span className={`text-[10px] font-mono tracking-widest uppercase font-black ${
-                    done || active ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)]'
-                  } ${active ? 'animate-pulse' : ''}`}>
+                    active ? 'text-[var(--color-accent)]' : done ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)]'
+                  }`}>
                     {step}
                   </span>
                 </div>
@@ -825,21 +823,23 @@ function Checkout() {
             })}
           </div>
 
-          {/* Glowing gradient progress bar */}
+          <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
+
+          {/* Progress bar */}
           <div className="w-full flex flex-col gap-1.5">
-            <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+            <div className="w-full h-1 rounded-full overflow-hidden bg-[var(--color-border)]">
               <div
                 className="h-full rounded-full transition-all duration-700 ease-out"
                 style={{
                   width: `${progressPct}%`,
-                  background: 'linear-gradient(90deg, var(--color-accent), var(--color-accent-hover, var(--color-accent)))',
-                  boxShadow: '0 0 10px var(--color-accent), 0 0 20px var(--color-accent)'
+                  background: 'var(--color-accent)',
                 }}
               />
             </div>
-            <span className="text-[9px] font-mono tracking-widest text-right" style={{ color: 'var(--color-muted)' }}>
-              {progressPct}%
-            </span>
+            <div className="flex justify-between text-[9px] font-mono tracking-widest" style={{ color: 'var(--color-muted)' }}>
+              <span>PROCESSING</span>
+              <span>{progressPct}%</span>
+            </div>
           </div>
 
         </div>
