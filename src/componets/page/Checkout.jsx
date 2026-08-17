@@ -691,11 +691,17 @@ function Checkout() {
       dispatch(setProducts(updatedProducts));
 
       // 3. Save Order into Firebase Database in parallel with critical operations
+      // ✅ UX FIX: Run a minimum display timer alongside order creation so the
+      // splash loader stays visible for at least 1.5s — prevents a jarring blink.
       const orderItemIds = cartItems.map(i => i.$id);
-      const [response] = await Promise.all([
-        ordersService.createOrder(orderPayload),
-        ...stockUpdatePromises,
-        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {})
+      const minLoaderTime = new Promise(resolve => setTimeout(resolve, 1500));
+      const [[response]] = await Promise.all([
+        Promise.all([
+          ordersService.createOrder(orderPayload),
+          ...stockUpdatePromises,
+          cartService.clearUserCart(user.$id, orderItemIds).catch(() => {})
+        ]),
+        minLoaderTime
       ]);
 
       if (!response) {
