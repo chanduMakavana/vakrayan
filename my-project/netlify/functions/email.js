@@ -32,17 +32,18 @@ const getOrderConfirmationHtml = (payload, origin) => {
   } = payload;
 
   const orderUrl = orderId ? `${origin}/order/${orderId}` : `${origin}/profile`;
+  const logoUrl = `${origin}/vakrayan-merged-logo.png`;
 
   const itemRows = (items || []).map(item => `
     <tr>
-      <td style="padding: 14px 10px; border-bottom: 1px solid #1E2923; color: #FFFFFF; font-size: 14px;">
-        <strong>${escapeHtml(item.name || 'Product')}</strong>
-        ${item.size ? `<span style="display:block; color:#718096; font-size:12px; margin-top:2px;">Size: ${escapeHtml(item.size)}</span>` : ''}
+      <td style="padding: 16px 12px; border-bottom: 1px solid #E2E8F0; color: #0F172A; font-size: 14px;">
+        <strong style="color: #0F172A; font-size: 14px;">${escapeHtml(item.name || 'Product')}</strong>
+        ${item.size ? `<span style="display:block; color:#64748B; font-size:12px; margin-top:3px; font-weight: 500;">Size: ${escapeHtml(item.size)}</span>` : ''}
       </td>
-      <td style="padding: 14px 10px; border-bottom: 1px solid #1E2923; color: #A0AEC0; font-size: 14px; text-align: center;">
+      <td style="padding: 16px 12px; border-bottom: 1px solid #E2E8F0; color: #475569; font-size: 14px; text-align: center; font-weight: 600;">
         x${item.quantity || 1}
       </td>
-      <td style="padding: 14px 10px; border-bottom: 1px solid #1E2923; color: #34D399; font-size: 14px; text-align: right; font-weight: 600;">
+      <td style="padding: 16px 12px; border-bottom: 1px solid #E2E8F0; color: #047857; font-size: 15px; text-align: right; font-weight: 700;">
         ₹${((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
       </td>
     </tr>
@@ -54,57 +55,57 @@ const getOrderConfirmationHtml = (payload, origin) => {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Confirmation - Vakrayan</title>
+    <title>Order Confirmed - Vakrayan</title>
   </head>
-  <body style="margin: 0; padding: 0; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E2E8F0;">
-    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0A0F0D; padding: 40px 10px;">
+  <body style="margin: 0; padding: 0; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0F172A;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F1F5F9; padding: 40px 12px;">
       <tr>
         <td align="center">
-          <table width="100%" max-width="600" style="max-width: 600px; background-color: #0F1714; border: 1px solid #1E2D27; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
+          <table width="100%" style="max-width: 600px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
             
-            <!-- Header / Brand -->
+            <!-- Brand Header with Merged Logo -->
             <tr>
-              <td style="padding: 36px 30px 24px; text-align: center; border-bottom: 1px solid #1A2822; background: linear-gradient(180deg, #13221B 0%, #0F1714 100%);">
-                <h1 style="margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 4px; color: #FFFFFF; text-transform: uppercase;">
-                  VAKRAYAN
-                </h1>
-                <p style="margin: 6px 0 0; font-size: 11px; letter-spacing: 2px; color: #34D399; text-transform: uppercase; font-weight: 700;">
-                  Premium Heavyweight Apparel
+              <td style="padding: 32px 30px 24px; text-align: center; border-bottom: 1px solid #F1F5F9; background-color: #FAFAFA;">
+                <a href="${origin}" style="text-decoration: none; display: inline-block;">
+                  <img src="${logoUrl}" alt="Vakrayan" style="max-height: 48px; width: auto; display: block; margin: 0 auto; border: 0;" />
+                </a>
+                <p style="margin: 8px 0 0; font-size: 11px; letter-spacing: 2.5px; color: #059669; text-transform: uppercase; font-weight: 800;">
+                  PREMIUM APPAREL
                 </p>
               </td>
             </tr>
 
             <!-- Status Banner -->
             <tr>
-              <td style="padding: 30px 30px 10px; text-align: center;">
-                <div style="display: inline-block; background-color: rgba(52, 211, 153, 0.1); border: 1px solid #059669; color: #34D399; font-size: 12px; font-weight: 800; letter-spacing: 2px; padding: 8px 18px; border-radius: 999px; text-transform: uppercase;">
-                  ✓ Order Confirmed
+              <td style="padding: 32px 32px 12px; text-align: center;">
+                <div style="display: inline-block; background-color: #ECFDF5; border: 1px solid #A7F3D0; color: #047857; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; padding: 6px 16px; border-radius: 999px; text-transform: uppercase;">
+                  ✓ ORDER CONFIRMED
                 </div>
-                <h2 style="margin: 18px 0 6px; font-size: 22px; font-weight: 800; color: #FFFFFF;">
+                <h2 style="margin: 18px 0 8px; font-size: 24px; font-weight: 900; color: #0F172A; letter-spacing: -0.5px;">
                   Thank you for your order, ${escapeHtml(customerName)}!
                 </h2>
-                <p style="margin: 0; font-size: 14px; color: #94A3B8; line-height: 1.5;">
-                  We are preparing your fit. Here is your order summary:
+                <p style="margin: 0; font-size: 14px; color: #64748B; line-height: 1.5;">
+                  We have received your order and our warehouse is getting it ready for dispatch.
                 </p>
               </td>
             </tr>
 
-            <!-- Order Meta Grid -->
+            <!-- Order Info Summary Box -->
             <tr>
-              <td style="padding: 20px 30px;">
-                <table width="100%" style="background-color: #141E1A; border: 1px solid #23352D; border-radius: 12px; padding: 16px;">
+              <td style="padding: 18px 32px;">
+                <table width="100%" style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 18px;">
                   <tr>
-                    <td style="padding: 6px 10px; font-size: 13px; color: #718096;">Order ID:</td>
-                    <td style="padding: 6px 10px; font-size: 13px; color: #FFFFFF; font-weight: 700; text-align: right;">#${escapeHtml(orderNumber)}</td>
+                    <td style="padding: 5px 8px; font-size: 13px; color: #64748B; font-weight: 500;">Order ID:</td>
+                    <td style="padding: 5px 8px; font-size: 13px; color: #0F172A; font-weight: 800; text-align: right; letter-spacing: 0.5px;">#${escapeHtml(orderNumber)}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 10px; font-size: 13px; color: #718096;">Payment:</td>
-                    <td style="padding: 6px 10px; font-size: 13px; color: #FFFFFF; font-weight: 600; text-align: right;">${escapeHtml(paymentMethod)}</td>
+                    <td style="padding: 5px 8px; font-size: 13px; color: #64748B; font-weight: 500;">Payment Method:</td>
+                    <td style="padding: 5px 8px; font-size: 13px; color: #0F172A; font-weight: 600; text-align: right;">${escapeHtml(paymentMethod)}</td>
                   </tr>
                   ${shippingAddress ? `
                   <tr>
-                    <td style="padding: 6px 10px; font-size: 13px; color: #718096; vertical-align: top;">Deliver To:</td>
-                    <td style="padding: 6px 10px; font-size: 13px; color: #CBD5E1; text-align: right;">${escapeHtml(shippingAddress)}</td>
+                    <td style="padding: 5px 8px; font-size: 13px; color: #64748B; font-weight: 500; vertical-align: top;">Shipping To:</td>
+                    <td style="padding: 5px 8px; font-size: 13px; color: #334155; text-align: right; line-height: 1.4;">${escapeHtml(shippingAddress)}</td>
                   </tr>` : ''}
                 </table>
               </td>
@@ -112,16 +113,16 @@ const getOrderConfirmationHtml = (payload, origin) => {
 
             <!-- Items Table -->
             <tr>
-              <td style="padding: 10px 30px 20px;">
-                <h3 style="margin: 0 0 12px; font-size: 14px; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; text-transform: uppercase;">
-                  Items in your order
+              <td style="padding: 8px 32px 20px;">
+                <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 800; color: #0F172A; letter-spacing: 1px; text-transform: uppercase;">
+                  ORDER DETAILS
                 </h3>
                 <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse;">
                   <thead>
-                    <tr style="border-bottom: 2px solid #23352D;">
-                      <th style="padding: 8px 10px; text-align: left; font-size: 11px; color: #718096; text-transform: uppercase;">Item</th>
-                      <th style="padding: 8px 10px; text-align: center; font-size: 11px; color: #718096; text-transform: uppercase;">Qty</th>
-                      <th style="padding: 8px 10px; text-align: right; font-size: 11px; color: #718096; text-transform: uppercase;">Price</th>
+                    <tr style="border-bottom: 2px solid #E2E8F0; background-color: #F8FAFC;">
+                      <th style="padding: 10px 12px; text-align: left; font-size: 11px; color: #64748B; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Item</th>
+                      <th style="padding: 10px 12px; text-align: center; font-size: 11px; color: #64748B; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Qty</th>
+                      <th style="padding: 10px 12px; text-align: right; font-size: 11px; color: #64748B; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -129,28 +130,28 @@ const getOrderConfirmationHtml = (payload, origin) => {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colspan="2" style="padding: 18px 10px 8px; font-size: 16px; font-weight: 800; color: #FFFFFF; text-transform: uppercase;">Total Paid:</td>
-                      <td style="padding: 18px 10px 8px; font-size: 18px; font-weight: 900; color: #34D399; text-align: right;">₹${Number(total).toLocaleString('en-IN')}</td>
+                      <td colspan="2" style="padding: 18px 12px 6px; font-size: 15px; font-weight: 800; color: #0F172A; text-transform: uppercase;">Total Paid:</td>
+                      <td style="padding: 18px 12px 6px; font-size: 19px; font-weight: 900; color: #047857; text-align: right;">₹${Number(total).toLocaleString('en-IN')}</td>
                     </tr>
                   </tfoot>
                 </table>
               </td>
             </tr>
 
-            <!-- Call to Action -->
+            <!-- Call to Action Button -->
             <tr>
-              <td style="padding: 10px 30px 36px; text-align: center;">
-                <a href="${orderUrl}" style="display: inline-block; background: #059669; background: linear-gradient(135deg, #059669 0%, #10B981 100%); color: #FFFFFF; text-decoration: none; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 14px 32px; border-radius: 10px; box-shadow: 0 10px 20px rgba(5, 150, 105, 0.3);">
-                  View / Track Order &rarr;
+              <td style="padding: 16px 32px 36px; text-align: center;">
+                <a href="${orderUrl}" style="display: inline-block; background-color: #059669; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; text-decoration: none; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 14px 34px; border-radius: 10px; box-shadow: 0 6px 16px rgba(5, 150, 105, 0.28);">
+                  Track Your Order &rarr;
                 </a>
               </td>
             </tr>
 
             <!-- Footer -->
             <tr>
-              <td style="padding: 24px 30px; background-color: #0B120F; border-top: 1px solid #1E2D27; text-align: center; color: #64748B; font-size: 12px; line-height: 1.6;">
-                <p style="margin: 0 0 6px;">Questions regarding your order? Reach us at <a href="mailto:support@vakrayan.com" style="color: #34D399; text-decoration: none;">support@vakrayan.com</a></p>
-                <p style="margin: 0;">&copy; ${new Date().getFullYear()} Vakrayan Premium Apparel. All rights reserved.</p>
+              <td style="padding: 24px 32px; background-color: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: center; color: #64748B; font-size: 12px; line-height: 1.6;">
+                <p style="margin: 0 0 6px;">Need help? Reach our team at <a href="mailto:support@vakrayan.com" style="color: #059669; text-decoration: none; font-weight: 600;">support@vakrayan.com</a></p>
+                <p style="margin: 0; font-size: 11px; color: #94A3B8;">&copy; ${new Date().getFullYear()} Vakrayan Premium Apparel &bull; All rights reserved.</p>
               </td>
             </tr>
 
@@ -166,6 +167,7 @@ const getOrderConfirmationHtml = (payload, origin) => {
 const getPasswordResetHtml = (payload, origin) => {
   const { resetUrl = '', email = '' } = payload;
   const targetUrl = resetUrl || `${origin}/reset-password`;
+  const logoUrl = `${origin}/vakrayan-merged-logo.png`;
 
   return `
   <!DOCTYPE html>
@@ -175,56 +177,49 @@ const getPasswordResetHtml = (payload, origin) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Your Password - Vakrayan</title>
   </head>
-  <body style="margin: 0; padding: 0; background-color: #0A0F0D; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #E2E8F0;">
-    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0A0F0D; padding: 40px 10px;">
+  <body style="margin: 0; padding: 0; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0F172A;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F1F5F9; padding: 40px 12px;">
       <tr>
         <td align="center">
-          <table width="100%" max-width="540" style="max-width: 540px; background-color: #0F1714; border: 1px solid #1E2D27; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
+          <table width="100%" style="max-width: 540px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
             
-            <!-- Header -->
+            <!-- Header with Merged Logo -->
             <tr>
-              <td style="padding: 36px 30px 24px; text-align: center; border-bottom: 1px solid #1A2822; background: linear-gradient(180deg, #13221B 0%, #0F1714 100%);">
-                <h1 style="margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 4px; color: #FFFFFF; text-transform: uppercase;">
-                  VAKRAYAN
-                </h1>
-                <p style="margin: 6px 0 0; font-size: 11px; letter-spacing: 2px; color: #34D399; text-transform: uppercase; font-weight: 700;">
-                  Security &amp; Account Recovery
+              <td style="padding: 32px 30px 24px; text-align: center; border-bottom: 1px solid #F1F5F9; background-color: #FAFAFA;">
+                <a href="${origin}" style="text-decoration: none; display: inline-block;">
+                  <img src="${logoUrl}" alt="Vakrayan" style="max-height: 48px; width: auto; display: block; margin: 0 auto; border: 0;" />
+                </a>
+                <p style="margin: 8px 0 0; font-size: 11px; letter-spacing: 2px; color: #059669; text-transform: uppercase; font-weight: 800;">
+                  SECURITY &amp; RECOVERY
                 </p>
               </td>
             </tr>
 
             <!-- Content -->
             <tr>
-              <td style="padding: 36px 30px 20px; text-align: center;">
-                <div style="font-size: 40px; margin-bottom: 12px;">🔒</div>
-                <h2 style="margin: 0 0 12px; font-size: 22px; font-weight: 800; color: #FFFFFF;">
+              <td style="padding: 36px 32px 24px; text-align: center;">
+                <div style="font-size: 44px; margin-bottom: 14px;">🔒</div>
+                <h2 style="margin: 0 0 12px; font-size: 22px; font-weight: 900; color: #0F172A;">
                   Reset Your Password
                 </h2>
-                <p style="margin: 0 0 24px; font-size: 14px; color: #94A3B8; line-height: 1.6;">
-                  We received a request to reset the password for your Vakrayan account (${escapeHtml(email)}). Click the button below to choose a new password:
+                <p style="margin: 0 0 28px; font-size: 14px; color: #64748B; line-height: 1.6;">
+                  We received a password reset request for your account (<strong>${escapeHtml(email)}</strong>). Click the button below to choose a new password:
                 </p>
 
-                <a href="${targetUrl}" style="display: inline-block; background: #059669; background: linear-gradient(135deg, #059669 0%, #10B981 100%); color: #FFFFFF; text-decoration: none; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 14px 36px; border-radius: 10px; box-shadow: 0 10px 20px rgba(5, 150, 105, 0.3);">
+                <a href="${targetUrl}" style="display: inline-block; background-color: #059669; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; text-decoration: none; font-size: 13px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 14px 36px; border-radius: 10px; box-shadow: 0 6px 16px rgba(5, 150, 105, 0.28);">
                   Reset Password &rarr;
                 </a>
 
-                <p style="margin: 28px 0 0; font-size: 12px; color: #64748B; line-height: 1.5;">
-                  If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+                <p style="margin: 28px 0 0; font-size: 12px; color: #94A3B8; line-height: 1.5;">
+                  If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
                 </p>
               </td>
             </tr>
 
-            <!-- Security Notice -->
+            <!-- Security Footer Note -->
             <tr>
-              <td style="padding: 16px 30px; background-color: #141E1A; border-top: 1px solid #1E2D27; font-size: 11px; color: #64748B; text-align: center;">
-                This reset link is valid for 1 hour. For security reasons, never share this link with anyone.
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="padding: 20px 30px; background-color: #0B120F; border-top: 1px solid #1E2D27; text-align: center; color: #64748B; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} Vakrayan Premium Apparel.
+              <td style="padding: 16px 32px; background-color: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: center; color: #64748B; font-size: 11px;">
+                This link will expire in 1 hour for security purposes.
               </td>
             </tr>
 

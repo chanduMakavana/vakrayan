@@ -93,23 +93,24 @@ export const emailService = {
             <!DOCTYPE html>
             <html>
             <head><meta charset="utf-8"></head>
-            <body style="margin:0;padding:0;background:#0A0F0D;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#E2E8F0;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0F0D;padding:30px 10px;">
+            <body style="margin:0;padding:0;background-color:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F172A;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F1F5F9;padding:36px 12px;">
                 <tr><td align="center">
-                  <table width="100%" max-width="600" style="max-width:600px;background:#0F1714;border:1px solid #1E2D27;border-radius:14px;overflow:hidden;">
+                  <table width="100%" style="max-width:600px;background-color:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
                     <tr>
-                      <td style="padding:28px 24px;text-align:center;border-bottom:1px solid #1A2822;background:#13221B;">
-                        <h1 style="margin:0;font-size:22px;font-weight:900;letter-spacing:3px;color:#FFFFFF;text-transform:uppercase;">VAKRAYAN</h1>
+                      <td style="padding:32px 24px 20px;text-align:center;border-bottom:1px solid #F1F5F9;background-color:#FAFAFA;">
+                        <img src="https://vakrayan.com/vakrayan-merged-logo.png" alt="Vakrayan" style="max-height:46px;width:auto;display:block;margin:0 auto;border:0;" />
+                        <p style="margin:8px 0 0;font-size:11px;letter-spacing:2px;color:#059669;text-transform:uppercase;font-weight:800;">PREMIUM APPAREL</p>
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding:28px 24px;line-height:1.6;font-size:14px;color:#CBD5E1;">
+                      <td style="padding:32px 28px;line-height:1.65;font-size:14px;color:#334155;">
                         ${body.replace(/\n/g, '<br/>')}
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding:16px 24px;background:#0B120F;border-top:1px solid #1E2D27;text-align:center;color:#64748B;font-size:11px;">
-                        &copy; ${new Date().getFullYear()} Vakrayan Premium Apparel &bull; <a href="https://vakrayan.com" style="color:#34D399;text-decoration:none;">vakrayan.com</a>
+                      <td style="padding:20px 24px;background-color:#F8FAFC;border-top:1px solid #E2E8F0;text-align:center;color:#64748B;font-size:11px;">
+                        &copy; ${new Date().getFullYear()} Vakrayan Premium Apparel &bull; <a href="https://vakrayan.com" style="color:#059669;text-decoration:none;font-weight:600;">vakrayan.com</a>
                       </td>
                     </tr>
                   </table>
@@ -121,6 +122,7 @@ export const emailService = {
           textContent: body
         })
       });
+
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
