@@ -1143,21 +1143,9 @@ function Checkout() {
                 {/* Simulated Order Submission */}
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className={`w-full md:col-span-2 font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all mt-4 ${
-                    isSubmitting
-                      ? 'bg-[var(--color-accent)]/70 cursor-not-allowed text-white/80'
-                      : 'bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.99] text-white cursor-pointer'
-                  }`}
+                  className="w-full md:col-span-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.99] text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer mt-4"
                 >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
-                      {selectedPayment === 'ONLINE' ? 'VERIFYING & OPENING PAYMENT...' : 'PLACING ORDER...'}
-                    </span>
-                  ) : (
-                    `FINALIZE & PLACE ORDER // ₹${Math.round(finalAmount).toLocaleString('en-IN')}`
-                  )}
+                  FINALIZE &amp; PLACE ORDER // ₹{Math.round(finalAmount).toLocaleString('en-IN')}
                 </button>
 
               </form>
