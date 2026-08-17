@@ -55,6 +55,17 @@ function SignUp() {
   const [showPass,     setShowPass]     = useState(false)
   const [focused,      setFocused]      = useState(null)
 
+  useEffect(() => {
+    document.title = 'Create Account | Vakrayan'
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => {
+      try { document.head.removeChild(meta) } catch {}
+    }
+  }, [])
+
   const onSubmit = async (data) => {
     setServerError(''); setLoading(true)
     try {

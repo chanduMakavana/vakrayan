@@ -55,7 +55,7 @@
     <!-- Razorpay Checkout SDK DNS prefetch -->
     <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
 
-    <!-- JSON-LD Structured Data for Search Engine Rich Snippets -->
+    <!-- JSON-LD Structured Data for Search Engine Rich Snippets & Sitelinks -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -66,6 +66,11 @@
           "name": "Vakrayan",
           "url": "https://vakrayan.com",
           "logo": "https://vakrayan.com/vakrayan-logo.png",
+          "sameAs": [
+            "https://www.instagram.com/vakrayan_official/",
+            "https://in.pinterest.com/vakrayan_official",
+            "https://x.com/vakrayan_official"
+          ],
           "description": "Vakrayan | Premium streetwear and heavyweight apparel crafted for contemporary street culture."
         },
         {
@@ -81,6 +86,48 @@
             "target": "https://vakrayan.com/shop?search={search_term_string}",
             "query-input": "required name=search_term_string"
           }
+        },
+        {
+          "@type": "ItemList",
+          "@id": "https://vakrayan.com/#sitelinks",
+          "name": "Vakrayan Navigation",
+          "itemListElement": [
+            {
+              "@type": "SiteNavigationElement",
+              "position": 1,
+              "name": "Home",
+              "description": "Official Vakrayan Store - Heavyweight Streetwear drops",
+              "url": "https://vakrayan.com/"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 2,
+              "name": "Shop All",
+              "description": "Explore all contemporary oversized t-shirts, printed tees, and heavyweight apparel",
+              "url": "https://vakrayan.com/shop"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 3,
+              "name": "Oversized T-Shirts",
+              "description": "Shop 240+ GSM premium heavyweight oversized streetwear tees",
+              "url": "https://vakrayan.com/category/oversized-tshirt"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 4,
+              "name": "Printed T-Shirts",
+              "description": "High-density screen printed & graphic streetwear drops",
+              "url": "https://vakrayan.com/category/printed-tshirt"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 5,
+              "name": "Shirts & Layering",
+              "description": "Premium casual shirts and streetwear overshirts",
+              "url": "https://vakrayan.com/category/shirts"
+            }
+          ]
         }
       ]
     }

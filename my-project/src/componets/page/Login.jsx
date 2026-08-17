@@ -51,7 +51,16 @@ function Login() {
 
   const showOverlay = useDelayedLoading(loading, 1500)
 
-  useEffect(() => { document.title = 'Login | Vakrayan' }, [])
+  useEffect(() => {
+    document.title = 'Login | Vakrayan'
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => {
+      try { document.head.removeChild(meta) } catch {}
+    }
+  }, [])
 
   const onSubmit = async (data) => {
     setServerError(''); setLoading(true)

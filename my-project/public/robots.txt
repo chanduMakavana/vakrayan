@@ -10,6 +10,9 @@ Disallow: /checkout
 Disallow: /profile
 Disallow: /order/
 Disallow: /cart
+Disallow: /signup
+Disallow: /login
+Disallow: /reset-password
 
 # AI Search & Browsing Agents
 User-agent: Google-Extended
