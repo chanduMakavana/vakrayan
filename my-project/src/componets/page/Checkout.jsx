@@ -575,14 +575,7 @@ function Checkout() {
   };
 
   const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
-    setCheckoutStatus('processing')
-    setProcessingStep(0)
-
-    // Simulate smooth processing steps
-    for (let i = 0; i < steps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      setProcessingStep(i + 1)
-    }
+    setCheckoutStatus('processing');
 
     try {
       const orderNumber = generateOrderNumber();
@@ -608,7 +601,7 @@ function Checkout() {
         }
       });
 
-      // 1. Build the Order Payload (supporting both camelCase and snake_case for maximum Firebase compatibility)
+      // 1. Build the Order Payload
       const orderPayload = {
         userId: user.$id,
         customerName: formData.name.trim(),
@@ -640,8 +633,6 @@ function Checkout() {
         razorpay_order_id: ordId,
         razorpayPaymentId: payId,
         razorpay_payment_id: payId,
-
-        // Dynamic additions for blueprint compatibility
         order_number: orderNumber,
         subtotal: Math.round(cartTotalAmount),
         tax_amount: Math.round(calculatedTax),
@@ -650,15 +641,11 @@ function Checkout() {
         tracking_url: ''
       };
 
-      // 2. Perform Stock Depletion size-wise on Catalog & update total_sold
+      // 2. Compute stock updates
       const stockUpdatePromises = [];
       const updatedProducts = products.map(prod => {
         let stocks = {};
-        try {
-          stocks = JSON.parse(prod.sizes_stock || '{}');
-        } catch {
-          stocks = {};
-        }
+        try { stocks = JSON.parse(prod.sizes_stock || '{}'); } catch { stocks = {}; }
 
         let stocksMutated = false;
         let quantitySold = 0;
@@ -675,52 +662,35 @@ function Checkout() {
         if (stocksMutated) {
           const serializedStock = JSON.stringify(stocks);
           const newTotalSold = Number(prod.total_sold || 0) + quantitySold;
-          
-          // Save stock update promise
           const promise = productsService.updateProduct(prod.$id || prod.id, { 
             sizes_stock: serializedStock,
             total_sold: newTotalSold
-          })
-          .catch(e => console.warn("Stock update on cloud ignored:", e.message));
-          
+          }).catch(e => console.warn("Stock update on cloud ignored:", e.message));
           stockUpdatePromises.push(promise);
-          
           return { ...prod, sizes_stock: serializedStock, total_sold: newTotalSold };
         }
         return prod;
       });
 
-      // Update Redux Products Cache instantly
+      // Update Redux state immediately
       dispatch(setProducts(updatedProducts));
 
-      // Await all stock updates before proceeding to save order
-      if (stockUpdatePromises.length > 0) {
-        await Promise.all(stockUpdatePromises);
-      }
+      // 3. Save Order into Firebase Database in parallel with critical operations
+      const orderItemIds = cartItems.map(i => i.$id);
+      const [response] = await Promise.all([
+        ordersService.createOrder(orderPayload),
+        ...stockUpdatePromises,
+        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {})
+      ]);
 
-      // 3. Save Order into Firebase Database
-      const response = await ordersService.createOrder(orderPayload);
       if (!response) {
         throw new Error("Order creation returned null — check Firebase collection configuration.");
       }
 
-      // If paid via Wallet, deduct balance in wallet collection
-      if (method === 'WALLET') {
-        try {
-          await walletService.createWalletTransaction({
-            userId: user.$id,
-            amount: calculatedFinalAmount,
-            type: 'debit',
-            title: `Payment for Order ${orderNumber}`,
-            referenceId: response.$id || response.id
-          });
-        } catch (walletErr) {
-          console.error("Failed to write debit wallet transaction:", walletErr.message);
-        }
-      }
-
-      // 3.1. Send Order Notification Webhook (Make.com, Zapier, Discord, Telegram, etc.)
+      // 4. Background tasks (Non-blocking for lightning fast UI transition)
       const rawItems = JSON.parse(orderPayload.items || '[]');
+      
+      // Dispatch Webhooks, Telegram & Customer Email
       sendWebhookNotification('order.created', {
         orderId: response.$id || response.id,
         orderNumber: orderNumber,
@@ -733,99 +703,63 @@ function Checkout() {
         shippingAddress: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`
       });
 
-      // 3.5. Save Address Profile in Background for Future Checkouts
-      try {
-        // Check if this exact address already exists
-        const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
-        const existingAddr = savedAddresses.find(a => {
-          const existingKey = `${(a.addressLine || a.address || '').trim()}_${a.city.trim()}_${a.pincode.trim()}`;
-          return existingKey === addressKey;
-        });
-
-        await addressService.saveAddress(user.$id, {
-          ...formData,
-          $id: existingAddr?.$id || existingAddr?.id, // Update if exists
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          pincode: formData.pincode,
-          state: formData.state || '',
-          country: formData.country || 'India',
-          is_default: savedAddresses.length === 0 && !existingAddr // Only set as default if new
-        });
-      } catch (addrErr) {
-        console.warn("⚠️ Address profile auto-save ignored on cloud database:", addrErr.message);
+      // Background Wallet Debit if applicable
+      if (method === 'WALLET') {
+        walletService.createWalletTransaction({
+          userId: user.$id,
+          amount: calculatedFinalAmount,
+          type: 'debit',
+          title: `Payment for Order ${orderNumber}`,
+          referenceId: response.$id || response.id
+        }).catch(walletErr => console.error("Wallet debit failed:", walletErr.message));
       }
 
-      // 4. Log coupon usage in database if coupon was applied
+      // Background Auto-Save Address
+      const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
+      const existingAddr = savedAddresses.find(a => {
+        const existingKey = `${(a.addressLine || a.address || '').trim()}_${a.city.trim()}_${a.pincode.trim()}`;
+        return existingKey === addressKey;
+      });
+      addressService.saveAddress(user.$id, {
+        ...formData,
+        $id: existingAddr?.$id || existingAddr?.id,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        pincode: formData.pincode,
+        state: formData.state || '',
+        country: formData.country || 'India',
+        is_default: savedAddresses.length === 0 && !existingAddr
+      }).catch(() => {});
+
+      // Background Coupon logging & Cart conversion tracking
       if (couponApplied && couponApplied !== 'NONE') {
-        try {
-          await couponUsageService.logCouponUsage(user.$id, couponApplied);
-        } catch (couponErr) {
-          console.warn("⚠️ Coupon usage tracking write failed:", couponErr.message);
-        }
+        couponUsageService.logCouponUsage(user.$id, couponApplied).catch(() => {});
       }
+      cartService.convertCartItems(user.$id, orderItemIds).catch(() => {});
 
-      // 4.1. Mark cart items as converted before clearing (for abandonment analytics)
-      try {
-        await cartService.convertCartItems(user.$id, cartItems.map(i => i.$id));
-      } catch (cartErr) {
-        console.warn("⚠️ Cart abandonment status conversion failed:", cartErr.message);
-      }
-
-      // 4.2. Clear Cart globally on Firebase database & Redux state & Clear Coupon
-      const orderItemIds = cartItems.map(i => i.$id);
-      await cartService.clearUserCart(user.$id, orderItemIds);
-      
-      try {
-        const freshItems = await cartService.getCartItems(user.$id);
-        dispatch(setCartItemsAction(freshItems));
-      } catch (reduxErr) {
-        console.warn("Failed to sync Redux with remaining cart items:", reduxErr);
-        dispatch(clearCartState());
-      }
+      // Clean Redux cart state
+      dispatch(clearCartState());
       
       sessionStorage.removeItem('checkout_coupon');
       sessionStorage.removeItem('checkout_discount');
       sessionStorage.removeItem('selected_cart_item_ids');
       sessionStorage.removeItem('deselected_cart_item_ids');
       
-      setCheckoutStatus('success')
+      // Instantly show success screen
+      setCheckoutStatus('success');
     } catch (error) {
-      console.error("Billing pipeline crash:", error)
-      showToast("Logistics error. Transaction aborted.", "error")
-      setCheckoutStatus('idle')
-      // ✅ Reset the double-submit lock on failure so user can retry
-      isSubmittingRef.current = false
+      console.error("Billing pipeline crash:", error);
+      showToast("Logistics error. Transaction aborted.", "error");
+      setCheckoutStatus('idle');
+      isSubmittingRef.current = false;
     }
   };
 
   if (checkoutStatus === 'processing') {
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-md z-10" />
-        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
-          <div className="w-8 h-8 border-4 border-[var(--color-accent)] border-t-[var(--color-accent)] rounded-full animate-spin" />
-          <h2 className="text-xl font-black tracking-widest uppercase text-[var(--color-text)]">
-            PROCESSING INVOICE
-          </h2>
-          <div className="space-y-1.5 w-full">
-            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse">
-              {steps[processingStep] || "Finalizing process modules..."}
-            </p>
-            {/* Custom progress bar */}
-            <div className="w-48 h-[1.5px] bg-[var(--color-border)] mx-auto rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-700" 
-                style={{ width: `${(processingStep / steps.length) * 100}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <Loader type="splash" text="CONFIRMING YOUR ORDER..." />
   }
 
   if (checkoutStatus === 'success') {
