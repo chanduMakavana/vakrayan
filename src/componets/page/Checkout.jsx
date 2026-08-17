@@ -768,26 +768,57 @@ function Checkout() {
   };
 
   if (checkoutStatus === 'processing') {
+    const progressPercent = Math.min(100, Math.round(((processingStep + 1) / steps.length) * 100));
     return (
-      <div className="w-full min-h-screen bg-[#fafafb] flex flex-col items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative">
+      <div className="w-full min-h-screen bg-[#fafafb] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative overflow-hidden">
         <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-10" />
-        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center animate-fade-in">
-          <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin" />
-          <h2 className="text-2xl font-black tracking-widest uppercase text-emerald-950 font-brand">
-            PROCESSING INVOICE
-          </h2>
-          <div className="space-y-2 w-full">
-            <p className="text-[11px] font-mono tracking-widest text-emerald-600 uppercase font-black animate-pulse">
-              {steps[processingStep] || "Finalizing process modules..."}
-            </p>
-            {/* Custom progress bar */}
-            <div className="w-52 h-1.5 bg-emerald-100 mx-auto rounded-full overflow-hidden relative">
-              <div 
-                className="absolute left-0 top-0 h-full bg-emerald-600 transition-all duration-700" 
-                style={{ width: `${(processingStep / steps.length) * 100}%` }}
-              />
+        
+        <div className="relative z-20 w-full max-w-md bg-white p-8 md:p-10 rounded-3xl border border-emerald-100/80 shadow-2xl text-center space-y-6 animate-scale-up">
+          {/* Spinner circle */}
+          <div className="flex justify-center">
+            <div className="w-20 h-20 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+              <div className="w-9 h-9 border-[3.5px] border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
             </div>
           </div>
+
+          <div className="space-y-1">
+            <h4 className="text-[11px] tracking-[0.4em] text-emerald-600 font-black uppercase">
+              SECURING ORDER
+            </h4>
+            <h1 className="text-2xl md:text-3xl font-black tracking-widest text-emerald-950 uppercase font-brand">
+              PROCESSING INVOICE
+            </h1>
+          </div>
+
+          {/* Active step box */}
+          <div className="bg-emerald-50/70 border border-emerald-200/70 py-3.5 px-4 rounded-2xl text-center space-y-1">
+            <span className="text-[9px] font-mono font-bold text-emerald-600 tracking-widest block uppercase">
+              STEP {Math.min(steps.length, processingStep + 1)} OF {steps.length}
+            </span>
+            <p className="text-xs font-mono font-bold text-emerald-800 uppercase tracking-wider animate-pulse">
+              {steps[processingStep] || "Finalizing process modules..."}
+            </p>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <div className="w-full h-2 bg-emerald-100/80 rounded-full overflow-hidden relative">
+              <div 
+                className="absolute left-0 top-0 h-full bg-emerald-600 transition-all duration-700 rounded-full" 
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 uppercase tracking-widest px-0.5">
+              <span>SYSTEM DISPATCH</span>
+              <span className="text-emerald-600 font-bold">{progressPercent}%</span>
+            </div>
+          </div>
+
+          <div className="w-14 h-[1.5px] bg-emerald-200/60 mx-auto rounded-full" />
+
+          <p className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+            PLEASE DO NOT REFRESH OR CLOSE THIS WINDOW
+          </p>
         </div>
       </div>
     )
