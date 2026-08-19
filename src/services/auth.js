@@ -136,6 +136,12 @@ export class AuthService {
             throw error;
         }
     }
+
+    // Must be called once on app mount to complete iOS Google redirect sign-in.
+    // On desktop this is a no-op (getRedirectResult returns null immediately).
+    async resolveGoogleRedirect() {
+        return this.account.resolveRedirectResult();
+    }
 }
 
 const authService = new AuthService();

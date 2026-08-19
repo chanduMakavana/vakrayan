@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy, FiRefreshCw } from 'react-icons/fi';
+import { FiArrowLeft, FiTruck, FiCheckCircle, FiShield, FiFileText, FiCopy, FiRefreshCw, FiCamera, FiImage } from 'react-icons/fi';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
 import ordersService from '../../services/orders';
@@ -1372,7 +1372,10 @@ function OrderDetail() {
                 {/* Review Image Upload Section */}
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase flex items-center gap-1.5">
+                      <FiCamera className="text-sm text-[var(--color-accent)] shrink-0" />
+                      Product Photos (Optional)
+                    </span>
                     <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
                       {modalImages.split(',').filter(Boolean).length} / 5 Uploaded
                     </span>
@@ -1411,8 +1414,15 @@ function OrderDetail() {
                     )}
                   </div>
 
-                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
-                    {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none flex items-center justify-center gap-2">
+                    {uploadingImage ? (
+                      'Uploading image...'
+                    ) : (
+                      <>
+                        <FiImage className="text-sm shrink-0" />
+                        Add Photo / Upload File
+                      </>
+                    )}
                     <input
                       type="file"
                       accept="image/*"
@@ -1424,8 +1434,8 @@ function OrderDetail() {
                         }
                         handleImageUpload(e, setModalImages, modalImages);
                       }}
-                      disabled={uploadingImage}
                       className="hidden"
+                      disabled={uploadingImage}
                     />
                   </label>
                 </div>

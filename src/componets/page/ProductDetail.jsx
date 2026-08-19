@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck, FiCopy, FiShare2 } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck, FiCopy, FiShare2, FiCamera, FiImage } from 'react-icons/fi';
 
 const RulerIcon = ({ className = "w-4 h-4 text-zinc-500 shrink-0 mt-0.5" }) => (
   <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2772,7 +2772,10 @@ function ProductDetail() {
                     {/* Review Image Upload Section */}
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                        <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase flex items-center gap-1.5">
+                          <FiCamera className="text-sm text-[var(--color-accent)] shrink-0" />
+                          Product Photos (Optional)
+                        </span>
                         <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
                           {newReviewImages.split(',').filter(Boolean).length} / 5 Uploaded
                         </span>
@@ -2811,8 +2814,15 @@ function ProductDetail() {
                         )}
                       </div>
 
-                      <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
-                        {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                      <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none flex items-center justify-center gap-2">
+                        {uploadingImage ? (
+                          'Uploading image...'
+                        ) : (
+                          <>
+                            <FiImage className="text-sm shrink-0" />
+                            Add Photo / Upload File
+                          </>
+                        )}
                         <input
                           type="file"
                           accept="image/*"
@@ -2824,8 +2834,8 @@ function ProductDetail() {
                             }
                             handleImageUpload(e, setNewReviewImages, newReviewImages);
                           }}
-                          disabled={uploadingImage}
                           className="hidden"
+                          disabled={uploadingImage}
                         />
                       </label>
                     </div>

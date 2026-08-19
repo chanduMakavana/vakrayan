@@ -723,6 +723,18 @@ to   { transform: translateX(0); }
   50% { opacity: 0.75; }
 }
 
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Skeleton - Clean Off-White Neutral (#f4f4f5) with minimal subtle pulse */
 .skeleton {
   background-color: #f4f4f5;

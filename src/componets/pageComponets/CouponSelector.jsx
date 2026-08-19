@@ -3,23 +3,13 @@ import campaignService from '../../services/campaign';
 import couponUsageService from '../../services/couponUsage';
 import { useToast } from '../../context/ToastContext';
 
-// Inline Tag Icon matching screenshot design
+// Inline Tag Icon matching design
 const TagIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
     <line x1="7" y1="7" x2="7.01" y2="7" />
   </svg>
 );
-
-// Standard default first-order & promo coupons fallback
-const DEFAULT_COUPONS = [
-  {
-    code: 'NEW10',
-    discount: 10,
-    min_order_value: 0,
-    description: 'Extra 10% off on your first purchase, on styles up to 40% off.*T&C'
-  }
-];
 
 export default function CouponSelector({
   cartTotalAmount = 0,
@@ -31,31 +21,24 @@ export default function CouponSelector({
 }) {
   const { showToast } = useToast();
   const [promoInput, setPromoInput] = useState('');
-  const [couponsList, setCouponsList] = useState(DEFAULT_COUPONS);
+  const [allCoupons, setAllCoupons] = useState([]);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
 
-  // Fetch dynamic coupons from DB and merge with defaults
+  // Fetch only active coupons created by admin in database
   useEffect(() => {
     let isMounted = true;
     setLoadingCoupons(true);
     campaignService.getCoupons()
       .then((dbCoupons) => {
         if (!isMounted) return;
-        if (Array.isArray(dbCoupons) && dbCoupons.length > 0) {
-          const merged = [...dbCoupons];
-          // Ensure default first-order coupons exist if not in DB
-          DEFAULT_COUPONS.forEach((def) => {
-            if (!merged.some(c => String(c.code).toUpperCase() === def.code.toUpperCase())) {
-              merged.push(def);
-            }
-          });
-          setCouponsList(merged);
+        if (Array.isArray(dbCoupons)) {
+          setAllCoupons(dbCoupons.filter(c => !c.isExpired));
         } else {
-          setCouponsList(DEFAULT_COUPONS);
+          setAllCoupons([]);
         }
       })
       .catch(() => {
-        if (isMounted) setCouponsList(DEFAULT_COUPONS);
+        if (isMounted) setAllCoupons([]);
       })
       .finally(() => {
         if (isMounted) setLoadingCoupons(false);
@@ -64,13 +47,16 @@ export default function CouponSelector({
     return () => { isMounted = false; };
   }, []);
 
+  // Only show coupons admin enabled for "Available Coupons & Offers" list
+  const displayCoupons = allCoupons.filter(c => c.show_in_available !== false);
+
   // Handle single coupon validation and application
   const applyCouponCode = async (targetCode) => {
     const cleanCode = String(targetCode || '').trim().toUpperCase();
     if (!cleanCode) return;
 
     try {
-      const match = couponsList.find(c => String(c.code || '').trim().toUpperCase() === cleanCode);
+      const match = allCoupons.find(c => String(c.code || '').trim().toUpperCase() === cleanCode);
       
       if (!match) {
         showToast(`Invalid coupon code: "${cleanCode}"`, 'error');
@@ -129,13 +115,13 @@ export default function CouponSelector({
 
   return (
     <div className="space-y-4">
-      {/* 1. Input Box matching screenshot */}
+      {/* 1. Input Box */}
       <form onSubmit={handleManualSubmit} className="flex gap-2">
         <input
           type="text"
           value={promoInput}
           onChange={(e) => setPromoInput(e.target.value)}
-          placeholder="Discount code or gift card"
+          placeholder="Discount code or coupon"
           className="flex-1 bg-white border border-zinc-200 focus:border-zinc-900 text-zinc-900 placeholder:text-zinc-400 rounded-xl px-4 py-3 text-xs outline-hidden transition-all shadow-2xs"
         />
         <button
@@ -164,77 +150,79 @@ export default function CouponSelector({
         </div>
       )}
 
-      {/* 2. Available Coupons List matching exact screenshot design */}
-      <div className="space-y-2">
-        <p className="text-[11px] font-bold text-[var(--color-muted)] uppercase tracking-wider">
-          Available Coupons & Offers
-        </p>
+      {/* 2. Available Coupons List - Only shows admin-selected coupons marked as visible */}
+      {displayCoupons.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-bold text-[var(--color-muted)] uppercase tracking-wider">
+            Available Coupons & Offers
+          </p>
 
-        <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
-          {couponsList.map((coupon) => {
-            const isCurrent = couponApplied && couponApplied.toUpperCase() === String(coupon.code).toUpperCase();
-            const minOrder = Number(coupon.min_order_value || 0);
-            const isEligible = cartTotalAmount >= minOrder;
+          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
+            {displayCoupons.map((coupon) => {
+              const isCurrent = couponApplied && couponApplied.toUpperCase() === String(coupon.code).toUpperCase();
+              const minOrder = Number(coupon.min_order_value || 0);
+              const isEligible = cartTotalAmount >= minOrder;
 
-            return (
-              <div
-                key={coupon.code}
-                className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all ${
-                  isCurrent
-                    ? 'border-emerald-500 bg-emerald-50/40 shadow-xs'
-                    : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]'
-                }`}
-              >
-                {/* Left: Tag Icon + Code & Description */}
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center shrink-0 mt-0.5">
-                    <TagIcon />
-                  </div>
-                  <div className="space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider font-mono">
-                        {coupon.code}
-                      </h4>
-                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full uppercase">
-                        {coupon.discount}% OFF
-                      </span>
+              return (
+                <div
+                  key={coupon.code}
+                  className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                    isCurrent
+                      ? 'border-emerald-500 bg-emerald-50/40 shadow-xs'
+                      : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]'
+                  }`}
+                >
+                  {/* Left: Tag Icon + Code & Description */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center shrink-0 mt-0.5">
+                      <TagIcon />
                     </div>
-                    <p className="text-[11px] text-[var(--color-muted)] leading-snug line-clamp-2">
-                      {coupon.description || `Get ${coupon.discount}% off on your purchase.`}
-                    </p>
-                    {minOrder > 0 && !isEligible && (
-                      <p className="text-[10px] text-amber-600 font-medium">
-                        Min. order: ₹{minOrder} (Add ₹{minOrder - cartTotalAmount} more)
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-[var(--color-text)] uppercase tracking-wider font-mono">
+                          {coupon.code}
+                        </h4>
+                        <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full uppercase">
+                          {coupon.discount}% OFF
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--color-muted)] leading-snug line-clamp-2">
+                        {coupon.description || `Get ${coupon.discount}% off on your purchase.`}
                       </p>
+                      {minOrder > 0 && !isEligible && (
+                        <p className="text-[10px] text-amber-600 font-medium">
+                          Min. order: ₹{minOrder} (Add ₹{minOrder - cartTotalAmount} more)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Apply / Applied Button */}
+                  <div>
+                    {isCurrent ? (
+                      <button
+                        type="button"
+                        onClick={onRemoveCoupon}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer shrink-0"
+                      >
+                        Applied ✓
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => applyCouponCode(coupon.code)}
+                        className="bg-black hover:bg-zinc-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer shrink-0"
+                      >
+                        Apply
+                      </button>
                     )}
                   </div>
                 </div>
-
-                {/* Right: Apply / Applied Black Button matching screenshot */}
-                <div>
-                  {isCurrent ? (
-                    <button
-                      type="button"
-                      onClick={onRemoveCoupon}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer shrink-0"
-                    >
-                      Applied ✓
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => applyCouponCode(coupon.code)}
-                      className="bg-black hover:bg-zinc-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer shrink-0"
-                    >
-                      Apply
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

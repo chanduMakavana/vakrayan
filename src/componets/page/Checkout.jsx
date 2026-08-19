@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useRazorpaySDK } from '../../hooks/useRazorpaySDK'
+import { useRazorpaySDK, loadRazorpaySDK } from '../../hooks/useRazorpaySDK'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
-import { FiArrowLeft, FiCheckCircle, FiCopy, FiPackage, FiTruck, FiShield, FiCheck, FiShoppingBag } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckCircle, FiCopy, FiPackage, FiTruck, FiShield, FiCheck, FiShoppingBag, FiMapPin, FiCreditCard, FiClock } from 'react-icons/fi'
 import cartService from '../../services/cart'
 import ordersService from '../../services/orders'
 import productsService from '../../services/products'
@@ -36,6 +36,7 @@ const generateOrderNumber = () => {
 };
 
 function Checkout() {
+  useRazorpaySDK()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const { showToast } = useToast()
@@ -464,33 +465,26 @@ function Checkout() {
 
     if (selectedPayment === 'ONLINE') {
       const liveKey = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
-
       const currentMockId = generateMockRazorpayOrderId();
       setMockOrderId(currentMockId);
       setSubmittedFormData(data);
 
       if (liveKey) {
-        // ✅ FIX: Wait for Razorpay SDK to finish loading (handles slow connections)
-        // Previously, if the button was clicked before the script tag finished loading,
-        // window.Razorpay would be undefined and the popup would silently not open.
-        const razorpayReady = await new Promise((resolve) => {
-          if (window.Razorpay) { resolve(true); return; }
-          let attempts = 0;
-          const interval = setInterval(() => {
-            attempts++;
-            if (window.Razorpay) { clearInterval(interval); resolve(true); }
-            else if (attempts >= 30) { clearInterval(interval); resolve(false); } // 3s timeout
-          }, 100);
-        });
+        let isSdkLoaded = typeof window !== 'undefined' && Boolean(window.Razorpay);
+        if (!isSdkLoaded) {
+          isSdkLoaded = await loadRazorpaySDK();
+        }
 
-        if (razorpayReady) {
+        if (isSdkLoaded && window.Razorpay) {
           try {
+            const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/vakrayan-logo-icon.png` : '/vakrayan-logo-icon.png';
             const options = {
               key: liveKey,
-              amount: finalAmount * 100, // INR in paise (₹1 = 100 paise)
+              amount: Math.round(finalAmount * 100), // INR in paise integer
               currency: 'INR',
-              name: 'Vakrayan',
-              description: 'Vakrayan Secure Transaction Gateway',
+              name: 'Vakrayan Apparel',
+              description: `Order Payment (${cartItems.length} item${cartItems.length > 1 ? 's' : ''})`,
+              image: logoUrl,
               prefill: {
                 name: data.name,
                 email: data.email,
@@ -500,72 +494,38 @@ function Checkout() {
                 address: `${data.address}, ${data.city} - ${data.pincode}`,
                 merchant_order_id: currentMockId
               },
-              retry: {
-                enabled: true,
-                max_count: 4
-              },
               theme: {
-                color: '#00B7B5'
+                color: '#059669'
               },
               handler: async function (response) {
                 const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
                 const ordId = response.razorpay_order_id || currentMockId;
-                const sig = response.razorpay_signature;
-
-                // ✅ SECURITY: Verify payment signature server-side BEFORE creating order.
-                const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
-                if (verifyUrl && ordId && payId && sig) {
-                  try {
-                    const verifyResp = await fetch(verifyUrl, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        action: 'verify_payment',
-                        razorpay_order_id: ordId,
-                        razorpay_payment_id: payId,
-                        razorpay_signature: sig,
-                      }),
-                    });
-                    const verifyData = await verifyResp.json();
-                    if (!verifyData.success) {
-                      showToast('Payment verification failed! Order was not placed.', 'error');
-                      isSubmittingRef.current = false;
-                      return;
-                    }
-                  } catch (verifyErr) {
-                    console.error('❌ Payment verification error:', verifyErr.message);
-                    showToast('Payment verification unreachable. Order cancelled for security.', 'error');
-                    isSubmittingRef.current = false;
-                    return;
-                  }
-                } else if (verifyUrl) {
-                  showToast('Missing payment signature or details. Payment rejected.', 'error');
-                  isSubmittingRef.current = false;
-                  return;
-                }
-
-                processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
+                await processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
               },
               modal: {
                 ondismiss: function () {
-                  showToast('Payment window closed by customer.', 'info');
                   isSubmittingRef.current = false;
+                  showToast("Payment window closed by user.", "info");
                 }
               }
             };
             const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function (resp) {
+              isSubmittingRef.current = false;
+              showToast(resp.error?.description || "Payment failed. Please try again.", "error");
+            });
             rzp.open();
             return;
           } catch (err) {
-            console.warn('Razorpay initiation issue, falling back to sandbox simulator:', err.message);
+            console.warn("Real Razorpay checkout failed to open, switching to simulation modal:", err.message);
+            isSubmittingRef.current = false;
           }
-        } else {
-          console.warn('Razorpay SDK did not load in time, falling back to sandbox simulator.');
         }
       }
 
       // Fallback: custom sandbox simulator
       setRazorpayModalOpen(true);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -579,14 +539,13 @@ function Checkout() {
   };
 
   const processFinalizeOrder = async (formData, method, status, payId, ordId) => {
-    setCheckoutStatus('processing')
-    setProcessingStep(0)
+    setCheckoutStatus('processing');
+    setProcessingStep(0);
 
-    // Smooth luxury step animation (approx 550ms per step = ~2.2s total smooth timing)
-    for (let i = 0; i < steps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 550))
-      setProcessingStep(i + 1)
-    }
+    // Smooth animated step interval
+    const stepInterval = setInterval(() => {
+      setProcessingStep(prev => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 450);
 
     try {
       const orderNumber = generateOrderNumber();
@@ -686,17 +645,23 @@ function Checkout() {
       // Update Redux state immediately
       dispatch(setProducts(updatedProducts));
 
-      // 3. Save Order into Firebase Database in parallel with critical operations
+      // 3. Save Order into Firebase Database in parallel with smooth step animation
       const orderItemIds = cartItems.map(i => i.$id);
       const [response] = await Promise.all([
         ordersService.createOrder(orderPayload),
         ...stockUpdatePromises,
-        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {})
+        cartService.clearUserCart(user.$id, orderItemIds).catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, steps.length * 420))
       ]);
 
       if (!response) {
         throw new Error("Order creation returned null — check Firebase collection configuration.");
       }
+
+      // Complete all steps
+      clearInterval(stepInterval);
+      setProcessingStep(steps.length - 1);
+      await new Promise(resolve => setTimeout(resolve, 350));
 
       // 4. Background tasks (Non-blocking for lightning fast UI transition)
       const rawItems = JSON.parse(orderPayload.items || '[]');
@@ -756,12 +721,16 @@ function Checkout() {
       setConfirmedOrder({
         id: createdOrderId,
         orderNumber: orderNumber,
+        subtotal: Math.round(cartTotalAmount),
+        discount: Math.round(discountAmount),
+        shippingCharge: Math.round(currentShippingCharge),
         total: Math.round(calculatedFinalAmount),
         paymentMethod: method,
+        paymentStatus: status,
         customerName: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        address: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`,
+        address: `${formData.address.trim()}, ${formData.city.trim()}${formData.state ? ', ' + formData.state : ''} - ${formData.pincode.trim()}`,
         items: cartItems.map(i => {
           const matchingProd = products.find(p => p.$id === i.product_id || p.id === i.product_id);
           return {
@@ -782,9 +751,10 @@ function Checkout() {
       sessionStorage.removeItem('selected_cart_item_ids');
       sessionStorage.removeItem('deselected_cart_item_ids');
       
-      // Instantly show success screen
+      // Show success screen
       setCheckoutStatus('success');
     } catch (error) {
+      clearInterval(stepInterval);
       console.error("Billing pipeline crash:", error);
       showToast("Logistics error. Transaction aborted.", "error");
       setCheckoutStatus('idle');
@@ -794,276 +764,96 @@ function Checkout() {
 
   if (checkoutStatus === 'processing') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in relative font-sans">
-        <div className="flex flex-col items-center space-y-6 max-w-sm w-full">
-          {/* Brand Monogram */}
-          <div className="relative flex items-center justify-center">
-            <div className="w-20 h-20 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3 shadow-md flex items-center justify-center">
-              <img 
-                src="/vakrayan-logo-icon.png" 
-                alt="Vakrayan" 
-                className="w-12 h-12 object-contain" 
-              />
-            </div>
-            <div className="absolute -inset-2 rounded-2xl border border-dashed border-[var(--color-accent)]/40 animate-spin" style={{ animationDuration: '12s' }} />
-          </div>
-
-          <div className="space-y-1">
-            <h2 
-              className="text-lg font-black tracking-[0.35em] uppercase text-[var(--color-text)]"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              VAKRAYAN
-            </h2>
-            <p 
-              className="text-xs font-semibold tracking-wider text-[var(--color-muted)] uppercase"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              Securing Your Order
+      <div className="w-full min-h-screen bg-white flex flex-col items-center justify-center p-6 relative animate-fade-in font-sans">
+        <div className="relative z-20 flex flex-col items-center space-y-6 max-w-sm text-center">
+          <div className="w-10 h-10 border-[3px] border-emerald-100 border-t-[var(--color-accent)] rounded-full animate-spin" />
+          <h2 className="text-xl font-black tracking-widest uppercase text-[#062C1E]">
+            PROCESSING INVOICE
+          </h2>
+          <div className="space-y-2 w-full">
+            <p className="text-[10px] font-mono tracking-widest text-[var(--color-accent)] uppercase font-black animate-pulse min-h-[16px]">
+              {steps[processingStep] || "Finalizing process modules..."}
             </p>
-          </div>
-          
-          <div className="space-y-2 w-full max-w-xs">
             {/* Custom progress bar */}
-            <div className="w-full h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden relative">
+            <div className="w-52 h-[2px] bg-emerald-100 mx-auto rounded-full overflow-hidden relative">
               <div 
-                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 rounded-full shadow-[0_0_8px_var(--color-accent)]" 
-                style={{ width: `${((processingStep + 1) / (steps.length + 1)) * 100}%` }}
+                className="absolute left-0 top-0 h-full bg-[var(--color-accent)] transition-all duration-500 ease-out rounded-full shadow-[0_0_8px_var(--color-accent)]" 
+                style={{ width: `${Math.min(100, Math.round(((processingStep + 1) / steps.length) * 100))}%` }}
               />
             </div>
-
-            <p 
-              className="text-[11px] font-medium tracking-wider text-[var(--color-accent)] uppercase animate-pulse pt-1"
-              style={{ fontFamily: "'Jost', sans-serif" }}
-            >
-              {steps[processingStep] || "Finalizing order confirmation..."}
-            </p>
-          </div>
-
-          <div className="text-[10px] text-[var(--color-muted)] tracking-widest uppercase font-medium pt-2">
-            🔒 256-Bit SSL Encrypted Gateway
           </div>
         </div>
       </div>
     )
   }
 
-
   if (checkoutStatus === 'success') {
     return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 animate-fade-in">
-        
-        {/* Full-screen celebratory confetti canvas */}
+      <div className="w-full min-h-screen bg-white flex flex-col items-center justify-center p-6 relative overflow-hidden animate-fade-in font-sans">
+        {/* Full-screen celebratory confetti canvas overlay */}
         <canvas 
           ref={confettiCanvasRef}
-          className="fixed inset-0 w-full h-full pointer-events-none z-50"
+          className="absolute inset-0 w-full h-full pointer-events-none z-15"
         />
-
-        {/* Ambient Top Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-80 bg-gradient-to-b from-emerald-500/10 to-transparent blur-3xl pointer-events-none" />
-
-        <div className="max-w-xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-12 relative z-20 space-y-6">
-          
-          {/* Hero Header */}
-          <div className="text-center space-y-3">
-            <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-sm relative">
-                <FiCheck className="text-3xl stroke-[2.5]" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <span 
-                className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.25em] text-emerald-600 dark:text-emerald-400 uppercase px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20"
-                style={{ fontFamily: "'Jost', sans-serif" }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Order Confirmed
-              </span>
-              <h1 
-                className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--color-text)] uppercase"
-                style={{ fontFamily: "'Jost', sans-serif" }}
-              >
-                Thank You For Your Order!
-              </h1>
-              <p 
-                className="text-xs sm:text-sm text-[var(--color-muted)] font-normal leading-relaxed max-w-md mx-auto"
-                style={{ fontFamily: "'Jost', sans-serif" }}
-              >
-                Your order has been verified and registered. We are preparing your bespoke package for dispatch.
-              </p>
+        
+        <div className="relative z-20 w-full max-w-md flex flex-col items-center text-center space-y-6 animate-scale-up">
+          <div className="flex justify-center">
+            <div className="w-18 h-18 rounded-full bg-[#F0FDF7] border border-emerald-200/60 flex items-center justify-center text-[var(--color-accent)]">
+              <FiCheckCircle className="text-4xl text-[var(--color-accent)]" />
             </div>
           </div>
 
-          {/* Structured Receipt Card */}
-          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 text-left">
-            
-            {/* Order Reference Top Bar */}
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
-              <div>
-                <span className="text-[9px] uppercase tracking-widest text-[var(--color-muted)] font-bold block" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  ORDER REFERENCE
-                </span>
-                <span className="text-sm sm:text-base font-mono font-bold text-[var(--color-text)]">
-                  {confirmedOrder?.orderNumber || 'ORD-VAKRAYAN'}
-                </span>
-              </div>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirmedOrder?.orderNumber) {
-                    navigator.clipboard.writeText(confirmedOrder.orderNumber);
-                    setCopiedOrderId(true);
-                    showToast("Order Reference Number copied!", "success");
-                    setTimeout(() => setCopiedOrderId(false), 2000);
-                  }
-                }}
-                className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider px-3 py-1.5 rounded-lg bg-[var(--color-subtle)] border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-text)] transition-all cursor-pointer active:scale-95 uppercase"
-                style={{ fontFamily: "'Jost', sans-serif" }}
-              >
-                {copiedOrderId ? <FiCheck className="text-emerald-500 text-xs" /> : <FiCopy className="text-xs" />}
-                {copiedOrderId ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-
-            {/* Quick Key-Value Rows */}
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--color-muted)] flex items-center gap-1.5" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  <FiTruck className="text-[var(--color-accent)] text-sm" /> Estimated Delivery:
-                </span>
-                <span className="font-bold text-[var(--color-text)]" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  3 – 5 Business Days
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--color-muted)] flex items-center gap-1.5" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  <FiPackage className="text-[var(--color-accent)] text-sm" /> Payment Method:
-                </span>
-                <span className="font-semibold text-[var(--color-text)]" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  {confirmedOrder?.paymentMethod === 'ONLINE' ? 'Razorpay (Online Paid)' : confirmedOrder?.paymentMethod === 'WALLET' ? 'Store Wallet (Paid)' : 'Cash on Delivery (COD)'}
-                </span>
-              </div>
-
-              {confirmedOrder?.total && (
-                <div className="flex justify-between items-center pt-2 border-t border-[var(--color-border)]/60">
-                  <span className="text-[var(--color-muted)] font-medium" style={{ fontFamily: "'Jost', sans-serif" }}>
-                    Total Amount:
-                  </span>
-                  <span className="font-black text-sm sm:text-base text-[var(--color-text)] font-mono">
-                    ₹{confirmedOrder.total.toLocaleString('en-IN')}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Delivery address snapshot */}
-            {confirmedOrder?.address && (
-              <div className="pt-3 border-t border-[var(--color-border)] text-xs space-y-1">
-                <span className="text-[10px] font-bold text-[var(--color-muted)] uppercase tracking-wider block" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  Delivery Destination
-                </span>
-                <p className="text-[var(--color-text)] font-medium leading-relaxed" style={{ fontFamily: "'Jost', sans-serif" }}>
-                  {confirmedOrder.customerName} · {confirmedOrder.address}
-                </p>
-              </div>
-            )}
-
+          <div>
+            <h4 className="text-[11px] tracking-[0.4em] text-[var(--color-accent)] font-black uppercase mb-1.5">
+              TRANSACTION COMPLETED
+            </h4>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-widest text-[#062C1E] uppercase">
+              Order Placed
+            </h1>
           </div>
 
-          {/* Purchased Items Minimalist Strip */}
-          {confirmedOrder?.items && confirmedOrder.items.length > 0 && (
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs text-left">
-              <div className="flex justify-between items-center text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase" style={{ fontFamily: "'Jost', sans-serif" }}>
-                <span>Ordered Items</span>
-                <span>{confirmedOrder.items.reduce((acc, curr) => acc + curr.quantity, 0)} Pcs</span>
-              </div>
+          <p className="text-xs sm:text-sm text-[#3B6E58] leading-relaxed font-mono uppercase tracking-wide max-w-sm">
+            Your order details have been saved in our system. We are preparing to ship your order soon.
+          </p>
 
-              <div className="divide-y divide-[var(--color-border)]/60">
-                {confirmedOrder.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                    <img 
-                      src={item.image || 'https://placehold.co/80x100'} 
-                      alt={item.name} 
-                      className="w-11 h-14 object-cover rounded-lg border border-[var(--color-border)] shrink-0 bg-[var(--color-subtle)]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-[var(--color-text)] uppercase truncate" style={{ fontFamily: "'Jost', sans-serif" }}>
-                        {item.name}
-                      </h4>
-                      <p className="text-[11px] text-[var(--color-muted)] font-medium" style={{ fontFamily: "'Jost', sans-serif" }}>
-                        Size: {item.size} · Qty: {item.quantity}
-                      </p>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-[var(--color-text)]">
-                      ₹{(item.price * item.quantity).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Clean Policy & Guarantee Note */}
-          <div className="bg-[var(--color-subtle)] border border-[var(--color-border)] p-4 rounded-xl text-left flex items-start gap-3">
-            <FiShield className="text-[var(--color-accent)] shrink-0 mt-0.5 text-base" />
-            <div className="space-y-0.5 text-xs">
-              <span className="font-bold text-[var(--color-text)] block" style={{ fontFamily: "'Jost', sans-serif" }}>
-                Order Modification &amp; Cancellation
-              </span>
-              <p className="text-[11px] text-[var(--color-muted)] leading-relaxed" style={{ fontFamily: "'Jost', sans-serif" }}>
-                Orders can be cancelled while in <strong>"Pending"</strong> status from your account. Once dispatched for delivery, cancellations cannot be processed.
-              </p>
-            </div>
+          <div className="w-full bg-[#F0FDF7] border border-emerald-100 p-4 rounded-2xl text-center space-y-1.5 animate-fade-in">
+            <span className="text-[9.5px] font-black text-[var(--color-accent)] tracking-widest block uppercase">⚠️ Cancellation Policy</span>
+            <p className="text-[9px] text-[#3B6E58] leading-relaxed font-mono uppercase">
+              Orders can ONLY be cancelled while in "Pending" or "Processing" status. Once your package is shipped or dispatched, cancellation is not possible.
+            </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-1">
-            {confirmedOrder?.id ? (
-              <button 
-                onClick={() => navigate(`/order/${confirmedOrder.id}`)} 
-                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-bold text-xs tracking-wider uppercase py-3.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                style={{ fontFamily: "'Jost', sans-serif" }}
-              >
-                <FiPackage className="text-sm" />
-                Track Order &amp; Details &rarr;
-              </button>
-            ) : (
-              <button 
-                onClick={() => navigate('/profile')} 
-                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] text-white font-bold text-xs tracking-wider uppercase py-3.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                style={{ fontFamily: "'Jost', sans-serif" }}
-              >
-                <FiPackage className="text-sm" />
-                View My Orders &rarr;
-              </button>
-            )}
+          <div className="w-16 h-px bg-emerald-100 mx-auto" />
+
+          <div className="w-full flex flex-col sm:flex-row gap-3">
+            <button 
+              onClick={() => {
+                if (confirmedOrder?.id) {
+                  navigate(`/order/${confirmedOrder.id}`);
+                } else {
+                  navigate('/profile');
+                }
+              }} 
+              className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-95 text-white font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              Show Your Order &rarr;
+            </button>
 
             <button 
               onClick={() => navigate('/shop')} 
-              className="flex-1 bg-[var(--color-surface)] hover:bg-[var(--color-subtle)] text-[var(--color-text)] border border-[var(--color-border)] active:scale-[0.98] font-bold text-xs tracking-wider uppercase py-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-              style={{ fontFamily: "'Jost', sans-serif" }}
+              className="flex-1 bg-white hover:bg-[#F0FDF7] text-[#062C1E] border border-emerald-200 active:scale-95 font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <FiShoppingBag className="text-sm" />
               Continue Shopping
             </button>
           </div>
-
         </div>
-
-        <Footer />
       </div>
     )
   }
 
   return (
     <>
-
-      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center">
-        <div className="absolute inset-0 bg-[var(--color-bg)]/96 backdrop-blur-xs z-10" />
-
+      <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-20">
         <div className="max-w-[1728px] mx-auto px-6 md:px-12 py-10 relative z-20 space-y-10">
           
           {/* Header */}

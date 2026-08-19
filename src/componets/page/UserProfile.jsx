@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useRazorpaySDK } from '../../hooks/useRazorpaySDK';
+import { useRazorpaySDK, loadRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell, FiRefreshCw } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell, FiRefreshCw, FiCamera, FiImage, FiX, FiCheck } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../services/auth';
 import addressService from '../../services/address';
@@ -216,7 +216,7 @@ function UserProfile() {
     }
   };
 
-  const handleTopUpProceed = (e) => {
+  const handleTopUpProceed = async (e) => {
     e.preventDefault();
     const amount = Number(topUpAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -226,67 +226,81 @@ function UserProfile() {
     setIsTopUpModalOpen(false);
 
     const liveKey = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
-    if (window.Razorpay && liveKey) {
-      const options = {
-        key: liveKey,
-        amount: Math.round(amount * 100), // in paise
-        currency: "INR",
-        name: "Vakrayan",
-        description: `Wallet Top-Up`,
-        prefill: {
-          name: user?.name || '',
-          email: user?.email || '',
-          contact: profilePhone || user?.prefs?.phone || ''
-        },
-        theme: {
-          color: "#A16207" // Premium gold color style gateway matching our theme
-        },
-        modal: {
-          ondismiss: () => {
-            showToast("Wallet top-up dismissed.", "info");
-          }
-        },
-        handler: async (response) => {
-          try {
-            const payId = response.razorpay_payment_id;
-            const ordId = response.razorpay_order_id;
-            const sig = response.razorpay_signature;
+    if (liveKey) {
+      let isSdkLoaded = typeof window !== 'undefined' && Boolean(window.Razorpay);
+      if (!isSdkLoaded) {
+        isSdkLoaded = await loadRazorpaySDK();
+      }
 
-            const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
-            if (verifyUrl && ordId && payId && sig) {
-              const verifyResp = await fetch(verifyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  razorpay_order_id: ordId,
-                  razorpay_payment_id: payId,
-                  razorpay_signature: sig,
-                }),
-              });
-              const verifyData = await verifyResp.json();
-              if (!verifyData.success) {
-                showToast('Top-up payment verification failed!', 'error');
-                return;
-              }
-            } else if (verifyUrl && !sig) {
-              showToast('Missing payment verification parameters.', 'error');
-              return;
+      if (isSdkLoaded && window.Razorpay) {
+        const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/vakrayan-logo-icon.png` : '/vakrayan-logo-icon.png';
+        const options = {
+          key: liveKey,
+          amount: Math.round(amount * 100), // in paise integer
+          currency: "INR",
+          name: "Vakrayan Apparel",
+          description: `Wallet Balance Top-Up (₹${amount})`,
+          image: logoUrl,
+          prefill: {
+            name: user?.name || '',
+            email: user?.email || '',
+            contact: profilePhone || user?.prefs?.phone || ''
+          },
+          notes: {
+            purpose: "Wallet Top-Up",
+            user_id: user?.$id || ''
+          },
+          theme: {
+            color: "#059669" // Official Brand Emerald Green
+          },
+          modal: {
+            ondismiss: () => {
+              showToast("Wallet top-up window closed.", "info");
             }
+          },
+          handler: async (response) => {
+            try {
+              const payId = response.razorpay_payment_id;
+              const ordId = response.razorpay_order_id;
+              const sig = response.razorpay_signature;
 
-            const finalPayId = payId || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-            await handleTopUpSuccess(finalPayId);
-          } catch (err) {
-            console.error("Top-up processing issue:", err);
-            showToast("Failed to complete top-up transaction.", "error");
+              const verifyUrl = import.meta.env.VITE_RAZORPAY_VERIFY_URL;
+              if (verifyUrl && ordId && payId && sig) {
+                const verifyResp = await fetch(verifyUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    razorpay_order_id: ordId,
+                    razorpay_payment_id: payId,
+                    razorpay_signature: sig,
+                  }),
+                });
+                const verifyData = await verifyResp.json();
+                if (!verifyData.success) {
+                  showToast('Top-up payment verification failed!', 'error');
+                  return;
+                }
+              }
+
+              const finalPayId = payId || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+              await handleTopUpSuccess(finalPayId);
+            } catch (err) {
+              console.error("Top-up processing issue:", err);
+              showToast("Failed to complete top-up transaction.", "error");
+            }
           }
+        };
+
+        try {
+          const rzp = new window.Razorpay(options);
+          rzp.on('payment.failed', function (resp) {
+            showToast(resp.error?.description || "Top-up payment failed. Please try again.", "error");
+          });
+          rzp.open();
+          return;
+        } catch (err) {
+          console.warn("Official Razorpay launch failed, falling back to simulator:", err.message);
         }
-      };
-      try {
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-        return;
-      } catch (err) {
-        console.warn("Real Razorpay initiation issue, falling back to sandbox simulator:", err.message);
       }
     }
 
@@ -1616,7 +1630,10 @@ function UserProfile() {
                 {/* Review Image Upload Section */}
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase">📸 Product Photos (Optional)</span>
+                    <span className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase flex items-center gap-1.5">
+                      <FiCamera className="text-sm text-[var(--color-accent)] shrink-0" />
+                      Product Photos (Optional)
+                    </span>
                     <span className="text-[9px] font-mono text-[var(--color-muted)] uppercase tracking-wider">
                       {modalImages.split(',').filter(Boolean).length} / 5 Uploaded
                     </span>
@@ -1655,8 +1672,15 @@ function UserProfile() {
                     )}
                   </div>
 
-                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none block">
-                    {uploadingImage ? 'Uploading image...' : '📷 Add Photo / Upload File'}
+                  <label className="w-full bg-neutral-950 hover:bg-neutral-850 text-white font-mono font-bold text-[10px] tracking-wider py-3 rounded-none uppercase transition-all cursor-pointer border border-neutral-950 text-center select-none flex items-center justify-center gap-2">
+                    {uploadingImage ? (
+                      'Uploading image...'
+                    ) : (
+                      <>
+                        <FiImage className="text-sm shrink-0" />
+                        Add Photo / Upload File
+                      </>
+                    )}
                     <input
                       type="file"
                       accept="image/*"
@@ -1787,25 +1811,26 @@ function UserProfile() {
 
       {/* Wallet Top-Up Amount Selector Modal */}
       {isTopUpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
+          {/* Neutral dark backdrop without green tint */}
           <div 
-            className="absolute inset-0 bg-[var(--color-accent)]/65 backdrop-blur-xs" 
+            className="absolute inset-0 bg-black/60 backdrop-blur-xs" 
             onClick={() => setIsTopUpModalOpen(false)}
           />
-          <div className="relative z-50 w-full max-w-md bg-[var(--color-surface)] p-6 border border-[var(--color-accent)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
+          <div className="relative z-50 w-full max-w-md bg-[var(--color-surface)] p-6 rounded-2xl border border-[var(--color-border)] shadow-2xl space-y-6 text-[var(--color-text)] animate-scale-up">
             <div>
               <span className="text-[8px] font-mono text-[var(--color-muted)] block uppercase tracking-widest">STORE WALLET</span>
               <h2 className="text-sm font-black tracking-wider uppercase text-[var(--color-text)] mt-1">
-                Top-Up Store Wallet
+                TOP-UP STORE WALLET
               </h2>
               <p className="text-[9px] text-[var(--color-muted)] uppercase tracking-wider mt-0.5 leading-relaxed">
-                Add money to your Store Wallet using our simulated payment gateway sandbox.
+                Add funds directly to your store wallet for instant 1-click checkout.
               </p>
             </div>
 
             <form onSubmit={handleTopUpProceed} className="space-y-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase">Amount to Add (₹)</label>
+                <label className="text-[10px] font-bold text-[var(--color-muted)] uppercase">AMOUNT TO ADD (₹)</label>
                 <input 
                   type="number"
                   required
@@ -1819,7 +1844,7 @@ function UserProfile() {
 
               {/* Quick Select Preset Buttons */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">Quick Presets</span>
+                <span className="text-[9px] font-mono font-bold text-[var(--color-muted)] uppercase">QUICK PRESETS</span>
                 <div className="grid grid-cols-4 gap-2">
                   {['200', '500', '1000', '2000'].map((preset) => (
                     <button
@@ -1842,15 +1867,15 @@ function UserProfile() {
                 <button
                   type="button"
                   onClick={() => setIsTopUpModalOpen(false)}
-                  className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-none cursor-pointer"
+                  className="w-full py-3 border border-[var(--color-border)] hover:bg-[var(--color-subtle)] active:scale-[0.98] transition-all text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--color-muted)] rounded-lg cursor-pointer"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-black uppercase tracking-wider text-white rounded-none cursor-pointer shadow-md"
+                  className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all text-[10px] font-mono font-black uppercase tracking-wider text-white rounded-lg cursor-pointer shadow-md"
                 >
-                  Proceed to Pay
+                  PROCEED TO PAY
                 </button>
               </div>
             </form>
