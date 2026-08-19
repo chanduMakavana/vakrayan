@@ -89,6 +89,29 @@ const LegalPage     = lazyWithRetry(() => import('./componets/page/LegalPage'))
 // ✅ PERFORMANCE FIX: Module-level constant — not recreated on every render
 const HIDE_NAVBAR_ON = ['/login', '/signup', '/reset-password', '/admin']
 
+// Known valid route prefixes
+const KNOWN_ROUTES = [
+  '/',
+  '/signup',
+  '/login',
+  '/reset-password',
+  '/product',
+  '/shop',
+  '/category',
+  '/cart',
+  '/terms',
+  '/privacy',
+  '/checkout',
+  '/profile',
+  '/order',
+  '/admin'
+]
+
+const isKnownRoute = (pathname) => {
+  if (pathname === '/') return true;
+  return KNOWN_ROUTES.some(r => r !== '/' && pathname.startsWith(r));
+}
+
 // Elegant Vertical Lift page transition variants
 const pageVariants = {
   initial: { opacity: 0, y: 16 },
@@ -508,8 +531,9 @@ function AppContent() {
 
   // ✅ PERFORMANCE FIX: Moved HIDE_NAVBAR_ON outside the component (module level)
   // to prevent a new array being created on every single render of AppContent.
-  const shouldShowNavbar = !HIDE_NAVBAR_ON.some(route => location.pathname.startsWith(route))
-  const shouldShowBottomNav = !['/admin', '/product', '/checkout', '/login', '/signup', '/reset-password'].some(route => location.pathname.startsWith(route))
+  const isValidRoute = isKnownRoute(location.pathname)
+  const shouldShowNavbar = isValidRoute && !HIDE_NAVBAR_ON.some(route => location.pathname.startsWith(route))
+  const shouldShowBottomNav = isValidRoute && !['/admin', '/product', '/checkout', '/login', '/signup', '/reset-password'].some(route => location.pathname.startsWith(route))
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg)' }}>
