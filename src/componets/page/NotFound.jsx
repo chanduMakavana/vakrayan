@@ -1,123 +1,138 @@
 import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiAlertTriangle } from 'react-icons/fi';
+import { FiArrowLeft, FiShoppingBag } from 'react-icons/fi';
 
-function GrowingTreeWithTshirts() {
+function FullScreenGrowingTree() {
   return (
-    <div className="relative w-full max-w-[280px] h-[220px] mx-auto flex items-center justify-center overflow-visible select-none">
+    <div className="absolute inset-0 w-full h-full pointer-events-none select-none flex items-end justify-center overflow-hidden">
       <svg
-        viewBox="0 0 300 240"
-        className="w-full h-full drop-shadow-md"
+        viewBox="0 0 1200 800"
+        className="w-full h-[90vh] md:h-full max-h-[900px] object-cover object-bottom"
         fill="none"
+        preserveAspectRatio="xMidYMax meet"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id="trunkGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="#291e14" />
-            <stop offset="60%" stopColor="#4a3525" />
+          <linearGradient id="grandTrunkGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stopColor="#1c130c" />
+            <stop offset="40%" stopColor="#3d2817" />
+            <stop offset="85%" stopColor="#5c3d23" />
             <stop offset="100%" stopColor="#2e7d32" />
           </linearGradient>
 
-          <linearGradient id="foliageGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#4ade80" />
-            <stop offset="50%" stopColor="#15803d" />
-            <stop offset="100%" stopColor="#0f5128" />
+          <linearGradient id="grandFoliage1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#34d399" />
+            <stop offset="40%" stopColor="#059669" />
+            <stop offset="100%" stopColor="#064e3b" />
+          </linearGradient>
+
+          <linearGradient id="grandFoliage2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#6ee7b7" />
+            <stop offset="60%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#047857" />
+          </linearGradient>
+
+          <linearGradient id="grandFoliageGold" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fef08a" />
+            <stop offset="100%" stopColor="#15803d" />
           </linearGradient>
           
-          <linearGradient id="foliageGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#86efac" />
-            <stop offset="100%" stopColor="#166534" />
-          </linearGradient>
+          <radialGradient id="sunGlow" cx="50%" cy="30%" r="50%">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+          </radialGradient>
         </defs>
 
-        {/* Soil Base with Growing Roots */}
-        <g className="animate-fade-in opacity-80">
-          <ellipse cx="150" cy="225" rx="55" ry="7" fill="#1b4332" opacity="0.25" />
-          <ellipse cx="150" cy="223" rx="38" ry="4" fill="#3e2723" opacity="0.4" />
-          <path d="M140 220 Q120 226 105 228" stroke="#3e2723" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M160 220 Q180 226 195 228" stroke="#3e2723" strokeWidth="2.5" strokeLinecap="round" />
+        {/* Ambient Back Glow */}
+        <circle cx="600" cy="360" r="380" fill="url(#sunGlow)" />
+
+        {/* Ground Mound / Island */}
+        <g className="animate-fade-in opacity-90">
+          <ellipse cx="600" cy="785" rx="460" ry="40" fill="#064e3b" opacity="0.35" />
+          <ellipse cx="600" cy="775" rx="340" ry="25" fill="#1c130c" opacity="0.6" />
+          <path d="M450 770 Q300 780 180 790" stroke="#3d2817" strokeWidth="6" strokeLinecap="round" opacity="0.7" />
+          <path d="M750 770 Q900 780 1020 790" stroke="#3d2817" strokeWidth="6" strokeLinecap="round" opacity="0.7" />
         </g>
 
-        {/* Tree Trunk & Branches with Grow/Scale Animation */}
-        <g className="origin-bottom transform transition-all" style={{ transformOrigin: '150px 220px', animation: 'treeGrow 2s cubic-bezier(0.34, 1.4, 0.64, 1) forwards' }}>
-          {/* Main Trunk */}
+        {/* Giant Majestic Tree with Full Screen Grow Animation */}
+        <g style={{ transformOrigin: '600px 770px', animation: 'grandTreeGrow 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+          
+          {/* Main Massive Trunk */}
           <path
-            d="M144 220 C144 185 142 140 148 115 C150 102 153 90 151 75 C149 90 152 102 154 115 C160 140 158 185 158 220 Z"
-            fill="url(#trunkGrad)"
+            d="M570 770 C575 660 560 520 580 430 C588 390 595 330 590 270 C605 330 612 390 620 430 C640 520 625 660 630 770 Z"
+            fill="url(#grandTrunkGrad)"
           />
 
-          {/* Left Large Branch */}
+          {/* Primary Left Massive Branch */}
           <path
-            d="M148 135 C132 125 110 120 85 105 C80 102 85 98 92 101 C112 110 130 116 148 123"
-            stroke="url(#trunkGrad)"
-            strokeWidth="5"
+            d="M580 500 C510 460 410 440 290 380 C270 370 285 355 310 365 C400 400 490 425 585 450"
+            stroke="url(#grandTrunkGrad)"
+            strokeWidth="16"
             strokeLinecap="round"
           />
 
-          {/* Right Large Branch */}
+          {/* Primary Right Massive Branch */}
           <path
-            d="M154 125 C172 115 195 112 218 95 C223 92 220 88 212 90 C192 98 174 105 154 113"
-            stroke="url(#trunkGrad)"
-            strokeWidth="5"
+            d="M620 480 C690 440 790 420 910 360 C930 350 915 335 890 345 C800 380 710 405 615 430"
+            stroke="url(#grandTrunkGrad)"
+            strokeWidth="16"
             strokeLinecap="round"
           />
 
-          {/* Upper Sub-branches */}
-          <path
-            d="M150 95 C138 80 120 72 108 58"
-            stroke="#2e7d32"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M152 90 C165 78 182 70 196 55"
-            stroke="#2e7d32"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M151 75 C151 55 149 42 150 28"
-            stroke="#2e7d32"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
+          {/* Secondary Sub-Branches */}
+          <path d="M590 370 C540 310 460 270 380 230" stroke="#3d2817" strokeWidth="10" strokeLinecap="round" />
+          <path d="M610 350 C660 290 740 250 820 210" stroke="#3d2817" strokeWidth="10" strokeLinecap="round" />
+          <path d="M595 280 C570 200 520 150 470 90" stroke="#2e7d32" strokeWidth="7" strokeLinecap="round" />
+          <path d="M605 270 C630 190 680 140 730 80" stroke="#2e7d32" strokeWidth="7" strokeLinecap="round" />
+          <path d="M600 240 L600 70" stroke="#2e7d32" strokeWidth="8" strokeLinecap="round" />
 
-          {/* Lush Green Foliage Clouds with Soft Blooming Pop */}
-          <g style={{ transformOrigin: '150px 70px', animation: 'foliageBloom 2.4s ease-out forwards' }}>
-            {/* Center Main Canopy */}
-            <circle cx="150" cy="50" r="32" fill="url(#foliageGrad1)" opacity="0.95" />
-            <circle cx="150" cy="35" r="24" fill="url(#foliageGrad2)" opacity="0.9" />
-            
-            {/* Left Foliage */}
-            <circle cx="100" cy="85" r="28" fill="url(#foliageGrad1)" opacity="0.95" />
-            <circle cx="90" cy="75" r="20" fill="url(#foliageGrad2)" opacity="0.85" />
-            
-            {/* Right Foliage */}
-            <circle cx="202" cy="78" r="28" fill="url(#foliageGrad1)" opacity="0.95" />
-            <circle cx="212" cy="68" r="20" fill="url(#foliageGrad2)" opacity="0.85" />
+          {/* Left Wing Branchlets */}
+          <path d="M350 400 C300 360 240 350 180 320" stroke="#3d2817" strokeWidth="7" strokeLinecap="round" />
+          <path d="M440 430 C400 380 350 360 290 320" stroke="#3d2817" strokeWidth="7" strokeLinecap="round" />
 
-            {/* Little aesthetic leaf clusters */}
-            <circle cx="125" cy="55" r="16" fill="#86efac" opacity="0.7" />
-            <circle cx="178" cy="52" r="16" fill="#86efac" opacity="0.7" />
-            <circle cx="150" cy="68" r="18" fill="#14532d" opacity="0.5" />
+          {/* Right Wing Branchlets */}
+          <path d="M850 380 C900 340 960 330 1020 300" stroke="#3d2817" strokeWidth="7" strokeLinecap="round" />
+          <path d="M760 410 C800 360 850 340 910 300" stroke="#3d2817" strokeWidth="7" strokeLinecap="round" />
+
+          {/* Grand Foliage Canopy Clouds with Lush Blooming */}
+          <g style={{ transformOrigin: '600px 240px', animation: 'grandFoliageBloom 2.6s ease-out forwards' }}>
+            {/* Center Crown */}
+            <circle cx="600" cy="140" r="110" fill="url(#grandFoliage1)" opacity="0.95" />
+            <circle cx="600" cy="90" r="85" fill="url(#grandFoliage2)" opacity="0.9" />
+            <circle cx="600" cy="190" r="95" fill="url(#grandFoliage1)" opacity="0.8" />
+
+            {/* Left Giant Foliage */}
+            <circle cx="420" cy="240" r="95" fill="url(#grandFoliage1)" opacity="0.95" />
+            <circle cx="360" cy="200" r="75" fill="url(#grandFoliage2)" opacity="0.9" />
+            <circle cx="280" cy="340" r="90" fill="url(#grandFoliage1)" opacity="0.95" />
+            <circle cx="200" cy="310" r="70" fill="url(#grandFoliage2)" opacity="0.85" />
+
+            {/* Right Giant Foliage */}
+            <circle cx="780" cy="220" r="95" fill="url(#grandFoliage1)" opacity="0.95" />
+            <circle cx="840" cy="180" r="75" fill="url(#grandFoliage2)" opacity="0.9" />
+            <circle cx="920" cy="320" r="90" fill="url(#grandFoliage1)" opacity="0.95" />
+            <circle cx="1000" cy="290" r="70" fill="url(#grandFoliage2)" opacity="0.85" />
+
+            {/* Aesthetic Gold/Emerald Highlights */}
+            <circle cx="510" cy="130" r="50" fill="url(#grandFoliageGold)" opacity="0.4" />
+            <circle cx="690" cy="120" r="50" fill="url(#grandFoliageGold)" opacity="0.4" />
+            <circle cx="600" cy="60" r="45" fill="#a7f3d0" opacity="0.6" />
           </g>
 
-          {/* --- T-SHIRT FRUITS (SWAYING IN THE BREEZE) --- */}
-          
-          {/* T-Shirt 1: Left Branch (Black Oversized Tee) */}
+          {/* ============================================================ */}
+          {/* --- SWAYING APPAREL T-SHIRT FRUITS (FULL SCREEN MAJESTIC) --- */}
+          {/* ============================================================ */}
+
+          {/* 1. Left Low Branch (Black Oversized Tee) */}
           <g 
-            className="cursor-pointer transition-transform hover:scale-125"
+            className="pointer-events-auto cursor-pointer"
             style={{
-              transformOrigin: '88px 105px',
-              animation: 'swayTshirt1 3.2s ease-in-out infinite alternate 1.6s, fruitSprout 1s ease-out 1.2s both'
+              transformOrigin: '230px 335px',
+              animation: 'swayLong1 3.8s ease-in-out infinite alternate 1.8s, sproutPop 1s ease-out 1.2s both'
             }}
           >
-            {/* Thread / Stem hanger */}
-            <line x1="88" y1="105" x2="88" y2="114" stroke="#1b4332" strokeWidth="1.5" strokeDasharray="1.5 1" />
-            {/* Hanger Hook */}
-            <path d="M88 114 Q91 112 88 110 Q85 112 88 114" fill="none" stroke="#d4af37" strokeWidth="1.2" />
-            {/* Miniature T-Shirt Shape */}
-            <g transform="translate(73, 114) scale(0.65)">
-              {/* T-shirt Silhouette */}
+            <line x1="230" y1="335" x2="230" y2="365" stroke="#1c130c" strokeWidth="2.5" strokeDasharray="3 2" />
+            <path d="M230 365 Q235 360 230 355 Q225 360 230 365" fill="none" stroke="#d4af37" strokeWidth="2" />
+            <g transform="translate(198, 365) scale(1.4)">
               <path
                 d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
                 fill="#18181b"
@@ -125,24 +140,21 @@ function GrowingTreeWithTshirts() {
                 strokeWidth="1.5"
                 strokeLinejoin="round"
               />
-              {/* VAKRAYAN Minimal Box Graphic on Tee */}
               <rect x="18" y="16" width="10" height="12" fill="#10b981" rx="1" />
               <line x1="20" y1="21" x2="26" y2="21" stroke="#ffffff" strokeWidth="1.2" />
             </g>
           </g>
 
-          {/* T-Shirt 2: Center Top (Emerald / Forest Green Signature Tee) */}
+          {/* 2. Left Mid Branch (Signature Emerald Tee) */}
           <g 
-            className="cursor-pointer transition-transform hover:scale-125"
+            className="pointer-events-auto cursor-pointer"
             style={{
-              transformOrigin: '150px 72px',
-              animation: 'swayTshirt2 2.8s ease-in-out infinite alternate 1.8s, fruitSprout 1s ease-out 1.5s both'
+              transformOrigin: '360px 250px',
+              animation: 'swayLong2 3.2s ease-in-out infinite alternate 2s, sproutPop 1s ease-out 1.4s both'
             }}
           >
-            {/* Thread / Stem */}
-            <line x1="150" y1="72" x2="150" y2="82" stroke="#1b4332" strokeWidth="1.5" />
-            {/* Miniature T-Shirt */}
-            <g transform="translate(134, 82) scale(0.72)">
+            <line x1="360" y1="250" x2="360" y2="285" stroke="#1c130c" strokeWidth="2.5" />
+            <g transform="translate(325, 285) scale(1.5)">
               <path
                 d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
                 fill="#047857"
@@ -150,23 +162,43 @@ function GrowingTreeWithTshirts() {
                 strokeWidth="1.5"
                 strokeLinejoin="round"
               />
-              {/* Golden 'V' Logo */}
               <path d="M19 18 L23 26 L27 18" stroke="#fef08a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </g>
           </g>
 
-          {/* T-Shirt 3: Right Branch (Off-White / Beige Oversized Tee) */}
+          {/* 3. Center Crown (Special Gold Anime Graphic Tee) */}
           <g 
-            className="cursor-pointer transition-transform hover:scale-125"
+            className="pointer-events-auto cursor-pointer"
             style={{
-              transformOrigin: '210px 96px',
-              animation: 'swayTshirt3 3.6s ease-in-out infinite alternate 2s, fruitSprout 1s ease-out 1.8s both'
+              transformOrigin: '600px 180px',
+              animation: 'swayLong3 3.5s ease-in-out infinite alternate 2.2s, sproutPop 1s ease-out 1.6s both'
             }}
           >
-            {/* Thread / Stem */}
-            <line x1="210" y1="96" x2="210" y2="106" stroke="#1b4332" strokeWidth="1.5" strokeDasharray="1.5 1" />
-            {/* Miniature T-Shirt */}
-            <g transform="translate(196, 106) scale(0.62)">
+            <line x1="600" y1="180" x2="600" y2="215" stroke="#1c130c" strokeWidth="2.5" />
+            <g transform="translate(562, 215) scale(1.65)">
+              <path
+                d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
+                fill="#09090b"
+                stroke="#d4af37"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+              {/* Golden Japanese Kanji / Crest */}
+              <circle cx="23" cy="22" r="5.5" fill="#e11d48" />
+              <rect x="21" y="29" width="4" height="6" fill="#fef08a" rx="0.5" />
+            </g>
+          </g>
+
+          {/* 4. Right Mid Branch (Off-White Vintage Boxy Tee) */}
+          <g 
+            className="pointer-events-auto cursor-pointer"
+            style={{
+              transformOrigin: '820px 240px',
+              animation: 'swayLong1 4s ease-in-out infinite alternate 2.4s, sproutPop 1s ease-out 1.7s both'
+            }}
+          >
+            <line x1="820" y1="240" x2="820" y2="275" stroke="#1c130c" strokeWidth="2.5" strokeDasharray="3 2" />
+            <g transform="translate(788, 275) scale(1.45)">
               <path
                 d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
                 fill="#f4f4f5"
@@ -174,61 +206,83 @@ function GrowingTreeWithTshirts() {
                 strokeWidth="1.5"
                 strokeLinejoin="round"
               />
-              {/* Anime Japanese Graphic / Red Dot on Chest */}
-              <circle cx="23" cy="22" r="4.5" fill="#e11d48" />
+              <circle cx="23" cy="21" r="5" fill="#e11d48" />
             </g>
           </g>
 
-          {/* T-Shirt 4: Little Mini Tee on Mid-Left */}
+          {/* 5. Right Low Branch (Cobalt Acid Wash Blue Tee) */}
           <g 
-            className="cursor-pointer"
+            className="pointer-events-auto cursor-pointer"
             style={{
-              transformOrigin: '122px 90px',
-              animation: 'swayTshirt1 2.5s ease-in-out infinite alternate 1.9s, fruitSprout 1s ease-out 2s both'
+              transformOrigin: '960px 320px',
+              animation: 'swayLong2 3.6s ease-in-out infinite alternate 2.6s, sproutPop 1s ease-out 1.9s both'
             }}
           >
-            <line x1="122" y1="90" x2="122" y2="98" stroke="#1b4332" strokeWidth="1.2" />
-            <g transform="translate(111, 98) scale(0.48)">
+            <line x1="960" y1="320" x2="960" y2="355" stroke="#1c130c" strokeWidth="2.5" />
+            <g transform="translate(928, 355) scale(1.4)">
               <path
                 d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
-                fill="#3b82f6"
+                fill="#2563eb"
                 stroke="#1d4ed8"
                 strokeWidth="1.5"
+                strokeLinejoin="round"
               />
+              <rect x="18" y="17" width="10" height="11" fill="#ffffff" rx="1" />
             </g>
           </g>
 
-          {/* T-Shirt 5: Little Mini Tee on Mid-Right */}
+          {/* 6. Extra Left Sub-Fruit (Crimson Red Heavyweight Tee) */}
           <g 
-            className="cursor-pointer"
+            className="pointer-events-auto cursor-pointer"
             style={{
-              transformOrigin: '180px 88px',
-              animation: 'swayTshirt2 3.1s ease-in-out infinite alternate 2.2s, fruitSprout 1s ease-out 2.1s both'
+              transformOrigin: '480px 200px',
+              animation: 'swayLong3 3s ease-in-out infinite alternate 2.1s, sproutPop 1s ease-out 2s both'
             }}
           >
-            <line x1="180" y1="88" x2="180" y2="96" stroke="#1b4332" strokeWidth="1.2" />
-            <g transform="translate(169, 96) scale(0.48)">
+            <line x1="480" y1="200" x2="480" y2="230" stroke="#1c130c" strokeWidth="2" />
+            <g transform="translate(454, 230) scale(1.15)">
               <path
                 d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
                 fill="#e11d48"
                 stroke="#9f1239"
                 strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+            </g>
+          </g>
+
+          {/* 7. Extra Right Sub-Fruit (Minimalist Lavender Tee) */}
+          <g 
+            className="pointer-events-auto cursor-pointer"
+            style={{
+              transformOrigin: '710px 190px',
+              animation: 'swayLong1 3.4s ease-in-out infinite alternate 2.3s, sproutPop 1s ease-out 2.1s both'
+            }}
+          >
+            <line x1="710" y1="190" x2="710" y2="220" stroke="#1c130c" strokeWidth="2" />
+            <g transform="translate(684, 220) scale(1.15)">
+              <path
+                d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
+                fill="#a855f7"
+                stroke="#7e22ce"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
               />
             </g>
           </g>
         </g>
       </svg>
 
-      {/* Inline Keyframe Styles for Smooth SVG Physics */}
+      {/* Physics CSS for Full-screen Organic Flow */}
       <style>{`
-        @keyframes treeGrow {
+        @keyframes grandTreeGrow {
           0% {
-            transform: scaleY(0) scaleX(0.4);
+            transform: scaleY(0) scaleX(0.2);
             opacity: 0;
           }
-          50% {
+          45% {
             transform: scaleY(0.7) scaleX(0.85);
-            opacity: 0.8;
+            opacity: 0.85;
           }
           100% {
             transform: scaleY(1) scaleX(1);
@@ -236,14 +290,14 @@ function GrowingTreeWithTshirts() {
           }
         }
 
-        @keyframes foliageBloom {
+        @keyframes grandFoliageBloom {
           0% {
             transform: scale(0);
             opacity: 0;
           }
           60% {
-            transform: scale(0.3);
-            opacity: 0.5;
+            transform: scale(0.4);
+            opacity: 0.6;
           }
           100% {
             transform: scale(1);
@@ -251,13 +305,13 @@ function GrowingTreeWithTshirts() {
           }
         }
 
-        @keyframes fruitSprout {
+        @keyframes sproutPop {
           0% {
             transform: scale(0);
             opacity: 0;
           }
           70% {
-            transform: scale(1.2);
+            transform: scale(1.3);
             opacity: 1;
           }
           100% {
@@ -266,22 +320,22 @@ function GrowingTreeWithTshirts() {
           }
         }
 
-        @keyframes swayTshirt1 {
-          0% { transform: rotate(-14deg); }
-          50% { transform: rotate(4deg); }
-          100% { transform: rotate(16deg); }
+        @keyframes swayLong1 {
+          0% { transform: rotate(-16deg); }
+          50% { transform: rotate(5deg); }
+          100% { transform: rotate(18deg); }
         }
 
-        @keyframes swayTshirt2 {
+        @keyframes swayLong2 {
           0% { transform: rotate(18deg); }
-          50% { transform: rotate(-3deg); }
-          100% { transform: rotate(-15deg); }
+          50% { transform: rotate(-4deg); }
+          100% { transform: rotate(-16deg); }
         }
 
-        @keyframes swayTshirt3 {
+        @keyframes swayLong3 {
           0% { transform: rotate(-12deg); }
-          50% { transform: rotate(6deg); }
-          100% { transform: rotate(14deg); }
+          50% { transform: rotate(7deg); }
+          100% { transform: rotate(15deg); }
         }
       `}</style>
     </div>
@@ -290,47 +344,73 @@ function GrowingTreeWithTshirts() {
 
 function NotFound() {
   return (
-    <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-4 md:p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-[var(--color-accent)] selection:text-white">
-      <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-xs z-10" />
+    <div className="w-full min-h-screen relative overflow-hidden bg-[#070e0a] text-white flex flex-col justify-between selection:bg-emerald-500 selection:text-black">
+      
+      {/* Background Ambience & Distressed Texture */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-15 mix-blend-overlay pointer-events-none"
+        style={{ backgroundImage: `url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#040806] via-[#07130c]/80 to-[#020503] pointer-events-none" />
 
-      <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-6 md:p-8 rounded-2xl border border-[var(--color-border)] shadow-2xl text-center space-y-5 animate-scale-up overflow-hidden">
-        
-        {/* Animated Tree with Hanging & Swaying T-Shirt Apparel 'Fruits' */}
-        <div className="pt-2">
-          <GrowingTreeWithTshirts />
+      {/* FULL SCREEN GROWING TREE WITH SWAYING APPAREL T-SHIRTS */}
+      <FullScreenGrowingTree />
+
+      {/* Top Header Badge / Navigation Indicator */}
+      <div className="relative z-30 pt-8 px-6 flex justify-between items-center max-w-7xl mx-auto w-full">
+        <Link to="/" className="text-xl md:text-2xl font-serif font-black tracking-[0.3em] uppercase text-white/90 hover:text-emerald-400 transition-colors">
+          VAKRAYAN
+        </Link>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono tracking-widest uppercase backdrop-blur-md">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          404 // DROP EXPIRED
         </div>
-
-        {/* 404 Header */}
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-mono font-bold tracking-widest uppercase border border-emerald-500/20 mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            ERROR CODE // 404
-          </div>
-          <h1 className="text-2xl md:text-3xl font-serif font-black tracking-widest text-[var(--color-text)] uppercase animate-slide-up">
-            OUT OF THE BRANCHES
-          </h1>
-        </div>
-
-        {/* Informational Subtext */}
-        <p className="text-xs text-[var(--color-muted)] leading-relaxed max-w-xs mx-auto uppercase tracking-wider font-medium">
-          Looks like this apparel drop hasn't grown on our trees yet or was harvested away.
-        </p>
-
-        {/* Divider */}
-        <div className="w-16 h-px bg-gradient-to-r from-transparent via-[var(--color-border)] to-transparent mx-auto" />
-
-        {/* Go back CTA */}
-        <div className="pt-1">
-          <Link 
-            to="/" 
-            className="inline-flex items-center text-white justify-center gap-3 w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] font-black text-xs tracking-widest uppercase py-4 rounded-xl shadow-lg hover:shadow-emerald-900/20 transition-all duration-200 cursor-pointer"
-          >
-            <FiArrowLeft className="text-sm" />
-            Explore Fresh Drops
-          </Link>
-        </div>
-
       </div>
+
+      {/* Floating Modern Frosted Glass Card in Center / Bottom */}
+      <div className="relative z-30 my-auto px-4 py-8 flex flex-col items-center justify-center text-center">
+        <div className="max-w-xl w-full bg-black/40 backdrop-blur-xl border border-white/10 p-8 md:p-10 rounded-3xl shadow-2xl space-y-6">
+          
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-mono tracking-[0.6em] text-emerald-400 font-bold uppercase">
+              // ARCHIVE UNREACHABLE
+            </h4>
+            <h1 className="text-3xl md:text-5xl font-serif font-black tracking-wider text-white uppercase">
+              OUT OF THE BRANCHES
+            </h1>
+          </div>
+
+          <p className="text-sm md:text-base text-gray-300/80 max-w-md mx-auto leading-relaxed font-light">
+            The streetwear piece you are hunting hasn't grown on our trees yet or was wiped from our active drops.
+          </p>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Link 
+              to="/" 
+              className="inline-flex items-center justify-center gap-3 w-full sm:w-auto px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs tracking-widest uppercase rounded-full shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <FiShoppingBag className="text-base" />
+              Explore Active Drops
+            </Link>
+            
+            <button 
+              onClick={() => window.history.back()} 
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-4 bg-white/5 hover:bg-white/10 text-white font-bold text-xs tracking-widest uppercase rounded-full border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+            >
+              <FiArrowLeft className="text-sm" />
+              Go Back
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Footer minimal signature */}
+      <div className="relative z-30 pb-6 text-center text-[10px] text-gray-500 font-mono tracking-widest uppercase">
+        VAKRAYAN APPAREL LABS • 2026
+      </div>
+
     </div>
   );
 }
