@@ -1,115 +1,106 @@
 import { Link } from 'react-router-dom';
-import { FiPlus, FiArrowLeft } from 'react-icons/fi';
+import { FiArrowLeft, FiShoppingBag, FiSearch, FiCompass } from 'react-icons/fi';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function NotFound() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   return (
-    <div className="w-full min-h-screen bg-white text-black flex flex-col justify-between p-6 md:p-12 relative overflow-hidden select-none font-sans">
+    <div className="w-full min-h-screen bg-[#f7f5f0] text-[#1a1a1a] flex flex-col justify-between selection:bg-black selection:text-white font-sans relative overflow-x-hidden">
       
-      {/* 1. TOP LEFT MINIMAL MESSAGE (Matching Reference Image) */}
-      <header className="relative z-20">
-        <h2 className="text-sm md:text-base font-extrabold tracking-tight text-black leading-snug">
-          We're not sure what happened there—sorry!
-        </h2>
-        <p className="text-sm md:text-base font-extrabold tracking-tight text-black">
-          Check for typos, try again?
-        </p>
+      {/* 1. TOP EDITORIAL HEADER BAR */}
+      <header className="relative z-30 pt-6 md:pt-8 px-6 md:px-12 max-w-7xl mx-auto w-full flex justify-between items-center">
+        <Link to="/" className="text-xl md:text-2xl font-serif font-black tracking-[0.35em] uppercase text-black hover:opacity-75 transition-opacity">
+          VAKRAYAN
+        </Link>
+        <div className="flex items-center gap-4">
+          <span className="hidden sm:inline-block font-mono text-[11px] uppercase tracking-[0.25em] text-[#737373]">
+            EDITION // UNTRACKED
+          </span>
+          <Link
+            to="/shop"
+            className="text-[11px] font-mono font-bold tracking-widest uppercase px-4 py-1.5 rounded-full border border-black/20 hover:bg-black hover:text-white transition-all cursor-pointer"
+          >
+            Vault Archive
+          </Link>
+        </div>
       </header>
 
-      {/* 2. CENTER ICONIC 404 WITH CAT / FLASHLIGHT SILHOUETTE */}
-      <main className="my-auto flex flex-col items-center justify-center relative py-8">
+      {/* 2. CENTER EDITORIAL ARTWORK HERO */}
+      <main className="relative z-20 my-auto flex flex-col items-center justify-center px-4 py-6 max-w-5xl mx-auto w-full text-center">
         
-        {/* Giant Crisp Vector Composition */}
-        <div className="relative w-full max-w-[420px] h-[260px] md:h-[300px] flex items-center justify-center">
-          
-          {/* Big Grey 404 Background Numbers */}
-          <div className="absolute inset-0 flex items-center justify-between px-4 text-[#bdbdbd] font-black text-[120px] md:text-[155px] tracking-tighter leading-none pointer-events-none select-none">
-            <span>4</span>
-            <span>4</span>
-          </div>
+        {/* Luxury Editorial Image Container with Soft Floating Animation */}
+        <div className="relative w-full max-w-[780px] rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-black/5 bg-[#f5f3ee] animate-fade-in group">
+          <img
+            src="/404-luxury-editorial.jpg"
+            alt="Vakrayan 404 Luxury Streetwear Editorial"
+            className="w-full h-auto object-cover select-none pointer-events-none transform transition-transform duration-700 group-hover:scale-[1.01]"
+            loading="eager"
+          />
 
-          {/* Centered Spotlight Aura Behind Cat Head */}
-          <div className="relative flex flex-col items-center justify-center z-10 -mt-2">
-            
-            {/* Glowing Search Ring / Spotlight */}
-            <div className="relative w-36 h-36 md:w-44 md:h-44 rounded-full border border-gray-300 flex items-center justify-center bg-radial from-gray-300/60 via-gray-200/30 to-transparent">
-              <div className="w-24 h-24 rounded-full bg-radial from-gray-900/30 via-gray-400/20 to-transparent blur-md" />
-            </div>
-
-            {/* Backview Cat Silhouette Looking Into The Portal */}
-            <svg
-              viewBox="0 0 200 240"
-              className="w-36 h-44 md:w-44 md:h-52 -mt-28 md:-mt-34 drop-shadow-md"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Curved Tail on Left */}
-              <path
-                d="M50 200 C30 190 20 160 30 145 C38 135 48 140 45 152 C40 165 48 185 68 190 Z"
-                fill="#000000"
-              />
-              <path
-                d="M60 210 C45 200 35 180 40 165 C45 155 55 160 52 170 C48 180 58 195 78 200 Z"
-                fill="#000000"
-              />
-
-              {/* Cat Back Body */}
-              <path
-                d="M100 70 C85 70 75 85 70 110 C65 135 60 180 60 215 C60 220 140 220 140 215 C140 180 135 135 130 110 C125 85 115 70 100 70 Z"
-                fill="#000000"
-              />
-
-              {/* Cat Head Backview with Pointy Ears */}
-              <path
-                d="M80 75 L70 40 C75 42 85 52 90 55 C96 54 104 54 110 55 C115 52 125 42 130 40 L120 75 C115 82 85 82 80 75 Z"
-                fill="#000000"
-              />
-            </svg>
-
-          </div>
-
+          {/* Subtle Ambient Light Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#f7f5f0]/80 via-transparent to-transparent opacity-60 pointer-events-none" />
         </div>
 
-        {/* Minimal Navigation Buttons */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center gap-3">
+        {/* Sophisticated Editorial Subtext */}
+        <div className="mt-4 md:mt-6 space-y-2 max-w-md mx-auto">
+          <p className="text-xs md:text-sm font-serif italic text-[#404040] tracking-wide">
+            "Looks like this piece is sold out or untraceable in the current drop."
+          </p>
+        </div>
+
+        {/* Instant Search Bar */}
+        <form onSubmit={handleSearch} className="mt-6 max-w-md w-full mx-auto relative flex items-center">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search oversized tees, anime drops..."
+            className="w-full bg-white border border-black/15 focus:border-black rounded-full py-3.5 pl-12 pr-28 text-xs text-black placeholder-[#8c8c8c] tracking-wide outline-none shadow-sm transition-all"
+          />
+          <FiSearch className="absolute left-4.5 text-[#737373] text-sm pointer-events-none" />
+          <button
+            type="submit"
+            className="absolute right-1.5 px-4 py-2 bg-black hover:bg-neutral-800 text-white font-bold text-[11px] tracking-widest uppercase rounded-full transition-all cursor-pointer"
+          >
+            Find
+          </button>
+        </form>
+
+        {/* Quick Editorial Action Links */}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs font-mono tracking-widest uppercase">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-black hover:bg-neutral-800 text-white font-bold text-xs tracking-wider uppercase rounded-md transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black hover:bg-neutral-800 text-white font-bold rounded-full shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
           >
-            <FiArrowLeft /> Back to Home
+            <FiArrowLeft className="text-sm" />
+            Return Home
           </Link>
 
           <Link
             to="/shop"
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-black font-bold text-xs tracking-wider uppercase rounded-md transition-all cursor-pointer border border-neutral-300"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white hover:bg-black hover:text-white text-black font-bold rounded-full border border-black/20 shadow-xs transition-all cursor-pointer"
           >
-            Explore Shop
+            <FiShoppingBag className="text-sm" />
+            Shop Latest Drops
           </Link>
         </div>
 
       </main>
 
-      {/* 3. BOTTOM BAR (Error Badge on Left, Plus Icon on Right - Matching Reference) */}
-      <footer className="relative z-20 flex justify-between items-center w-full">
-        
-        {/* Left Side: Cat Silhouette Icon + Error Badge */}
-        <div className="flex items-center gap-2 bg-neutral-100/90 border border-neutral-200/80 px-3 py-1.5 rounded-lg shadow-xs">
-          {/* Cat Icon */}
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12c0 2.85 1.2 5.41 3.12 7.23L4 21l3.5-1.5c1.37.5 2.89.5 4.5.5 5.52 0 10-4.48 10-10S17.52 2 12 2zm-3 8c.83 0 1.5.67 1.5 1.5S9.83 13 9 13s-1.5-.67-1.5-1.5S8.17 10 9 10zm6 0c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5z" />
-          </svg>
-          <span className="text-lg md:text-xl font-black tracking-tight text-black">
-            Error
-          </span>
-        </div>
-
-        {/* Right Side: Square Plus Button */}
-        <Link
-          to="/"
-          title="Return to Home"
-          className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 flex items-center justify-center text-black text-lg transition-colors cursor-pointer"
-        >
-          <FiPlus className="text-xl" />
-        </Link>
+      {/* 3. BOTTOM EDITORIAL FOOTER */}
+      <footer className="relative z-30 py-6 px-6 max-w-7xl mx-auto w-full flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono tracking-[0.25em] text-[#737373] uppercase border-t border-black/5 gap-2">
+        <span>VAKRAYAN PREMIUM APPAREL</span>
+        <span>AESTHETIC ARCHIVE • 2026</span>
       </footer>
 
     </div>
