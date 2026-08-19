@@ -38,22 +38,35 @@ import PhonePromptModal from './componets/pageComponets/PhonePromptModal'
  *   Before: ~5-8 MB initial bundle (includes AdminPanel 273 KB + ProductDetail 151 KB eagerly)
  *   After:  ~200-400 KB initial bundle (only Home + router + Navbar are eager)
  */
-// Helper to auto-retry dynamic imports if Vite HMR or dev server chunk cache is stale
+// Helper to auto-retry dynamic imports if Vite HMR or dev server chunk cache is stale.
+// On iOS mobile networks chunks can transiently fail — retry up to 2 times with a delay.
 const lazyWithRetry = (importFn) =>
   lazy(async () => {
-    try {
-      const component = await importFn();
-      sessionStorage.removeItem('vite_chunk_reload');
-      return component;
-    } catch (error) {
-      const reloaded = sessionStorage.getItem('vite_chunk_reload');
-      if (!reloaded) {
-        sessionStorage.setItem('vite_chunk_reload', 'true');
-        window.location.reload();
+    const MAX_RETRIES = 2
+    const RETRY_DELAY_MS = 800
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const component = await importFn()
+        // Success — clear any stale reload flag and return
+        sessionStorage.removeItem('vite_chunk_reload')
+        return component
+      } catch (error) {
+        if (attempt < MAX_RETRIES) {
+          // Wait briefly then retry (helps on flaky mobile connections)
+          await new Promise((res) => setTimeout(res, RETRY_DELAY_MS * (attempt + 1)))
+        } else {
+          // All retries exhausted — reload the page once as last resort
+          const reloaded = sessionStorage.getItem('vite_chunk_reload')
+          if (!reloaded) {
+            sessionStorage.setItem('vite_chunk_reload', 'true')
+            window.location.reload()
+          }
+          throw error
+        }
       }
-      throw error;
     }
-  });
+  })
 
 const shopImporter = () => import('./componets/page/Shop')
 const productDetailImporter = () => import('./componets/page/ProductDetail')
@@ -259,6 +272,10 @@ function AppContent() {
       // 1. Auth check & session recovery
       const authTask = (async () => {
         try {
+          // Resolve any pending iOS Google redirect sign-in before checking current user.
+          // On desktop/Android this resolves immediately (no-op).
+          await authService.resolveGoogleRedirect()
+
           const googleSessionExpiry = localStorage.getItem('google_session_expiry')
           if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
             localStorage.removeItem('google_session_expiry')

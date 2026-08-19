@@ -1,7 +1,7 @@
 import { auth, db as firestore, storage as firebaseStorage, googleProvider } from './config';
 import { 
   createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, signInWithPopup,
+  signOut, onAuthStateChanged, updateProfile, signInWithPopup, signInWithRedirect, getRedirectResult,
   sendPasswordResetEmail, confirmPasswordReset, updatePassword as updateAuthPassword,
   EmailAuthProvider, reauthenticateWithCredential
 } from 'firebase/auth';
@@ -185,41 +185,79 @@ export class Account {
 
     createOAuth2Session(provider, success, failure) {
         if (provider === 'google') {
-            // Call signInWithPopup synchronously in event callstack for instant popup launch
+            // iOS Safari / Chrome block signInWithPopup due to ITP & popup restrictions.
+            // Detect iOS and use signInWithRedirect instead so login works reliably.
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isCriOS = /CriOS/.test(navigator.userAgent); // Chrome on iOS
+            const useRedirect = isIOS || isCriOS;
+
+            if (useRedirect) {
+                // Store success URL so we can redirect back after getRedirectResult resolves
+                if (success) sessionStorage.setItem('google_redirect_success', success);
+                if (failure) sessionStorage.setItem('google_redirect_failure', failure);
+                return signInWithRedirect(auth, googleProvider);
+            }
+
+            // Desktop / Android — use popup as before
             return signInWithPopup(auth, googleProvider)
                 .then(async (result) => {
-                    const user = result.user;
-                    const sessionId = crypto.randomUUID();
-                    localStorage.setItem('current_session_id', sessionId);
-
-                    // Set expiration to 12:00 AM (midnight) of the next day
-                    const nextMidnight = new Date();
-                    nextMidnight.setDate(nextMidnight.getDate() + 1);
-                    nextMidnight.setHours(0, 0, 0, 0);
-                    localStorage.setItem('google_session_expiry', String(nextMidnight.getTime()));
-
-                    const docRef = doc(firestore, 'users', user.uid);
-                    try {
-                        const docSnap = await getDoc(docRef);
-                        if (!docSnap.exists()) {
-                            await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {}, activeSessions: [sessionId] });
-                        } else {
-                            await updateDoc(docRef, { activeSessions: arrayUnion(sessionId) });
-                        }
-                    } catch (err) {
-                        console.warn('Firestore doc update warning:', err);
-                    }
-
-                    if (success && typeof window !== 'undefined') {
-                        window.location.href = success;
-                    }
-                    return result;
+                    return this._handleGoogleResult(result, success);
                 })
                 .catch((error) => {
                     localStorage.removeItem('google_session_expiry');
                     console.error('OAuth error:', error);
                     throw error;
                 });
+        }
+    }
+
+    // Shared post-sign-in logic for both popup and redirect flows
+    async _handleGoogleResult(result, successUrl) {
+        const user = result.user;
+        const sessionId = crypto.randomUUID();
+        localStorage.setItem('current_session_id', sessionId);
+
+        // Set expiration to 12:00 AM (midnight) of the next day
+        const nextMidnight = new Date();
+        nextMidnight.setDate(nextMidnight.getDate() + 1);
+        nextMidnight.setHours(0, 0, 0, 0);
+        localStorage.setItem('google_session_expiry', String(nextMidnight.getTime()));
+
+        const docRef = doc(firestore, 'users', user.uid);
+        try {
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+                await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {}, activeSessions: [sessionId] });
+            } else {
+                await updateDoc(docRef, { activeSessions: arrayUnion(sessionId) });
+            }
+        } catch (err) {
+            console.warn('Firestore doc update warning:', err);
+        }
+
+        if (successUrl && typeof window !== 'undefined') {
+            window.location.href = successUrl;
+        }
+        return result;
+    }
+
+    // Call this on app mount to complete an iOS redirect sign-in
+    async resolveRedirectResult() {
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                const successUrl = sessionStorage.getItem('google_redirect_success') || '/';
+                sessionStorage.removeItem('google_redirect_success');
+                sessionStorage.removeItem('google_redirect_failure');
+                await this._handleGoogleResult(result, successUrl);
+            }
+        } catch (error) {
+            localStorage.removeItem('google_session_expiry');
+            const failureUrl = sessionStorage.getItem('google_redirect_failure') || '/login';
+            sessionStorage.removeItem('google_redirect_success');
+            sessionStorage.removeItem('google_redirect_failure');
+            console.error('Redirect result error:', error);
+            if (typeof window !== 'undefined') window.location.href = failureUrl;
         }
     }
 
