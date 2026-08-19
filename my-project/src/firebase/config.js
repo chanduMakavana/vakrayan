@@ -5,7 +5,7 @@ import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC2L5K6zkTT7m153YqtT7kiYwO4TEGh4gA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vakrayan-9ce25.firebaseapp.com",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vakrayan.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "vakrayan-9ce25",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "vakrayan-9ce25.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1024899978871",

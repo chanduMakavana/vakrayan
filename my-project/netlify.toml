@@ -3,6 +3,16 @@
   command = "npm run build"
   functions = "netlify/functions"
 
+# Firebase Auth handler proxy — must come before the SPA catch-all.
+# iOS Safari/Chrome (ITP) blocks cross-origin cookies during signInWithRedirect
+# when authDomain differs from the app domain. Proxying /__/auth/* through
+# vakrayan.com (same origin as the app) fixes Google login on iPhone.
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://vakrayan-9ce25.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
