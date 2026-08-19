@@ -1,50 +1,50 @@
 import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiAlertTriangle } from 'react-icons/fi';
+import { FiArrowLeft } from 'react-icons/fi';
 
 function NotFound() {
   return (
-    <div className="w-full min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6 bg-[url(https://static.vecteezy.com/system/resources/previews/015/586/867/large_2x/overlay-distressed-concrete-texture-background-free-photo.jpg)] bg-cover bg-center relative selection:bg-[var(--color-accent)] selection:text-white">
-      <div className="absolute inset-0 bg-[var(--color-bg)]/95 backdrop-blur-xs z-10" />
-
-      <div className="relative z-20 w-full max-w-md bg-[var(--color-surface)] p-8 md:p-10 rounded-none border border-[var(--color-border)] shadow-xl text-center space-y-6 animate-scale-up">
-        
-        {/* Warning Icon Badge */}
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 animate-bounce animate-pulse-glow">
-            <FiAlertTriangle className="text-2xl" />
-          </div>
-        </div>
-
-        {/* 404 Header */}
-        <div>
-          <h4 className="text-[10px] font-serif tracking-[0.5em] text-[var(--color-accent)] font-black uppercase mb-1">
-            ERROR CODE // 404
-          </h4>
-          <h1 className="text-2xl md:text-3xl font-serif font-black tracking-widest text-[var(--color-text)] uppercase animate-slide-up">
-            DROP EXPIRATION
-          </h1>
-        </div>
-
-        {/* Informational Subtext */}
-        <p className="text-xs text-[var(--color-muted)] leading-relaxed max-w-xs mx-auto uppercase tracking-wide font-medium">
-          The vakrayan drops archive or page view-frame you are trying to access is currently untraceable or has been wiped from live servers.
-        </p>
-
-        {/* Divider */}
-        <div className="w-12 h-px bg-[var(--color-border)] mx-auto" />
-
-        {/* Go back CTA */}
-        <div className="pt-2">
-          <Link 
-            to="/" 
-            className="inline-flex items-center text-white justify-center gap-3 w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] active:scale-[0.98] font-black text-xs tracking-widest uppercase py-4 rounded-none shadow-md transition-all cursor-pointer"
-          >
-            <FiArrowLeft className="text-sm"  />
-            Continue Shopping
-          </Link>
-        </div>
-
+    <div className="w-full min-h-screen bg-[#f5f3ee] text-[#1a1a1a] flex flex-col justify-between selection:bg-black selection:text-white font-sans relative overflow-hidden">
+      
+      {/* 1. SEAMLESS FULL-SCREEN BACKGROUND ARTWORK (WITH AIR-FLOWING TAGS & THREADS) */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+        <img
+          src="/404-luxury-editorial.jpg"
+          alt="Vakrayan 404 Visual"
+          className="w-full h-full object-cover object-center select-none"
+        />
+        {/* Soft edge blending */}
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#f5f3ee]/80 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#f5f3ee]/90 to-transparent pointer-events-none" />
       </div>
+
+      {/* 2. TOP MINIMAL LUXURY HEADER */}
+      <header className="relative z-20 pt-5 md:pt-7 px-6 md:px-12 max-w-7xl mx-auto w-full flex justify-between items-center">
+        <Link to="/" className="flex-shrink-0 flex items-center group">
+          <img
+            src="/vakrayan-merged-logo.png"
+            alt="Vakrayan"
+            className="h-10 sm:h-12 md:h-14 w-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-105"
+          />
+        </Link>
+        <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-[#737373] bg-white/80 px-4 py-1 rounded-full backdrop-blur-xs border border-black/10 shadow-xs">
+          PAGE 404
+        </span>
+      </header>
+
+      {/* 3. CENTER CLEAR SPACE (T-Shirt and Floating Tags in mid-air remain 100% visible) */}
+      <div className="relative z-10 flex-1 pointer-events-none" />
+
+      {/* 4. BOTTOM CLEAN "BACK TO HOME" ACTION ONLY */}
+      <footer className="relative z-20 pb-8 md:pb-12 px-6 max-w-md mx-auto w-full text-center flex flex-col items-center">
+        <Link
+          to="/"
+          className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-black hover:bg-neutral-800 text-white font-bold text-xs tracking-widest uppercase rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
+        >
+          <FiArrowLeft className="text-sm" />
+          Back to Home
+        </Link>
+      </footer>
+
     </div>
   );
 }
