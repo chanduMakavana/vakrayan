@@ -48,12 +48,17 @@ function NotFound() {
     <div className="w-full min-h-screen relative overflow-hidden bg-[#040a06] text-white flex flex-col justify-between select-none">
       
       {/* ======================================================== */}
-      {/* 1. TOP HEADER (LOGO & HARVEST HUD) */}
+      {/* 1. TOP HEADER (LOGO, 404 BADGE & HARVEST HUD) */}
       {/* ======================================================== */}
-      <header className="relative z-40 pt-5 px-5 md:px-8 flex justify-between items-center max-w-7xl mx-auto w-full">
-        <Link to="/" className="text-xl md:text-2xl font-serif font-black tracking-[0.25em] uppercase text-white hover:text-emerald-400 transition-colors">
-          VAKRAYAN
-        </Link>
+      <header className="relative z-40 pt-5 px-4 md:px-8 flex justify-between items-center max-w-7xl mx-auto w-full">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="text-xl md:text-2xl font-serif font-black tracking-[0.25em] uppercase text-white hover:text-emerald-400 transition-colors">
+            VAKRAYAN
+          </Link>
+          <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px] font-mono font-bold tracking-widest">
+            ERROR 404
+          </span>
+        </div>
         
         {/* Score & Pluck Tracker */}
         <div className="flex items-center gap-3 bg-[#0a180e] px-4 py-2 rounded-full border border-emerald-500/40 shadow-lg">
@@ -68,12 +73,24 @@ function NotFound() {
       </header>
 
       {/* ======================================================== */}
-      {/* 2. INSTRUCTION BANNER (CLEAR & PROMINENT) */}
+      {/* 2. 404 HERO TITLE & INSTRUCTION BANNER */}
       {/* ======================================================== */}
-      <div className="relative z-40 text-center px-4 -mt-2">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono tracking-wide">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          👉 Tap any T-Shirt on the Tree to Pluck & Drop!
+      <div className="relative z-40 text-center px-4 -mt-1 space-y-1.5">
+        <div className="inline-flex items-center gap-2">
+          <span className="text-2xl md:text-3xl font-mono font-black tracking-widest text-emerald-400">
+            404
+          </span>
+          <span className="text-gray-500 font-mono">//</span>
+          <span className="text-xs md:text-sm font-mono tracking-widest uppercase text-gray-300 font-bold">
+            DROP NOT FOUND
+          </span>
+        </div>
+
+        <div>
+          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            👉 Tap any T-Shirt on the Tree to Drop & Harvest!
+          </div>
         </div>
       </div>
 
