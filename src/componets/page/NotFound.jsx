@@ -1,35 +1,33 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiArrowLeft, FiShoppingBag, FiAward, FiRotateCcw } from 'react-icons/fi';
 
-// High-fidelity Streetwear Drop Items on the Tree
-const INITIAL_TREE_TSHIRTS = [
-  { id: 1, cx: 270, cy: 330, color: '#18181b', stroke: '#3f3f46', name: 'Oversized Noir', points: 20, isFallen: false, fallenX: 25 },
-  { id: 2, cx: 380, cy: 230, color: '#047857', stroke: '#10b981', name: 'Vakrayan Emerald', points: 30, isFallen: false, fallenX: 35 },
-  { id: 3, cx: 480, cy: 170, color: '#dc2626', stroke: '#f87171', name: 'Crimson Drop', points: 25, isFallen: false, fallenX: 45 },
-  { id: 4, cx: 600, cy: 130, color: '#09090b', stroke: '#fbbf24', name: 'Golden Anime Graphic', points: 50, isFallen: false, fallenX: 52 },
-  { id: 5, cx: 720, cy: 160, color: '#7c3aed', stroke: '#a78bfa', name: 'Cyber Lavender', points: 35, isFallen: false, fallenX: 62 },
-  { id: 6, cx: 830, cy: 220, color: '#f4f4f5', stroke: '#e4e4e7', name: 'Vintage Boxy White', points: 25, isFallen: false, fallenX: 72 },
-  { id: 7, cx: 940, cy: 310, color: '#2563eb', stroke: '#60a5fa', name: 'Acid Wash Blue', points: 20, isFallen: false, fallenX: 82 },
-  { id: 8, cx: 530, cy: 270, color: '#059669', stroke: '#34d399', name: 'Signature Tee', points: 15, isFallen: false, fallenX: 40 },
-  { id: 9, cx: 670, cy: 260, color: '#d97706', stroke: '#fcd34d', name: 'Ochre Drop', points: 30, isFallen: false, fallenX: 60 },
+// 9 High-Style Streetwear T-Shirts attached to specific tree branches
+const INITIAL_TSHIRTS = [
+  { id: 1, x: 22, y: 46, color: '#18181b', stroke: '#52525b', name: 'Oversized Noir', points: 20, isFallen: false, fallenLeft: 18 },
+  { id: 2, x: 31, y: 34, color: '#047857', stroke: '#10b981', name: 'Vakrayan Emerald', points: 30, isFallen: false, fallenLeft: 27 },
+  { id: 3, x: 40, y: 24, color: '#dc2626', stroke: '#f87171', name: 'Crimson Drop', points: 25, isFallen: false, fallenLeft: 36 },
+  { id: 4, x: 50, y: 17, color: '#09090b', stroke: '#fbbf24', name: 'Golden Anime Graphic', points: 50, isFallen: false, fallenLeft: 47 },
+  { id: 5, x: 60, y: 22, color: '#7c3aed', stroke: '#c084fc', name: 'Cyber Lavender', points: 35, isFallen: false, fallenLeft: 58 },
+  { id: 6, x: 69, y: 32, color: '#f4f4f5', stroke: '#d4d4d8', name: 'Vintage Boxy White', points: 25, isFallen: false, fallenLeft: 69 },
+  { id: 7, x: 78, y: 44, color: '#2563eb', stroke: '#60a5fa', name: 'Acid Wash Blue', points: 20, isFallen: false, fallenLeft: 80 },
+  { id: 8, x: 44, y: 39, color: '#059669', stroke: '#34d399', name: 'Signature Tee', points: 15, isFallen: false, fallenLeft: 41 },
+  { id: 9, x: 56, y: 37, color: '#d97706', stroke: '#fde047', name: 'Ochre Drop', points: 30, isFallen: false, fallenLeft: 64 },
 ];
 
 function NotFound() {
-  const [tshirts, setTshirts] = useState(INITIAL_TREE_TSHIRTS);
+  const [tshirts, setTshirts] = useState(INITIAL_TSHIRTS);
   const [score, setScore] = useState(0);
   const [pluckedCount, setPluckedCount] = useState(0);
-  const [lastPlucked, setLastPlucked] = useState(null);
   const [copiedCoupon, setCopiedCoupon] = useState(false);
 
-  // Soundless & smooth tap to drop T-shirt from branch to ground
-  const handleDropTshirt = (id) => {
+  // Pluck a T-shirt from branch and drop it straight down
+  const handlePluck = (id) => {
     setTshirts((prev) =>
       prev.map((item) => {
         if (item.id === id && !item.isFallen) {
           setScore((s) => s + item.points);
           setPluckedCount((c) => c + 1);
-          setLastPlucked(item);
           return { ...item, isFallen: true };
         }
         return item;
@@ -37,246 +35,197 @@ function NotFound() {
     );
   };
 
-  // Reset tree drops
-  const handleRegrowTree = () => {
-    setTshirts(INITIAL_TREE_TSHIRTS);
+  // Reset/Regrow all T-shirts on tree
+  const handleRegrow = () => {
+    setTshirts(INITIAL_TSHIRTS);
     setScore(0);
     setPluckedCount(0);
-    setLastPlucked(null);
   };
 
   const isAllPlucked = pluckedCount >= tshirts.length;
 
   return (
-    <div className="w-full min-h-screen relative overflow-hidden bg-[#040906] text-white flex flex-col justify-between select-none">
+    <div className="w-full min-h-screen relative overflow-hidden bg-[#040a06] text-white flex flex-col justify-between select-none">
       
-      {/* Subtle Atmospheric Grid Background (Zero-lag SVG) */}
-      <div className="absolute inset-0 bg-[radial-gradient(#064e3b_1px,transparent_1px)] [background-size:24px_24px] opacity-25 pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#020503] via-transparent to-[#020503]/90 pointer-events-none" />
-
       {/* ======================================================== */}
-      {/* --- TOP HUD BAR (MINIMAL & SLEEK) */}
+      {/* 1. TOP HEADER (LOGO & HARVEST HUD) */}
       {/* ======================================================== */}
-      <div className="relative z-30 pt-6 px-5 md:px-10 flex justify-between items-center max-w-7xl mx-auto w-full">
-        <Link to="/" className="text-lg md:text-2xl font-serif font-black tracking-[0.3em] uppercase text-white hover:text-emerald-400 transition-colors">
+      <header className="relative z-40 pt-5 px-5 md:px-8 flex justify-between items-center max-w-7xl mx-auto w-full">
+        <Link to="/" className="text-xl md:text-2xl font-serif font-black tracking-[0.25em] uppercase text-white hover:text-emerald-400 transition-colors">
           VAKRAYAN
         </Link>
         
-        {/* Score & Harvest Counter */}
-        <div className="flex items-center gap-3 bg-black/70 px-4 py-2 rounded-full border border-emerald-500/30 backdrop-blur-sm shadow-lg">
+        {/* Score & Pluck Tracker */}
+        <div className="flex items-center gap-3 bg-[#0a180e] px-4 py-2 rounded-full border border-emerald-500/40 shadow-lg">
           <div className="text-[11px] font-mono text-emerald-400 font-bold">
-            DROPS HARVESTED: <span className="text-sm text-white font-black">{pluckedCount}/{tshirts.length}</span>
+            DROPS: <span className="text-sm text-white font-black">{pluckedCount}/{tshirts.length}</span>
           </div>
           <div className="h-3.5 w-px bg-white/20" />
           <div className="text-[11px] font-mono text-amber-400 font-bold">
             SCORE: <span className="text-sm text-white font-black">{score}</span>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ======================================================== */}
-      {/* --- FLOATING INSTRUCTION PILL (TOP CENTER) */}
+      {/* 2. INSTRUCTION BANNER (CLEAR & PROMINENT) */}
       {/* ======================================================== */}
-      <div className="relative z-30 text-center px-4 -mt-2">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-mono tracking-wide shadow-md">
+      <div className="relative z-40 text-center px-4 -mt-2">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono tracking-wide">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          👉 Tap or Click any T-Shirt on the Tree to Drop & Harvest!
+          👉 Tap any T-Shirt on the Tree to Pluck & Drop!
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* --- FRONT-LAYER MAJESTIC TREE WITH INTERACTIVE T-SHIRTS */}
+      {/* 3. MAIN TREE ARENA (FRONT & CENTER - ZERO LAG VECTOR) */}
       {/* ======================================================== */}
-      <div className="relative z-20 w-full flex-1 flex items-end justify-center">
-        <svg
-          viewBox="0 0 1200 700"
-          className="w-full h-[65vh] md:h-[75vh] max-h-[850px] object-cover object-bottom overflow-visible"
-          fill="none"
-          preserveAspectRatio="xMidYMax meet"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            {/* Trunk Gradient */}
-            <linearGradient id="crispTrunk" x1="0%" y1="100%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#181109" />
-              <stop offset="60%" stopColor="#3b2615" />
-              <stop offset="100%" stopColor="#1e5128" />
-            </linearGradient>
+      <div className="relative z-30 flex-1 w-full max-w-5xl mx-auto flex items-end justify-center px-2">
+        
+        {/* Tree SVG Base Canvas */}
+        <div className="relative w-full h-[58vh] md:h-[68vh] max-h-[750px] flex items-end justify-center">
+          
+          <svg
+            viewBox="0 0 1000 650"
+            className="w-full h-full object-contain object-bottom pointer-events-none"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="trunkCrisp" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stopColor="#1a1109" />
+                <stop offset="50%" stopColor="#382414" />
+                <stop offset="100%" stopColor="#1f4d2b" />
+              </linearGradient>
 
-            {/* Tree Leaf Cloud Layers */}
-            <linearGradient id="leafGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#34d399" />
-              <stop offset="60%" stopColor="#059669" />
-              <stop offset="100%" stopColor="#022c22" />
-            </linearGradient>
-            
-            <linearGradient id="leafGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#6ee7b7" />
-              <stop offset="70%" stopColor="#10b981" />
-              <stop offset="100%" stopColor="#047857" />
-            </linearGradient>
+              <radialGradient id="canopyGreen1" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="70%" stopColor="#059669" />
+                <stop offset="100%" stopColor="#022c22" />
+              </radialGradient>
+            </defs>
 
-            {/* Backdrop Sun Glow */}
-            <radialGradient id="treeAura" cx="50%" cy="40%" r="50%">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-            </radialGradient>
-          </defs>
+            {/* Ground Soil Mound */}
+            <ellipse cx="500" cy="635" rx="420" ry="24" fill="#047857" opacity="0.3" />
+            <ellipse cx="500" cy="625" rx="300" ry="16" fill="#1a1109" />
 
-          {/* Glowing Tree Aura */}
-          <circle cx="600" cy="280" r="360" fill="url(#treeAura)" />
-
-          {/* Ground Surface Island */}
-          <ellipse cx="600" cy="690" rx="550" ry="30" fill="#047857" opacity="0.25" />
-          <ellipse cx="600" cy="680" rx="380" ry="18" fill="#181109" opacity="0.8" />
-          <path d="M450 670 Q300 680 180 685" stroke="#3b2615" strokeWidth="5" strokeLinecap="round" />
-          <path d="M750 670 Q900 680 1020 685" stroke="#3b2615" strokeWidth="5" strokeLinecap="round" />
-
-          {/* --- MAIN TREE LAYER --- */}
-          <g>
-            {/* Trunk */}
+            {/* Tree Main Trunk */}
             <path
-              d="M565 680 C570 560 555 420 575 330 C585 290 592 230 588 170 C608 230 615 290 625 330 C645 420 630 560 635 680 Z"
-              fill="url(#crispTrunk)"
+              d="M470 625 C475 510 460 380 480 300 C490 260 495 200 490 140 C510 200 515 260 525 300 C545 380 530 510 535 625 Z"
+              fill="url(#trunkCrisp)"
             />
 
-            {/* Heavy Main Branches */}
-            <path d="M575 400 C505 360 405 340 270 280 C250 270 265 255 290 265 C390 300 480 325 580 350" stroke="url(#crispTrunk)" strokeWidth="16" strokeLinecap="round" />
-            <path d="M625 380 C695 340 795 320 930 260 C950 250 935 235 910 245 C810 280 720 305 620 330" stroke="url(#crispTrunk)" strokeWidth="16" strokeLinecap="round" />
-            <path d="M585 270 C535 210 455 170 375 130" stroke="#3b2615" strokeWidth="10" strokeLinecap="round" />
-            <path d="M615 250 C665 190 745 150 825 110" stroke="#3b2615" strokeWidth="10" strokeLinecap="round" />
-            <path d="M595 180 C570 100 520 60 470 20" stroke="#1e5128" strokeWidth="7" strokeLinecap="round" />
-            <path d="M605 170 C630 100 680 60 730 20" stroke="#1e5128" strokeWidth="7" strokeLinecap="round" />
-            <path d="M600 150 L600 20" stroke="#1e5128" strokeWidth="8" strokeLinecap="round" />
+            {/* Big Left & Right Branches */}
+            <path d="M480 370 C410 330 320 310 200 250 C180 240 195 225 220 235 C310 270 395 295 485 320" stroke="url(#trunkCrisp)" strokeWidth="15" strokeLinecap="round" />
+            <path d="M525 350 C595 310 685 290 805 230 C825 220 810 205 785 215 C695 250 610 275 520 300" stroke="url(#trunkCrisp)" strokeWidth="15" strokeLinecap="round" />
+            <path d="M490 240 C440 180 365 140 290 100" stroke="#382414" strokeWidth="9" strokeLinecap="round" />
+            <path d="M515 220 C565 160 640 120 715 80" stroke="#382414" strokeWidth="9" strokeLinecap="round" />
+            <path d="M500 140 L500 30" stroke="#1f4d2b" strokeWidth="7" strokeLinecap="round" />
 
             {/* Lush Vector Foliage Clouds */}
-            <circle cx="600" cy="90" r="110" fill="url(#leafGrad1)" />
-            <circle cx="600" cy="40" r="85" fill="url(#leafGrad2)" />
-            <circle cx="420" cy="180" r="95" fill="url(#leafGrad1)" />
-            <circle cx="350" cy="140" r="75" fill="url(#leafGrad2)" />
-            <circle cx="270" cy="270" r="90" fill="url(#leafGrad1)" />
-            <circle cx="780" cy="170" r="95" fill="url(#leafGrad1)" />
-            <circle cx="850" cy="130" r="75" fill="url(#leafGrad2)" />
-            <circle cx="930" cy="260" r="90" fill="url(#leafGrad1)" />
+            <circle cx="500" cy="80" r="100" fill="url(#canopyGreen1)" />
+            <circle cx="340" cy="160" r="90" fill="url(#canopyGreen1)" />
+            <circle cx="210" cy="240" r="80" fill="url(#canopyGreen1)" />
+            <circle cx="660" cy="150" r="90" fill="url(#canopyGreen1)" />
+            <circle cx="790" cy="230" r="80" fill="url(#canopyGreen1)" />
+            <circle cx="430" cy="200" r="60" fill="#10b981" opacity="0.8" />
+            <circle cx="580" cy="190" r="60" fill="#10b981" opacity="0.8" />
+          </svg>
 
-            {/* Mid Clusters */}
-            <circle cx="510" cy="230" r="60" fill="url(#leafGrad2)" opacity="0.9" />
-            <circle cx="690" cy="220" r="60" fill="url(#leafGrad2)" opacity="0.9" />
-          </g>
-
-          {/* --- INTERACTIVE STREETWEAR T-SHIRTS (CLICK TO DROP) --- */}
+          {/* ======================================================== */}
+          {/* 4. INTERACTIVE T-SHIRTS (CLICKABLE & SWAYING) */}
+          {/* ======================================================== */}
           {tshirts.map((item, index) => {
-            if (item.isFallen) return null; // Already fallen to the ground
+            if (item.isFallen) return null;
 
-            const swayAnim = index % 3 === 0 ? 'swayCrisp1' : index % 3 === 1 ? 'swayCrisp2' : 'swayCrisp3';
+            const swayClass = index % 3 === 0 ? 'animate-sway-1' : index % 3 === 1 ? 'animate-sway-2' : 'animate-sway-3';
 
-            return (
-              <g
-                key={item.id}
-                onClick={() => handleDropTshirt(item.id)}
-                className="cursor-pointer group select-none"
-                style={{
-                  transformOrigin: `${item.cx}px ${item.cy}px`,
-                  animation: `${swayAnim} ${3 + (index % 3) * 0.5}s ease-in-out infinite alternate`,
-                }}
-              >
-                {/* Hanging Thread */}
-                <line
-                  x1={item.cx}
-                  y1={item.cy}
-                  x2={item.cx}
-                  y2={item.cy + 28}
-                  stroke="#2d3748"
-                  strokeWidth="2"
-                  strokeDasharray="2 2"
-                />
-
-                {/* Hanger */}
-                <path
-                  d={`M${item.cx} ${item.cy + 28} Q${item.cx + 5} ${item.cy + 24} ${item.cx} ${item.cy + 20} Q${item.cx - 5} ${item.cy + 24} ${item.cx} ${item.cy + 28}`}
-                  fill="none"
-                  stroke="#fbbf24"
-                  strokeWidth="1.5"
-                />
-
-                {/* Clickable Hover-Enlarged T-Shirt */}
-                <g transform={`translate(${item.cx - 28}, ${item.cy + 28}) scale(1.3)`} className="transition-transform group-hover:scale-160 group-active:scale-120">
-                  {/* T-shirt Silhouette */}
-                  <path
-                    d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
-                    fill={item.color}
-                    stroke={item.stroke}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                    className="drop-shadow-lg"
-                  />
-                  {/* Chest Logo Box */}
-                  <rect x="18" y="16" width="10" height="11" fill="rgba(255,255,255,0.25)" rx="1" />
-                </g>
-
-                {/* Points Tag Badge on Hover */}
-                <text
-                  x={item.cx}
-                  y={item.cy + 95}
-                  textAnchor="middle"
-                  fill="#6ee7b7"
-                  fontSize="11"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                >
-                  +{item.points} PTS
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-
-        {/* ======================================================== */}
-        {/* --- FALLEN T-SHIRTS ACCUMULATED AT THE BOTTOM GROUND */}
-        {/* ======================================================== */}
-        <div className="absolute bottom-2 inset-x-0 h-16 pointer-events-none flex items-center justify-center">
-          {tshirts.map((item) => {
-            if (!item.isFallen) return null;
             return (
               <div
                 key={item.id}
-                className="absolute bottom-3 transform -translate-x-1/2 animate-bounce-short"
-                style={{ left: `${item.fallenX}%` }}
+                onClick={() => handlePluck(item.id)}
+                className={`absolute cursor-pointer select-none group transform -translate-x-1/2 -translate-y-1/2 origin-top ${swayClass}`}
+                style={{
+                  left: `${item.x}%`,
+                  top: `${item.y}%`,
+                  willChange: 'transform',
+                }}
               >
-                <div className="relative group">
-                  <svg width="40" height="40" viewBox="0 0 50 50" fill="none">
+                {/* Hanger Hook & Thread */}
+                <div className="flex flex-col items-center">
+                  <div className="w-0.5 h-4 bg-emerald-950 border-r border-dashed border-gray-400" />
+                  <div className="w-3 h-2 -mt-1 border-t-2 border-amber-400 rounded-t-full" />
+                </div>
+
+                {/* Streetwear T-Shirt Shape */}
+                <div className="transform transition-transform duration-150 group-hover:scale-135 group-active:scale-95 drop-shadow-lg">
+                  <svg width="44" height="44" viewBox="0 0 50 50" fill="none">
                     <path
-                      d="M17 6 L9 14 L3 10 L0 17 L7 21 L7 44 L43 44 L43 21 L50 17 L47 10 L41 14 L33 6 C30 10 20 10 17 6 Z"
+                      d="M17 5 L9 13 L3 9 L0 16 L7 20 L7 42 L39 42 L39 20 L46 16 L43 9 L37 13 L29 5 C26 9 20 9 17 5 Z"
                       fill={item.color}
                       stroke={item.stroke}
                       strokeWidth="2"
+                      strokeLinejoin="round"
                     />
+                    <rect x="18" y="16" width="10" height="11" fill="rgba(255,255,255,0.3)" rx="1" />
                   </svg>
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[9px] font-mono text-emerald-400 font-bold bg-black/80 px-1 rounded">
-                    ✓
-                  </div>
+                </div>
+
+                {/* Score popup preview */}
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono text-emerald-300 font-bold bg-black/80 px-1 rounded text-center -mt-1">
+                  +{item.points}
                 </div>
               </div>
             );
           })}
+
+          {/* ======================================================== */}
+          {/* 5. FALLEN T-SHIRTS PILED ON THE GROUND */}
+          {/* ======================================================== */}
+          <div className="absolute bottom-1 inset-x-0 h-14 pointer-events-none flex items-center justify-center">
+            {tshirts.map((item) => {
+              if (!item.isFallen) return null;
+              return (
+                <div
+                  key={item.id}
+                  className="absolute bottom-2 transform -translate-x-1/2 transition-all duration-300"
+                  style={{ left: `${item.fallenLeft}%` }}
+                >
+                  <div className="relative">
+                    <svg width="34" height="34" viewBox="0 0 50 50" fill="none">
+                      <path
+                        d="M17 6 L9 14 L3 10 L0 17 L7 21 L7 44 L43 44 L43 21 L50 17 L47 10 L41 14 L33 6 C30 10 20 10 17 6 Z"
+                        fill={item.color}
+                        stroke={item.stroke}
+                        strokeWidth="2"
+                      />
+                    </svg>
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-emerald-400 font-bold bg-black/90 px-1 rounded">
+                      ✓
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* --- BOTTOM FLOATING BAR (WINNER MODAL OR CONTROLS) */}
+      {/* 6. BOTTOM ACTIONS & REWARDS */}
       {/* ======================================================== */}
-      <div className="relative z-30 pb-6 px-4 flex flex-col items-center justify-center">
+      <footer className="relative z-40 pb-6 px-4 flex flex-col items-center justify-center">
         {isAllPlucked ? (
-          // Win Rewards Card
-          <div className="max-w-md w-full bg-black/85 border-2 border-emerald-500/50 p-5 rounded-2xl text-center space-y-3 shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-scale-up">
-            <div className="inline-flex items-center gap-2 text-amber-400 text-sm font-mono font-bold">
-              <FiAward className="text-xl" /> ALL DROPS HARVESTED! ({score} PTS)
+          // Reward Winner Modal
+          <div className="max-w-sm w-full bg-[#0a180e] border-2 border-emerald-500/60 p-4 rounded-2xl text-center space-y-2.5 shadow-2xl">
+            <div className="inline-flex items-center gap-1.5 text-amber-400 text-sm font-mono font-bold">
+              <FiAward className="text-lg" /> ALL DROPS HARVESTED! ({score} PTS)
             </div>
 
-            <div className="p-3 bg-emerald-950/70 border border-emerald-500/30 rounded-xl space-y-1">
-              <p className="text-[11px] text-gray-300 font-mono">10% OFF Special Discount Unlocked:</p>
-              <div className="text-lg font-mono font-black text-emerald-400 tracking-widest">
+            <div className="p-2.5 bg-black/60 border border-emerald-500/30 rounded-xl space-y-1">
+              <p className="text-[10px] text-gray-300 font-mono">10% OFF Discount Unlocked:</p>
+              <div className="text-base font-mono font-black text-emerald-400 tracking-widest">
                 VAKRAYAN10
               </div>
               <button
@@ -287,31 +236,31 @@ function NotFound() {
                 }}
                 className="text-[10px] text-emerald-300 underline font-mono cursor-pointer"
               >
-                {copiedCoupon ? '✓ COPIED TO CLIPBOARD' : 'Click to Copy Code'}
+                {copiedCoupon ? '✓ COPIED!' : 'Click to Copy Code'}
               </button>
             </div>
 
-            <div className="flex gap-2 justify-center pt-1">
+            <div className="flex gap-2 justify-center pt-0.5">
               <button
-                onClick={handleRegrowTree}
-                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs tracking-wider uppercase rounded-xl border border-white/20 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                onClick={handleRegrow}
+                className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs tracking-wider uppercase rounded-xl border border-white/20 transition-all cursor-pointer inline-flex items-center gap-1"
               >
-                <FiRotateCcw /> Regrow Tree
+                <FiRotateCcw /> Regrow
               </button>
               <Link
                 to="/"
-                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs tracking-wider uppercase rounded-xl shadow-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs tracking-wider uppercase rounded-xl shadow-lg transition-all cursor-pointer inline-flex items-center gap-1"
               >
-                <FiShoppingBag /> Shop Fresh Drops
+                <FiShoppingBag /> Shop Now
               </Link>
             </div>
           </div>
         ) : (
-          // Minimal Footer Actions
+          // Minimal Bottom Buttons
           <div className="flex items-center gap-3">
             <Link 
               to="/" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs tracking-widest uppercase rounded-full shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs tracking-widest uppercase rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
             >
               <FiShoppingBag className="text-sm" />
               Continue Shopping
@@ -319,32 +268,37 @@ function NotFound() {
 
             <button
               onClick={() => window.history.back()}
-              className="inline-flex items-center gap-2 px-5 py-3 bg-white/5 hover:bg-white/10 text-white font-bold text-xs tracking-widest uppercase rounded-full border border-white/10 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-xs tracking-widest uppercase rounded-full border border-white/10 transition-all cursor-pointer"
             >
               <FiArrowLeft className="text-sm" />
-              Go Back
+              Back
             </button>
           </div>
         )}
-      </div>
+      </footer>
 
-      {/* Ultra Lightweight CSS Keyframes (Zero CPU Load) */}
+      {/* Zero-Lag Hardware Accelerated Keyframes */}
       <style>{`
-        @keyframes swayCrisp1 {
-          0% { transform: rotate(-14deg); }
-          100% { transform: rotate(16deg); }
+        @keyframes sway1 {
+          0% { transform: translate(-50%, -50%) rotate(-12deg); }
+          100% { transform: translate(-50%, -50%) rotate(14deg); }
         }
-        @keyframes swayCrisp2 {
-          0% { transform: rotate(16deg); }
-          100% { transform: rotate(-14deg); }
+        @keyframes sway2 {
+          0% { transform: translate(-50%, -50%) rotate(15deg); }
+          100% { transform: translate(-50%, -50%) rotate(-13deg); }
         }
-        @keyframes swayCrisp3 {
-          0% { transform: rotate(-10deg); }
-          100% { transform: rotate(14deg); }
+        @keyframes sway3 {
+          0% { transform: translate(-50%, -50%) rotate(-8deg); }
+          100% { transform: translate(-50%, -50%) rotate(12deg); }
         }
-        @keyframes bounceShort {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
+        .animate-sway-1 {
+          animation: sway1 3.2s ease-in-out infinite alternate;
+        }
+        .animate-sway-2 {
+          animation: sway2 2.8s ease-in-out infinite alternate;
+        }
+        .animate-sway-3 {
+          animation: sway3 3.5s ease-in-out infinite alternate;
         }
       `}</style>
     </div>
