@@ -17,11 +17,13 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Use initializeFirestore with forceLongPolling to bypass Edge Tracking Prevention CORS issues safely
+// Use initializeFirestore with autoDetectLongPolling to bypass Safari/iOS ITP CORS issues
+// experimentalAutoDetectLongPolling replaces the deprecated experimentalForceLongPolling
+// and correctly handles both Listen and Write channels via long-polling when needed
 let dbInstance;
 try {
   dbInstance = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
 } catch (e) {
