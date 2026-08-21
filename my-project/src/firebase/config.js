@@ -3,22 +3,9 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// Dynamically resolve authDomain:
-// In production on vakrayan.com, using "vakrayan.com" routes OAuth via Netlify's /__/auth/* proxy
-// which is 100% same-origin and completely bypasses Safari/Mac ITP cross-site tracking blocks.
-const resolveAuthDomain = () => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'vakrayan.com' || host === 'www.vakrayan.com') {
-      return host;
-    }
-  }
-  return import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vakrayan.com";
-};
-
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC2L5K6zkTT7m153YqtT7kiYwO4TEGh4gA",
-  authDomain: resolveAuthDomain(),
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vakrayan-9ce25.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "vakrayan-9ce25",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "vakrayan-9ce25.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1024899978871",
