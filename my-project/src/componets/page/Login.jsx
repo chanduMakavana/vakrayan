@@ -108,9 +108,7 @@ function Login() {
   const handleGoogleSignIn = async () => {
     setServerError(''); setLoading(true)
     try {
-      const rememberChecked = document.getElementById('remember')?.checked
-      if (rememberChecked) localStorage.setItem('remember_me', 'true')
-      else localStorage.removeItem('remember_me')
+      localStorage.setItem('remember_me', 'true')
       sessionStorage.setItem('session_active', 'true')
       sessionStorage.removeItem('dismissed_phone_prompt')
       await authService.loginWithGoogle()

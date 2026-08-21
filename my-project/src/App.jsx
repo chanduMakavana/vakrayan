@@ -313,19 +313,6 @@ function AppContent() {
 
           const userData = await authService.getCurrentUser()
           if (userData) {
-            const rememberMe = localStorage.getItem('remember_me') === 'true'
-            const sessionActive = sessionStorage.getItem('session_active') === 'true'
-
-            if (!rememberMe && !sessionActive) {
-              await authService.logout()
-              localStorage.removeItem('remember_me')
-              sessionStorage.removeItem('session_active')
-              dispatch(logoutAction())
-              const guestItems = loadGuestCartItems()
-              dispatch(setCartItems(guestItems))
-              return
-            }
-
             sessionStorage.setItem('session_active', 'true')
             dispatch(loginAction({ user: userData }))
 

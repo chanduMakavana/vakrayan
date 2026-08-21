@@ -68,18 +68,24 @@ export class Account {
                         const docSnap = await getDoc(doc(firestore, 'users', user.uid));
                         const data = docSnap.exists() ? docSnap.data() : { prefs: {} };
                         
-                        // Check if session has been invalidated (only if activeSessions array is explicitly maintained)
-                        const activeSessions = data.activeSessions;
-                        const currentSessionId = localStorage.getItem('current_session_id');
+                        let currentSessionId = localStorage.getItem('current_session_id');
+                        if (!currentSessionId) {
+                            currentSessionId = crypto.randomUUID();
+                            localStorage.setItem('current_session_id', currentSessionId);
+                        }
                         
-                        // Only sign out if activeSessions is explicitly populated and currentSessionId is missing from it
-                        if (currentSessionId && Array.isArray(activeSessions) && activeSessions.length > 0 && !activeSessions.includes(currentSessionId)) {
-                            await signOut(auth);
-                            localStorage.removeItem('current_session_id');
-                            localStorage.removeItem('remember_me');
-                            sessionStorage.removeItem('session_active');
-                            reject({ message: 'Session invalidated' });
-                            return;
+                        // Check if session has been explicitly invalidated by user logging out on other devices
+                        const activeSessions = data.activeSessions;
+                        if (Array.isArray(activeSessions) && activeSessions.length > 0 && !activeSessions.includes(currentSessionId)) {
+                            // If currentSessionId was just generated or session is fresh, update Firestore rather than killing session
+                            if (!localStorage.getItem('session_active')) {
+                                await signOut(auth);
+                                localStorage.removeItem('current_session_id');
+                                localStorage.removeItem('remember_me');
+                                sessionStorage.removeItem('session_active');
+                                reject({ message: 'Session invalidated' });
+                                return;
+                            }
                         }
 
                         const prefs = data.prefs || {};
@@ -225,10 +231,18 @@ export class Account {
     }
 
     // Shared post-sign-in logic for both popup and redirect flows
-    async _handleGoogleResult(result, successUrl) {
+    async _handleGoogleResult(result, successUrl, shouldRedirect = true) {
         const user = result.user;
-        const sessionId = crypto.randomUUID();
-        localStorage.setItem('current_session_id', sessionId);
+        let sessionId = localStorage.getItem('current_session_id');
+        if (!sessionId) {
+            sessionId = crypto.randomUUID();
+            localStorage.setItem('current_session_id', sessionId);
+        }
+
+        // Always persist Google login session across page refreshes and browser restarts
+        localStorage.setItem('remember_me', 'true');
+        sessionStorage.setItem('session_active', 'true');
+        sessionStorage.removeItem('dismissed_phone_prompt');
 
         // Set expiration to 12:00 AM (midnight) of the next day
         const nextMidnight = new Date();
@@ -240,21 +254,25 @@ export class Account {
         try {
             const docSnap = await getDoc(docRef);
             if (!docSnap.exists()) {
-                await setDoc(docRef, { name: user.displayName, email: user.email, prefs: {}, activeSessions: [sessionId] });
+                await setDoc(docRef, { name: user.displayName || 'User', email: user.email, prefs: {}, activeSessions: [sessionId] }, { merge: true });
             } else {
                 await updateDoc(docRef, { activeSessions: arrayUnion(sessionId) });
             }
         } catch (err) {
-            console.warn('Firestore doc update warning:', err);
+            console.warn('Firestore user document update warning:', err);
         }
 
-        if (successUrl && typeof window !== 'undefined') {
-            window.location.href = successUrl;
+        if (shouldRedirect && successUrl && typeof window !== 'undefined') {
+            const currentPath = window.location.pathname;
+            const targetPath = new URL(successUrl, window.location.origin).pathname;
+            if (currentPath !== targetPath) {
+                window.location.href = successUrl;
+            }
         }
         return result;
     }
 
-    // Call this on app mount to complete an iOS redirect sign-in
+    // Call this on app mount to complete an iOS/Mac redirect sign-in
     async resolveRedirectResult() {
         try {
             const result = await getRedirectResult(auth);
@@ -262,7 +280,9 @@ export class Account {
                 const successUrl = sessionStorage.getItem('google_redirect_success') || '/';
                 sessionStorage.removeItem('google_redirect_success');
                 sessionStorage.removeItem('google_redirect_failure');
-                await this._handleGoogleResult(result, successUrl);
+                // shouldRedirect = false because App.jsx is already mounting and will seamlessly pick up the user!
+                await this._handleGoogleResult(result, successUrl, false);
+                return result.user;
             }
         } catch (error) {
             localStorage.removeItem('google_session_expiry');
@@ -270,8 +290,11 @@ export class Account {
             sessionStorage.removeItem('google_redirect_success');
             sessionStorage.removeItem('google_redirect_failure');
             console.error('Redirect result error:', error);
-            if (typeof window !== 'undefined') window.location.href = failureUrl;
+            if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                window.location.href = failureUrl;
+            }
         }
+        return null;
     }
 
 
