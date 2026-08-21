@@ -183,31 +183,44 @@ export class Account {
         return true;
     }
 
-    createOAuth2Session(provider, success, failure) {
+    async createOAuth2Session(provider, success, failure) {
         if (provider === 'google') {
-            // iOS Safari / Chrome block signInWithPopup due to ITP & popup restrictions.
-            // Detect iOS and use signInWithRedirect instead so login works reliably.
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            const isCriOS = /CriOS/.test(navigator.userAgent); // Chrome on iOS
-            const useRedirect = isIOS || isCriOS;
+            const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+            // Detect iOS, iPadOS (including desktop mode on iPad), and macOS Safari
+            const isIOS = (/iPad|iPhone|iPod/.test(ua) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !window.MSStream;
+            const isCriOS = /CriOS/.test(ua);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+
+            // Store redirect URLs in sessionStorage for redirect completion
+            if (success) sessionStorage.setItem('google_redirect_success', success);
+            if (failure) sessionStorage.setItem('google_redirect_failure', failure);
+
+            // macOS Safari and iOS block signInWithPopup due to popup blockers & ITP cross-site tracking restrictions.
+            // Using signInWithRedirect guarantees reliable login across Mac & iOS.
+            const useRedirect = isIOS || isCriOS || isSafari;
 
             if (useRedirect) {
-                // Store success URL so we can redirect back after getRedirectResult resolves
-                if (success) sessionStorage.setItem('google_redirect_success', success);
-                if (failure) sessionStorage.setItem('google_redirect_failure', failure);
                 return signInWithRedirect(auth, googleProvider);
             }
 
-            // Desktop / Android — use popup as before
-            return signInWithPopup(auth, googleProvider)
-                .then(async (result) => {
-                    return this._handleGoogleResult(result, success);
-                })
-                .catch((error) => {
-                    localStorage.removeItem('google_session_expiry');
-                    console.error('OAuth error:', error);
-                    throw error;
-                });
+            // Desktop (Chrome / Firefox / Edge) — use popup with seamless redirect fallback
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                return await this._handleGoogleResult(result, success);
+            } catch (error) {
+                console.warn('Popup login failed, attempting redirect fallback. Reason:', error.code || error.message);
+                // If popup was blocked or blocked by browser security/ITP, fallback to redirect
+                if (
+                    error.code === 'auth/popup-blocked' ||
+                    error.code === 'auth/cancelled-popup-request' ||
+                    error.code === 'auth/internal-error' ||
+                    error.code === 'auth/network-request-failed'
+                ) {
+                    return signInWithRedirect(auth, googleProvider);
+                }
+                localStorage.removeItem('google_session_expiry');
+                throw error;
+            }
         }
     }
 

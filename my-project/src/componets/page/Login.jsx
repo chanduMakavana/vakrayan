@@ -116,7 +116,15 @@ function Login() {
       await authService.loginWithGoogle()
     } catch (error) {
       let msg = error?.message || 'Google authentication failed.'
-      if (msg.includes('Firebase: Error')) msg = 'Google authentication failed. Please try again.'
+      if (msg.includes('auth/unauthorized-domain')) {
+        msg = 'Domain not authorized in Firebase Console (Authentication > Settings > Authorized domains).'
+      } else if (msg.includes('auth/operation-not-allowed')) {
+        msg = 'Google Sign-In is not enabled in Firebase Console (Authentication > Sign-in method).'
+      } else if (msg.includes('auth/popup-closed-by-user')) {
+        msg = 'Sign-in was cancelled.'
+      } else if (msg.includes('Firebase: Error')) {
+        msg = 'Google authentication failed. Please try again.'
+      }
       setServerError(msg); setLoading(false)
     }
   }
