@@ -48,14 +48,13 @@ export class Account {
 
     async get() {
         return new Promise((resolve, reject) => {
-            const unsubscribe = onAuthStateChanged(auth, async (user) => {
-                unsubscribe();
+            const checkUser = async (user) => {
                 if (user) {
                     try {
-                        // Check if Google OAuth 1-Hour Session Limit has expired (only for sessions created via Google)
+                        // Check if Google session expiry limit has reached
                         const googleSessionExpiry = localStorage.getItem('google_session_expiry');
                         if (googleSessionExpiry && Date.now() > Number(googleSessionExpiry)) {
-                            console.warn('Google session expired (1 hour limit reached). Logging out.');
+                            console.warn('Google session expired. Logging out.');
                             localStorage.removeItem('google_session_expiry');
                             localStorage.removeItem('remember_me');
                             sessionStorage.removeItem('session_active');
@@ -65,36 +64,21 @@ export class Account {
                             return;
                         }
 
-                        const docSnap = await getDoc(doc(firestore, 'users', user.uid));
-                        const data = docSnap.exists() ? docSnap.data() : { prefs: {} };
-                        
                         let currentSessionId = localStorage.getItem('current_session_id');
                         if (!currentSessionId) {
                             currentSessionId = crypto.randomUUID();
                             localStorage.setItem('current_session_id', currentSessionId);
                         }
-                        
-                        // Check if session has been explicitly invalidated by user logging out on other devices
-                        const activeSessions = data.activeSessions;
-                        if (Array.isArray(activeSessions) && activeSessions.length > 0 && !activeSessions.includes(currentSessionId)) {
-                            // If currentSessionId was just generated or session is fresh, update Firestore rather than killing session
-                            if (!localStorage.getItem('session_active')) {
-                                await signOut(auth);
-                                localStorage.removeItem('current_session_id');
-                                localStorage.removeItem('remember_me');
-                                sessionStorage.removeItem('session_active');
-                                reject({ message: 'Session invalidated' });
-                                return;
-                            }
+
+                        let data = { prefs: {} };
+                        try {
+                            const docSnap = await getDoc(doc(firestore, 'users', user.uid));
+                            if (docSnap.exists()) data = docSnap.data();
+                        } catch (docErr) {
+                            console.warn("Firestore getDoc warning (falling back):", docErr);
                         }
 
                         const prefs = data.prefs || {};
-
-                        // ✅ FIX: Build labels array from Firestore prefs.role field.
-                        // Firebase doesn't have Firebase-style user.labels, so we
-                        // derive them from the Firestore user document.
-                        // To make someone admin: Firebase Console → Firestore → users
-                        //   → [uid] → prefs → role: "admin"
                         const labels = [];
                         if (prefs.role === 'admin') labels.push('admin');
                         if (data.labels && Array.isArray(data.labels)) {
@@ -106,11 +90,10 @@ export class Account {
                             email: user.email,
                             name: user.displayName || data.name || 'User',
                             prefs,
-                            labels, // Populated from Firestore — used by AdminRoute
+                            labels,
                             phone: data.phone || prefs.phone || '',
                         });
                     } catch (error) {
-                        console.warn("Firestore get user error, falling back to auth info:", error);
                         resolve({
                             $id: user.uid,
                             email: user.email,
@@ -123,6 +106,16 @@ export class Account {
                 } else {
                     reject({ message: 'Not logged in' });
                 }
+            };
+
+            if (auth.currentUser) {
+                checkUser(auth.currentUser);
+                return;
+            }
+
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+                unsubscribe();
+                checkUser(user);
             });
         });
     }
@@ -209,10 +202,10 @@ export class Account {
                 return signInWithRedirect(auth, googleProvider);
             }
 
-            // Desktop (Chrome / Firefox / Edge) — use popup with seamless redirect fallback
+            // Desktop (Chrome / Firefox / Edge / Mac) — use popup with seamless redirect fallback
             try {
                 const result = await signInWithPopup(auth, googleProvider);
-                return await this._handleGoogleResult(result, success);
+                return await this._handleGoogleResult(result, success, false);
             } catch (error) {
                 console.warn('Popup login failed, attempting redirect fallback. Reason:', error.code || error.message);
                 // If popup was blocked or blocked by browser security/ITP, fallback to redirect

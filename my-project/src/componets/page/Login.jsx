@@ -111,7 +111,17 @@ function Login() {
       localStorage.setItem('remember_me', 'true')
       sessionStorage.setItem('session_active', 'true')
       sessionStorage.removeItem('dismissed_phone_prompt')
-      await authService.loginWithGoogle()
+      const result = await authService.loginWithGoogle()
+      if (result) {
+        const userData = await authService.getCurrentUser()
+        if (userData) {
+          dispatch(loginAction({ user: userData }))
+          try { await hydrateCartFromDb(userData.$id, dispatch) } catch (e) { console.error(e) }
+          const from = location.state?.from?.pathname || '/'
+          sessionStorage.setItem('just_logged_in', 'true')
+          navigate(from, { replace: true })
+        }
+      }
     } catch (error) {
       let msg = error?.message || 'Google authentication failed.'
       if (msg.includes('auth/unauthorized-domain')) {
@@ -123,7 +133,9 @@ function Login() {
       } else if (msg.includes('Firebase: Error')) {
         msg = 'Google authentication failed. Please try again.'
       }
-      setServerError(msg); setLoading(false)
+      setServerError(msg)
+    } finally {
+      setLoading(false)
     }
   }
 
