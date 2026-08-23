@@ -68,7 +68,7 @@ export async function handler(event) {
     if (!botToken || !targetChatId) {
       const missing = [];
       if (!botToken)     missing.push('TELEGRAM_BOT_TOKEN (or VITE_TELEGRAM_BOT_TOKEN)');
-      if (!targetChatId) missing.push(`TELEGRAM_${channelRoute.toUpperCase()}_CHAT_ID (or VITE_ variant)`);
+      if (!targetChatId) missing.push(`TELEGRAM_${(channelRoute || 'order').toUpperCase()}_CHAT_ID (or VITE_ variant)`);
       console.error('[telegram.js] Missing env vars:', missing.join(', '));
       return {
         statusCode: 400,
