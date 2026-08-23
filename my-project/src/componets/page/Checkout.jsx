@@ -477,6 +477,31 @@ function Checkout() {
 
         if (isSdkLoaded && window.Razorpay) {
           try {
+            // Attempt server-side Razorpay order creation
+            let serverOrderId = '';
+            try {
+              const rzpOrderRes = await fetch('/.netlify/functions/razorpay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'create_order',
+                  amount: Math.round(finalAmount * 100),
+                  receipt: `rcpt_${Date.now().toString(36)}`,
+                  notes: {
+                    address: `${data.address}, ${data.city} - ${data.pincode}`
+                  }
+                })
+              });
+              if (rzpOrderRes.ok) {
+                const rzpOrderData = await rzpOrderRes.json();
+                if (rzpOrderData?.order?.id) {
+                  serverOrderId = rzpOrderData.order.id;
+                }
+              }
+            } catch (err) {
+              console.warn("Server-side order creation fallback to client:", err.message);
+            }
+
             const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/vakrayan-logo-icon.png` : '/vakrayan-logo-icon.png';
             const options = {
               key: liveKey,
@@ -485,6 +510,7 @@ function Checkout() {
               name: 'Vakrayan Apparel',
               description: `Order Payment (${cartItems.length} item${cartItems.length > 1 ? 's' : ''})`,
               image: logoUrl,
+              ...(serverOrderId ? { order_id: serverOrderId } : {}),
               prefill: {
                 name: data.name,
                 email: data.email,
@@ -498,8 +524,31 @@ function Checkout() {
                 color: '#059669'
               },
               handler: async function (response) {
+                // Verify payment signature on backend if signature was returned
+                if (response.razorpay_signature && response.razorpay_order_id) {
+                  try {
+                    const verifyRes = await fetch('/.netlify/functions/razorpay', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'verify_payment',
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature
+                      })
+                    });
+                    const verifyData = await verifyRes.json();
+                    if (!verifyRes.ok || !verifyData.verified) {
+                      isSubmittingRef.current = false;
+                      showToast("Payment verification failed. Please contact support if your account was debited.", "error");
+                      return;
+                    }
+                  } catch (verifyErr) {
+                    console.warn("Server payment verification non-blocking:", verifyErr.message);
+                  }
+                }
                 const payId = response.razorpay_payment_id || `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-                const ordId = response.razorpay_order_id || currentMockId;
+                const ordId = response.razorpay_order_id || serverOrderId || currentMockId;
                 await processFinalizeOrder(data, 'ONLINE', 'PAID', payId, ordId);
               },
               modal: {
@@ -517,16 +566,22 @@ function Checkout() {
             rzp.open();
             return;
           } catch (err) {
-            console.warn("Real Razorpay checkout failed to open, switching to simulation modal:", err.message);
+            console.warn("Real Razorpay checkout failed to open:", err.message);
             isSubmittingRef.current = false;
           }
         }
       }
 
-      // Fallback: custom sandbox simulator
-      setRazorpayModalOpen(true);
-      isSubmittingRef.current = false;
-      return;
+      // Fallback: custom sandbox simulator only allowed in DEV mode or when explicitly enabled
+      if (import.meta.env.DEV || import.meta.env.VITE_ENABLE_SANDBOX === 'true') {
+        setRazorpayModalOpen(true);
+        isSubmittingRef.current = false;
+        return;
+      } else {
+        isSubmittingRef.current = false;
+        showToast("Payment gateway could not be loaded. Please choose another payment method or try again.", "error");
+        return;
+      }
     }
 
     if (selectedPayment === 'WALLET') {
@@ -557,6 +612,24 @@ function Checkout() {
       const currentShippingCharge = baseShipping + currentCodFee + remoteSurcharge;
       const calculatedFinalAmount = discountedAmount + currentShippingCharge;
       const calculatedTax = calculatedFinalAmount * 0.18 / 1.18;
+
+      // 0. If paying via WALLET, verify balance and execute atomic blocking debit before order creation
+      if (method === 'WALLET') {
+        const walletBalance = await walletService.getUserBalance(user.$id);
+        if (walletBalance < calculatedFinalAmount) {
+          throw new Error("Insufficient wallet balance. Please top up or choose another payment method.");
+        }
+        const walletDebit = await walletService.createWalletTransaction({
+          userId: user.$id,
+          amount: calculatedFinalAmount,
+          type: 'debit',
+          title: `Payment for Order ${orderNumber}`,
+          referenceId: `wallet_order_${Date.now()}`
+        });
+        if (!walletDebit) {
+          throw new Error("Wallet balance debit failed. Please check your balance or try another payment method.");
+        }
+      }
 
       const serializedAddress = JSON.stringify({
         customerAddress: `${formData.address.trim()}, ${formData.city.trim()}, ${formData.state?.trim() || ''} - ${formData.pincode.trim()}, ${formData.country?.trim() || 'India'} [Payment: ${method}]`,
@@ -678,17 +751,6 @@ function Checkout() {
         items: rawItems,
         shippingAddress: `${formData.address.trim()}, ${formData.city.trim()} - ${formData.pincode.trim()}`
       });
-
-      // Background Wallet Debit if applicable
-      if (method === 'WALLET') {
-        walletService.createWalletTransaction({
-          userId: user.$id,
-          amount: calculatedFinalAmount,
-          type: 'debit',
-          title: `Payment for Order ${orderNumber}`,
-          referenceId: response.$id || response.id
-        }).catch(walletErr => console.error("Wallet debit failed:", walletErr.message));
-      }
 
       // Background Auto-Save Address
       const addressKey = `${formData.address.trim()}_${formData.city.trim()}_${formData.pincode.trim()}`;
@@ -1144,13 +1206,17 @@ function Checkout() {
                 {selectedPayment === 'ONLINE' && (
                   <div className="p-3.5 bg-[var(--color-accent-light)] border border-[var(--color-border)] rounded-xl space-y-1.5 animate-fade-in">
                     <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[var(--color-accent)] tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                      💡 Razorpay Secured Sandbox Active
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      🔒 256-Bit SSL Encrypted Razorpay Checkout
                     </div>
-                    <p className="text-[9px] font-mono uppercase text-[var(--color-accent)]/90 leading-relaxed">
-                      UPI: Enter <strong className="select-all font-black text-[var(--color-accent-hover)]">success@razorpay</strong> for instant verify, or use mock handles. <br />
-                      Cards: Enter any test card details in the secure pop-up.
+                    <p className="text-[9px] font-mono uppercase text-[var(--color-muted)] leading-relaxed">
+                      Instant & secure checkout supporting UPI (Google Pay, PhonePe, Paytm), Cards (Credit / Debit), and NetBanking.
                     </p>
+                    {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_SANDBOX === 'true') && (
+                      <p className="text-[8px] font-mono text-amber-700 bg-amber-500/10 p-1.5 rounded-md mt-1">
+                        🛠️ DEV MODE: Test UPI <strong>success@razorpay</strong> or mock simulation enabled.
+                      </p>
+                    )}
                   </div>
                 )}
 

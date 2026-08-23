@@ -127,9 +127,26 @@ export class OrdersService {
                 });
                 return documents;
             } catch (indexErr) {
-                console.warn("⚠️ Firestore index missing or query failed for getUserOrders. Falling back to getOrders client-side filter:", indexErr.message);
-                const allOrders = await this.getOrders();
-                return (allOrders || []).filter(order => order.userId === userId);
+                console.warn("⚠️ Firestore compound index missing for getUserOrders. Falling back to single-clause query:", indexErr.message);
+                try {
+                    const fallbackRes = await this.databases.listDocuments(
+                        conf.firebaseDatabaseId,
+                        collectionName,
+                        [
+                            Query.equal("userId", userId),
+                            Query.limit(100)
+                        ]
+                    );
+                    let fallbackDocs = fallbackRes?.documents || fallbackRes || [];
+                    fallbackDocs.sort((a, b) => {
+                        const dateA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || 0).getTime();
+                        const dateB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || 0).getTime();
+                        return dateB - dateA;
+                    });
+                    return fallbackDocs;
+                } catch {
+                    return [];
+                }
             }
         }
         catch (error) {

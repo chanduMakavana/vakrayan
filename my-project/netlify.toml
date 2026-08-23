@@ -13,6 +13,12 @@
   status = 200
   force = true
 
+# Missing assets return 404 instead of HTML to prevent Safari module MIME error
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

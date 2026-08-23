@@ -5,7 +5,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginAction } from '../../features/login'
 import authService from '../../services/auth'
 import { setCartItems } from '../../features/addToCart'
-import cartService from '../../services/cart'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 import { hydrateCartFromDb } from '../../utils/cartMergeHelper'
 import Loader from '../pageComponets/Loader'
@@ -77,9 +76,7 @@ function SignUp() {
         if (userData) {
           dispatch(loginAction({ user: userData }))
           try {
-            await hydrateCartFromDb(userData.$id)
-            const cartItems = await cartService.getCartItems(userData.$id)
-            dispatch(setCartItems(cartItems))
+            await hydrateCartFromDb(userData.$id, dispatch)
           } catch (err) { console.error('Cart merge on signup failed:', err); dispatch(setCartItems([])) }
           const hasSentKey = `sent_signup_${userData.$id || userData.id}`
           localStorage.setItem(hasSentKey, 'true')
@@ -117,9 +114,7 @@ function SignUp() {
         if (userData) {
           dispatch(loginAction({ user: userData }))
           try {
-            await hydrateCartFromDb(userData.$id)
-            const cartItems = await cartService.getCartItems(userData.$id)
-            dispatch(setCartItems(cartItems))
+            await hydrateCartFromDb(userData.$id, dispatch)
           } catch (err) {
             console.error('Cart merge on signup failed:', err)
           }

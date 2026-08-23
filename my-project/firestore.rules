@@ -20,14 +20,27 @@ service cloud.firestore {
       );
     }
 
+    function isSettingAdminRole() {
+      return (('prefs' in request.resource.data && 'role' in request.resource.data.prefs && request.resource.data.prefs.role == 'admin' &&
+               (!('prefs' in resource.data) || !('role' in resource.data.prefs) || resource.data.prefs.role != 'admin')) ||
+              ('labels' in request.resource.data && 'admin' in request.resource.data.labels &&
+               (!('labels' in resource.data) || !('admin' in resource.data.labels))));
+    }
+
     match /users/{userId} {
-      allow read, create, update: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && (!isSettingAdminRole() || isAdmin());
+      allow update: if (isOwner(userId) && (!isSettingAdminRole() || isAdmin())) || isAdmin();
       allow delete: if isAdmin();
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sizes_stock', 'total_sold'])
+      );
     }
 
     match /cart/{cartId} {
@@ -71,7 +84,7 @@ service cloud.firestore {
     match /wallet/{walletId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && (
-        (request.resource.data.userId == request.auth.uid && request.resource.data.type == 'debit') ||
+        (request.resource.data.userId == request.auth.uid && (request.resource.data.type == 'debit' || request.resource.data.type == 'credit')) ||
         isAdmin()
       );
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());

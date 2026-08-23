@@ -27,19 +27,20 @@ export default defineConfig({
          * undefined to let Vite decide (default code-splitting for app code).
          */
         manualChunks(id) {
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+          const normalizedId = id.replace(/\\/g, '/');
+          if (normalizedId.includes('node_modules/react/') || normalizedId.includes('node_modules/react-dom/')) {
             return 'vendor-react';
           }
-          if (id.includes('node_modules/react-router') || id.includes('node_modules/react-router-dom')) {
+          if (normalizedId.includes('node_modules/react-router') || normalizedId.includes('node_modules/react-router-dom')) {
             return 'vendor-router';
           }
-          if (id.includes('node_modules/@reduxjs/') || id.includes('node_modules/react-redux') || id.includes('node_modules/redux')) {
+          if (normalizedId.includes('node_modules/@reduxjs/') || normalizedId.includes('node_modules/react-redux') || normalizedId.includes('node_modules/redux')) {
             return 'vendor-redux';
           }
-          if (id.includes('node_modules/firebase')) {
+          if (normalizedId.includes('node_modules/firebase')) {
             return 'vendor-firebase';
           }
-          if (id.includes('node_modules/framer-motion')) {
+          if (normalizedId.includes('node_modules/framer-motion')) {
             return 'vendor-motion';
           }
         },

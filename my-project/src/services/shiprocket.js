@@ -52,11 +52,11 @@ export async function authenticateShiprocket(email, password) {
       });
       const directData = await directRes.json();
       if (!directRes.ok || directData.error) {
-        throw new Error(directData.error || directData.message || 'Failed to connect to Shiprocket API.');
+        throw new Error(directData.error || directData.message || 'Failed to connect to Shiprocket API.', { cause: err });
       }
       return directData;
     } catch (fallbackErr) {
-      throw new Error(fallbackErr.message || err.message);
+      throw new Error(fallbackErr.message || err.message, { cause: fallbackErr });
     }
   }
 }
@@ -88,7 +88,9 @@ export function formatOrderForShiprocket(order, options = {}) {
               pincode = inner.pincode || pincode;
               rawAddr = [inner.line, inner.city, inner.state, inner.pincode, inner.country || 'India'].filter(Boolean).join(', ');
             }
-          } catch {}
+          } catch {
+            // Ignore inner address parsing error
+          }
         }
         addressText = rawAddr;
       }
@@ -96,7 +98,9 @@ export function formatOrderForShiprocket(order, options = {}) {
         metadata = { ...metadata, ...parsed.metadata };
       }
     }
-  } catch {}
+  } catch {
+    // Ignore outer address parsing error
+  }
 
   let parsedItems;
   try {

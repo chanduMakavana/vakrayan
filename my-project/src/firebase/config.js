@@ -26,7 +26,7 @@ try {
     experimentalAutoDetectLongPolling: true,
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
-} catch (e) {
+} catch {
   // If already initialized (e.g. during Hot Module Replacement), retrieve the existing instance
   dbInstance = getFirestore(app);
 }

@@ -12,6 +12,7 @@ import { FaStar } from 'react-icons/fa';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
+import Loader from '../pageComponets/Loader';
 
 function OrderDetail() {
   const { id } = useParams();
@@ -23,6 +24,7 @@ function OrderDetail() {
   const cartItems = useSelector(state => state.cart || []);
   const products = useSelector(state => state.products.allItems || []);
   const [order, setOrder] = useState(null);
+  const [currentTimestamp] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [reorderLoading, setReorderLoading] = useState(false);
 
@@ -32,12 +34,6 @@ function OrderDetail() {
   const [modalComment, setModalComment] = useState('');
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalSuccessMsg, setModalSuccessMsg] = useState('');
-
-  // Fit & characteristic rating modal states
-  const [modalFit, setModalFit] = useState('true'); // 'tight', 'true', or 'loose'
-  const [modalComfort, setModalComfort] = useState(5);
-  const [modalQuality, setModalQuality] = useState(5);
-  const [modalBreathable, setModalBreathable] = useState(5);
 
   const [modalImages, setModalImages] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -219,14 +215,7 @@ function OrderDetail() {
   }, [id, user, isAuthenticated, navigate, showToast]);
 
   if (loading) {
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4">
-        <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
-        <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-black uppercase">
-          LOADING ORDER DETAILS...
-        </div>
-      </div>
-    );
+    return <Loader type="splash" text="LOADING ORDER DETAILS..." />;
   }
 
   if (!order) return null;
@@ -249,8 +238,8 @@ function OrderDetail() {
 
   // Parse order number, state, tax, etc.
   const parseOrderAddressAndMetadata = (ord) => {
-    let addressText = ord.address || '';
-    let metadata = {
+    let addrText = ord.address || '';
+    let meta = {
       order_number: ord.order_number || `ORD-${new Date(ord.$createdAt || '2026-01-01').getFullYear()}-${ord.$id?.substring(0, 6).toUpperCase() || 'UNKNOWN'}`,
       tracking_number: ord.tracking_number || '',
       tracking_url: ord.tracking_url || '',
@@ -264,7 +253,6 @@ function OrderDetail() {
       const parsed = JSON.parse(ord.address);
       if (parsed && typeof parsed === 'object' && 'customerAddress' in parsed) {
         let rawAddr = parsed.customerAddress;
-        // Handle if customerAddress is itself a JSON string (old nested format)
         if (typeof rawAddr === 'string' && rawAddr.trim().startsWith('{')) {
           try {
             const innerParsed = JSON.parse(rawAddr);
@@ -280,30 +268,29 @@ function OrderDetail() {
             console.warn("Could not parse nested customer address:", innerErr.message);
           }
         }
-        addressText = rawAddr;
+        addrText = rawAddr;
         if (parsed.metadata) {
-          metadata = { ...metadata, ...parsed.metadata };
+          meta = { ...meta, ...parsed.metadata };
         }
       }
     } catch (outerErr) {
       console.warn("Could not parse order address or metadata JSON:", outerErr.message);
     }
 
-    if (typeof addressText === 'string') {
-      addressText = addressText.replace(/\[Payment:\s*\w+\]/i, '').trim();
-      if (addressText.endsWith(',')) {
-        addressText = addressText.slice(0, -1).trim();
+    if (typeof addrText === 'string') {
+      addrText = addrText.replace(/\[Payment:\s*\w+\]/i, '').trim();
+      if (addrText.endsWith(',')) {
+        addrText = addrText.slice(0, -1).trim();
       }
     }
 
-    return { addressText, metadata };
+    return { addressText: addrText, metadata: meta };
   };
 
   const { addressText, metadata } = parseOrderAddressAndMetadata(order);
 
   const isCancellationLocked = !!(metadata.cancellation_locked || order.cancellation_locked || metadata.uncancelled_at || order.uncancelled_at);
 
-  // Check if order was cancelled by the admin / store
   const isAdminCancelled = 
     metadata.cancelled_by === 'admin' || 
     metadata.cancelled_by === 'store' ||
@@ -329,9 +316,8 @@ function OrderDetail() {
     const cancelTime = new Date(cancelTimeStr).getTime();
     if (isNaN(cancelTime)) return true;
     
-    const now = Date.now();
     const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
-    return (now - cancelTime) <= twentyFourHoursInMs;
+    return (currentTimestamp - cancelTime) <= twentyFourHoursInMs;
   })();
 
   // Reactivate / Restore cancelled order back to PENDING status within 24 hours
@@ -986,10 +972,6 @@ function OrderDetail() {
                                             setReviewModalItem({ name: item.name, productId });
                                             setModalRating(5);
                                             setModalComment('');
-                                            setModalFit('true');
-                                            setModalComfort(5);
-                                            setModalQuality(5);
-                                            setModalBreathable(5);
                                           } else {
                                             showToast("Failed to locate product in current catalog.", "error");
                                           }

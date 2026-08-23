@@ -2,15 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRazorpaySDK, loadRazorpaySDK } from '../../hooks/useRazorpaySDK';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { FiMapPin, FiShoppingBag, FiArrowRight, FiArrowLeft, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiBell, FiRefreshCw, FiCamera, FiImage, FiX, FiCheck } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiArrowRight, FiLogOut, FiUser, FiCompass, FiHelpCircle, FiShield, FiRefreshCw, FiCamera, FiImage } from 'react-icons/fi';
 import { login as loginAction, logout as logoutAction } from '../../features/login';
 import authService from '../../services/auth';
 import addressService from '../../services/address';
 import ordersService from '../../services/orders';
 import reviewsService from '../../services/reviews';
 import productsService from '../../services/products';
-import cartService from '../../services/cart';
-import { addCartItemState } from '../../features/addToCart';
 import { setProducts } from '../../features/productsSlice';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
@@ -20,8 +18,8 @@ import RazorpaySandboxModal from '../pageComponets/RazorpaySandboxModal';
 import walletService from '../../services/wallet';
 import PageSkeleton from '../pageComponets/PageSkeleton';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
-import { requestNotificationPermission } from '../../services/notifications';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
+import { sendWebhookNotification } from '../../utils/webhookHelper';
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -29,7 +27,6 @@ function UserProfile() {
   const { showToast } = useToast();
 
   const { user, isAuthenticated } = useSelector(state => state.auth);
-  const cartItems = useSelector(state => state.cart);
   const { items: products, fetched: productsFetched } = useSelector(state => state.products);
 
   const [orders, setOrders] = useState([]);
@@ -44,75 +41,15 @@ function UserProfile() {
     document.title = `${name} | Vakrayan`
   }, [user?.name])
 
-  const [activeProfileTab, setActiveProfileTab] = useState(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get('tab') || 'overview';
-  });
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const activeProfileTab = searchParams.get('tab') || 'overview';
 
   // Helper: switch tab + clean URL
   const switchTab = (tab) => {
-    setActiveProfileTab(tab);
     navigate('/profile' + (tab !== 'overview' ? `?tab=${tab}` : ''), { replace: true });
   };
 
-  const [notificationStatus, setNotificationStatus] = useState(
-    typeof window !== 'undefined' && window.Notification ? window.Notification.permission : 'default'
-  );
-  const [notificationLoading, setNotificationLoading] = useState(false);
   const [reorderConfirmOrder, setReorderConfirmOrder] = useState(null);
-
-  const handleEnableNotifications = async () => {
-    setNotificationLoading(true);
-    try {
-      const token = await requestNotificationPermission(user?.$id);
-      if (token) {
-        showToast("Push notifications enabled successfully!", "success");
-      } else {
-        showToast("Could not enable notifications. Please check browser settings.", "warning");
-      }
-      setNotificationStatus(window.Notification ? window.Notification.permission : 'default');
-    } catch (err) {
-      console.error(err);
-      showToast("An error occurred.", "error");
-    } finally {
-      setNotificationLoading(false);
-    }
-  };
-
-  const handleSendTestNotification = () => {
-    if (window.Notification && window.Notification.permission === "granted") {
-      const title = "Vakrayan Official";
-      const options = {
-        body: "🔥 Live drop restock! Grab your heavyweight fits before they sell out.",
-        icon: "/vakrayan-favicon.png",
-        badge: "/vakrayan-favicon.png"
-      };
-
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then((registration) => {
-          registration.showNotification(title, options);
-          showToast("Test notification sent!", "success");
-        }).catch((err) => {
-          console.error("Service worker not ready:", err);
-          new Notification(title, options);
-          showToast("Test notification sent!", "success");
-        });
-      } else {
-        new Notification(title, options);
-        showToast("Test notification sent!", "success");
-      }
-    } else {
-      showToast("Please enable notifications first.", "warning");
-    }
-  };
-
-  // Sync tab when URL changes (e.g. navigating from Track Order)
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const tab = params.get('tab');
-    if (tab) setActiveProfileTab(tab);
-    else setActiveProfileTab('overview');
-  }, [location.search]);
   
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profilePhone, setProfilePhone] = useState(user?.prefs?.phone || '');
@@ -344,12 +281,6 @@ function UserProfile() {
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalSuccessMsg, setModalSuccessMsg] = useState('');
 
-  // Fit & characteristic rating modal states
-  const [modalFit, setModalFit] = useState('true'); // 'tight', 'true', or 'loose'
-  const [modalComfort, setModalComfort] = useState(5);
-  const [modalQuality, setModalQuality] = useState(5);
-  const [modalBreathable, setModalBreathable] = useState(5);
-
   const [modalImages, setModalImages] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -558,6 +489,8 @@ function UserProfile() {
     }
   };
 
+  const [currentTimestamp] = useState(() => Date.now());
+
   // Helper to check if cancelled order occurred within 24 hours (1 day)
   const isWithin1DayOfCancellation = (ord) => {
     if (!ord) return false;
@@ -571,9 +504,8 @@ function UserProfile() {
     const cancelTime = new Date(cancelTimeStr).getTime();
     if (isNaN(cancelTime)) return true;
     
-    const now = Date.now();
     const twentyFourHours = 24 * 60 * 60 * 1000;
-    return (now - cancelTime) <= twentyFourHours;
+    return (currentTimestamp - cancelTime) <= twentyFourHours;
   };
 
   // Reactivate / Restore cancelled order back to PENDING status within 24 hours
@@ -1069,10 +1001,6 @@ function UserProfile() {
                                               setReviewModalItem({ name: item.name, productId });
                                               setModalRating(5);
                                               setModalComment('');
-                                              setModalFit('true');
-                                              setModalComfort(5);
-                                              setModalQuality(5);
-                                              setModalBreathable(5);
                                             } else {
                                               showToast("Failed to locate product in current catalog.", "error");
                                             }

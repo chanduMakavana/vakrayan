@@ -4,19 +4,17 @@ export function useDelayedLoading(loading, delay = 1500) {
   const [showLoader, setShowLoader] = useState(false)
 
   useEffect(() => {
-    let timer
-    if (loading) {
-      timer = setTimeout(() => {
-        setShowLoader(true)
-      }, delay)
-    } else {
-      setShowLoader(false)
-    }
+    if (!loading) return
+
+    const timer = setTimeout(() => {
+      setShowLoader(true)
+    }, delay)
 
     return () => {
-      if (timer) clearTimeout(timer)
+      clearTimeout(timer)
+      setShowLoader(false)
     }
   }, [loading, delay])
 
-  return showLoader
+  return loading && showLoader
 }

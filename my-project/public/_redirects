@@ -1,1 +1,8 @@
-/*    /index.html   200
+# Firebase Auth handler proxy — essential for iOS Safari / Chrome ITP
+/__/auth/*    https://vakrayan-9ce25.firebaseapp.com/__/auth/:splat    200!
+
+# Missing assets must return 404 so stale chunk imports trigger reload rather than MIME type error
+/assets/*     /404.html                                               404
+
+# SPA Catch-all
+/*            /index.html                                             200

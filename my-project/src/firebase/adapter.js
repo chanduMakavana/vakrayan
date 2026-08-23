@@ -93,7 +93,7 @@ export class Account {
                             labels,
                             phone: data.phone || prefs.phone || '',
                         });
-                    } catch (error) {
+                    } catch {
                         resolve({
                             $id: user.uid,
                             email: user.email,
@@ -121,7 +121,7 @@ export class Account {
     }
 
 
-    async deleteSession(sessionId) {
+    async deleteSession(_sessionId) {
         const currentSessionId = localStorage.getItem('current_session_id');
         if (auth.currentUser && currentSessionId) {
             const userDocRef = doc(firestore, 'users', auth.currentUser.uid);
@@ -148,8 +148,10 @@ export class Account {
 
     async updatePrefs(prefs) {
         if (!auth.currentUser) throw new Error('Not logged in');
-        await updateDoc(doc(firestore, 'users', auth.currentUser.uid), { prefs });
-        return { prefs };
+        const cleanPrefs = { ...(prefs || {}) };
+        delete cleanPrefs.role;
+        await updateDoc(doc(firestore, 'users', auth.currentUser.uid), { prefs: cleanPrefs });
+        return { prefs: cleanPrefs };
     }
 
     async updateName(name) {
@@ -303,9 +305,8 @@ export class Account {
             return await sendPasswordResetEmail(auth, email);
         }
     }
-    
     // In Firebase, userId is ignored. secret maps to oobCode.
-    async updateRecovery(userId, secret, password, passwordAgain) {
+    async updateRecovery(_userId, secret, password) {
         return await confirmPasswordReset(auth, secret, password);
     }
 }
@@ -313,7 +314,7 @@ export class Account {
 export class Databases {
     constructor(client) { this.client = client; }
 
-    async createDocument(databaseId, collectionId, documentId, data, permissions = []) {
+    async createDocument(_databaseId, collectionId, documentId, data) {
         let docRef;
         if (documentId === 'unique()') {
             docRef = doc(collection(firestore, collectionId));
@@ -326,39 +327,64 @@ export class Databases {
         return { $id: docRef.id, $collectionId: collectionId, ...payload };
     }
 
-    async listDocuments(databaseId, collectionId, queries = []) {
-        let q = collection(firestore, collectionId);
-        
+    async getDocument(_databaseId, collectionId, documentId) {
+        const docRef = doc(firestore, collectionId, documentId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+            throw new Error(`Document with ID ${documentId} not found`);
+        }
+        return { $id: docSnap.id, $collectionId: collectionId, ...docSnap.data() };
+    }
+
+    async updateDocument(_databaseId, collectionId, documentId, data) {
+        const docRef = doc(firestore, collectionId, documentId);
+        const payload = { ...data, $updatedAt: new Date().toISOString() };
+        await updateDoc(docRef, payload);
+        const docSnap = await getDoc(docRef);
+        return { $id: docSnap.id, $collectionId: collectionId, ...docSnap.data() };
+    }
+
+    async deleteDocument(_databaseId, collectionId, documentId) {
+        const docRef = doc(firestore, collectionId, documentId);
+        await deleteDoc(docRef);
+        return true;
+    }
+
+    async listDocuments(_databaseId, collectionId, queries = []) {
+        const colRef = collection(firestore, collectionId);
         const filterWheres = [];
-        const sortOrders = []; // Array of { key, direction }
+        const sortOrders = [];
         let limitVal = null;
 
-        // Parse queries
         queries.forEach(queryStr => {
             try {
-                const parsed = JSON.parse(queryStr);
-                if (parsed.type === 'equal') {
-                    filterWheres.push(where(parsed.key, '==', parsed.value));
-                } else if (parsed.type === 'orderDesc') {
-                    sortOrders.push({ key: parsed.key, dir: 'desc' });
-                } else if (parsed.type === 'orderAsc') {
-                    sortOrders.push({ key: parsed.key, dir: 'asc' });
-                } else if (parsed.type === 'limit') {
-                    limitVal = parseInt(parsed.value, 10);
+                const parsed = typeof queryStr === 'string' ? JSON.parse(queryStr) : queryStr;
+                if (parsed && typeof parsed === 'object') {
+                    if (parsed.type === 'equal') {
+                        let queryValue = parsed.value;
+                        if (queryValue === 'true') queryValue = true;
+                        else if (queryValue === 'false') queryValue = false;
+                        else if (!isNaN(queryValue) && queryValue !== '' && typeof queryValue === 'string' && !queryValue.startsWith('0')) {
+                            if (parsed.key !== 'phone' && parsed.key !== 'userId' && parsed.key !== 'order_number' && parsed.key !== 'code') {
+                                queryValue = Number(queryValue);
+                            }
+                        }
+                        filterWheres.push(where(parsed.key, '==', queryValue));
+                    } else if (parsed.type === 'orderDesc') {
+                        sortOrders.push({ key: parsed.key, dir: 'desc' });
+                    } else if (parsed.type === 'orderAsc') {
+                        sortOrders.push({ key: parsed.key, dir: 'asc' });
+                    } else if (parsed.type === 'limit') {
+                        limitVal = parseInt(parsed.value, 10);
+                    }
                 }
             } catch {
-                // Legacy string format fallback
-                const equalMatch = queryStr.match(/equal\("([^"]+)",\s*\[?"?([^"\]]+)"?\]?\)/);
-                if (equalMatch) filterWheres.push(where(equalMatch[1], '==', equalMatch[2]));
-                const orderDescMatch = queryStr.match(/orderDesc\("([^"]+)"\)/);
-                if (orderDescMatch) sortOrders.push({ key: orderDescMatch[1], dir: 'desc' });
-                const limitMatch = queryStr.match(/limit\((\d+)\)/);
-                if (limitMatch) limitVal = parseInt(limitMatch[1], 10);
+                // Legacy string parsing fallback
             }
         });
 
         // 1. Build optimal query (with server-side orderBy + limit)
-        let mainQuery = q;
+        let mainQuery = colRef;
         filterWheres.forEach(clause => { mainQuery = query(mainQuery, clause); });
         sortOrders.forEach(sort => { mainQuery = query(mainQuery, orderBy(sort.key, sort.dir)); });
         if (limitVal !== null) { mainQuery = query(mainQuery, limit(limitVal)); }
@@ -369,14 +395,14 @@ export class Databases {
         } catch (err) {
             console.warn(`⚠️ Firestore query error for collection "${collectionId}". Falling back to client-side sorting & limit. Reason:`, err.message);
             
-            // 2. Build fallback query (where clauses ONLY — never require composite indexes or complex sorting)
+            // 2. Build fallback query (where clauses ONLY — never require composite indexes)
             try {
-                let fallbackQuery = q;
+                let fallbackQuery = colRef;
                 filterWheres.forEach(clause => { fallbackQuery = query(fallbackQuery, clause); });
                 querySnapshot = await getDocs(fallbackQuery);
             } catch (fallbackErr) {
                 console.warn(`⚠️ Filtered query fallback failed, reading base collection "${collectionId}":`, fallbackErr.message);
-                querySnapshot = await getDocs(q);
+                querySnapshot = await getDocs(colRef);
             }
             
             // Map documents
@@ -392,7 +418,6 @@ export class Databases {
                     documents.sort((a, b) => {
                         let valA = a[s.key];
                         let valB = b[s.key];
-                        // Handle date parsing if sorting by date fields
                         if (s.key === '$createdAt' || s.key === 'createdAt' || s.key === '$updatedAt' || s.key === 'updatedAt' || s.key === 'created_at') {
                             valA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.updatedAt || a.date || 0).getTime();
                             valB = new Date(b.$createdAt || b.createdAt || b.created_at || b.$updatedAt || b.updatedAt || b.date || 0).getTime();
@@ -418,7 +443,6 @@ export class Databases {
             ...d.data()
         }));
 
-        // In case documents were missing $createdAt and weren't ordered properly, ensure safe descending order if orderDesc was requested
         if (sortOrders.some(s => s.key === '$createdAt' || s.key === 'createdAt')) {
             documents.sort((a, b) => {
                 const valA = new Date(a.$createdAt || a.createdAt || a.created_at || a.$updatedAt || a.date || 0).getTime();
@@ -428,30 +452,6 @@ export class Databases {
         }
 
         return { total: documents.length, documents };
-    }
-
-
-
-    async updateDocument(databaseId, collectionId, documentId, data) {
-        const docRef = doc(firestore, collectionId, documentId);
-        const payload = { ...data, $updatedAt: new Date().toISOString() };
-        await updateDoc(docRef, payload);
-        const updated = await getDoc(docRef);
-        return { $id: updated.id, $collectionId: collectionId, ...updated.data() };
-    }
-
-    async deleteDocument(databaseId, collectionId, documentId) {
-        await deleteDoc(doc(firestore, collectionId, documentId));
-        return true;
-    }
-
-    async getDocument(databaseId, collectionId, documentId) {
-        const docRef = doc(firestore, collectionId, documentId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            return { $id: docSnap.id, $collectionId: collectionId, ...docSnap.data() };
-        }
-        throw new Error('Document not found');
     }
 }
 
@@ -497,7 +497,7 @@ export class Storage {
         }
     }
 
-    getFileView(fileId, bucketId) {
+    getFileView(fileId) {
         if (!fileId) return '';
         if (typeof fileId === 'object' && fileId !== null) {
             fileId = fileId.$id || fileId.url || fileId.id || fileId.href || '';
@@ -518,7 +518,7 @@ export class Storage {
         return `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;
     }
     
-    async deleteFile(bucketId, fileId) {
+    async deleteFile(_bucketId, _fileId) {
         // Mock
         return true;
     }

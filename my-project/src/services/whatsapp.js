@@ -3,9 +3,6 @@
  * Supports sending OTP, Order Confirmation notifications, and Text alerts.
  */
 
-const WHATSAPP_PHONE_NUMBER_ID = import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID || '1296679850195220';
-const WHATSAPP_ACCESS_TOKEN = import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN || '';
-
 /**
  * Format Indian 10-digit mobile number to international format (91XXXXXXXXXX)
  */
@@ -19,7 +16,7 @@ export function formatWhatsAppNumber(phone) {
 }
 
 /**
- * Send WhatsApp OTP to a user's mobile number
+ * Send WhatsApp OTP to a user's mobile number via Netlify serverless function
  * @param {string} phone - User's 10-digit mobile number
  * @param {string|number} otpCode - 4-6 digit OTP
  * @returns {Promise<{success: boolean, data?: any, error?: string}>}
@@ -30,68 +27,48 @@ export async function sendWhatsAppOTP(phone, otpCode) {
     return { success: false, error: 'Invalid phone number.' };
   }
 
-  const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-
-  // First try default template `hello_world` or custom `vakrayan_otp`
-  const templatePayload = {
-    messaging_product: "whatsapp",
-    to: formattedPhone,
-    type: "template",
-    template: {
-      name: "hello_world",
-      language: { code: "en_US" }
-    }
-  };
-
   try {
-    const response = await fetch(url, {
+    const response = await fetch('/.netlify/functions/whatsapp', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(templatePayload)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "otp",
+        phone: formattedPhone,
+        otpCode
+      })
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (response.ok && data.messages) {
       return { success: true, data };
     }
 
-    console.warn("WhatsApp Template dispatch response:", data);
-    return { success: !data.error, data, error: data.error?.message };
+    return { success: response.ok, data, error: data.error };
   } catch (err) {
-    console.error("WhatsApp API Network Failure:", err);
+    console.error("WhatsApp Service Network Failure:", err);
     return { success: false, error: err.message };
   }
 }
 
 /**
- * Send WhatsApp text message notification (inside 24h window or test numbers)
+ * Send WhatsApp text message notification via Netlify serverless function
  */
 export async function sendWhatsAppTextMessage(phone, messageText) {
   const formattedPhone = formatWhatsAppNumber(phone);
   if (!formattedPhone) return { success: false, error: 'Invalid phone' };
 
-  const url = `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
-  const payload = {
-    messaging_product: "whatsapp",
-    to: formattedPhone,
-    type: "text",
-    text: { body: messageText }
-  };
-
   try {
-    const res = await fetch(url, {
+    const res = await fetch('/.netlify/functions/whatsapp', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "text",
+        phone: formattedPhone,
+        messageText
+      })
     });
-    const data = await res.json();
-    return { success: res.ok, data };
+    const data = await res.json().catch(() => ({}));
+    return { success: res.ok, data, error: data.error };
   } catch (err) {
     return { success: false, error: err.message };
   }

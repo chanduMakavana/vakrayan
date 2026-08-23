@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 /**
@@ -19,13 +19,9 @@ export default function FastImage({
   ...props
 }) {
   const optimizedSrc = getOptimizedImageUrl(src, width, quality);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedSrc, setLoadedSrc] = useState('');
   const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    setIsLoaded(false);
-    setHasError(false);
-  }, [src]);
+  const isLoaded = loadedSrc === optimizedSrc;
 
   return (
     <div className={`relative overflow-hidden bg-emerald-950/5 ${className}`} style={style}>
@@ -41,12 +37,12 @@ export default function FastImage({
         decoding="async"
         {...(priority ? { fetchPriority: 'high' } : {})}
         onLoad={(e) => {
-          setIsLoaded(true);
+          setLoadedSrc(optimizedSrc);
           if (onLoad) onLoad(e);
         }}
         onError={(e) => {
           setHasError(true);
-          setIsLoaded(true);
+          setLoadedSrc(optimizedSrc);
           if (onError) onError(e);
         }}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
