@@ -22,9 +22,9 @@ service cloud.firestore {
 
     function isSettingAdminRole() {
       return (('prefs' in request.resource.data && 'role' in request.resource.data.prefs && request.resource.data.prefs.role == 'admin' &&
-               (!('prefs' in resource.data) || !('role' in resource.data.prefs) || resource.data.prefs.role != 'admin')) ||
+               (resource == null || !('prefs' in resource.data) || !('role' in resource.data.prefs) || resource.data.prefs.role != 'admin')) ||
               ('labels' in request.resource.data && 'admin' in request.resource.data.labels &&
-               (!('labels' in resource.data) || !('admin' in resource.data.labels))));
+               (resource == null || !('labels' in resource.data) || !('admin' in resource.data.labels))));
     }
 
     match /users/{userId} {

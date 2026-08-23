@@ -142,6 +142,11 @@ export class AuthService {
     async resolveGoogleRedirect() {
         return this.account.resolveRedirectResult();
     }
+
+    // Subscribe to continuous Firebase Auth state changes (crucial for iOS/mobile Google login)
+    onAuthStateChanged(callback) {
+        return this.account.onAuthStateChanged(callback);
+    }
 }
 
 const authService = new AuthService();

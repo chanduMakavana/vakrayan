@@ -110,11 +110,18 @@ function SignUp() {
       sessionStorage.removeItem('dismissed_phone_prompt')
       const result = await authService.loginWithGoogle()
       if (result) {
-        const userData = await authService.getCurrentUser()
-        if (userData) {
-          dispatch(loginAction({ user: userData }))
+        const currentUser = (await authService.getCurrentUser()) || (result.user ? {
+          $id: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName || 'User',
+          prefs: {},
+          labels: [],
+          phone: result.user.phoneNumber || ''
+        } : null)
+        if (currentUser) {
+          dispatch(loginAction({ user: currentUser }))
           try {
-            await hydrateCartFromDb(userData.$id, dispatch)
+            await hydrateCartFromDb(currentUser.$id, dispatch)
           } catch (err) {
             console.error('Cart merge on signup failed:', err)
           }

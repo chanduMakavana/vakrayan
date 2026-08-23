@@ -289,6 +289,19 @@ function AppContent() {
     let mounted = true
     listenForForegroundMessages()
 
+    // 0. Continuous real-time Firebase Auth listener (crucial for iOS Safari / Mobile Google popup & redirects)
+    const unsubscribeAuth = authService.onAuthStateChanged(async (userData) => {
+      if (userData && mounted) {
+        sessionStorage.setItem('session_active', 'true')
+        dispatch(loginAction({ user: userData }))
+        try {
+          await hydrateCartFromDb(userData.$id, dispatch)
+        } catch (err) {
+          console.error("Cart hydration on auth state change failed:", err)
+        }
+      }
+    })
+
     const warmupApp = async () => {
       const startTime = Date.now()
 
@@ -442,6 +455,7 @@ function AppContent() {
 
     return () => {
       mounted = false
+      if (unsubscribeAuth) unsubscribeAuth()
       clearTimeout(maxTimer)
     }
   }, [dispatch]) // eslint-disable-line react-hooks/exhaustive-deps

@@ -120,6 +120,28 @@ export class Account {
         });
     }
 
+    onAuthStateChanged(callback) {
+        return onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                try {
+                    const user = await this.get();
+                    callback(user);
+                } catch {
+                    callback({
+                        $id: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        name: firebaseUser.displayName || 'User',
+                        prefs: {},
+                        labels: [],
+                        phone: firebaseUser.phoneNumber || ''
+                    });
+                }
+            } else {
+                callback(null);
+            }
+        });
+    }
+
 
     async deleteSession(_sessionId) {
         const currentSessionId = localStorage.getItem('current_session_id');
