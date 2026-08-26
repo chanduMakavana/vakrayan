@@ -1305,11 +1305,6 @@ function Checkout() {
                     <p className="text-[9px] font-mono uppercase text-[var(--color-muted)] leading-relaxed">
                       Instant & secure checkout supporting UPI (Google Pay, PhonePe, Paytm), Cards (Credit / Debit), and NetBanking.
                     </p>
-                    {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_SANDBOX === 'true') && (
-                      <p className="text-[8px] font-mono text-amber-700 bg-amber-500/10 p-1.5 rounded-md mt-1">
-                        🛠️ DEV MODE: Test UPI <strong>success@razorpay</strong> or mock simulation enabled.
-                      </p>
-                    )}
                   </div>
                 )}
 
