@@ -1195,7 +1195,7 @@ function Checkout() {
                 {/* Premium Payment Method Selector */}
                 <div className="w-full md:col-span-2 flex flex-col gap-2 mt-2">
                   <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Payment Option</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-stretch">
                     
                     {/* COD Option */}
                     <div 
@@ -1206,7 +1206,7 @@ function Checkout() {
                           showToast("Cash on Delivery is not serviceable for this remote route.", "error");
                         }
                       }}
-                      className={`p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col justify-between gap-1.5 h-full ${
                         !codAvailable
                         ? 'opacity-50 cursor-not-allowed border-[var(--color-border)] bg-[var(--color-subtle)]'
                         : selectedPayment === 'COD' 
@@ -1236,7 +1236,7 @@ function Checkout() {
                     {/* Online Razorpay Option */}
                     <div 
                       onClick={() => setSelectedPayment('ONLINE')}
-                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col justify-between gap-1.5 h-full ${
                         selectedPayment === 'ONLINE' 
                         ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50 shadow-sm' 
                         : 'border-[var(--color-border)] hover:border-[var(--color-accent)] bg-[var(--color-subtle)]'
@@ -1255,7 +1255,7 @@ function Checkout() {
                       </p>
                     </div>
 
-                    {/* Store Wallet Option */}
+                    {/* Store Wallet Option — Full Width */}
                     {isAuthenticated && (
                       <div 
                         onClick={() => {
@@ -1265,7 +1265,7 @@ function Checkout() {
                             showToast(`Insufficient Wallet Balance (Available: ₹${walletBalance.toFixed(2)}). Please pay online or top up in your profile.`, "error");
                           }
                         }}
-                        className={`p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                        className={`md:col-span-2 p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
                           walletBalance < finalAmount
                           ? 'opacity-50 cursor-not-allowed border-[var(--color-border)] bg-[var(--color-subtle)]'
                           : selectedPayment === 'WALLET' 
@@ -1293,20 +1293,21 @@ function Checkout() {
                       </div>
                     )}
 
+                    {/* Online SSL Encrypted Banner — Full Width */}
+                    {selectedPayment === 'ONLINE' && (
+                      <div className="md:col-span-2 p-3.5 bg-[var(--color-accent-light)] border border-[var(--color-border)] rounded-xl space-y-1.5 animate-fade-in">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[var(--color-accent)] tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          🔒 256-Bit SSL Encrypted Razorpay Checkout
+                        </div>
+                        <p className="text-[9px] font-mono uppercase text-[var(--color-muted)] leading-relaxed">
+                          Instant & secure checkout supporting UPI (Google Pay, PhonePe, Paytm), Cards (Credit / Debit), and NetBanking.
+                        </p>
+                      </div>
+                    )}
+
                   </div>
                 </div>
-
-                {selectedPayment === 'ONLINE' && (
-                  <div className="p-3.5 bg-[var(--color-accent-light)] border border-[var(--color-border)] rounded-xl space-y-1.5 animate-fade-in">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[var(--color-accent)] tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      🔒 256-Bit SSL Encrypted Razorpay Checkout
-                    </div>
-                    <p className="text-[9px] font-mono uppercase text-[var(--color-muted)] leading-relaxed">
-                      Instant & secure checkout supporting UPI (Google Pay, PhonePe, Paytm), Cards (Credit / Debit), and NetBanking.
-                    </p>
-                  </div>
-                )}
 
                 {/* Simulated Order Submission */}
                 <button
