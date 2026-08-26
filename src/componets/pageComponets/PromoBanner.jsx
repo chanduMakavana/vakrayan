@@ -55,7 +55,7 @@ function PromoBanner() {
         variants={containerVariants}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: true, margin: '-80px' }}
+        viewport={{ once: true, amount: 0.1 }}
         className="relative z-10 max-w-[1728px] mx-auto px-6 py-10 md:py-12 text-center"
       >
         <motion.div variants={childVariants} className="flex justify-center mb-3">

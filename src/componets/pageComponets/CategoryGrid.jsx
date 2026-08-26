@@ -112,7 +112,7 @@ function CategoryGrid() {
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
-          viewport={{ once: true, margin: '-80px' }}
+          viewport={{ once: true, amount: 0.1 }}
           className="flex flex-wrap justify-center gap-3 md:gap-4"
         >
           {visibleCategories.map((c, idx) => {

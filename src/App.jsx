@@ -497,6 +497,16 @@ function AppContent() {
     dispatch(filterProductsForMode(adminMode))
   }, [adminMode, allProductsCount, dispatch])
 
+  // Trigger viewport re-evaluation when initial splash screen loader unmounts
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        window.dispatchEvent(new Event('scroll'))
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [loading])
+
   // Background preloading of critical route chunks during browser idle time
   useEffect(() => {
     const load = () => {

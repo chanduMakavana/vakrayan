@@ -77,7 +77,7 @@ function RecentlyViewedHome() {
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
-          viewport={{ once: true, margin: '-100px' }}
+          viewport={{ once: true, amount: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6"
         >
           {viewedProducts.map((product) => {
