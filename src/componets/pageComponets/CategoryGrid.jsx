@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { motion } from 'framer-motion'
+import { motion, useInView } from 'framer-motion'
 import categoryService from '../../services/category'
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
@@ -19,6 +19,16 @@ function CategoryGrid() {
   const [searchParams] = useSearchParams()
   const shouldScroll = searchParams.get('scroll') === 'categories'
   const [categoryConfigs, setCategoryConfigs] = useState([])
+  const sectionRef = useRef(null)
+  const isInView = useInView(sectionRef, { once: true, amount: 0.05 })
+  const [fallbackShow, setFallbackShow] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFallbackShow(true), 800)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const shouldShow = isInView || fallbackShow
 
   useEffect(() => {
     if (shouldScroll) {
@@ -109,10 +119,10 @@ function CategoryGrid() {
 
         {/* Equal-size category flex/grid wrapper - centered for odd counts */}
         <motion.div
+          ref={sectionRef}
           variants={containerVariants}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.1 }}
+          animate={shouldShow ? "show" : "hidden"}
           className="flex flex-wrap justify-center gap-3 md:gap-4"
         >
           {visibleCategories.map((c, idx) => {

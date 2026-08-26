@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, useInView } from 'framer-motion'
 import campaignService from '../../services/campaign'
 
 const containerVariants = {
@@ -21,6 +21,16 @@ const statsData = [
 
 function PromoBanner() {
   const [promoText, setPromoText] = useState('⚡ FREE EXPRESS SHIPPING & 7-DAY EASY RETURNS ON ALL ORDERS')
+  const sectionRef = useRef(null)
+  const isInView = useInView(sectionRef, { once: true, amount: 0.05 })
+  const [fallbackShow, setFallbackShow] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFallbackShow(true), 800)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const shouldShow = isInView || fallbackShow
 
   useEffect(() => {
     const localText = localStorage.getItem('campaignPromoText')
@@ -52,10 +62,10 @@ function PromoBanner() {
 
       {/* Content */}
       <motion.div
+        ref={sectionRef}
         variants={containerVariants}
         initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, amount: 0.1 }}
+        animate={shouldShow ? "show" : "hidden"}
         className="relative z-10 max-w-[1728px] mx-auto px-6 py-10 md:py-12 text-center"
       >
         <motion.div variants={childVariants} className="flex justify-center mb-3">
