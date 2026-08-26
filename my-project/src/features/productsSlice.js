@@ -15,6 +15,7 @@ const initialState = {
     fetched: false, // Tracks if catalog has been successfully loaded once
     offers: [],     // Store all offers loaded from database
     offersFetched: false,
+    currentAdminMode: false,
 };
 
 export const productsSlice = createSlice({
@@ -22,16 +23,16 @@ export const productsSlice = createSlice({
     initialState,
     reducers: {
         setProducts: (state, action) => {
-            // Normalize is_live to boolean at ingestion so all subsequent checks are simple === true
-            state.allItems = (action.payload ?? []).map(p => ({
+            const rawItems = Array.isArray(action.payload) ? action.payload : (action.payload?.products ?? []);
+            const adminMode = action.payload?.adminMode !== undefined ? !!action.payload.adminMode : state.currentAdminMode;
+            
+            state.allItems = rawItems.map(p => ({
                 ...p,
                 is_live: normalizeIsLive(p.is_live)
             }));
-            // NOTE: adminMode is passed as the second action arg, not read from localStorage.
-            // Reducers must be pure functions — no side effects, no localStorage access.
-            // filterProductsForMode should be dispatched separately after setProducts
-            // if admin filtering is needed.
-            state.items = state.allItems.filter(p => p.is_live === true);
+            state.items = adminMode
+                ? state.allItems
+                : state.allItems.filter(p => p.is_live === true);
             state.fetched = true;
         },
 
@@ -39,6 +40,7 @@ export const productsSlice = createSlice({
         // Accepts boolean payload: true = show all (admin), false = live only
         filterProductsForMode: (state, action) => {
             const adminMode = !!action.payload;
+            state.currentAdminMode = adminMode;
             state.items = adminMode
                 ? state.allItems
                 : state.allItems.filter(p => p.is_live === true);

@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { motion } from 'framer-motion'
+import { motion, useInView } from 'framer-motion'
 import wishlistService from '../../services/wishlist'
 import ProductCardSkeleton from './ProductCardSkeleton'
 import { useDelayedLoading } from '../../hooks/useDelayedLoading'
@@ -37,8 +37,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
       tabIndex={0}
       aria-label={`View ${product.name}`}
     >
-    <motion.div
-      variants={cardVariants}
+    <div
       className="flex flex-col w-full h-full"
       onMouseEnter={() => {
         setIsHovered(true);
@@ -160,7 +159,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
           })()}
         </div>
       </div>
-    </motion.div>
+    </div>
     </Link>
   );
 }
@@ -201,11 +200,19 @@ function BestSellers() {
 
   const displayedProducts = featuredProducts.length > 0 ? featuredProducts.slice(0, 4) : sortedProducts.slice(0, 4)
 
+  const sectionRef = useRef(null)
+  const isInView = useInView(sectionRef, { once: true, amount: 0.05 })
+  const [fallbackShow, setFallbackShow] = useState(false)
+
   useEffect(() => {
     if (displayedProducts.length > 0) {
       preloadProductBatch(displayedProducts, 4)
     }
+    const timer = setTimeout(() => setFallbackShow(true), 800)
+    return () => clearTimeout(timer)
   }, [displayedProducts])
+
+  const shouldShow = isInView || fallbackShow
 
   return (
     <section id="drops" className="scroll-mt-20 selection:bg-[var(--color-accent)] selection:text-white"
@@ -245,13 +252,7 @@ function BestSellers() {
         )}
 
         {/* Products Grid */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-100px' }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6"
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {!loading && displayedProducts.map((product) => (
             <BestSellerCard
               key={product.$id || product.id}
@@ -265,7 +266,7 @@ function BestSellers() {
               user={user}
             />
           ))}
-        </motion.div>
+        </div>
 
         {/* Centered CTA button at the bottom of the grid */}
         <div className="mt-6 flex justify-center">

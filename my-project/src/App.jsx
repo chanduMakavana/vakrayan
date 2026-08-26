@@ -490,10 +490,22 @@ function AppContent() {
   // location.pathname intentionally excluded: the interval must not be torn down
   // and recreated on every navigation — only on mount/unmount.
 
-  // Re-filter products when adminMode changes
+  const allProductsCount = useSelector(state => state.products.allItems.length);
+
+  // Re-filter products when adminMode or catalog items update
   useEffect(() => {
     dispatch(filterProductsForMode(adminMode))
-  }, [adminMode, dispatch])
+  }, [adminMode, allProductsCount, dispatch])
+
+  // Trigger viewport re-evaluation when initial splash screen loader unmounts
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        window.dispatchEvent(new Event('scroll'))
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [loading])
 
   // Background preloading of critical route chunks during browser idle time
   useEffect(() => {

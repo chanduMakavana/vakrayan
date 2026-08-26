@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { motion } from 'framer-motion'
+import { motion, useInView } from 'framer-motion'
 import categoryService from '../../services/category'
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer'
 
@@ -19,6 +19,16 @@ function CategoryGrid() {
   const [searchParams] = useSearchParams()
   const shouldScroll = searchParams.get('scroll') === 'categories'
   const [categoryConfigs, setCategoryConfigs] = useState([])
+  const sectionRef = useRef(null)
+  const isInView = useInView(sectionRef, { once: true, amount: 0.05 })
+  const [fallbackShow, setFallbackShow] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFallbackShow(true), 800)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const shouldShow = isInView || fallbackShow
 
   useEffect(() => {
     if (shouldScroll) {
@@ -108,19 +118,12 @@ function CategoryGrid() {
         </div>
 
         {/* Equal-size category flex/grid wrapper - centered for odd counts */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-80px' }}
-          className="flex flex-wrap justify-center gap-3 md:gap-4"
-        >
+        <div className="flex flex-wrap justify-center gap-3 md:gap-4">
           {visibleCategories.map((c, idx) => {
             const img = getCategoryImage(c.value)
             return (
-              <motion.div 
+              <div 
                 key={c.value} 
-                variants={cardVariants}
                 className="w-[calc(50%-6px)] md:w-[calc(25%-12px)] min-w-[140px] max-w-[280px]"
               >
                 <Link
@@ -177,10 +180,10 @@ function CategoryGrid() {
                     <div className="category-underline mt-2.5" />
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             )
           })}
-        </motion.div>
+        </div>
       </div>
     </section>
   )

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, useInView } from 'framer-motion'
 import campaignService from '../../services/campaign'
 
 const containerVariants = {
@@ -21,6 +21,16 @@ const statsData = [
 
 function PromoBanner() {
   const [promoText, setPromoText] = useState('⚡ FREE EXPRESS SHIPPING & 7-DAY EASY RETURNS ON ALL ORDERS')
+  const sectionRef = useRef(null)
+  const isInView = useInView(sectionRef, { once: true, amount: 0.05 })
+  const [fallbackShow, setFallbackShow] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFallbackShow(true), 800)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const shouldShow = isInView || fallbackShow
 
   useEffect(() => {
     const localText = localStorage.getItem('campaignPromoText')
@@ -51,23 +61,16 @@ function PromoBanner() {
       <div className="absolute top-1/2 left-0 w-40 h-40 blob blob-emerald animate-blob" style={{ animationDelay: '5s', opacity: 0.08 }} />
 
       {/* Content */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: '-80px' }}
-        className="relative z-10 max-w-[1728px] mx-auto px-6 py-10 md:py-12 text-center"
-      >
-        <motion.div variants={childVariants} className="flex justify-center mb-3">
+      <div className="relative z-10 max-w-[1728px] mx-auto px-6 py-10 md:py-12 text-center">
+        <div className="flex justify-center mb-3">
           <div className="accent-line" />
-        </motion.div>
+        </div>
 
-        <motion.p variants={childVariants} className="eyebrow mb-2">
+        <p className="eyebrow mb-2">
           Our Philosophy
-        </motion.p>
+        </p>
 
-        <motion.h2
-          variants={childVariants}
+        <h2
           style={{
             fontFamily: "'Barlow Condensed', 'Impact', sans-serif",
             fontSize: 'clamp(2.2rem, 5vw, 4rem)',
@@ -82,10 +85,9 @@ function PromoBanner() {
           Raw Aesthetics.
           <br />
           <span style={{ color: 'var(--color-accent)' }}>No Compromise.</span>
-        </motion.h2>
+        </h2>
 
-        <motion.p
-          variants={childVariants}
+        <p
           style={{
             color: 'var(--color-muted)',
             fontSize: 15,
@@ -96,13 +98,10 @@ function PromoBanner() {
           }}
         >
           We don't just drop clothing — we define subculture. Every thread is engineered for heavy operations, keeping comfort locked in and motion unbothered.
-        </motion.p>
+        </p>
 
         {/* Stats row */}
-        <motion.div
-          variants={childVariants}
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           {statsData.map(({ value, label }) => (
             <div
               key={label}
@@ -117,10 +116,10 @@ function PromoBanner() {
               </p>
             </div>
           ))}
-        </motion.div>
+        </div>
 
         {/* Brand tags */}
-        <motion.div variants={childVariants} className="mt-8 flex justify-center items-center gap-4 flex-wrap">
+        <div className="mt-8 flex justify-center items-center gap-4 flex-wrap">
           {['EST. 2026', 'MADE IN INDIA', 'PREMIUM QUALITY'].map((tag, i) => (
             <span
               key={tag}
@@ -137,8 +136,8 @@ function PromoBanner() {
               {tag}
             </span>
           ))}
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     </section>
   )
 }

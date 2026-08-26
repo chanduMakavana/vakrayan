@@ -1,7 +1,7 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import wishlistService from '../../services/wishlist';
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice';
 import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer';
@@ -34,6 +34,16 @@ function RecentlyViewedHome() {
   const products = useSelector(state => state.products.items || []);
   const wishlist = useSelector(state => state.wishlist || []);
   const { user, isAuthenticated } = useSelector(state => state.auth);
+  const sectionRef = useRef(null);
+  const isInView = useInView(sectionRef, { once: true, amount: 0.05 });
+  const [fallbackShow, setFallbackShow] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFallbackShow(true), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const shouldShow = isInView || fallbackShow;
 
   const viewedProducts = useMemo(() => {
     const saved = localStorage.getItem('recently_viewed');
@@ -73,13 +83,7 @@ function RecentlyViewedHome() {
         </div>
 
         {/* Products grid */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-100px' }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6"
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {viewedProducts.map((product) => {
             const parentId = product.$id || product.id;
             const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Image';
@@ -94,9 +98,8 @@ function RecentlyViewedHome() {
             const isWishlisted = wishlist.some(item => item.$id === parentId || item.id === parentId);
 
             return (
-              <motion.div
+              <div
                 key={parentId}
-                variants={cardVariants}
                 onClick={() => { navigate(`/product/${product.slug || parentId}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="group relative flex flex-col bg-white border border-emerald-900/15 hover:border-emerald-600 transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer rounded-none overflow-hidden"
               >
@@ -184,10 +187,10 @@ function RecentlyViewedHome() {
                     </span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
-        </motion.div>
+        </div>
       </div>
     </section>
   );
