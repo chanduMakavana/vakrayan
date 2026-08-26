@@ -79,10 +79,10 @@ function AdminAnalytics({ orders = [], products = [] }) {
     
     orders.forEach(o => {
       if (o.status === "CANCELLED") return
-      let items = []
+      let items
       try {
         items = typeof o.items === "string" ? JSON.parse(o.items) : o.items || []
-      } catch (err) {
+      } catch {
         items = []
       }
       

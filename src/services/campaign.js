@@ -59,7 +59,9 @@ export class CampaignService {
                             if (parsed && typeof parsed.show_in_available === 'boolean') {
                                 showInAvailable = parsed.show_in_available;
                             }
-                        } catch {}
+                        } catch {
+                            // Ignore malformed coupon_usage JSON
+                        }
                     }
                     return {
                         ...doc,

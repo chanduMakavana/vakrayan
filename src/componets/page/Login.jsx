@@ -108,16 +108,41 @@ function Login() {
   const handleGoogleSignIn = async () => {
     setServerError(''); setLoading(true)
     try {
-      const rememberChecked = document.getElementById('remember')?.checked
-      if (rememberChecked) localStorage.setItem('remember_me', 'true')
-      else localStorage.removeItem('remember_me')
+      localStorage.setItem('remember_me', 'true')
       sessionStorage.setItem('session_active', 'true')
       sessionStorage.removeItem('dismissed_phone_prompt')
-      await authService.loginWithGoogle()
+      const result = await authService.loginWithGoogle()
+      if (result) {
+        const currentUser = (await authService.getCurrentUser()) || (result.user ? {
+          $id: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName || 'User',
+          prefs: {},
+          labels: [],
+          phone: result.user.phoneNumber || ''
+        } : null)
+        if (currentUser) {
+          dispatch(loginAction({ user: currentUser }))
+          try { await hydrateCartFromDb(currentUser.$id, dispatch) } catch (e) { console.error(e) }
+          const from = location.state?.from?.pathname || '/'
+          sessionStorage.setItem('just_logged_in', 'true')
+          navigate(from, { replace: true })
+        }
+      }
     } catch (error) {
       let msg = error?.message || 'Google authentication failed.'
-      if (msg.includes('Firebase: Error')) msg = 'Google authentication failed. Please try again.'
-      setServerError(msg); setLoading(false)
+      if (msg.includes('auth/unauthorized-domain')) {
+        msg = 'Domain not authorized in Firebase Console (Authentication > Settings > Authorized domains).'
+      } else if (msg.includes('auth/operation-not-allowed')) {
+        msg = 'Google Sign-In is not enabled in Firebase Console (Authentication > Sign-in method).'
+      } else if (msg.includes('auth/popup-closed-by-user')) {
+        msg = 'Sign-in was cancelled.'
+      } else if (msg.includes('Firebase: Error')) {
+        msg = 'Google authentication failed. Please try again.'
+      }
+      setServerError(msg)
+    } finally {
+      setLoading(false)
     }
   }
 

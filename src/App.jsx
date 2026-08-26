@@ -156,9 +156,8 @@ function AppRoutes() {
   const location = useLocation()
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {/* ✅ Suspense wraps all lazy routes — handles chunk download fallback */}
-      <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<PageLoader />}>
+      <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
           {/* Public routes */}
           <Route path='/signup'              element={<PageWrapper><SignUp /></PageWrapper>} />
@@ -172,6 +171,7 @@ function AppRoutes() {
           <Route path='/cart'                element={<PageWrapper><AddToCartPage /></PageWrapper>} />
           <Route path='/terms'               element={<PageWrapper><LegalPage /></PageWrapper>} />
           <Route path='/privacy'             element={<PageWrapper><LegalPage /></PageWrapper>} />
+          <Route path='/privacy-policy'      element={<PageWrapper><LegalPage /></PageWrapper>} />
           <Route path='/*'                   element={<PageWrapper><NotFound /></PageWrapper>} />
 
           {/* Protected routes */}
@@ -190,8 +190,8 @@ function AppRoutes() {
             <AdminRoute><PageWrapper><AdminPanel /></PageWrapper></AdminRoute>
           } />
         </Routes>
-      </Suspense>
-    </AnimatePresence>
+      </AnimatePresence>
+    </Suspense>
   )
 }
 
@@ -289,6 +289,19 @@ function AppContent() {
     let mounted = true
     listenForForegroundMessages()
 
+    // 0. Continuous real-time Firebase Auth listener (crucial for iOS Safari / Mobile Google popup & redirects)
+    const unsubscribeAuth = authService.onAuthStateChanged(async (userData) => {
+      if (userData && mounted) {
+        sessionStorage.setItem('session_active', 'true')
+        dispatch(loginAction({ user: userData }))
+        try {
+          await hydrateCartFromDb(userData.$id, dispatch)
+        } catch (err) {
+          console.error("Cart hydration on auth state change failed:", err)
+        }
+      }
+    })
+
     const warmupApp = async () => {
       const startTime = Date.now()
 
@@ -313,19 +326,6 @@ function AppContent() {
 
           const userData = await authService.getCurrentUser()
           if (userData) {
-            const rememberMe = localStorage.getItem('remember_me') === 'true'
-            const sessionActive = sessionStorage.getItem('session_active') === 'true'
-
-            if (!rememberMe && !sessionActive) {
-              await authService.logout()
-              localStorage.removeItem('remember_me')
-              sessionStorage.removeItem('session_active')
-              dispatch(logoutAction())
-              const guestItems = loadGuestCartItems()
-              dispatch(setCartItems(guestItems))
-              return
-            }
-
             sessionStorage.setItem('session_active', 'true')
             dispatch(loginAction({ user: userData }))
 
@@ -455,6 +455,7 @@ function AppContent() {
 
     return () => {
       mounted = false
+      if (unsubscribeAuth) unsubscribeAuth()
       clearTimeout(maxTimer)
     }
   }, [dispatch]) // eslint-disable-line react-hooks/exhaustive-deps

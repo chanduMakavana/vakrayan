@@ -38,7 +38,7 @@ export class AuthService {
         try {
             const user = await this.account.get();
             return user ?? null;
-        } catch (error) {
+        } catch {
             // No active session is a normal state on initial mount, do not throw
             console.warn("Firebase service :: getCurrentUser :: Not Logged In");
             return null;
@@ -49,7 +49,7 @@ export class AuthService {
     async logout() {
         try {
             return await this.account.deleteSession('current');
-        } catch (error) {
+        } catch {
             console.warn("Firebase service :: logout :: No active session found or already logged out");
             return null;
         }
@@ -141,6 +141,11 @@ export class AuthService {
     // On desktop this is a no-op (getRedirectResult returns null immediately).
     async resolveGoogleRedirect() {
         return this.account.resolveRedirectResult();
+    }
+
+    // Subscribe to continuous Firebase Auth state changes (crucial for iOS/mobile Google login)
+    onAuthStateChanged(callback) {
+        return this.account.onAuthStateChanged(callback);
     }
 }
 

@@ -3,9 +3,13 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+const defaultAuthDomain = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')
+  ? (window.location.host.includes('vakrayan') ? window.location.host : "vakrayan-9ce25.firebaseapp.com")
+  : "vakrayan-9ce25.firebaseapp.com";
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC2L5K6zkTT7m153YqtT7kiYwO4TEGh4gA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vakrayan.com",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultAuthDomain,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "vakrayan-9ce25",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "vakrayan-9ce25.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1024899978871",
@@ -17,14 +21,16 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Use initializeFirestore with forceLongPolling to bypass Edge Tracking Prevention CORS issues safely
+// Use initializeFirestore with autoDetectLongPolling to bypass Safari/iOS ITP CORS issues
+// experimentalAutoDetectLongPolling replaces the deprecated experimentalForceLongPolling
+// and correctly handles both Listen and Write channels via long-polling when needed
 let dbInstance;
 try {
   dbInstance = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
-} catch (e) {
+} catch {
   // If already initialized (e.g. during Hot Module Replacement), retrieve the existing instance
   dbInstance = getFirestore(app);
 }
@@ -33,6 +39,7 @@ export const db = dbInstance;
 
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Safe Messaging Initialization Helper with Dynamic Import
 export const getMessagingInstance = async () => {

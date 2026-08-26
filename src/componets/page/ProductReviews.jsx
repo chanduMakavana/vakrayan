@@ -7,6 +7,7 @@ import productsService from '../../services/products';
 import reviewsService from '../../services/reviews';
 import { useToast } from '../../context/ToastContext';
 import Footer from '../pageComponets/Footer';
+import Loader from '../pageComponets/Loader';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 function ProductReviews() {
@@ -137,14 +138,7 @@ function ProductReviews() {
   }, [reviews, ratingFilter, sortBy, verifiedOnly]);
 
   if (loading) {
-    return (
-      <div className="w-full min-h-screen bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4">
-        <div className="w-6 h-6 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
-        <div className="text-[10px] tracking-[0.5em] text-[var(--color-text)] font-black uppercase">
-          Loading Product Reviews...
-        </div>
-      </div>
-    );
+    return <Loader type="splash" text="LOADING REVIEWS..." />;
   }
 
   if (!product) return null;

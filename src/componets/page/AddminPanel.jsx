@@ -1401,6 +1401,25 @@ function AdminPanel() {
         showToast(`🚀 Shiprocket Parcel Created! AWB: ${res.awb_number} (${res.courier_partner})`, "success");
         setIsShiprocketDispatchModalOpen(false);
 
+        // Notify customer on WhatsApp & Telegram
+        let customerPhone = shiprocketTargetOrder.phone || '';
+        let customerName = shiprocketTargetOrder.customerName || '';
+        try {
+          const parsedAddr = typeof shiprocketTargetOrder.address === 'string' ? JSON.parse(shiprocketTargetOrder.address) : shiprocketTargetOrder.address;
+          customerPhone = customerPhone || parsedAddr?.phone || '';
+          customerName = customerName || parsedAddr?.name || '';
+        } catch {}
+
+        sendWebhookNotification('order.shipped', {
+          orderId: shiprocketTargetOrder.$id || shiprocketTargetOrder.id,
+          orderNumber: shiprocketTargetOrder.order_number || (shiprocketTargetOrder.$id || '').substring(0, 8).toUpperCase(),
+          customerName: customerName || 'Valued Customer',
+          phone: customerPhone,
+          trackingNumber: res.awb_number,
+          trackingUrl: res.tracking_url,
+          courierName: res.courier_partner || 'Shiprocket'
+        });
+
         // Auto print shipping label slip with generated AWB and tracking QR code
         handlePrintShippingLabels({
           ...shiprocketTargetOrder,
@@ -1976,6 +1995,26 @@ function AdminPanel() {
       tracking_number: trackingNum,
       tracking_url: trackingUrl
     });
+
+    // Notify customer on WhatsApp & Telegram
+    let customerPhone = shippedTargetOrder.phone || '';
+    let customerName = shippedTargetOrder.customerName || '';
+    try {
+      const parsedAddr = typeof shippedTargetOrder.address === 'string' ? JSON.parse(shippedTargetOrder.address) : shippedTargetOrder.address;
+      customerPhone = customerPhone || parsedAddr?.phone || '';
+      customerName = customerName || parsedAddr?.name || '';
+    } catch {}
+
+    sendWebhookNotification('order.shipped', {
+      orderId: shippedTargetOrder.$id || shippedTargetOrder.id,
+      orderNumber: shippedTargetOrder.order_number || (shippedTargetOrder.$id || '').substring(0, 8).toUpperCase(),
+      customerName: customerName || 'Valued Customer',
+      phone: customerPhone,
+      trackingNumber: trackingNum,
+      trackingUrl: trackingUrl,
+      courierName: 'Delhivery / Shiprocket'
+    });
+
     setShippedTargetOrder(null);
   };
 

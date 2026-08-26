@@ -648,8 +648,10 @@ function ProductDetail() {
          }
          if (isMounted) {
            setProduct(cachedProduct);
-           setActiveImageIdx(0);
-           
+           const isSameProduct = product && (product.$id === cachedProduct.$id || product.id === cachedProduct.id);
+           if (!isSameProduct) {
+             setActiveImageIdx(0);
+             
              let stockMap = {};
              try {
                stockMap = JSON.parse(cachedProduct.sizes_stock || '{}');
@@ -664,15 +666,16 @@ function ProductDetail() {
              const firstInStockSize = unionSizes.find(sz => stockMap[sz] > 0);
              setSelectedSize(firstInStockSize || unionSizes[0] || '');
 
-            setSelectedColor(cachedProduct.color_name || '');
-            setActiveVariant(null);
- 
-            const cachedCategory = cachedProduct.category || "";
-            const filteredSuggestions = products.filter(
-              item => cachedCategory && item.category === cachedCategory && (item.$id || item.id) !== (cachedProduct.$id || cachedProduct.id)
-            );
-            setSuggestProduct(filteredSuggestions);
-            setLoading(false);
+             setSelectedColor(cachedProduct.color_name || '');
+             setActiveVariant(null);
+           }
+
+           const cachedCategory = cachedProduct.category || "";
+           const filteredSuggestions = products.filter(
+             item => cachedCategory && item.category === cachedCategory && (item.$id || item.id) !== (cachedProduct.$id || cachedProduct.id)
+           );
+           setSuggestProduct(filteredSuggestions);
+           setLoading(false);
          }
          return;
        }
@@ -687,8 +690,10 @@ function ProductDetail() {
            return;
          }
          setProduct(mainProductData);
-         setActiveImageIdx(0);
-         
+         const isSameProduct = product && (product.$id === mainProductData.$id || product.id === mainProductData.id);
+         if (!isSameProduct) {
+           setActiveImageIdx(0);
+           
            let stockMap = {};
            try {
              stockMap = JSON.parse(mainProductData.sizes_stock || '{}');
@@ -705,6 +710,7 @@ function ProductDetail() {
 
           setSelectedColor(mainProductData.color_name || '');
           setActiveVariant(null);
+         }
 
           const mainCategory = mainProductData.category || "";
           const filteredSuggestions = products.filter(
@@ -1059,18 +1065,24 @@ function ProductDetail() {
     }
   };
 
+  const backImagesList = Array.isArray(product?.back_image_links)
+    ? product.back_image_links
+    : product?.back_image_link
+    ? [product.back_image_link]
+    : [];
+
   const rawGalleryImages = activeVariant
     ? [activeVariant.front, activeVariant.back].filter(Boolean)
     : [
         product?.front_image_link || product?.image_url || product?.image,
-        ...(Array.isArray(product?.back_image_links) ? product?.back_image_links : product?.back_image_link ? [product?.back_image_link] : [])
+        ...backImagesList
       ].filter(Boolean);
 
   const galleryImages = Array.from(new Set(rawGalleryImages));
-  galleryImagesRef.current = galleryImages;
 
   // Background preload all product gallery images into browser RAM cache for 0ms instant lightbox switching
   useEffect(() => {
+    galleryImagesRef.current = galleryImages;
     if (galleryImages && galleryImages.length > 0) {
       galleryImages.forEach(imgUrl => {
         if (imgUrl) {
@@ -2086,6 +2098,7 @@ function ProductDetail() {
             })()}
 
             {displaySizes && displaySizes.length > 0 && (() => {
+
               let stockMap = {};
               try {
                 stockMap = JSON.parse(product.sizes_stock || '{}');
@@ -2135,7 +2148,7 @@ function ProductDetail() {
                     if (stockVal === 0) {
                       return null; // Rendered below Add to Cart instead
                     }
-                    if (stockVal < 5) {
+                    if (stockVal <= 5) {
                       const fillPercent = (stockVal / 5) * 100;
                       return (
                         <div className="space-y-1.5 mt-1.5 animate-fade-in">
@@ -2177,9 +2190,10 @@ function ProductDetail() {
                  {selectedSize && (() => {
                    const baseSizeVal = selectedSize || 'M';
                    const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                   if (availableStock > 5) return null;
                    return (
-                     <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wider">
-                       {availableStock} items left in size {baseSizeVal}
+                     <span className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider animate-pulse">
+                       Only {availableStock} left in size {baseSizeVal}
                      </span>
                    );
                  })()}

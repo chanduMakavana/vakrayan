@@ -15,13 +15,13 @@ export class AddressService {
     // Addresses are always fetched from Firebase DB on demand.
 
     /** @deprecated — localStorage address caching removed for security */
-    getLocalAddress(_userId) { return null; }
+    getLocalAddress() { return null; }
 
     /** @deprecated — localStorage address caching removed for security */
     saveLocalAddress(_userId, data) { return data; }
 
     /** @deprecated — localStorage address caching removed for security */
-    getLocalAddresses(_userId) { return []; }
+    getLocalAddresses() { return []; }
 
     /** @deprecated — localStorage address caching removed for security */
     saveLocalAddresses(_userId, list) { return list; }

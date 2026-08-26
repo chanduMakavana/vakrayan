@@ -98,7 +98,7 @@ export const sendWebhookNotification = async (event, payload) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyPayload)
       }).catch(() => {});
-    } catch (err) {
+    } catch {
       // Silently catch dispatcher errors
     }
   }
@@ -205,7 +205,7 @@ export const sendWebhookNotification = async (event, payload) => {
     } catch {
       // Silently catch — notification delivery failure is non-critical
     }
-  } catch (err) {
+  } catch {
     // Silently catch dispatcher errors
   }
 
@@ -234,9 +234,10 @@ export const sendWebhookNotification = async (event, payload) => {
       }).catch((emailErr) => {
         console.warn('⚠️ Order confirmation email dispatch failed:', emailErr.message);
       });
-    } catch (err) {
+    } catch {
       // Non-blocking
     }
   }
 };
+
 

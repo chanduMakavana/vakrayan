@@ -5,7 +5,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginAction } from '../../features/login'
 import authService from '../../services/auth'
 import { setCartItems } from '../../features/addToCart'
-import cartService from '../../services/cart'
 import { sendWebhookNotification } from '../../utils/webhookHelper'
 import { hydrateCartFromDb } from '../../utils/cartMergeHelper'
 import Loader from '../pageComponets/Loader'
@@ -77,9 +76,7 @@ function SignUp() {
         if (userData) {
           dispatch(loginAction({ user: userData }))
           try {
-            await hydrateCartFromDb(userData.$id)
-            const cartItems = await cartService.getCartItems(userData.$id)
-            dispatch(setCartItems(cartItems))
+            await hydrateCartFromDb(userData.$id, dispatch)
           } catch (err) { console.error('Cart merge on signup failed:', err); dispatch(setCartItems([])) }
           const hasSentKey = `sent_signup_${userData.$id || userData.id}`
           localStorage.setItem(hasSentKey, 'true')
@@ -110,11 +107,43 @@ function SignUp() {
     try {
       localStorage.setItem('remember_me', 'true')
       sessionStorage.setItem('session_active', 'true')
-      await authService.loginWithGoogle()
+      sessionStorage.removeItem('dismissed_phone_prompt')
+      const result = await authService.loginWithGoogle()
+      if (result) {
+        const currentUser = (await authService.getCurrentUser()) || (result.user ? {
+          $id: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName || 'User',
+          prefs: {},
+          labels: [],
+          phone: result.user.phoneNumber || ''
+        } : null)
+        if (currentUser) {
+          dispatch(loginAction({ user: currentUser }))
+          try {
+            await hydrateCartFromDb(currentUser.$id, dispatch)
+          } catch (err) {
+            console.error('Cart merge on signup failed:', err)
+          }
+          const from = location.state?.from?.pathname || '/'
+          sessionStorage.setItem('just_logged_in', 'true')
+          navigate(from, { replace: true })
+        }
+      }
     } catch (error) {
       let msg = error?.message || 'Google authentication failed. Please try again.'
-      if (msg.includes('Firebase: Error')) msg = 'Google authentication failed. Please try again.'
-      setServerError(msg); setLoading(false)
+      if (msg.includes('auth/unauthorized-domain')) {
+        msg = 'Domain not authorized in Firebase Console (Authentication > Settings > Authorized domains).'
+      } else if (msg.includes('auth/operation-not-allowed')) {
+        msg = 'Google Sign-In is not enabled in Firebase Console (Authentication > Sign-in method).'
+      } else if (msg.includes('auth/popup-closed-by-user')) {
+        msg = 'Sign-in was cancelled.'
+      } else if (msg.includes('Firebase: Error')) {
+        msg = 'Google authentication failed. Please try again.'
+      }
+      setServerError(msg)
+    } finally {
+      setLoading(false)
     }
   }
 
