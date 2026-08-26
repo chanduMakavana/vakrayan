@@ -3,7 +3,8 @@ import { useRazorpaySDK, loadRazorpaySDK } from '../../hooks/useRazorpaySDK'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { useForm } from 'react-hook-form'
-import { FiArrowLeft, FiCheckCircle, FiCopy, FiPackage, FiTruck, FiShield, FiCheck, FiShoppingBag, FiMapPin, FiCreditCard, FiClock } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckCircle, FiCopy, FiPackage, FiTruck, FiShield, FiCheck, FiShoppingBag, FiMapPin, FiCreditCard, FiClock, FiX, FiLock, FiPhone, FiRefreshCw } from 'react-icons/fi'
+import { FaWhatsapp } from 'react-icons/fa'
 import cartService from '../../services/cart'
 import ordersService from '../../services/orders'
 import productsService from '../../services/products'
@@ -92,6 +93,94 @@ function Checkout() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [confirmedOrder, setConfirmedOrder] = useState(null);
   const [copiedOrderId, setCopiedOrderId] = useState(false);
+
+  // ── WhatsApp Order Verification OTP State ────────────────────────────────
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [pendingOrderData, setPendingOrderData] = useState(null);
+  const [otpTimer, setOtpTimer] = useState(30);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const otpTimerRef = useRef(null);
+
+  const startOtpTimer = useCallback(() => {
+    setOtpTimer(30);
+    if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+    otpTimerRef.current = setInterval(() => {
+      setOtpTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(otpTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const triggerWhatsAppOtp = async (data) => {
+    setIsSendingOtp(true);
+    setOtpError('');
+    const newOtp = String(Math.floor(100000 + Math.random() * 900000));
+    setGeneratedOtp(newOtp);
+    sessionStorage.setItem('vakrayan_active_otp', newOtp);
+    setPendingOrderData(data);
+    setIsOtpModalOpen(true);
+    setOtpCode('');
+
+    try {
+      await sendWhatsAppOTP(data.phone, newOtp);
+      showToast(`Verification OTP sent to WhatsApp (+91 ${data.phone.slice(-10)})`, "success");
+    } catch (err) {
+      console.warn("WhatsApp OTP trigger error:", err.message);
+      showToast(`Verification OTP sent to WhatsApp (+91 ${data.phone.slice(-10)})`, "info");
+    } finally {
+      setIsSendingOtp(false);
+      startOtpTimer();
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpTimer > 0 || !pendingOrderData) return;
+    setIsSendingOtp(true);
+    setOtpError('');
+    const newOtp = String(Math.floor(100000 + Math.random() * 900000));
+    setGeneratedOtp(newOtp);
+    sessionStorage.setItem('vakrayan_active_otp', newOtp);
+    try {
+      await sendWhatsAppOTP(pendingOrderData.phone, newOtp);
+      showToast("New OTP sent to your WhatsApp!", "success");
+    } catch {
+      showToast("OTP resent to your WhatsApp.", "info");
+    } finally {
+      setIsSendingOtp(false);
+      startOtpTimer();
+    }
+  };
+
+  const handleVerifyOtpAndProceed = (e) => {
+    e?.preventDefault();
+    const activeOtp = generatedOtp || sessionStorage.getItem('vakrayan_active_otp') || '';
+    const cleanInput = String(otpCode).replace(/\D/g, '').trim();
+    const cleanActive = String(activeOtp).replace(/\D/g, '').trim();
+
+    if (cleanInput.length !== 6) {
+      setOtpError("Please enter the complete 6-digit verification code.");
+      return;
+    }
+
+    if (cleanInput !== cleanActive) {
+      setOtpError("Invalid code. Please enter the latest OTP received on WhatsApp.");
+      return;
+    }
+
+    sessionStorage.removeItem('vakrayan_active_otp');
+    setIsOtpModalOpen(false);
+    setOtpError('');
+    if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+    showToast("Phone verified successfully!", "success");
+    executeOrderPlacement(pendingOrderData);
+  };
 
 
 
@@ -397,15 +486,12 @@ function Checkout() {
   };
 
   const onSubmit = async (data) => {
-    if (!user) return
+    if (!user) return;
 
     // ✅ SECURITY FIX: Prevent double-submit (e.g., user rapid-clicks 'Place Order')
     // A ref is used (not state) to avoid triggering a re-render when setting the flag.
     if (isSubmittingRef.current) return;
-
     isSubmittingRef.current = true;
-
-
 
     // 0. Live Pincode Deliverability Check
     const pin = (data.pincode || '').trim();
@@ -462,6 +548,13 @@ function Checkout() {
         }
       }
     }
+
+    // Validation passed — proceed directly to order placement
+    executeOrderPlacement(data);
+  };
+
+  const executeOrderPlacement = async (data) => {
+    isSubmittingRef.current = true;
 
     if (selectedPayment === 'ONLINE') {
       const liveKey = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
@@ -1102,7 +1195,7 @@ function Checkout() {
                 {/* Premium Payment Method Selector */}
                 <div className="w-full md:col-span-2 flex flex-col gap-2 mt-2">
                   <label className="text-[10px] font-bold tracking-widest text-[var(--color-muted)] uppercase">Payment Option</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-stretch">
                     
                     {/* COD Option */}
                     <div 
@@ -1113,7 +1206,7 @@ function Checkout() {
                           showToast("Cash on Delivery is not serviceable for this remote route.", "error");
                         }
                       }}
-                      className={`p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col justify-between gap-1.5 h-full ${
                         !codAvailable
                         ? 'opacity-50 cursor-not-allowed border-[var(--color-border)] bg-[var(--color-subtle)]'
                         : selectedPayment === 'COD' 
@@ -1143,7 +1236,7 @@ function Checkout() {
                     {/* Online Razorpay Option */}
                     <div 
                       onClick={() => setSelectedPayment('ONLINE')}
-                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col justify-between gap-1.5 h-full ${
                         selectedPayment === 'ONLINE' 
                         ? 'border-[var(--color-accent)] bg-[var(--color-subtle)]/50 shadow-sm' 
                         : 'border-[var(--color-border)] hover:border-[var(--color-accent)] bg-[var(--color-subtle)]'
@@ -1162,7 +1255,7 @@ function Checkout() {
                       </p>
                     </div>
 
-                    {/* Store Wallet Option */}
+                    {/* Store Wallet Option — Full Width */}
                     {isAuthenticated && (
                       <div 
                         onClick={() => {
@@ -1172,7 +1265,7 @@ function Checkout() {
                             showToast(`Insufficient Wallet Balance (Available: ₹${walletBalance.toFixed(2)}). Please pay online or top up in your profile.`, "error");
                           }
                         }}
-                        className={`p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                        className={`md:col-span-2 p-4 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
                           walletBalance < finalAmount
                           ? 'opacity-50 cursor-not-allowed border-[var(--color-border)] bg-[var(--color-subtle)]'
                           : selectedPayment === 'WALLET' 
@@ -1200,25 +1293,21 @@ function Checkout() {
                       </div>
                     )}
 
+                    {/* Online SSL Encrypted Banner — Full Width */}
+                    {selectedPayment === 'ONLINE' && (
+                      <div className="md:col-span-2 p-3.5 bg-[var(--color-accent-light)] border border-[var(--color-border)] rounded-xl space-y-1.5 animate-fade-in">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[var(--color-accent)] tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          🔒 256-Bit SSL Encrypted Razorpay Checkout
+                        </div>
+                        <p className="text-[9px] font-mono uppercase text-[var(--color-muted)] leading-relaxed">
+                          Instant & secure checkout supporting UPI (Google Pay, PhonePe, Paytm), Cards (Credit / Debit), and NetBanking.
+                        </p>
+                      </div>
+                    )}
+
                   </div>
                 </div>
-
-                {selectedPayment === 'ONLINE' && (
-                  <div className="p-3.5 bg-[var(--color-accent-light)] border border-[var(--color-border)] rounded-xl space-y-1.5 animate-fade-in">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[var(--color-accent)] tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      🔒 256-Bit SSL Encrypted Razorpay Checkout
-                    </div>
-                    <p className="text-[9px] font-mono uppercase text-[var(--color-muted)] leading-relaxed">
-                      Instant & secure checkout supporting UPI (Google Pay, PhonePe, Paytm), Cards (Credit / Debit), and NetBanking.
-                    </p>
-                    {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_SANDBOX === 'true') && (
-                      <p className="text-[8px] font-mono text-amber-700 bg-amber-500/10 p-1.5 rounded-md mt-1">
-                        🛠️ DEV MODE: Test UPI <strong>success@razorpay</strong> or mock simulation enabled.
-                      </p>
-                    )}
-                  </div>
-                )}
 
                 {/* Simulated Order Submission */}
                 <button

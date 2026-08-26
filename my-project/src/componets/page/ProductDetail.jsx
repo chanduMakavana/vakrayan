@@ -2148,7 +2148,7 @@ function ProductDetail() {
                     if (stockVal === 0) {
                       return null; // Rendered below Add to Cart instead
                     }
-                    if (stockVal < 5) {
+                    if (stockVal <= 5) {
                       const fillPercent = (stockVal / 5) * 100;
                       return (
                         <div className="space-y-1.5 mt-1.5 animate-fade-in">
@@ -2190,9 +2190,10 @@ function ProductDetail() {
                  {selectedSize && (() => {
                    const baseSizeVal = selectedSize || 'M';
                    const availableStock = stocks[baseSizeVal] !== undefined ? Number(stocks[baseSizeVal]) : 10;
+                   if (availableStock > 5) return null;
                    return (
-                     <span className="text-[10px] font-mono font-bold text-[var(--color-muted)] uppercase tracking-wider">
-                       {availableStock} items left in size {baseSizeVal}
+                     <span className="text-[10px] font-mono font-bold text-rose-600 uppercase tracking-wider animate-pulse">
+                       Only {availableStock} left in size {baseSizeVal}
                      </span>
                    );
                  })()}

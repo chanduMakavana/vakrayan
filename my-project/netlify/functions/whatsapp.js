@@ -47,12 +47,12 @@ export async function handler(event) {
     const phoneNumberId =
       process.env.WHATSAPP_PHONE_NUMBER_ID ||
       process.env.VITE_WHATSAPP_PHONE_NUMBER_ID ||
-      '1296679850195220';
+      '1403690629486187';
 
     const accessToken =
       process.env.WHATSAPP_ACCESS_TOKEN ||
       process.env.VITE_WHATSAPP_ACCESS_TOKEN ||
-      '';
+      'EAASitTFCMWMBSVqJlUBDskd2E6YQJsXxEDH8QFT8bBjgDJBUAaWRZBiZAZA4QdqFgZCRgttImXMZBBRKA8xZBTdn0TDh5NSibmupfa8Drsn6NMtYC6oEyYzQziMGUEFV9u1YxkabyO2EgaDE1PY398f5Q5TUhXXsiPztRkE9jYjavVOJGOocSbZC9232ehkO1yWwQZDZD';
 
     if (!accessToken) {
       return {
@@ -70,17 +70,18 @@ export async function handler(event) {
       };
     }
 
-    const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+    const url = `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`;
     let requestPayload;
 
-    if (action === 'otp' || action === 'template') {
+    if (action === 'template' && templateName) {
       requestPayload = {
         messaging_product: 'whatsapp',
         to: phone,
         type: 'template',
         template: {
-          name: templateName || 'hello_world',
-          language: { code: languageCode || 'en_US' }
+          name: templateName,
+          language: { code: languageCode || 'en_US' },
+          ...(payload.components ? { components: payload.components } : {})
         }
       };
     } else {
@@ -88,7 +89,7 @@ export async function handler(event) {
         messaging_product: 'whatsapp',
         to: phone,
         type: 'text',
-        text: { body: messageText || '' }
+        text: { body: messageText || (payload.otpCode ? `🔐 *Vakrayan OTP Code:* ${payload.otpCode}` : '') }
       };
     }
 

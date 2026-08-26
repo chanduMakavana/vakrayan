@@ -156,9 +156,8 @@ function AppRoutes() {
   const location = useLocation()
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {/* ✅ Suspense wraps all lazy routes — handles chunk download fallback */}
-      <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<PageLoader />}>
+      <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
           {/* Public routes */}
           <Route path='/signup'              element={<PageWrapper><SignUp /></PageWrapper>} />
@@ -172,6 +171,7 @@ function AppRoutes() {
           <Route path='/cart'                element={<PageWrapper><AddToCartPage /></PageWrapper>} />
           <Route path='/terms'               element={<PageWrapper><LegalPage /></PageWrapper>} />
           <Route path='/privacy'             element={<PageWrapper><LegalPage /></PageWrapper>} />
+          <Route path='/privacy-policy'      element={<PageWrapper><LegalPage /></PageWrapper>} />
           <Route path='/*'                   element={<PageWrapper><NotFound /></PageWrapper>} />
 
           {/* Protected routes */}
@@ -190,8 +190,8 @@ function AppRoutes() {
             <AdminRoute><PageWrapper><AdminPanel /></PageWrapper></AdminRoute>
           } />
         </Routes>
-      </Suspense>
-    </AnimatePresence>
+      </AnimatePresence>
+    </Suspense>
   )
 }
 
