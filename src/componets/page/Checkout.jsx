@@ -11,7 +11,7 @@ import productsService from '../../services/products'
 import campaignService from '../../services/campaign'
 import addressService from '../../services/address'
 import walletService from '../../services/wallet'
-import { clearCartState, setCartItems as setCartItemsAction } from '../../features/addToCart'
+import { clearCartState, setCartItems as setCartItemsAction, removeCartItemState } from '../../features/addToCart'
 import { setProducts } from '../../features/productsSlice'
 import Footer from '../pageComponets/Footer'
 import { playSuccessChime, triggerConfetti } from '../../utils/sensoryHelper'
@@ -527,7 +527,7 @@ function Checkout() {
       }
     }
 
-    // 0. Live Stock Validation — fetch all products in parallel to eliminate sequential N+1 waterfall
+    // 0. Live Stock & Product Existence Validation — fetch all products in parallel
     const stockResults = await Promise.allSettled(
       cartItems.map(cartItem => productsService.getProductById(cartItem.product_id))
     );
@@ -536,16 +536,37 @@ function Checkout() {
       const result = stockResults[idx];
       const liveProduct = result.status === 'fulfilled' ? result.value : null;
       const productToCheck = liveProduct || products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
-      if (productToCheck) {
-        let stocks;
-        try { stocks = JSON.parse(productToCheck.sizes_stock || '{}'); } catch { stocks = {}; }
-        const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
-        const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 10;
-        if (Number(cartItem.quantity) > availableStock) {
-          showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
-          isSubmittingRef.current = false;
-          return;
+
+      // Block checkout if product was deleted from admin database or marked inactive
+      if (!productToCheck || productToCheck.is_active === false || productToCheck.is_deleted === true) {
+        showToast(`"${cartItem.name || 'Selected product'}" is no longer available in our store and has been removed from your cart.`, "error");
+        if (cartItem.$id) {
+          cartService.removeFromCart(cartItem.$id, user?.$id).catch(() => {});
+          dispatch(removeCartItemState(cartItem.$id));
         }
+        isSubmittingRef.current = false;
+        return;
+      }
+
+      let stocks;
+      try { stocks = JSON.parse(productToCheck.sizes_stock || '{}'); } catch { stocks = {}; }
+      const baseSize = cartItem.size ? String(cartItem.size).split('/')[0].trim() : 'M';
+      const availableStock = stocks[baseSize] !== undefined ? Number(stocks[baseSize]) : 0;
+
+      if (availableStock <= 0) {
+        showToast(`"${cartItem.name}" (Size: ${cartItem.size}) is completely Out of Stock and has been removed from your cart.`, "error");
+        if (cartItem.$id) {
+          cartService.removeFromCart(cartItem.$id, user?.$id).catch(() => {});
+          dispatch(removeCartItemState(cartItem.$id));
+        }
+        isSubmittingRef.current = false;
+        return;
+      }
+
+      if (Number(cartItem.quantity) > availableStock) {
+        showToast(`Insufficient stock for "${cartItem.name}" (Size: ${cartItem.size}). Only ${availableStock} unit(s) left. Please adjust your cart.`, "error");
+        isSubmittingRef.current = false;
+        return;
       }
     }
 

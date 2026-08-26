@@ -1421,6 +1421,19 @@ function Navbar() {
                     showToast("Please select at least one item to checkout.", "error");
                     return;
                   }
+                  if (products && products.length > 0) {
+                    const invalidItems = cartItems.filter(item => !products.some(p => (p.$id === item.product_id || p.id === item.product_id) && p.is_active !== false && !p.is_deleted));
+                    if (invalidItems.length > 0) {
+                      invalidItems.forEach(item => {
+                        dispatch(removeCartItemState(item.$id));
+                        if (isAuthenticated && user) {
+                          cartService.removeFromCart(item.$id).catch(() => {});
+                        }
+                      });
+                      showToast("Some items in your cart are no longer available in the store and have been removed.", "error");
+                      return;
+                    }
+                  }
                   setCartDrawerOpen(false);
                   sessionStorage.setItem('selected_cart_item_ids', JSON.stringify(selectedItemIds));
                   navigate('/checkout');
