@@ -1431,7 +1431,7 @@ function Navbar() {
                           cartService.removeFromCart(item.$id).catch(() => {});
                         }
                       });
-                      showToast("Some items in your cart are in Draft mode or unavailable and have been removed.", "error");
+                      showToast("Some items in your bag are currently out of stock or unavailable and have been removed.", "error");
                       return;
                     }
                   }

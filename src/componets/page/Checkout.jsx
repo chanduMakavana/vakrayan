@@ -543,7 +543,7 @@ function Checkout() {
 
       // Block checkout if product was deleted, saved to Draft (is_live: false), or marked inactive
       if (!productToCheck || !isLive || !isActive || !notDeleted) {
-        showToast(`"${cartItem.name || 'Selected product'}" is currently in Draft mode or unavailable and has been removed from your cart.`, "error");
+        showToast(`"${cartItem.name || 'Selected item'}" is currently out of stock or no longer available and has been removed from your cart.`, "error");
         if (cartItem.$id) {
           cartService.removeFromCart(cartItem.$id, user?.$id).catch(() => {});
           dispatch(removeCartItemState(cartItem.$id));
