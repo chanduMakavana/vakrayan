@@ -537,9 +537,13 @@ function Checkout() {
       const liveProduct = result.status === 'fulfilled' ? result.value : null;
       const productToCheck = liveProduct || products.find(p => p.$id === cartItem.product_id || p.id === cartItem.product_id);
 
-      // Block checkout if product was deleted from admin database or marked inactive
-      if (!productToCheck || productToCheck.is_active === false || productToCheck.is_deleted === true) {
-        showToast(`"${cartItem.name || 'Selected product'}" is no longer available in our store and has been removed from your cart.`, "error");
+      const isLive = productToCheck && (productToCheck.is_live === true || productToCheck.is_live === 'true' || productToCheck.is_live === 1 || productToCheck.is_live === '1');
+      const isActive = productToCheck && productToCheck.is_active !== false && productToCheck.is_active !== 'false';
+      const notDeleted = productToCheck && !productToCheck.is_deleted;
+
+      // Block checkout if product was deleted, saved to Draft (is_live: false), or marked inactive
+      if (!productToCheck || !isLive || !isActive || !notDeleted) {
+        showToast(`"${cartItem.name || 'Selected product'}" is currently in Draft mode or unavailable and has been removed from your cart.`, "error");
         if (cartItem.$id) {
           cartService.removeFromCart(cartItem.$id, user?.$id).catch(() => {});
           dispatch(removeCartItemState(cartItem.$id));

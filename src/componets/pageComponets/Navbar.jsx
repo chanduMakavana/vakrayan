@@ -1422,7 +1422,8 @@ function Navbar() {
                     return;
                   }
                   if (products && products.length > 0) {
-                    const invalidItems = cartItems.filter(item => !products.some(p => (p.$id === item.product_id || p.id === item.product_id) && p.is_active !== false && !p.is_deleted));
+                    const isLiveProduct = (p) => p && (p.is_live === true || p.is_live === 'true' || p.is_live === 1 || p.is_live === '1') && p.is_active !== false && !p.is_deleted;
+                    const invalidItems = cartItems.filter(item => !products.some(p => (p.$id === item.product_id || p.id === item.product_id) && isLiveProduct(p)));
                     if (invalidItems.length > 0) {
                       invalidItems.forEach(item => {
                         dispatch(removeCartItemState(item.$id));
@@ -1430,7 +1431,7 @@ function Navbar() {
                           cartService.removeFromCart(item.$id).catch(() => {});
                         }
                       });
-                      showToast("Some items in your cart are no longer available in the store and have been removed.", "error");
+                      showToast("Some items in your cart are in Draft mode or unavailable and have been removed.", "error");
                       return;
                     }
                   }
