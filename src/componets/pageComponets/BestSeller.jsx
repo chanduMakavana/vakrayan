@@ -37,8 +37,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
       tabIndex={0}
       aria-label={`View ${product.name}`}
     >
-    <motion.div
-      variants={cardVariants}
+    <div
       className="flex flex-col w-full h-full"
       onMouseEnter={() => {
         setIsHovered(true);
@@ -160,7 +159,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
           })()}
         </div>
       </div>
-    </motion.div>
+    </div>
     </Link>
   );
 }
@@ -253,13 +252,7 @@ function BestSellers() {
         )}
 
         {/* Products Grid */}
-        <motion.div
-          ref={sectionRef}
-          variants={containerVariants}
-          initial="hidden"
-          animate={shouldShow ? "show" : "hidden"}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6"
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {!loading && displayedProducts.map((product) => (
             <BestSellerCard
               key={product.$id || product.id}
@@ -273,7 +266,7 @@ function BestSellers() {
               user={user}
             />
           ))}
-        </motion.div>
+        </div>
 
         {/* Centered CTA button at the bottom of the grid */}
         <div className="mt-6 flex justify-center">

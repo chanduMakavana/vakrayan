@@ -83,13 +83,7 @@ function RecentlyViewedHome() {
         </div>
 
         {/* Products grid */}
-        <motion.div
-          ref={sectionRef}
-          variants={containerVariants}
-          initial="hidden"
-          animate={shouldShow ? "show" : "hidden"}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6"
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {viewedProducts.map((product) => {
             const parentId = product.$id || product.id;
             const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Image';
@@ -104,9 +98,8 @@ function RecentlyViewedHome() {
             const isWishlisted = wishlist.some(item => item.$id === parentId || item.id === parentId);
 
             return (
-              <motion.div
+              <div
                 key={parentId}
-                variants={cardVariants}
                 onClick={() => { navigate(`/product/${product.slug || parentId}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="group relative flex flex-col bg-white border border-emerald-900/15 hover:border-emerald-600 transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer rounded-none overflow-hidden"
               >
@@ -194,10 +187,10 @@ function RecentlyViewedHome() {
                     </span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

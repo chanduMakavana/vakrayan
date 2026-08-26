@@ -118,19 +118,12 @@ function CategoryGrid() {
         </div>
 
         {/* Equal-size category flex/grid wrapper - centered for odd counts */}
-        <motion.div
-          ref={sectionRef}
-          variants={containerVariants}
-          initial="hidden"
-          animate={shouldShow ? "show" : "hidden"}
-          className="flex flex-wrap justify-center gap-3 md:gap-4"
-        >
+        <div className="flex flex-wrap justify-center gap-3 md:gap-4">
           {visibleCategories.map((c, idx) => {
             const img = getCategoryImage(c.value)
             return (
-              <motion.div 
+              <div 
                 key={c.value} 
-                variants={cardVariants}
                 className="w-[calc(50%-6px)] md:w-[calc(25%-12px)] min-w-[140px] max-w-[280px]"
               >
                 <Link
@@ -187,10 +180,10 @@ function CategoryGrid() {
                     <div className="category-underline mt-2.5" />
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             )
           })}
-        </motion.div>
+        </div>
       </div>
     </section>
   )
