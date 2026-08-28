@@ -635,8 +635,12 @@ function ProductDetail() {
    async function loadCompleteProductStage() {
      try {
        if (isMounted) setLoading(true);
-
-       const cachedProduct = products.find(p => p.slug === idOrSlug || p.$id === idOrSlug || p.id === idOrSlug);
+        const targetIdOrSlug = String(idOrSlug || '').trim().toLowerCase();
+        const cachedProduct = products.find(p => 
+          (p.slug && String(p.slug).trim().toLowerCase() === targetIdOrSlug) || 
+          (p.$id && String(p.$id).trim().toLowerCase() === targetIdOrSlug) || 
+          (p.id && String(p.id).trim().toLowerCase() === targetIdOrSlug)
+        );
        if (cachedProduct) {
          const isProductLive = cachedProduct.is_live === true || cachedProduct.is_live === 'true' || cachedProduct.is_live === 1 || cachedProduct.is_live === '1';
          if (!adminMode && !isProductLive) {
@@ -648,7 +652,7 @@ function ProductDetail() {
          }
          if (isMounted) {
            setProduct(cachedProduct);
-           const isSameProduct = product && (product.$id === cachedProduct.$id || product.id === cachedProduct.id);
+           const isSameProduct = product && ((product.$id && cachedProduct.$id && product.$id === cachedProduct.$id) || (product.id && cachedProduct.id && product.id === cachedProduct.id));
            if (!isSameProduct) {
              setActiveImageIdx(0);
              
@@ -690,7 +694,7 @@ function ProductDetail() {
            return;
          }
          setProduct(mainProductData);
-         const isSameProduct = product && (product.$id === mainProductData.$id || product.id === mainProductData.id);
+         const isSameProduct = product && ((product.$id && mainProductData.$id && product.$id === mainProductData.$id) || (product.id && mainProductData.id && product.id === mainProductData.id));
          if (!isSameProduct) {
            setActiveImageIdx(0);
            
@@ -740,8 +744,9 @@ function ProductDetail() {
 
   useEffect(() => {
     if (product && product.color_group_id && products.length > 0) {
+      const targetGroup = String(product.color_group_id).trim().toLowerCase();
       const siblings = products.filter(
-        p => p.color_group_id === product.color_group_id
+        p => p.color_group_id && String(p.color_group_id).trim().toLowerCase() === targetGroup
       );
       const timer = setTimeout(() => {
         setGroupProducts(siblings);
@@ -2046,13 +2051,34 @@ function ProductDetail() {
                             type="button"
                             onClick={() => {
                               if (!isCurrent) {
+                                setProduct(sibling);
+                                setActiveImageIdx(0);
+                                setImageLoaded(false);
+                                
+                                let stockMap = {};
+                                try {
+                                  stockMap = JSON.parse(sibling.sizes_stock || '{}');
+                                } catch {
+                                  stockMap = {};
+                                }
+                                const unionSizes = Array.from(new Set([
+                                  ...(sibling.sizes || []),
+                                  ...Object.keys(stockMap)
+                                ])).filter(sz => ['XS', 'S', 'M', 'L', 'XL', 'XXL'].includes(sz));
+
+                                const firstInStockSize = unionSizes.find(sz => stockMap[sz] > 0);
+                                setSelectedSize(firstInStockSize || unionSizes[0] || '');
+                                setSelectedColor(sibling.color_name || '');
+                                setActiveVariant(null);
+                                
                                 navigate(`/product/${sibling.slug || siblingId}`, { replace: true });
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
                               }
                             }}
                             className={`w-14 h-18 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
                               isCurrent
-                                ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/20 scale-105 shadow-md'
-                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102'
+                                ? 'border-[#059669] ring-2 ring-[#059669]/20 scale-105 shadow-md'
+                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102 opacity-85 hover:opacity-100'
                             }`}
                             title={sibling.color_name}
                           >
