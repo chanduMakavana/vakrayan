@@ -2600,8 +2600,9 @@ function ProductDetail() {
                     <div className="w-full aspect-3/4 rounded-none overflow-hidden bg-neutral-100 relative border border-[var(--color-border)]/50">
                       
                       {activeTag && (
-                        <div className="absolute top-2 left-2 z-20 flex items-center bg-white/95 backdrop-blur-md px-2 py-1 rounded-sm shadow-sm select-none">
-                          <span className="text-neutral-900 font-sans text-[8px] md:text-[9px] tracking-widest uppercase font-bold">
+                        <div className="absolute top-2 left-2 z-20 px-2 py-[2px] bg-[#059669] text-white rounded-full shadow-xs flex items-center gap-1 max-w-[65%] select-none">
+                          <span className="w-1 h-1 rounded-full bg-white shrink-0"></span>
+                          <span className="text-[7.5px] sm:text-[8.5px] font-mono font-bold tracking-wider uppercase truncate">
                             {activeTag}
                           </span>
                         </div>
