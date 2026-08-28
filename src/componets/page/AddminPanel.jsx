@@ -19,6 +19,7 @@ import AdminAnalytics from '../pageComponets/AdminAnalytics';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
 import { getStoredShiprocketConfig, saveShiprocketConfig, authenticateShiprocket, createShiprocketShipment, fetchShiprocketOfficialLabel } from '../../services/shiprocket';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
+import { getEffectiveViews } from '../../utils/productViews';
 
 
 const TAG_OPTIONS = ['NEW DROP', 'BEST SELLER', 'FEW LEFT', 'LIMITED ITEM'];
@@ -3164,6 +3165,10 @@ function AdminPanel() {
                                     </div>
                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-[10px] text-[var(--color-muted)] uppercase tracking-tight font-medium">
                                       <span className="font-bold text-[var(--color-text)] text-xs">₹{p.price}</span>
+                                      <span>·</span>
+                                      <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[8.5px] font-mono font-black rounded-full tracking-wider inline-flex items-center gap-1">
+                                        👁️ {getEffectiveViews(p)} views
+                                      </span>
                                       {p.tag && (
                                         <>
                                           <span>·</span>

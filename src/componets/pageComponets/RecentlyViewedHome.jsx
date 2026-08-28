@@ -5,6 +5,7 @@ import { motion, useInView } from 'framer-motion';
 import wishlistService from '../../services/wishlist';
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice';
 import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer';
+import { getEffectiveViews } from '../../utils/productViews';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,7 +34,7 @@ function RecentlyViewedHome() {
   const dispatch = useDispatch();
   const products = useSelector(state => state.products.items || []);
   const wishlist = useSelector(state => state.wishlist || []);
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const { user, isAuthenticated, adminMode } = useSelector(state => state.auth);
   const sectionRef = useRef(null);
   const isInView = useInView(sectionRef, { once: true, amount: 0.05 });
   const [fallbackShow, setFallbackShow] = useState(false);
@@ -132,6 +133,21 @@ function RecentlyViewedHome() {
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                     </svg>
                   </button>
+
+                  {/* Admin edit button & watch counter */}
+                  {adminMode && (
+                    <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 flex-wrap">
+                      <button
+                        onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } }); }}
+                        className="px-2 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
+                      >
+                        Edit
+                      </button>
+                      <span className="px-2 py-[2px] text-amber-300 font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-zinc-950/90 rounded-full border border-amber-500/30 backdrop-blur-md shadow-xs flex items-center gap-1 select-none" title="Product Watch / Views Counter">
+                        👁️ {getEffectiveViews(product)}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Tag */}
                   {activeTag && (

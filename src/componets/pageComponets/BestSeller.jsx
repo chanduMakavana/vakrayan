@@ -8,6 +8,7 @@ import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import { scatterProducts } from '../../utils/colorHelper'
 import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer'
+import { getEffectiveViews } from '../../utils/productViews'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -79,14 +80,19 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
           </svg>
         </button>
 
-        {/* Admin edit button */}
+        {/* Admin edit button & watch counter */}
         {adminMode && (
-          <button
-            onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } }); }}
-            className="absolute bottom-2 left-2 z-30 px-2.5 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
-          >
-            Edit
-          </button>
+          <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 flex-wrap">
+            <button
+              onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } }); }}
+              className="px-2 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
+            >
+              Edit
+            </button>
+            <span className="px-2 py-[2px] text-amber-300 font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-zinc-950/90 rounded-full border border-amber-500/30 backdrop-blur-md shadow-xs flex items-center gap-1 select-none" title="Product Watch / Views Counter">
+              👁️ {getEffectiveViews(product)}
+            </span>
+          </div>
         )}
 
         {/* Tag badge */}

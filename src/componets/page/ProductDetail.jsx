@@ -28,6 +28,7 @@ import AddToCartButton from '../pageComponets/AddToCartButton';
 import Footer from '../pageComponets/Footer';
 import restockService from '../../services/restock';
 import { FaStar, FaWhatsapp } from 'react-icons/fa';
+import { getEffectiveViews } from '../../utils/productViews';
 import { useToast } from '../../context/ToastContext';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
@@ -770,6 +771,24 @@ function ProductDetail() {
       preloadImage(getOptimizedImageUrl(imgUrl, 1000, 80), idx === 0);
     });
   }, [product]);
+
+  // Increment view counter when product is viewed
+  useEffect(() => {
+    if (!product) return;
+    const prodId = product.$id || product.id;
+    if (!prodId) return;
+    
+    const viewedKey = `viewed_${prodId}`;
+    if (!sessionStorage.getItem(viewedKey)) {
+      sessionStorage.setItem(viewedKey, 'true');
+      const currentCount = Number(product.views_count || 0);
+      productsService.incrementProductViews(prodId, currentCount).then(newCount => {
+        if (newCount) {
+          setProduct(prev => prev ? { ...prev, views_count: newCount } : prev);
+        }
+      }).catch(() => {});
+    }
+  }, [product?.$id, product?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1922,15 +1941,21 @@ function ProductDetail() {
                   </span>
                 )}
                 {adminMode && (
-                  <button
-                    onClick={() => {
-                      const targetId = product.$id || product.id;
-                      navigate(`/admin?edit=${targetId}`, { state: { editProductId: targetId } });
-                    }}
-                    className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
-                  >
-                    Edit Drop
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        const targetId = product.$id || product.id;
+                        navigate(`/admin?edit=${targetId}`, { state: { editProductId: targetId } });
+                      }}
+                      className="flex items-center gap-1 text-[10px] text-neutral-950 font-mono font-bold uppercase tracking-wider bg-yellow-450 hover:bg-yellow-500 px-3 py-1 rounded-none border border-neutral-950 cursor-pointer shadow-xs transition-all whitespace-nowrap shrink-0"
+                    >
+                      Edit Drop
+                    </button>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-zinc-950 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold uppercase tracking-wider rounded-none shadow-xs whitespace-nowrap">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                      <span>👁️ WATCHES: {getEffectiveViews(product)} VIEWS</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
