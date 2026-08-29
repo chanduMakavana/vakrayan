@@ -1007,22 +1007,25 @@ function ProductDetail() {
     });
   }, [product]);
 
-  // Increment view counter when product is viewed
+  // Increment view counter when product or color variant changes
   useEffect(() => {
     if (!product) return;
     const prodId = product.$id || product.id;
     if (!prodId) return;
-    
-    const viewedKey = `viewed_${prodId}`;
-    if (!sessionStorage.getItem(viewedKey)) {
-      sessionStorage.setItem(viewedKey, 'true');
-      const currentCount = Number(product.views_count || 0);
-      productsService.incrementProductViews(prodId, currentCount).then(newCount => {
-        if (newCount) {
-          setProduct(prev => prev ? { ...prev, views_count: newCount } : prev);
-        }
-      }).catch(() => {});
-    }
+
+    const currentCount = Number(product.views_count || getEffectiveViews(product) || 0);
+    productsService.incrementProductViews(prodId, currentCount).then(newCount => {
+      if (newCount) {
+        setProduct(prev => {
+          if (!prev) return prev;
+          const currentId = prev.$id || prev.id;
+          if (currentId === prodId) {
+            return { ...prev, views_count: newCount };
+          }
+          return prev;
+        });
+      }
+    }).catch(() => {});
   }, [product?.$id, product?.id]);
 
   useEffect(() => {
@@ -2060,7 +2063,11 @@ function ProductDetail() {
                             type="button"
                             onClick={() => {
                               if (!isCurrent) {
-                                setProduct(sibling);
+                                const targetViews = Number(sibling.views_count || getEffectiveViews(sibling) || 0);
+                                setProduct({
+                                  ...sibling,
+                                  views_count: targetViews
+                                });
                                 setActiveImageIdx(0);
                                 setImageLoaded(false);
                                 
