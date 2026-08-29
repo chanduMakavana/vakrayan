@@ -1135,6 +1135,7 @@ function Shop() {
                           {/* Floating Heart Button */}
                           <button
                             onClick={async (e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               const exists = wishlist.some(item => item.$id === parentId || item.id === parentId);
                               let updated;
@@ -1181,6 +1182,7 @@ function Shop() {
                             <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 flex-wrap">
                               <button
                                 onClick={(e) => {
+                                  e.preventDefault();
                                   e.stopPropagation();
                                   navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } });
                                 }}

@@ -2638,6 +2638,7 @@ function ProductDetail() {
                       {/* Wishlist Heart Button */}
                       <button
                         onClick={async (e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           if (isWishlisted) {
                             dispatch(removeWishlistItemState(uniqueId));
@@ -2667,7 +2668,11 @@ function ProductDetail() {
                       {adminMode && (
                         <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 flex-wrap">
                           <button
-                            onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${uniqueId}`, { state: { editProductId: uniqueId } }); }}
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              navigate(`/admin?edit=${uniqueId}`, { state: { editProductId: uniqueId } });
+                            }}
                             className="px-2 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
                           >
                             Edit
