@@ -2688,20 +2688,20 @@ function ProductDetail() {
                         </div>
                       )}
 
-                      <div className="w-full h-full relative overflow-hidden">
+                      <div className="w-full h-full relative overflow-hidden" onMouseEnter={() => preloadImage(getOptimizedImageUrl(backView, 500, 75))}>
                         <img
                           src={getOptimizedImageUrl(frontView, 500, 75)}
                           alt={item.name}
                           loading="lazy"
                           decoding="async"
-                          className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 group-hover:opacity-0"
+                          className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
                         />
                         <img  
                           src={getOptimizedImageUrl(backView, 500, 75)}
                           alt={item.name}
                           loading="lazy"
                           decoding="async"
-                          className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-500 opacity-0 group-hover:opacity-100"
+                          className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
                         />
                       </div>
                     </div>

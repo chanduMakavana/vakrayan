@@ -114,8 +114,11 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
           </div>
         )}
 
-        {/* Dynamic single-image / on-demand back-image flip */}
-        <div className={`w-full h-full relative ${isOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
+        {/* Dynamic single-image / smooth CSS back-image flip */}
+        <div 
+          className={`w-full h-full relative overflow-hidden ${isOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}
+          onMouseEnter={() => hasBackView && preloadImage(getOptimizedImageUrl(backView, 500, 75))}
+        >
           <img 
             src={getOptimizedImageUrl(frontView, 500, 75)} 
             alt={product.name} 
@@ -123,9 +126,9 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
             decoding="async"
             width={500}
             height={667}
-            className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-300 ${isHovered && hasBackView ? 'opacity-0' : 'opacity-100'}`} 
+            className={`w-full h-full object-cover object-center absolute inset-0 transition-image-flip ${hasBackView ? 'group-hover:opacity-0' : ''}`} 
           />
-          {hasBackView && isHovered && (
+          {hasBackView && (
             <img 
               src={getOptimizedImageUrl(backView, 500, 75)} 
               alt={`${product.name} back`} 
@@ -133,7 +136,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
               decoding="async"
               width={500}
               height={667}
-              className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300 opacity-100" 
+              className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100" 
             />
           )}
         </div>
