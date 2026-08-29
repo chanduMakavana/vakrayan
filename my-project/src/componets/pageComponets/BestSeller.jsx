@@ -8,6 +8,7 @@ import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import { scatterProducts } from '../../utils/colorHelper'
 import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer'
+import { getEffectiveViews } from '../../utils/productViews'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -50,6 +51,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
         {/* Wishlist button */}
         <button
           onClick={async (e) => {
+            e.preventDefault();
             e.stopPropagation();
             if (isWishlisted) {
               dispatch(removeWishlistItemState(parentId));
@@ -79,14 +81,23 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
           </svg>
         </button>
 
-        {/* Admin edit button */}
+        {/* Admin edit button & watch counter */}
         {adminMode && (
-          <button
-            onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } }); }}
-            className="absolute bottom-2 left-2 z-30 px-2.5 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
-          >
-            Edit
-          </button>
+          <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 flex-wrap">
+            <button
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate(`/admin?edit=${parentId}`, { state: { editProductId: parentId } });
+              }}
+              className="px-2 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
+            >
+              Edit
+            </button>
+            <span className="px-2 py-[2px] text-amber-300 font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-zinc-950/90 rounded-full border border-amber-500/30 backdrop-blur-md shadow-xs flex items-center gap-1 select-none" title="Product Watch / Views Counter">
+              👁️ {getEffectiveViews(product)}
+            </span>
+          </div>
         )}
 
         {/* Tag badge */}
@@ -108,8 +119,11 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
           </div>
         )}
 
-        {/* Dynamic single-image / on-demand back-image flip */}
-        <div className={`w-full h-full relative ${isOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}>
+        {/* Dynamic single-image / smooth CSS back-image flip */}
+        <div 
+          className={`w-full h-full relative overflow-hidden ${isOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`}
+          onMouseEnter={() => hasBackView && preloadImage(getOptimizedImageUrl(backView, 500, 75))}
+        >
           <img 
             src={getOptimizedImageUrl(frontView, 500, 75)} 
             alt={product.name} 
@@ -117,9 +131,9 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
             decoding="async"
             width={500}
             height={667}
-            className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-300 ${isHovered && hasBackView ? 'opacity-0' : 'opacity-100'}`} 
+            className={`w-full h-full object-cover object-center absolute inset-0 transition-image-flip ${hasBackView ? 'group-hover:opacity-0' : ''}`} 
           />
-          {hasBackView && isHovered && (
+          {hasBackView && (
             <img 
               src={getOptimizedImageUrl(backView, 500, 75)} 
               alt={`${product.name} back`} 
@@ -127,7 +141,7 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
               decoding="async"
               width={500}
               height={667}
-              className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300 opacity-100" 
+              className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100" 
             />
           )}
         </div>
