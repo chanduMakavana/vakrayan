@@ -40,6 +40,10 @@ import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
 const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", onClick }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
+  useEffect(() => {
+    setIsLoaded(false);
+  }, [src]);
+
   return (
     <div
       onClick={onClick}
@@ -57,8 +61,8 @@ const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", on
         loading={loading}
         onLoad={() => setIsLoaded(true)}
         onError={() => setIsLoaded(true)}
-        className={`w-full h-full object-cover object-center transition-opacity duration-300 ease-out ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
+        className={`w-full h-full object-cover object-center transition-all duration-500 ease-out ${
+          isLoaded ? 'opacity-100 scale-100 blur-0' : 'opacity-0 scale-103 blur-[2px]'
         }`}
       />
     </div>
@@ -2094,20 +2098,25 @@ function ProductDetail() {
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }
                             }}
-                            className={`w-14 h-18 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
+                            className={`relative w-14 h-18 rounded-lg border-2 overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer ${
                               isCurrent
-                                ? 'border-[#059669] ring-2 ring-[#059669]/20 scale-105 shadow-md'
-                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102 opacity-85 hover:opacity-100'
+                                ? 'border-[#059669] ring-2 ring-[#059669]/30 scale-105 shadow-md'
+                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102 opacity-75 hover:opacity-100'
                             }`}
                             title={sibling.color_name}
                           >
                             <img 
                               src={getOptimizedImageUrl(siblingImage, 120, 75)} 
                               alt={sibling.color_name} 
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                               loading="lazy"
                               decoding="async"
                             />
+                            {isCurrent && (
+                              <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#059669] text-white flex items-center justify-center shadow-xs animate-scale-up">
+                                <FiCheck className="w-2.5 h-2.5 stroke-[3]" />
+                              </div>
+                            )}
                           </button>
                         );
                       })}
