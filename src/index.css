@@ -858,17 +858,13 @@ border-radius: var(--radius-full);
 animation: fadeUp 0.38s var(--ease-out-expo) forwards;
 }
 
-/* Smooth hover image transition & zoom (60fps GPU Accelerated) */
+/* Simple instant hover image transition */
 .transition-image-flip {
-  transition: opacity 0.5s cubic-bezier(0.25, 1, 0.5, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  will-change: opacity, transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: translateZ(0);
+  transition: opacity 0.15s ease-out !important;
 }
 
 .group:hover .transition-image-flip {
-  transform: scale(1.05) translateZ(0);
+  transform: none !important;
 }
 
 /* ============================================================

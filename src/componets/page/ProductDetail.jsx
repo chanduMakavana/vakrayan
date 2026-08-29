@@ -2092,25 +2092,20 @@ function ProductDetail() {
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }
                             }}
-                            className={`relative w-14 h-18 rounded-lg border-2 overflow-hidden transition-all duration-300 flex items-center justify-center cursor-pointer ${
+                            className={`w-14 h-18 rounded-lg border-2 overflow-hidden flex items-center justify-center cursor-pointer ${
                               isCurrent
-                                ? 'border-[#059669] ring-2 ring-[#059669]/30 scale-105 shadow-md'
-                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102 opacity-75 hover:opacity-100'
+                                ? 'border-[#059669]'
+                                : 'border-[var(--color-border)] hover:border-neutral-400'
                             }`}
                             title={sibling.color_name}
                           >
                             <img 
                               src={getOptimizedImageUrl(siblingImage, 120, 75)} 
                               alt={sibling.color_name} 
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                              className="w-full h-full object-cover"
                               loading="lazy"
                               decoding="async"
                             />
-                            {isCurrent && (
-                              <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#059669] text-white flex items-center justify-center shadow-xs animate-scale-up">
-                                <FiCheck className="w-2.5 h-2.5 stroke-[3]" />
-                              </div>
-                            )}
                           </button>
                         );
                       })}
