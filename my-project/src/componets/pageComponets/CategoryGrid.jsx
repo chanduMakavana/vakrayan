@@ -71,6 +71,14 @@ function CategoryGrid() {
       categoriesList.push({ value, label: cat.replace(/-/g, ' ') })
     }
   })
+  categoryConfigs.forEach(cfg => {
+    if (cfg.category && !cfg.isDeleted) {
+      const value = cfg.category.toLowerCase().trim()
+      if (!categoriesList.some(item => item.value === value)) {
+        categoriesList.push({ value, label: (cfg.name || cfg.label || value).replace(/-/g, ' ') })
+      }
+    }
+  })
 
   const getCategoryImage = (catValue) => {
     // 1. Admin Panel Override (if admin explicitly set custom category image)

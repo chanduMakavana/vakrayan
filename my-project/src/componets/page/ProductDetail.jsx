@@ -28,7 +28,7 @@ import AddToCartButton from '../pageComponets/AddToCartButton';
 import Footer from '../pageComponets/Footer';
 import restockService from '../../services/restock';
 import { FaStar, FaWhatsapp } from 'react-icons/fa';
-import { getEffectiveViews } from '../../utils/productViews';
+import { getEffectiveViews, hasViewedInSession, markViewedInSession } from '../../utils/productViews';
 import { useToast } from '../../context/ToastContext';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
@@ -43,7 +43,7 @@ const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", on
   return (
     <div
       onClick={onClick}
-      className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group transition-all duration-300 hover:border-neutral-900 ${className}`}
+      className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group ${className}`}
     >
       {!isLoaded && (
         <div className="absolute inset-0 z-10 skeleton flex items-center justify-center">
@@ -57,9 +57,7 @@ const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", on
         loading={loading}
         onLoad={() => setIsLoaded(true)}
         onError={() => setIsLoaded(true)}
-        className={`w-full h-full object-cover object-center transition-opacity duration-300 ease-out ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
-        }`}
+        className="w-full h-full object-cover object-center opacity-100"
       />
     </div>
   );
@@ -870,13 +868,22 @@ function ProductDetail() {
    let isMounted = true;
    async function loadCompleteProductStage() {
      try {
-       if (isMounted) setLoading(true);
-        const targetIdOrSlug = String(idOrSlug || '').trim().toLowerCase();
-        const cachedProduct = products.find(p => 
-          (p.slug && String(p.slug).trim().toLowerCase() === targetIdOrSlug) || 
-          (p.$id && String(p.$id).trim().toLowerCase() === targetIdOrSlug) || 
-          (p.id && String(p.id).trim().toLowerCase() === targetIdOrSlug)
-        );
+         const targetIdOrSlug = String(idOrSlug || '').trim().toLowerCase();
+         const cachedProduct = products.find(p => 
+           (p.slug && String(p.slug).trim().toLowerCase() === targetIdOrSlug) || 
+           (p.$id && String(p.$id).trim().toLowerCase() === targetIdOrSlug) || 
+           (p.id && String(p.id).trim().toLowerCase() === targetIdOrSlug)
+         );
+
+         const currentMatch = product && (
+           (product.slug && String(product.slug).trim().toLowerCase() === targetIdOrSlug) ||
+           (product.$id && String(product.$id).trim().toLowerCase() === targetIdOrSlug) ||
+           (product.id && String(product.id).trim().toLowerCase() === targetIdOrSlug)
+         );
+
+         if (!cachedProduct && !currentMatch && isMounted) {
+           setLoading(true);
+         }
        if (cachedProduct) {
          const isProductLive = cachedProduct.is_live === true || cachedProduct.is_live === 'true' || cachedProduct.is_live === 1 || cachedProduct.is_live === '1';
          if (!adminMode && !isProductLive) {
@@ -1007,19 +1014,25 @@ function ProductDetail() {
     });
   }, [product]);
 
-  // Increment view counter when product is viewed
+  // Smart Unique Session View Counter — Increments ONLY once per unique session per product/color variant
   useEffect(() => {
     if (!product) return;
     const prodId = product.$id || product.id;
     if (!prodId) return;
-    
-    const viewedKey = `viewed_${prodId}`;
-    if (!sessionStorage.getItem(viewedKey)) {
-      sessionStorage.setItem(viewedKey, 'true');
-      const currentCount = Number(product.views_count || 0);
+
+    if (!hasViewedInSession(prodId)) {
+      markViewedInSession(prodId);
+      const currentCount = getEffectiveViews(product);
       productsService.incrementProductViews(prodId, currentCount).then(newCount => {
         if (newCount) {
-          setProduct(prev => prev ? { ...prev, views_count: newCount } : prev);
+          setProduct(prev => {
+            if (!prev) return prev;
+            const currentId = prev.$id || prev.id;
+            if (currentId === prodId) {
+              return { ...prev, views_count: newCount };
+            }
+            return prev;
+          });
         }
       }).catch(() => {});
     }
@@ -2044,15 +2057,21 @@ function ProductDetail() {
             {(() => {
 
               if (product.color_group_id && groupProducts.length > 1) {
+                const currentProdId = product.$id || product.id;
+                const sortedGroupProducts = [
+                  ...groupProducts.filter(s => (s.$id || s.id) === currentProdId),
+                  ...groupProducts.filter(s => (s.$id || s.id) !== currentProdId)
+                ];
+
                 return (
                   <div className="space-y-2 pb-1">
                     <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name || 'ORIGINAL'}</span>
                     </h4>
                     <div className="flex gap-2.5 flex-wrap">
-                      {groupProducts.map((sibling) => {
+                      {sortedGroupProducts.map((sibling) => {
                         const siblingId = sibling.$id || sibling.id;
-                        const isCurrent = siblingId === (product.$id || product.id);
+                        const isCurrent = siblingId === currentProdId;
                         const siblingImage = sibling.front_image_link || sibling.image_url || sibling.image || 'https://placehold.co/100x125';
                         return (
                           <button
@@ -2060,7 +2079,11 @@ function ProductDetail() {
                             type="button"
                             onClick={() => {
                               if (!isCurrent) {
-                                setProduct(sibling);
+                                const targetViews = Number(sibling.views_count || getEffectiveViews(sibling) || 0);
+                                setProduct({
+                                  ...sibling,
+                                  views_count: targetViews
+                                });
                                 setActiveImageIdx(0);
                                 setImageLoaded(false);
                                 
@@ -2084,10 +2107,10 @@ function ProductDetail() {
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }
                             }}
-                            className={`w-14 h-18 rounded-lg border-2 overflow-hidden transition-all flex items-center justify-center cursor-pointer ${
+                            className={`w-14 h-18 rounded-lg border-2 overflow-hidden flex items-center justify-center cursor-pointer ${
                               isCurrent
-                                ? 'border-[#059669] ring-2 ring-[#059669]/20 scale-105 shadow-md'
-                                : 'border-[var(--color-border)] hover:border-neutral-400 hover:scale-102 opacity-85 hover:opacity-100'
+                                ? 'border-[#059669]'
+                                : 'border-[var(--color-border)] hover:border-neutral-400'
                             }`}
                             title={sibling.color_name}
                           >

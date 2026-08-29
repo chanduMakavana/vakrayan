@@ -6,7 +6,7 @@ export const getLocalViews = (productId) => {
   if (!productId) return 0;
   try {
     const viewsMap = JSON.parse(localStorage.getItem('product_views') || '{}');
-    return viewsMap[productId] || 0;
+    return Number(viewsMap[productId] || 0);
   } catch {
     return 0;
   }
@@ -18,4 +18,20 @@ export const getEffectiveViews = (product) => {
   const cloudViews = Number(product.views_count || 0);
   const localViews = getLocalViews(pId);
   return Math.max(cloudViews, localViews);
+};
+
+export const hasViewedInSession = (productId) => {
+  if (!productId) return true;
+  try {
+    return Boolean(sessionStorage.getItem(`vk_session_viewed_${productId}`));
+  } catch {
+    return false;
+  }
+};
+
+export const markViewedInSession = (productId) => {
+  if (!productId) return;
+  try {
+    sessionStorage.setItem(`vk_session_viewed_${productId}`, '1');
+  } catch {}
 };

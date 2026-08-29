@@ -87,11 +87,13 @@ export class ProductsService {
 
     // Increment views count for a product
     async incrementProductViews(productId, currentViews = 0) {
-        if (!productId) return;
-        const newCount = (Number(currentViews) || 0) + 1;
+        if (!productId) return 0;
+        let newCount = (Number(currentViews) || 0) + 1;
         try {
             const localViews = JSON.parse(localStorage.getItem('product_views') || '{}');
-            localViews[productId] = Math.max(localViews[productId] || 0, newCount);
+            const prevViews = Number(localViews[productId] || 0);
+            newCount = Math.max(prevViews, Number(currentViews) || 0) + 1;
+            localViews[productId] = newCount;
             localStorage.setItem('product_views', JSON.stringify(localViews));
         } catch {}
 

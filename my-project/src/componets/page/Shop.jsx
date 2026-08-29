@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import productsService from '../../services/products'
 import wishlistService from '../../services/wishlist'
+import categoryService from '../../services/category'
 import Footer from '../pageComponets/Footer'
 import ProductCardSkeleton from '../pageComponets/ProductCardSkeleton'
 import { useDelayedLoading } from '../../hooks/useDelayedLoading'
@@ -61,10 +62,41 @@ function Shop() {
   const { user, isAuthenticated, adminMode } = useSelector(state => state.auth)
   const reduxFetched = useSelector(state => state.products.fetched)
 
-  // ✅ Dynamic category list extracted from actual products + fallback defaults
+  const [categoryConfigs, setCategoryConfigs] = useState([])
+
+  useEffect(() => {
+    let active = true;
+    const fetchConfigs = async () => {
+      try {
+        const configs = await categoryService.getCategoryConfigs();
+        if (active) setCategoryConfigs(configs || []);
+      } catch (err) {
+        console.error("Failed to load category configs in Shop:", err);
+      }
+    };
+    fetchConfigs();
+    return () => { active = false; };
+  }, []);
+
+  // ✅ Dynamic category list synced with Admin Panel Category Configs + live products
   const dynamicCategories = useMemo(() => {
     const categoryMap = new Map();
     categoryMap.set('all', 'All Categories');
+
+    // Extract list of categories deleted/hidden by Admin
+    const deletedCategorySlugs = new Set(
+      categoryConfigs.filter(cfg => cfg.isDeleted).map(cfg => (cfg.category || '').toLowerCase().trim())
+    );
+
+    // Custom label mappings set by Admin
+    const customLabels = new Map();
+    categoryConfigs.forEach(cfg => {
+      if (cfg.category && !cfg.isDeleted) {
+        const slug = String(cfg.category).toLowerCase().trim();
+        const displayLabel = cfg.name || cfg.label || slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        customLabels.set(slug, displayLabel);
+      }
+    });
 
     const defaults = [
       { value: 'oversized-tshirt', label: 'Oversized Tees' },
@@ -72,14 +104,21 @@ function Shop() {
       { value: 'shirts', label: 'Shirts' },
       { value: 'hoodies', label: 'Hoodies' }
     ];
-    defaults.forEach(d => categoryMap.set(d.value, d.label));
 
-    // Dynamically extract all unique categories present in products
+    // 1. Add defaults if not deleted by Admin
+    defaults.forEach(d => {
+      const slug = d.value.toLowerCase().trim();
+      if (!deletedCategorySlugs.has(slug)) {
+        categoryMap.set(slug, customLabels.get(slug) || d.label);
+      }
+    });
+
+    // 2. Dynamically extract categories from live products (if not deleted by Admin)
     products.forEach(p => {
       if (p.category) {
-        const slug = String(p.category).trim();
-        if (!categoryMap.has(slug)) {
-          const formattedLabel = slug
+        const slug = String(p.category).toLowerCase().trim();
+        if (!deletedCategorySlugs.has(slug) && !categoryMap.has(slug)) {
+          const formattedLabel = customLabels.get(slug) || slug
             .split('-')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
@@ -88,8 +127,19 @@ function Shop() {
       }
     });
 
+    // 3. Include any custom categories added in Admin Panel configs that aren't deleted
+    categoryConfigs.forEach(cfg => {
+      if (cfg.category && !cfg.isDeleted) {
+        const slug = String(cfg.category).toLowerCase().trim();
+        if (!categoryMap.has(slug)) {
+          const displayLabel = customLabels.get(slug) || slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          categoryMap.set(slug, displayLabel);
+        }
+      }
+    });
+
     return Array.from(categoryMap.entries()).map(([value, label]) => ({ value, label }));
-  }, [products]);
+  }, [products, categoryConfigs]);
 
   // ✅ SEO: Dynamic page title — updates when category URL changes
   useEffect(() => {
