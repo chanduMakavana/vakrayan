@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { isCodAvailableForPincode, calculateDeliveryDetails } from '../../utils/pincodeHelper';
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { FiChevronDown, FiChevronUp, FiTruck, FiArrowLeft, FiMapPin, FiX, FiChevronLeft, FiChevronRight, FiPlus, FiMinus, FiAlertCircle, FiVideo, FiPackage, FiRefreshCw, FiTag, FiSlash, FiCheckCircle, FiZap, FiCheck, FiCopy, FiShare2, FiCamera, FiImage } from 'react-icons/fi';
@@ -35,8 +35,242 @@ import { sendWebhookNotification } from '../../utils/webhookHelper';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
 import Loader from '../pageComponets/Loader';
-import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
+// Image Component with Smooth Surface Placeholder (Memoized at module level to prevent unmount flickering on size/state changes)
+const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", onClick }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
 
+  return (
+    <div
+      onClick={onClick}
+      className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group transition-all duration-300 hover:border-neutral-900 ${className}`}
+    >
+      {!isLoaded && (
+        <div className="absolute inset-0 z-10 skeleton flex items-center justify-center">
+          <div className="w-5 h-5 rounded-full border-2 border-neutral-300 border-t-neutral-800 animate-spin opacity-40" />
+        </div>
+      )}
+
+      <img
+        src={src}
+        alt={alt}
+        loading={loading}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setIsLoaded(true)}
+        className={`w-full h-full object-cover object-center transition-opacity duration-300 ease-out ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+    </div>
+  );
+});
+ImageWithSkeleton.displayName = 'ImageWithSkeleton';
+
+// 100% Full Markdown & GFM Parser Component (Memoized at module level)
+const RenderMarkdown = memo(({ content }) => {
+  if (!content) return null;
+
+  const rawText = String(content);
+
+  const parseInlineMarkdown = (text) => {
+    if (!text) return null;
+
+    const regex = /(!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)|`[^`]+`|\*\*.*?\*\*|__.*?__|~~.*?~~|\*.*?\*|_.*?_)/g;
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+      if (!part) return null;
+
+      if (part.startsWith('![') && part.includes('](') && part.endsWith(')')) {
+        const alt = part.slice(2, part.indexOf(']('));
+        const url = part.slice(part.indexOf('](') + 2, -1);
+        return (
+          <img
+            key={index}
+            src={url}
+            alt={alt}
+            className="max-w-full h-auto rounded-lg my-2 border border-zinc-200 shadow-xs block"
+          />
+        );
+      }
+
+      if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+        const linkText = part.slice(1, part.indexOf(']('));
+        const rawUrl = part.slice(part.indexOf('](') + 2, -1).trim();
+        const isSafeUrl = /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(rawUrl);
+        const safeUrl = isSafeUrl ? rawUrl : '#';
+        return (
+          <a
+            key={index}
+            href={safeUrl}
+            target={safeUrl.startsWith('http') ? "_blank" : undefined}
+            rel={safeUrl.startsWith('http') ? "noopener noreferrer" : undefined}
+            className="text-[#059669] font-bold underline hover:text-[#047857] transition-colors"
+          >
+            {linkText}
+          </a>
+        );
+      }
+
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return (
+          <code key={index} className="bg-zinc-100 text-zinc-900 px-1.5 py-0.5 rounded font-mono text-[11px] border border-zinc-200 font-bold">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+
+      if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+        return <strong key={index} className="font-extrabold text-[var(--color-text)]">{part.slice(2, -2)}</strong>;
+      }
+
+      if (part.startsWith('~~') && part.endsWith('~~')) {
+        return <del key={index} className="line-through text-zinc-400">{part.slice(2, -2)}</del>;
+      }
+
+      if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+        return <em key={index} className="italic text-[var(--color-text)]">{part.slice(1, -1)}</em>;
+      }
+
+      return part;
+    });
+  };
+
+  const lines = rawText.split(/\r?\n/);
+  const elements = [];
+  let inCodeBlock = false;
+  let codeBlockLang = '';
+  let codeBlockLines = [];
+  let currentList = [];
+  let listType = null;
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      if (listType === 'ol') {
+        elements.push(
+          <ol key={`ol-${elements.length}`} className="list-decimal list-inside space-y-1 my-2 text-[var(--color-muted)] font-medium">
+            {currentList.map((item, i) => (
+              <li key={i}>{parseInlineMarkdown(item)}</li>
+            ))}
+          </ol>
+        );
+      } else {
+        elements.push(
+          <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-1 my-2 text-[var(--color-muted)] font-medium">
+            {currentList.map((item, i) => (
+              <li key={i}>{parseInlineMarkdown(item)}</li>
+            ))}
+          </ul>
+        );
+      }
+      currentList = [];
+      listType = null;
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    if (line.trim().startsWith('```')) {
+      if (inCodeBlock) {
+        elements.push(
+          <div key={`code-${idx}`} className="my-3 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 text-emerald-400 font-mono text-xs">
+            {codeBlockLang && (
+              <div className="bg-zinc-900 text-zinc-400 px-3 py-1 text-[10px] uppercase font-bold tracking-wider border-b border-zinc-800">
+                {codeBlockLang}
+              </div>
+            )}
+            <pre className="p-3.5 overflow-x-auto leading-relaxed">
+              <code>{codeBlockLines.join('\n')}</code>
+            </pre>
+          </div>
+        );
+        inCodeBlock = false;
+        codeBlockLang = '';
+        codeBlockLines = [];
+      } else {
+        flushList();
+        inCodeBlock = true;
+        codeBlockLang = line.trim().slice(3).trim();
+      }
+      return;
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line);
+      return;
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    if (trimmed.startsWith('#')) {
+      flushList();
+      const level = (line.match(/^#+/) || [''])[0].length;
+      const headingText = trimmed.replace(/^#+\s*/, '');
+
+      if (level === 1) {
+        elements.push(
+          <h1 key={`h1-${idx}`} className="text-lg font-bold tracking-tight text-[var(--color-text)] uppercase mt-3 mb-1">
+            {parseInlineMarkdown(headingText)}
+          </h1>
+        );
+      } else if (level === 2) {
+        elements.push(
+          <h2 key={`h2-${idx}`} className="text-base font-bold tracking-tight text-[var(--color-text)] uppercase mt-3 mb-1">
+            {parseInlineMarkdown(headingText)}
+          </h2>
+        );
+      } else {
+        elements.push(
+          <h3 key={`h3-${idx}`} className="text-sm font-bold text-[var(--color-text)] uppercase mt-2 mb-1">
+            {parseInlineMarkdown(headingText)}
+          </h3>
+        );
+      }
+      return;
+    }
+
+    if (trimmed.startsWith('>')) {
+      flushList();
+      const quoteText = trimmed.replace(/^>\s*/, '');
+      elements.push(
+        <blockquote key={`bq-${idx}`} className="border-l-2 border-[#059669] pl-3 py-1 my-2 text-[var(--color-muted)] italic bg-emerald-500/5">
+          {parseInlineMarkdown(quoteText)}
+        </blockquote>
+      );
+      return;
+    }
+
+    const olMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+    if (olMatch) {
+      if (listType && listType !== 'ol') flushList();
+      listType = 'ol';
+      currentList.push(olMatch[2]);
+      return;
+    }
+
+    const ulMatch = trimmed.match(/^[-*+]\s+(.*)/);
+    if (ulMatch) {
+      if (listType && listType !== 'ul') flushList();
+      listType = 'ul';
+      currentList.push(ulMatch[1]);
+      return;
+    }
+
+    flushList();
+    elements.push(
+      <p key={`p-${idx}`} className="leading-relaxed text-[var(--color-muted)] my-1 font-medium">
+        {parseInlineMarkdown(trimmed)}
+      </p>
+    );
+  });
+
+  flushList();
+
+  return <div className="space-y-1 text-xs font-mono">{elements}</div>;
+});
+RenderMarkdown.displayName = 'RenderMarkdown';
 
 function ProductDetail() {
   const { idOrSlug } = useParams();
@@ -1089,20 +1323,32 @@ function ProductDetail() {
     }
   };
 
-  const backImagesList = Array.isArray(product?.back_image_links)
-    ? product.back_image_links
-    : product?.back_image_link
-    ? [product.back_image_link]
-    : [];
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    const backImagesList = Array.isArray(product?.back_image_links)
+      ? product.back_image_links
+      : product?.back_image_link
+      ? [product.back_image_link]
+      : [];
 
-  const rawGalleryImages = activeVariant
-    ? [activeVariant.front, activeVariant.back].filter(Boolean)
-    : [
-        product?.front_image_link || product?.image_url || product?.image,
-        ...backImagesList
-      ].filter(Boolean);
+    const rawGalleryImages = activeVariant
+      ? [activeVariant.front, activeVariant.back].filter(Boolean)
+      : [
+          product?.front_image_link || product?.image_url || product?.image,
+          ...backImagesList
+        ].filter(Boolean);
 
-  const galleryImages = Array.from(new Set(rawGalleryImages));
+    return Array.from(new Set(rawGalleryImages));
+  }, [
+    product?.$id,
+    product?.id,
+    product?.front_image_link,
+    product?.image_url,
+    product?.image,
+    product?.back_image_link,
+    JSON.stringify(product?.back_image_links || []),
+    activeVariant
+  ]);
 
   // Background preload all product gallery images into browser RAM cache for 0ms instant lightbox switching
   useEffect(() => {
@@ -1312,6 +1558,10 @@ function ProductDetail() {
   const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
   const activeImage = galleryImages[activeImageIndex] || '';
 
+  const optimizedActiveImage = useMemo(() => {
+    return activeImage ? getOptimizedImageUrl(activeImage, 1000, 80) : '';
+  }, [activeImage]);
+
   const handleLightboxNext = () => {
     if (galleryImages.length <= 1) return;
     setImageLoaded(false);
@@ -1358,276 +1608,7 @@ function ProductDetail() {
     }
   };
 
-  // Image Component with Smooth Surface Placeholder
-  const ImageWithSkeleton = ({ src, alt, className = "", loading = "lazy", onClick }) => {
-    const [isLoaded, setIsLoaded] = useState(false);
 
-    return (
-      <div
-        onClick={onClick}
-        className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group transition-all duration-300 hover:border-neutral-900 ${className}`}
-      >
-        {/* Subtle Surface Loading Pulse */}
-        {!isLoaded && (
-          <div className="absolute inset-0 z-10 skeleton flex items-center justify-center">
-            <div className="w-5 h-5 rounded-full border-2 border-neutral-300 border-t-neutral-800 animate-spin opacity-40" />
-          </div>
-        )}
-
-        <img
-          src={src}
-          alt={alt}
-          loading={loading}
-          onLoad={() => setIsLoaded(true)}
-          onError={() => setIsLoaded(true)}
-          className={`w-full h-full object-cover object-center transition-opacity duration-300 ease-out ${
-            isLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-      </div>
-    );
-  };
-
-  // 100% Full Markdown & GFM Parser Component
-  const RenderMarkdown = ({ content }) => {
-    if (!content) return null;
-
-    const rawText = String(content);
-
-    // Helper to parse inline markdown (bold, italic, strikethrough, inline code, links, images)
-    const parseInlineMarkdown = (text) => {
-      if (!text) return null;
-
-      const regex = /(!\[.*?\]\(.*?\)|\[.*?\]\(.*?\)|`[^`]+`|\*\*.*?\*\*|__.*?__|~~.*?~~|\*.*?\*|_.*?_)/g;
-      const parts = text.split(regex);
-
-      return parts.map((part, index) => {
-        if (!part) return null;
-
-        // Image: ![alt](url)
-        if (part.startsWith('![') && part.includes('](') && part.endsWith(')')) {
-          const alt = part.slice(2, part.indexOf(']('));
-          const url = part.slice(part.indexOf('](') + 2, -1);
-          return (
-            <img
-              key={index}
-              src={url}
-              alt={alt}
-              className="max-w-full h-auto rounded-lg my-2 border border-zinc-200 shadow-xs block"
-            />
-          );
-        }
-
-        // Link: [text](url)
-        if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
-          const linkText = part.slice(1, part.indexOf(']('));
-          const rawUrl = part.slice(part.indexOf('](') + 2, -1).trim();
-          const isSafeUrl = /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(rawUrl);
-          const safeUrl = isSafeUrl ? rawUrl : '#';
-          return (
-            <a
-              key={index}
-              href={safeUrl}
-              target={safeUrl.startsWith('http') ? "_blank" : undefined}
-              rel={safeUrl.startsWith('http') ? "noopener noreferrer" : undefined}
-              className="text-[#059669] font-bold underline hover:text-[#047857] transition-colors"
-            >
-              {linkText}
-            </a>
-          );
-        }
-
-        // Inline Code: `code`
-        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-          return (
-            <code key={index} className="bg-zinc-100 text-zinc-900 px-1.5 py-0.5 rounded font-mono text-[11px] border border-zinc-200 font-bold">
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-
-        // Bold: **text** or __text__
-        if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
-          return <strong key={index} className="font-extrabold text-[var(--color-text)]">{part.slice(2, -2)}</strong>;
-        }
-
-        // Strikethrough: ~~text~~
-        if (part.startsWith('~~') && part.endsWith('~~')) {
-          return <del key={index} className="line-through text-zinc-400">{part.slice(2, -2)}</del>;
-        }
-
-        // Italic: *text* or _text_
-        if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
-          return <em key={index} className="italic text-zinc-800">{part.slice(1, -1)}</em>;
-        }
-
-        return part;
-      });
-    };
-
-    const lines = rawText.split(/\r?\n/);
-    const elements = [];
-
-    let inCodeBlock = false;
-    let codeBlockLang = '';
-    let codeBlockLines = [];
-
-    let currentList = [];
-    let currentListType = null; // 'ul' | 'ol' | 'task'
-
-    const flushList = () => {
-      if (currentList.length > 0) {
-        const listKey = `list-${elements.length}`;
-        if (currentListType === 'task') {
-          elements.push(
-            <ul key={listKey} className="space-y-1.5 my-2 pl-1 font-medium text-[var(--color-text)]">
-              {currentList.map((item, i) => (
-                <li key={i} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    readOnly
-                    className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#059669] cursor-pointer"
-                  />
-                  <span className={item.checked ? 'line-through text-zinc-400' : ''}>
-                    {parseInlineMarkdown(item.text)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          );
-        } else if (currentListType === 'ul') {
-          elements.push(
-            <ul key={listKey} className="list-disc list-inside space-y-1 my-2 pl-1 font-medium text-[var(--color-text)]">
-              {currentList.map((item, i) => (
-                <li key={i}>{parseInlineMarkdown(item)}</li>
-              ))}
-            </ul>
-          );
-        } else if (currentListType === 'ol') {
-          elements.push(
-            <ol key={listKey} className="list-decimal list-inside space-y-1 my-2 pl-1 font-medium text-[var(--color-text)]">
-              {currentList.map((item, i) => (
-                <li key={i}>{parseInlineMarkdown(item)}</li>
-              ))}
-            </ol>
-          );
-        }
-        currentList = [];
-        currentListType = null;
-      }
-    };
-
-    lines.forEach((line, idx) => {
-      // 1. Code block handling: ```javascript or ```
-      if (line.trim().startsWith('```')) {
-        if (inCodeBlock) {
-          // End of code block
-          elements.push(
-            <div key={`code-${idx}`} className="my-3 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 text-emerald-400 font-mono text-xs">
-              {codeBlockLang && (
-                <div className="bg-zinc-900 text-zinc-400 px-3 py-1 text-[10px] uppercase font-bold tracking-wider border-b border-zinc-800">
-                  {codeBlockLang}
-                </div>
-              )}
-              <pre className="p-3.5 overflow-x-auto leading-relaxed">
-                <code>{codeBlockLines.join('\n')}</code>
-              </pre>
-            </div>
-          );
-          inCodeBlock = false;
-          codeBlockLang = '';
-          codeBlockLines = [];
-        } else {
-          // Start of code block
-          flushList();
-          inCodeBlock = true;
-          codeBlockLang = line.trim().slice(3).trim();
-          codeBlockLines = [];
-        }
-        return;
-      }
-
-      if (inCodeBlock) {
-        codeBlockLines.push(line);
-        return;
-      }
-
-      const trimmed = line.trim();
-
-      // 2. Empty line
-      if (!trimmed) {
-        flushList();
-        return;
-      }
-
-      // 3. Horizontal Rule: --- or *** or ___
-      if (/^([*_-]\s*){3,}$/.test(trimmed)) {
-        flushList();
-        elements.push(<hr key={`hr-${idx}`} className="my-4 border-t border-zinc-200 dark:border-zinc-800" />);
-        return;
-      }
-
-      // 4. Headings H1 to H6
-      if (/^#{1,6}\s+/.test(trimmed)) {
-        flushList();
-        const level = trimmed.match(/^#{1,6}/)[0].length;
-        const text = trimmed.replace(/^#{1,6}\s+/, '');
-        const inline = parseInlineMarkdown(text);
-
-        if (level === 1) {
-          elements.push(<h1 key={`h1-${idx}`} className="text-base md:text-lg font-mono font-black uppercase tracking-wider text-[var(--color-text)] mt-4 mb-2 border-b pb-1 border-zinc-200">{inline}</h1>);
-        } else if (level === 2) {
-          elements.push(<h2 key={`h2-${idx}`} className="text-sm md:text-base font-mono font-black uppercase tracking-wider text-[var(--color-text)] mt-3.5 mb-1.5">{inline}</h2>);
-        } else if (level === 3) {
-          elements.push(<h3 key={`h3-${idx}`} className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--color-text)] mt-3 mb-1">{inline}</h3>);
-        } else {
-          elements.push(<h4 key={`h4-${idx}`} className="text-xs font-mono font-bold uppercase tracking-wide text-[var(--color-text)] mt-2.5 mb-1">{inline}</h4>);
-        }
-        return;
-      }
-
-      // 5. Task List: - [x] task or - [ ] task
-      if (/^[-*•]\s+\[([ xX])\]\s+/.test(trimmed)) {
-        const match = trimmed.match(/^[-*•]\s+\[([ xX])\]\s+(.+)/);
-        if (match) {
-          if (currentListType && currentListType !== 'task') flushList();
-          currentListType = 'task';
-          const isChecked = match[1].toLowerCase() === 'x';
-          currentList.push({ checked: isChecked, text: match[2] });
-          return;
-        }
-      }
-
-      // 6. Unordered List Bullet: - Item or * Item or • Item
-      if (/^[-*•]\s+/.test(trimmed)) {
-        if (currentListType && currentListType !== 'ul') flushList();
-        currentListType = 'ul';
-        currentList.push(trimmed.replace(/^[-*•]\s+/, ''));
-        return;
-      }
-
-      // 7. Ordered List: 1. Item
-      if (/^\d+\.\s+/.test(trimmed)) {
-        if (currentListType && currentListType !== 'ol') flushList();
-        currentListType = 'ol';
-        currentList.push(trimmed.replace(/^\d+\.\s+/, ''));
-        return;
-      }
-
-      // 8. Regular paragraph
-      flushList();
-      elements.push(
-        <p key={`p-${idx}`} className="leading-relaxed text-[var(--color-muted)] my-1 font-medium">
-          {parseInlineMarkdown(trimmed)}
-        </p>
-      );
-    });
-
-    flushList();
-
-    return <div className="space-y-1 text-xs font-mono">{elements}</div>;
-  };
 
   const rawDescription = product?.description || "";
   const returnPolicyMatch = rawDescription.match(/\[RETURN_POLICY\]:\s*(.+)/);
@@ -1874,10 +1855,10 @@ function ProductDetail() {
               <div className="w-full aspect-3/4 overflow-hidden pointer-events-none">
                 <img
                   ref={mainImageRef}
-                  src={getOptimizedImageUrl(activeImage, 1000, 80)}
+                  src={optimizedActiveImage}
                   alt={product.name}
                   fetchPriority="high"
-                  decoding="sync"
+                  decoding="async"
                   onLoad={() => setImageLoaded(true)}
                   style={{
                     transformOrigin: 'center center',
@@ -1885,7 +1866,7 @@ function ProductDetail() {
                       ? `translate(${mainPhotoOffset.x}px, ${mainPhotoOffset.y}px) scale(${mainPhotoZoom})`
                       : 'none'
                   }}
-                  className={`w-full h-full object-cover object-center transition-all duration-200 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-40'}`}
+                  className="w-full h-full object-cover object-center transition-opacity duration-200 ease-out"
                 />
               </div>
 
