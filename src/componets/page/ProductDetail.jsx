@@ -28,7 +28,7 @@ import AddToCartButton from '../pageComponets/AddToCartButton';
 import Footer from '../pageComponets/Footer';
 import restockService from '../../services/restock';
 import { FaStar, FaWhatsapp } from 'react-icons/fa';
-import { getEffectiveViews } from '../../utils/productViews';
+import { getEffectiveViews, hasViewedInSession, markViewedInSession } from '../../utils/productViews';
 import { useToast } from '../../context/ToastContext';
 import storageService, { compressImage } from '../../services/storage';
 import { sendWebhookNotification } from '../../utils/webhookHelper';
@@ -1007,25 +1007,28 @@ function ProductDetail() {
     });
   }, [product]);
 
-  // Increment view counter when product or color variant changes
+  // Smart Unique Session View Counter — Increments ONLY once per unique session per product/color variant
   useEffect(() => {
     if (!product) return;
     const prodId = product.$id || product.id;
     if (!prodId) return;
 
-    const currentCount = Number(product.views_count || getEffectiveViews(product) || 0);
-    productsService.incrementProductViews(prodId, currentCount).then(newCount => {
-      if (newCount) {
-        setProduct(prev => {
-          if (!prev) return prev;
-          const currentId = prev.$id || prev.id;
-          if (currentId === prodId) {
-            return { ...prev, views_count: newCount };
-          }
-          return prev;
-        });
-      }
-    }).catch(() => {});
+    if (!hasViewedInSession(prodId)) {
+      markViewedInSession(prodId);
+      const currentCount = getEffectiveViews(product);
+      productsService.incrementProductViews(prodId, currentCount).then(newCount => {
+        if (newCount) {
+          setProduct(prev => {
+            if (!prev) return prev;
+            const currentId = prev.$id || prev.id;
+            if (currentId === prodId) {
+              return { ...prev, views_count: newCount };
+            }
+            return prev;
+          });
+        }
+      }).catch(() => {});
+    }
   }, [product?.$id, product?.id]);
 
   useEffect(() => {
