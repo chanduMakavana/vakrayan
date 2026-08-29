@@ -2638,6 +2638,7 @@ function ProductDetail() {
                 const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';
                 const backView = item.back_image_links?.[0] || item.back_image_link || frontView;
                 const activeTag = item.tag || (item.category === 'oversized-tshirt' ? 'OVERSIZED FIT' : "");
+                const isWishlisted = wishlist.some(w => w.$id === uniqueId || w.id === uniqueId);
 
                 return (
                   <div 
@@ -2650,6 +2651,50 @@ function ProductDetail() {
                   >
                     <div className="w-full aspect-3/4 rounded-none overflow-hidden bg-neutral-100 relative border border-[var(--color-border)]/50">
                       
+                      {/* Wishlist Heart Button */}
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (isWishlisted) {
+                            dispatch(removeWishlistItemState(uniqueId));
+                            const savedList = JSON.parse(localStorage.getItem('wishlist')) || [];
+                            localStorage.setItem('wishlist', JSON.stringify(savedList.filter(w => w.$id !== uniqueId && w.id !== uniqueId)));
+                            if (isAuthenticated && user) { try { await wishlistService.removeFromWishlist(user.$id, uniqueId) } catch {} }
+                          } else {
+                            dispatch(addWishlistItemState(item));
+                            const savedList = JSON.parse(localStorage.getItem('wishlist')) || [];
+                            localStorage.setItem('wishlist', JSON.stringify([...savedList, item]));
+                            if (isAuthenticated && user) { try { await wishlistService.addToWishlist(user.$id, uniqueId) } catch {} }
+                          }
+                        }}
+                        className={`absolute top-2 right-2 z-30 w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 shadow-xs border ${
+                          isWishlisted 
+                            ? 'bg-[#059669] border-[#059669] text-white' 
+                            : 'bg-white/95 border-emerald-900/15 text-[#059669] hover:bg-[#059669] hover:text-white hover:border-[#059669]'
+                        }`}
+                        aria-label={isWishlisted ? `Remove ${item.name} from wishlist` : `Add ${item.name} to wishlist`}
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={isWishlisted ? '#fff' : 'none'} stroke="currentColor" strokeWidth="2">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                      </button>
+
+                      {/* Admin edit button & watch counter */}
+                      {adminMode && (
+                        <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 flex-wrap">
+                          <button
+                            onClick={e => { e.stopPropagation(); navigate(`/admin?edit=${uniqueId}`, { state: { editProductId: uniqueId } }); }}
+                            className="px-2 py-[2px] cursor-pointer transition-all duration-200 text-white font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-[#0D1A14] hover:bg-black rounded-full border border-white/20 shadow-xs"
+                          >
+                            Edit
+                          </button>
+                          <span className="px-2 py-[2px] text-amber-300 font-mono font-bold text-[7.5px] sm:text-[8.5px] uppercase tracking-wider bg-zinc-950/90 rounded-full border border-amber-500/30 backdrop-blur-md shadow-xs flex items-center gap-1 select-none" title="Product Watch / Views Counter">
+                            👁️ {getEffectiveViews(item)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Tag badge */}
                       {activeTag && (
                         <div className="absolute top-2 left-2 z-20 px-2 py-[2px] bg-[#059669] text-white rounded-full shadow-xs flex items-center gap-1 max-w-[65%] select-none">
                           <span className="w-1 h-1 rounded-full bg-white shrink-0"></span>
