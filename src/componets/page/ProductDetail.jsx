@@ -35,6 +35,7 @@ import { sendWebhookNotification } from '../../utils/webhookHelper';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
 import Loader from '../pageComponets/Loader';
+import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
 // Image Component with Smooth Surface Placeholder (Memoized at module level to prevent unmount flickering on size/state changes)
 const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", onClick }) => {
   const [isLoaded, setIsLoaded] = useState(false);
