@@ -40,14 +40,10 @@ import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
 const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", onClick }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    setIsLoaded(false);
-  }, [src]);
-
   return (
     <div
       onClick={onClick}
-      className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group transition-all duration-300 hover:border-neutral-900 ${className}`}
+      className={`relative overflow-hidden bg-[var(--color-surface)] border border-neutral-200/80 aspect-3/4 rounded-none cursor-default group ${className}`}
     >
       {!isLoaded && (
         <div className="absolute inset-0 z-10 skeleton flex items-center justify-center">
@@ -61,9 +57,7 @@ const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", on
         loading={loading}
         onLoad={() => setIsLoaded(true)}
         onError={() => setIsLoaded(true)}
-        className={`w-full h-full object-cover object-center transition-all duration-500 ease-out ${
-          isLoaded ? 'opacity-100 scale-100 blur-0' : 'opacity-0 scale-103 blur-[2px]'
-        }`}
+        className="w-full h-full object-cover object-center opacity-100"
       />
     </div>
   );
