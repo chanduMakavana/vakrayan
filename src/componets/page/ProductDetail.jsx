@@ -868,13 +868,22 @@ function ProductDetail() {
    let isMounted = true;
    async function loadCompleteProductStage() {
      try {
-       if (isMounted) setLoading(true);
-        const targetIdOrSlug = String(idOrSlug || '').trim().toLowerCase();
-        const cachedProduct = products.find(p => 
-          (p.slug && String(p.slug).trim().toLowerCase() === targetIdOrSlug) || 
-          (p.$id && String(p.$id).trim().toLowerCase() === targetIdOrSlug) || 
-          (p.id && String(p.id).trim().toLowerCase() === targetIdOrSlug)
-        );
+         const targetIdOrSlug = String(idOrSlug || '').trim().toLowerCase();
+         const cachedProduct = products.find(p => 
+           (p.slug && String(p.slug).trim().toLowerCase() === targetIdOrSlug) || 
+           (p.$id && String(p.$id).trim().toLowerCase() === targetIdOrSlug) || 
+           (p.id && String(p.id).trim().toLowerCase() === targetIdOrSlug)
+         );
+
+         const currentMatch = product && (
+           (product.slug && String(product.slug).trim().toLowerCase() === targetIdOrSlug) ||
+           (product.$id && String(product.$id).trim().toLowerCase() === targetIdOrSlug) ||
+           (product.id && String(product.id).trim().toLowerCase() === targetIdOrSlug)
+         );
+
+         if (!cachedProduct && !currentMatch && isMounted) {
+           setLoading(true);
+         }
        if (cachedProduct) {
          const isProductLive = cachedProduct.is_live === true || cachedProduct.is_live === 'true' || cachedProduct.is_live === 1 || cachedProduct.is_live === '1';
          if (!adminMode && !isProductLive) {
