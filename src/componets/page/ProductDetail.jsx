@@ -1350,6 +1350,13 @@ function ProductDetail() {
     activeVariant
   ]);
 
+  const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
+  const activeImage = galleryImages[activeImageIndex] || '';
+
+  const optimizedActiveImage = useMemo(() => {
+    return activeImage ? getOptimizedImageUrl(activeImage, 1000, 80) : '';
+  }, [activeImage]);
+
   // Background preload all product gallery images into browser RAM cache for 0ms instant lightbox switching
   useEffect(() => {
     galleryImagesRef.current = galleryImages;
@@ -1555,12 +1562,7 @@ function ProductDetail() {
     isAllOutOfStock = totalStock === 0;
   }
 
-  const activeImageIndex = activeImageIdx < galleryImages.length ? activeImageIdx : 0;
-  const activeImage = galleryImages[activeImageIndex] || '';
 
-  const optimizedActiveImage = useMemo(() => {
-    return activeImage ? getOptimizedImageUrl(activeImage, 1000, 80) : '';
-  }, [activeImage]);
 
   const handleLightboxNext = () => {
     if (galleryImages.length <= 1) return;
