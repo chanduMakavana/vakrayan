@@ -7,7 +7,7 @@ import ProductCardSkeleton from './ProductCardSkeleton'
 import { useDelayedLoading } from '../../hooks/useDelayedLoading'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import { scatterProducts } from '../../utils/colorHelper'
-import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer'
+import { getOptimizedImageUrl, preloadProductBatch, preloadImage, DEFAULT_FALLBACK_IMAGE } from '../../utils/imageOptimizer'
 import { getEffectiveViews } from '../../utils/productViews'
 
 const containerVariants = {
@@ -126,21 +126,23 @@ function BestSellerCard({ product, isOutOfStock, isWishlisted, adminMode, naviga
         >
           <img 
             src={getOptimizedImageUrl(frontView, 500, 75)} 
-            alt={product.name} 
+            alt={`${product.name} - ${product.color_name || 'Vakrayan Apparel'}`}
             loading="lazy" 
             decoding="async"
             width={500}
             height={667}
+            onError={(e) => { e.currentTarget.src = DEFAULT_FALLBACK_IMAGE; }}
             className={`w-full h-full object-cover object-center absolute inset-0 transition-image-flip ${hasBackView ? 'group-hover:opacity-0' : ''}`} 
           />
           {hasBackView && (
             <img 
               src={getOptimizedImageUrl(backView, 500, 75)} 
-              alt={`${product.name} back`} 
+              alt={`${product.name} back view`} 
               loading="lazy" 
               decoding="async"
               width={500}
               height={667}
+              onError={(e) => { e.currentTarget.src = DEFAULT_FALLBACK_IMAGE; }}
               className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100" 
             />
           )}

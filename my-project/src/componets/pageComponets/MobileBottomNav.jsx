@@ -69,8 +69,8 @@ function MobileBottomNav() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          aria-label="Mobile navigation"
-          className="md:hidden fixed bottom-0 left-0 right-0 z-[150]"
+          aria-label="Mobile and tablet navigation"
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-[150]"
           style={{
             background: "var(--glass-bg-heavy)",
             backdropFilter: "blur(24px) saturate(180%)",

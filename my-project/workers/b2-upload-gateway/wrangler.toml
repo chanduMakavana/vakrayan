@@ -1,4 +1,4 @@
-﻿name = "b2-upload-gateway"
+name = "b2-upload-gateway"
 main = "index.js"
 compatibility_date = "2024-09-23"
 
@@ -9,7 +9,11 @@ compatibility_date = "2024-09-23"
 # (Find in: Backblaze → Buckets → your bucket → Bucket Settings → Friendly URL)
 
 [vars]
-B2_BUCKET_URL = ""
+B2_KEY_ID = "0052263ad72aac70000000005"
+B2_APPLICATION_KEY = "K005vZrwq55+UUnw7g6Dh1XsCO50aEs"
+B2_BUCKET_NAME = "vakrayan"
+B2_BUCKET_ID = "624286534aad07c29afa0c17"
+B2_BUCKET_URL = "https://f005.backblazeb2.com/file/vakrayan"
 
 [observability]
 enabled = true

@@ -35,7 +35,7 @@ import { sendWebhookNotification } from '../../utils/webhookHelper';
 import cartService from '../../services/cart';
 import { addCartItemState } from '../../features/addToCart';
 import Loader from '../pageComponets/Loader';
-import { getOptimizedImageUrl, preloadImage } from '../../utils/imageOptimizer';
+import { getOptimizedImageUrl, preloadImage, DEFAULT_FALLBACK_IMAGE } from '../../utils/imageOptimizer';
 // Image Component with Smooth Surface Placeholder (Memoized at module level to prevent unmount flickering on size/state changes)
 const ImageWithSkeleton = memo(({ src, alt, className = "", loading = "lazy", onClick }) => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -1872,10 +1872,15 @@ function ProductDetail() {
                 <img
                   ref={mainImageRef}
                   src={optimizedActiveImage}
-                  alt={product.name}
+                  alt={`${product.name} - ${product.color_name || 'Vakrayan Apparel'}`}
+                  loading="eager"
                   fetchPriority="high"
                   decoding="async"
                   onLoad={() => setImageLoaded(true)}
+                  onError={(e) => {
+                    e.currentTarget.src = DEFAULT_FALLBACK_IMAGE;
+                    setImageLoaded(true);
+                  }}
                   style={{
                     transformOrigin: 'center center',
                     transform: mainPhotoZoom > 1 

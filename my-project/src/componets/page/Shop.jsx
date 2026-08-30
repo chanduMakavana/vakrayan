@@ -13,7 +13,7 @@ import { setProducts } from '../../features/productsSlice'
 import { addWishlistItemState, removeWishlistItemState } from '../../features/wishlistSlice'
 import Fuse from 'fuse.js'
 import { scatterProducts } from '../../utils/colorHelper'
-import { getOptimizedImageUrl, preloadProductBatch, preloadImage } from '../../utils/imageOptimizer'
+import { getOptimizedImageUrl, preloadProductBatch, preloadImage, DEFAULT_FALLBACK_IMAGE } from '../../utils/imageOptimizer'
 import { getEffectiveViews } from '../../utils/productViews'
 
 // Clean SVG Icons for Filters & Search (replacing emojis)
@@ -1268,16 +1268,18 @@ function Shop() {
                           <div className={`w-full h-full relative ${isAllOutOfStock ? 'grayscale-[30%] opacity-60' : ''}`} onMouseEnter={() => preloadImage(getOptimizedImageUrl(backView, 600, 75))}>
                             <img
                               src={getOptimizedImageUrl(frontView, 600, 75)}
-                              alt={product.name}
+                              alt={`${product.name} - ${product.color_name || 'Vakrayan Apparel'}`}
                               loading="lazy"
                               decoding="async"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_FALLBACK_IMAGE; }}
                               className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip group-hover:opacity-0"
                             />
                             <img  
                               src={getOptimizedImageUrl(backView, 600, 75)}
-                              alt={`${product.name} alternate frame`}
+                              alt={`${product.name} back view`}
                               loading="lazy"
                               decoding="async"
+                              onError={(e) => { e.currentTarget.src = DEFAULT_FALLBACK_IMAGE; }}
                               className="w-full h-full object-cover object-center absolute inset-0 transition-image-flip opacity-0 group-hover:opacity-100"
                             />
                           </div>

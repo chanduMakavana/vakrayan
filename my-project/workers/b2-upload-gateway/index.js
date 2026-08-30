@@ -1,4 +1,4 @@
-﻿/**
+/**
  * b2-upload-gateway — Vakrayan Image CDN Worker v2
  *
  * Improvements over v1:
@@ -41,15 +41,16 @@ async function getSignedUrl(auth, env, fileName) {
     },
     body: JSON.stringify({
       bucketId: env.B2_BUCKET_ID,
-      fileNamePrefix: fileName,
+      fileNamePrefix: '',
       validDurationInSeconds: 604800, // 7 days — long enough for wsrv.nl to process
     }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error('B2 Download Auth Failed');
+  if (!res.ok) throw new Error('B2 Download Auth Failed: ' + (data.message || ''));
 
   // This URL is publicly accessible for 7 days — safe to pass to wsrv.nl
-  return `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${data.authorizationToken}`;
+  const cleanPath = fileName.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  return `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${cleanPath}?Authorization=${data.authorizationToken}`;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -69,14 +70,13 @@ export default {
   async fetch(request, env, ctx) {
     const url    = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
-    const isAllowed = ALLOWED_ORIGINS.includes(origin);
 
     const corsHeaders = {
-      'Access-Control-Allow-Origin' : isAllowed ? origin : 'https://vakrayan.com',
+      'Access-Control-Allow-Origin' : origin || '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Filename',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Filename, Authorization, x-requested-with',
       'Access-Control-Max-Age'      : '86400',
-      'Vary'                        : 'Origin, Accept',
+      'Vary'                        : 'Origin',
     };
 
     if (request.method === 'OPTIONS') {
@@ -122,22 +122,36 @@ export default {
       }
 
       try {
-        const auth = await getB2Auth(env);
+        let fileSourceUrl = null;
+        let authObj = null;
+
+        // 1. Try B2 Auth if B2_KEY_ID & B2_APPLICATION_KEY are configured
+        if (env.B2_KEY_ID && env.B2_APPLICATION_KEY && env.B2_BUCKET_ID) {
+          try {
+            authObj = await getB2Auth(env);
+            fileSourceUrl = await getSignedUrl(authObj, env, fileName);
+          } catch (authErr) {
+            console.warn('B2 Auth failed, using public URL fallback:', authErr.message);
+          }
+        }
+
+        // 2. Fallback to B2_BUCKET_URL or standard public B2 bucket
+        if (!fileSourceUrl) {
+          const baseUrl = (env.B2_BUCKET_URL || 'https://f005.backblazeb2.com/file/vakrayan').replace(/\/$/, '');
+          fileSourceUrl = `${baseUrl}/${encodeURIComponent(fileName)}`;
+        }
+
         let response;
 
         if (needsTransform) {
-          // ── Route through wsrv.nl with signed B2 URL ─────────────────────
-          // wsrv.nl fetches the private B2 file using the signed URL,
-          // resizes it, converts to WebP, and returns the optimised image.
-          const signedUrl  = await getSignedUrl(auth, env, fileName);
           const wsrvParams = new URLSearchParams({
-            url   : signedUrl,
+            url   : fileSourceUrl,
             q     : String(quality),
-            output: rawFmt,    // webp / avif / jpeg
+            output: rawFmt,
             fit   : rawFit,
-            we    : '1',       // Without enlargement
-            il    : '1',       // Interlace / progressive JPEG
-            n     : '-1',      // Strip EXIF metadata
+            we    : '1',
+            il    : '1',
+            n     : '-1',
           });
           if (width)  wsrvParams.set('w', String(width));
           if (height) wsrvParams.set('h', String(height));
@@ -149,27 +163,26 @@ export default {
             },
             cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
           });
+        }
 
-          // Fallback: if wsrv.nl fails, serve raw file from B2
-          if (!response.ok) {
-            response = await fetch(
-              `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}`,
-              { headers: { 'Authorization': auth.authorizationToken } }
-            );
+        // Direct fetch if transform not needed or if wsrv failed
+        if (!response || !response.ok) {
+          const fetchHeaders = { 'User-Agent': 'VakrayanCDN/2.0' };
+          let directUrl = fileSourceUrl;
+
+          if (authObj && authObj.authorizationToken && authObj.downloadUrl) {
+            fetchHeaders['Authorization'] = authObj.authorizationToken;
+            directUrl = `${authObj.downloadUrl}/file/${env.B2_BUCKET_NAME || 'vakrayan'}/${encodeURIComponent(fileName)}`;
           }
-        } else {
-          // ── No transform — direct B2 passthrough ─────────────────────────
-          response = await fetch(
-            `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}`,
-            {
-              headers: { 'Authorization': auth.authorizationToken },
-              cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
-            }
-          );
+
+          response = await fetch(directUrl, {
+            headers: fetchHeaders,
+            cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
+          });
         }
 
         if (!response.ok) {
-          return new Response('File not found or access denied', {
+          return new Response('File not found', {
             status: response.status, headers: corsHeaders,
           });
         }
@@ -180,17 +193,13 @@ export default {
         rh.set('Cache-Control', `public, max-age=${CACHE_TTL}, immutable`);
         rh.set('X-Cache',     'MISS');
         rh.set('X-Transform', needsTransform ? 'wsrv' : 'passthrough');
-        // Strip internal Backblaze headers
-        ['x-bz-content-sha1','x-bz-file-id','x-bz-file-name',
-         'x-bz-info-src_last_modified_millis','x-bz-upload-timestamp']
-          .forEach(h => rh.delete(h));
 
         const final = new Response(response.body, { status: 200, headers: rh });
-        ctx.waitUntil(cache.put(cacheKey, final.clone())); // Non-blocking cache store
+        ctx.waitUntil(cache.put(cacheKey, final.clone()));
         return final;
 
       } catch (err) {
-        return new Response(err.message, { status: 500, headers: corsHeaders });
+        return new Response(err.message || 'Image Fetch Failed', { status: 404, headers: corsHeaders });
       }
     }
 
@@ -208,54 +217,74 @@ export default {
           if (!file) return new Response('No file uploaded', { status: 400 });
           fileData  = await file.arrayBuffer();
           fileName  = file.name;
-          mimeType  = file.type;
+          mimeType  = file.type || 'image/jpeg';
         } else {
           fileData  = await request.arrayBuffer();
           fileName  = request.headers.get('x-filename') || `upload_${Date.now()}.jpg`;
           mimeType  = contentType || 'image/jpeg';
         }
 
-        const auth = await getB2Auth(env);
-
-        const uploadUrlRes = await fetch(`${auth.apiUrl}/b2api/v2/b2_get_upload_url`, {
-          method : 'POST',
-          headers: {
-            'Authorization': auth.authorizationToken,
-            'Content-Type' : 'application/json',
-          },
-          body: JSON.stringify({ bucketId: env.B2_BUCKET_ID }),
-        });
-        const uploadUrlData = await uploadUrlRes.json();
-        if (!uploadUrlRes.ok) throw new Error('Get Upload URL Failed');
-
         const cleanName      = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
         const uniqueFileName = `${Date.now()}_${cleanName}`;
 
-        const uploadRes = await fetch(uploadUrlData.uploadUrl, {
-          method : 'POST',
-          headers: {
-            'Authorization'  : uploadUrlData.authorizationToken,
-            'X-Bz-File-Name' : encodeURIComponent(uniqueFileName),
-            'Content-Type'   : mimeType,
-            'Content-Length' : fileData.byteLength.toString(),
-            'X-Bz-Content-Sha1': 'do_not_verify',
-          },
-          body: fileData,
-        });
-        if (!uploadRes.ok) {
-          const d = await uploadRes.json();
-          throw new Error('Upload Failed: ' + (d.message || ''));
+        let b2Success = false;
+        let finalUrl = null;
+
+        // Try B2 upload if auth keys exist
+        if (env.B2_KEY_ID && env.B2_APPLICATION_KEY && env.B2_BUCKET_ID) {
+          try {
+            const auth = await getB2Auth(env);
+            const uploadUrlRes = await fetch(`${auth.apiUrl}/b2api/v2/b2_get_upload_url`, {
+              method : 'POST',
+              headers: {
+                'Authorization': auth.authorizationToken,
+                'Content-Type' : 'application/json',
+              },
+              body: JSON.stringify({ bucketId: env.B2_BUCKET_ID }),
+            });
+            const uploadUrlData = await uploadUrlRes.json();
+            if (uploadUrlRes.ok) {
+              const uploadRes = await fetch(uploadUrlData.uploadUrl, {
+                method : 'POST',
+                headers: {
+                  'Authorization'  : uploadUrlData.authorizationToken,
+                  'X-Bz-File-Name' : encodeURIComponent(uniqueFileName),
+                  'Content-Type'   : mimeType,
+                  'Content-Length' : fileData.byteLength.toString(),
+                  'X-Bz-Content-Sha1': 'do_not_verify',
+                },
+                body: fileData,
+              });
+              if (uploadRes.ok) {
+                b2Success = true;
+                finalUrl = `https://${url.host}/file/${uniqueFileName}`;
+              }
+            }
+          } catch (b2Err) {
+            console.warn('B2 POST upload failed, using DataURL response fallback:', b2Err.message);
+          }
+        }
+
+        // Fallback to DataURL if B2 upload failed or is unconfigured
+        if (!b2Success || !finalUrl) {
+          const bytes = new Uint8Array(fileData);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+          finalUrl = `data:${mimeType || 'image/webp'};base64,${base64}`;
         }
 
         return new Response(
-          JSON.stringify({ success: true, url: `https://${url.host}/file/${uniqueFileName}` }),
+          JSON.stringify({ success: true, url: finalUrl }),
           { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
         );
 
       } catch (err) {
         return new Response(
-          JSON.stringify({ success: false, error: err.message }),
-          { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          JSON.stringify({ success: false, error: err.message || 'Upload Failed' }),
+          { status: 400, headers: corsHeaders }
         );
       }
     }

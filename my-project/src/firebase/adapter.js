@@ -1,4 +1,5 @@
 import { auth, db as firestore, storage as firebaseStorage, googleProvider } from './config';
+import { conf } from '../services/conf/conf';
 import { 
   createUserWithEmailAndPassword, signInWithEmailAndPassword, 
   signOut, onAuthStateChanged, updateProfile, signInWithPopup, signInWithRedirect, getRedirectResult,
@@ -9,7 +10,7 @@ import {
   collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, limit, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { 
-  ref, uploadBytes, getDownloadURL 
+  ref, uploadBytes, getDownloadURL, deleteObject 
 } from 'firebase/storage';
 
 export class Client {
@@ -467,11 +468,13 @@ export class Databases {
 export class Storage {
     constructor(client) { this.client = client; }
 
-    async createFile(bucketId, fileId, file) {
-        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "";
+    async createFile(bucketId = 'products', fileId, file) {
+        if (!file) throw new Error("No file provided for upload.");
+
+        const workerUrl = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || conf?.firebaseCloudflareWorkerUrl || "https://b2-upload-gateway.vakrayan.workers.dev/";
         
-        // If Backblaze/Cloudflare Worker is configured, route uploads there!
-        if (workerUrl) {
+        // Prioritize Backblaze B2 via Cloudflare Worker Gateway
+        if (workerUrl && typeof workerUrl === 'string' && workerUrl.startsWith('http')) {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -483,26 +486,38 @@ export class Storage {
                 
                 if (response.ok) {
                     const data = await response.json();
-                    if (data && data.url) {
-                        return { $id: data.url };
+                    const candidateUrl = data?.url || data?.link || data?.fileUrl;
+                    if (candidateUrl && typeof candidateUrl === 'string' && candidateUrl.startsWith('http') && !candidateUrl.startsWith('data:')) {
+                        return { $id: candidateUrl, url: candidateUrl };
                     }
                 }
-                console.warn("Cloudflare Worker in adapter returned non-ok status or missing URL, falling back to Firebase Storage.");
+                console.warn("Cloudflare Worker upload response not OK, falling back to Firebase Storage.");
             } catch (err) {
-                console.warn("Cloudflare Worker upload in adapter failed, falling back to Firebase Storage:", err.message);
+                console.warn("Cloudflare Worker upload failed, falling back to Firebase Storage:", err.message);
             }
         }
 
-        // Fallback to Firebase Storage
-        const uniqueId = fileId === 'unique()' ? Date.now().toString() : fileId;
-        const storageRef = ref(firebaseStorage, `${bucketId}/${uniqueId}_${file.name}`);
-        await uploadBytes(storageRef, file);
+        // Primary Production Storage: Upload directly to Firebase Storage
         try {
+            const cleanName = (file.name || 'image').replace(/[^a-zA-Z0-9._-]/g, '_');
+            const uniquePrefix = fileId && fileId !== 'unique()' ? fileId : `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+            const folder = bucketId || 'products';
+            const storagePath = `${folder}/${uniquePrefix}_${cleanName}`;
+            
+            const storageRef = ref(firebaseStorage, storagePath);
+            const metadata = {
+                contentType: file.type || 'image/jpeg',
+                customMetadata: {
+                    uploadedAt: new Date().toISOString()
+                }
+            };
+            
+            await uploadBytes(storageRef, file, metadata);
             const downloadUrl = await getDownloadURL(storageRef);
-            return { $id: downloadUrl };
-        } catch {
-            const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'vakrayan-9ce25.firebasestorage.app';
-            return { $id: `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(storageRef.fullPath)}?alt=media` };
+            return { $id: downloadUrl, url: downloadUrl, path: storagePath };
+        } catch (firebaseErr) {
+            console.error("Firebase Storage uploadBytes error:", firebaseErr);
+            throw new Error(`Firebase Storage upload failed: ${firebaseErr.message}`);
         }
     }
 
@@ -514,8 +529,8 @@ export class Storage {
         if (typeof fileId !== 'string') return '';
         fileId = fileId.trim();
 
-        // If fileId is already a full URL (like from Backblaze or Firebase Storage getDownloadURL), just return it
-        if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+        // If fileId is already a full URL or DataURL, return directly with domain fixes
+        if (fileId.startsWith('http://') || fileId.startsWith('https://') || fileId.startsWith('data:image/')) {
             if (fileId.includes('chandumakavana61.workers.dev')) {
                 return fileId.replace(/b2-upload-gateway\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
                              .replace(/vakrayan-data\.chandumakavana61\.workers\.dev/g, 'b2-upload-gateway.vakrayan.workers.dev')
@@ -523,13 +538,38 @@ export class Storage {
             }
             return fileId;
         }
-        const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '';
+        const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'vakrayan-9ce25.firebasestorage.app';
         return `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(fileId)}?alt=media`;
     }
     
-    async deleteFile(_bucketId, _fileId) {
-        // Mock
-        return true;
+    async deleteFile(bucketId = 'products', fileIdOrUrl) {
+        if (!fileIdOrUrl || typeof fileIdOrUrl !== 'string') return true;
+        fileIdOrUrl = fileIdOrUrl.trim();
+
+        try {
+            let storagePath = fileIdOrUrl;
+            if (fileIdOrUrl.startsWith('http://') || fileIdOrUrl.startsWith('https://')) {
+                if (fileIdOrUrl.includes('firebasestorage.googleapis.com')) {
+                    const decodedUrl = decodeURIComponent(fileIdOrUrl);
+                    const match = decodedUrl.match(/\/o\/([^?#]+)/);
+                    if (match && match[1]) {
+                        storagePath = match[1];
+                    } else {
+                        return true; // Not a deletable path pattern
+                    }
+                } else {
+                    // External URL or worker URL — skip Firebase Storage deletion
+                    return true;
+                }
+            }
+
+            const storageRef = ref(firebaseStorage, storagePath);
+            await deleteObject(storageRef);
+            return true;
+        } catch (err) {
+            console.warn("Firebase Storage file deletion warning (file may already be removed):", err.message);
+            return true; // Graceful non-blocking resolve
+        }
     }
 }
 

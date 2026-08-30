@@ -9,7 +9,7 @@ import { useToast } from '../../context/ToastContext';
 import restockService from '../../services/restock';
 import couponUsageService from '../../services/couponUsage';
 import cartService from '../../services/cart';
-import storageService from '../../services/storage';
+import storageService, { validateImageFile } from '../../services/storage';
 import slidesService from '../../services/slides';
 import offersService from '../../services/offers';
 import walletService from '../../services/wallet';
@@ -605,20 +605,38 @@ function AdminPanel() {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
 
+    const validation = validateImageFile(file, 10);
+    if (!validation.valid) {
+      showToast(`⚠️ ${validation.error}`, "error");
+      return;
+    }
+
+    const previousUrl = watch(fieldName);
+    let objectUrl = null;
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {}
+
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
       const response = await storageService.uploadFile(file);
       const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
       if (fileUrl) {
         setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-        showToast("✓ Image uploaded successfully to Cloud Storage!", "success");
+        showToast("✓ Image uploaded successfully!", "success");
+        if (previousUrl && previousUrl !== fileUrl && previousUrl.includes('firebasestorage.googleapis.com')) {
+          storageService.deleteFile(previousUrl).catch(() => {});
+        }
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image drop upload failed:", err);
-      showToast("Cloud Storage upload failed.", "error");
+      showToast(`Upload failed: ${err.message || 'Please try again.'}`, "error");
     } finally {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
     }
   };
@@ -649,17 +667,20 @@ function AdminPanel() {
           {isUploading ? (
             <div className="flex flex-col items-center gap-2">
               <div className="w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin" />
-              <span className="text-[10px] font-mono tracking-wider text-[var(--color-muted)] uppercase animate-pulse">Uploading...</span>
+              <span className="text-[10px] font-mono tracking-wider text-[var(--color-muted)] uppercase animate-pulse">Uploading Image...</span>
             </div>
           ) : imgUrl ? (
             <div className="relative w-full flex flex-col items-center gap-3 z-20">
               <div className="relative group w-20 h-24 rounded-lg overflow-hidden border border-[var(--color-border)] shadow-xs">
-                <img src={getOptimizedImageUrl(imgUrl, 160, 75)} alt="Product view" className="w-full h-full object-cover" />
+                <img src={getOptimizedImageUrl(imgUrl, 160, 75)} alt="Product preview" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    if (imgUrl && imgUrl.includes('firebasestorage.googleapis.com')) {
+                      storageService.deleteFile(imgUrl).catch(() => {});
+                    }
                     setValue(fieldName, '', { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                   }}
                   className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200 cursor-pointer"
@@ -676,7 +697,7 @@ function AdminPanel() {
                   Change Image
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/svg+xml"
                     onChange={(e) => handleProductImageUpload(e, fieldName)}
                     disabled={isUploading}
                     className="hidden"
@@ -689,7 +710,7 @@ function AdminPanel() {
               {/* Native full-area file input for 100% reliable click & drag-and-drop */}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/svg+xml"
                 onChange={(e) => handleProductImageUpload(e, fieldName)}
                 disabled={isUploading}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -702,7 +723,7 @@ function AdminPanel() {
                     Drag & Drop Image here
                   </p>
                   <p className="text-[9px] text-[var(--color-muted)] uppercase font-medium">
-                    or click to browse local files
+                    or click to browse local files (JPG, PNG, WebP, AVIF — max 10MB)
                   </p>
                 </div>
               </div>
@@ -710,7 +731,7 @@ function AdminPanel() {
           )}
         </div>
 
-        {/* Text input fallback so they can still paste direct URLs */}
+        {/* Text input fallback so direct URLs can still be pasted if desired */}
         <div className="mt-1 flex items-center gap-1.5 bg-neutral-900/[0.02] p-1.5 rounded-lg border border-[var(--color-border)]/40">
           <span className="text-[8px] font-mono text-[var(--color-muted)] uppercase tracking-wider pl-1.5">Or paste link:</span>
           <input
@@ -740,20 +761,39 @@ function AdminPanel() {
     const file = e?.target?.files?.[0];
     if (!file) return;
 
+    const validation = validateImageFile(file, 10);
+    if (!validation.valid) {
+      showToast(`⚠️ ${validation.error}`, "error");
+      if (e?.target) e.target.value = '';
+      return;
+    }
+
+    const previousUrl = watch(fieldName);
+    let objectUrl = null;
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {}
+
     setUploadingFields(prev => ({ ...prev, [fieldName]: true }));
     try {
       const response = await storageService.uploadFile(file);
       const fileUrl = storageService.getFileView(response?.$id || response?.url || response);
       if (fileUrl) {
         setValue(fieldName, fileUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-        showToast("✓ Image uploaded successfully!", "success");
+        showToast("✓ Images uploaded successfully", "success");
+        if (previousUrl && previousUrl !== fileUrl && previousUrl.includes('firebasestorage.googleapis.com')) {
+          storageService.deleteFile(previousUrl).catch(() => {});
+        }
       } else {
         throw new Error("Failed to upload image file");
       }
     } catch (err) {
       console.error("Product image upload failed:", err);
-      showToast("Cloud Storage upload failed.", "error");
+      showToast(`Upload failed: ${err.message || 'Please try again.'}`, "error");
     } finally {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
       setUploadingFields(prev => ({ ...prev, [fieldName]: false }));
       if (e?.target) e.target.value = '';
     }
@@ -854,6 +894,17 @@ function AdminPanel() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const onSubmit = async (data) => {
+    if (Object.values(uploadingFields).some(Boolean)) {
+      showToast("⚠️ Image upload is currently in progress. Please wait until finished.", "error");
+      return;
+    }
+
+    const primaryImage = (data.front_image_link || "").trim();
+    if (!primaryImage) {
+      showToast("⚠️ Primary Product Image (Front View) is compulsory! Please upload or select an image.", "error");
+      return;
+    }
+
     if (data.is_featured) {
       const featuredCount = products.filter(p => 
         (p.is_featured === true || p.is_featured === 'true' || p.is_featured === 1 || p.is_featured === '1') &&
@@ -1206,8 +1257,25 @@ function AdminPanel() {
     if (!sweepTargetProductId) return;
     setIsSweepProductModalOpen(false);
     try {
+      const targetProd = products.find(p => (p.$id || p.id) === sweepTargetProductId);
       await productsService.deleteProduct(sweepTargetProductId);
       showToast('🗑️ Live Drop Revoked From Firebase Repository Pool!', 'success');
+
+      // Asynchronously purge associated storage files
+      if (targetProd) {
+        const imagesToPurge = [
+          targetProd.front_image_link,
+          targetProd.image_url,
+          targetProd.image,
+          ...(Array.isArray(targetProd.back_image_links) ? targetProd.back_image_links : [targetProd.back_image_link])
+        ].filter(Boolean);
+
+        imagesToPurge.forEach(url => {
+          if (typeof url === 'string' && url.includes('firebasestorage.googleapis.com')) {
+            storageService.deleteFile(url).catch(() => {});
+          }
+        });
+      }
     } catch (err) {
       console.error("Failed to delete product:", err.message);
       showToast("Failed to delete product. Check Firebase connection.", "error");
