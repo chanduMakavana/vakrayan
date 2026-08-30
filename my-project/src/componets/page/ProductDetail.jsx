@@ -2062,21 +2062,15 @@ function ProductDetail() {
             {(() => {
 
               if (product.color_group_id && groupProducts.length > 1) {
-                const currentProdId = product.$id || product.id;
-                const sortedGroupProducts = [
-                  ...groupProducts.filter(s => (s.$id || s.id) === currentProdId),
-                  ...groupProducts.filter(s => (s.$id || s.id) !== currentProdId)
-                ];
-
                 return (
                   <div className="space-y-2 pb-1">
                     <h4 className="text-xs font-mono font-bold text-[var(--color-muted)] uppercase tracking-widest">
                       COLOR: <span className="text-neutral-950 font-sans font-extrabold">{product.color_name || 'ORIGINAL'}</span>
                     </h4>
                     <div className="flex gap-2.5 flex-wrap">
-                      {sortedGroupProducts.map((sibling) => {
+                      {groupProducts.map((sibling) => {
                         const siblingId = sibling.$id || sibling.id;
-                        const isCurrent = siblingId === currentProdId;
+                        const isCurrent = siblingId === (product.$id || product.id);
                         const siblingImage = sibling.front_image_link || sibling.image_url || sibling.image || 'https://placehold.co/100x125';
                         return (
                           <button
