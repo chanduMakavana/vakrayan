@@ -2639,7 +2639,7 @@ function ProductDetail() {
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5 lg:gap-3.5">
               {suggestProduct.map((item) => {
                 const uniqueId = item.$id || item.id;
                 const frontView = item.front_image_link || item.image_url || item.image || 'https://placehold.co/400x500?text=No+Preview';

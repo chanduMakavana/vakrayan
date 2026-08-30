@@ -1,4 +1,4 @@
-﻿/**
+/**
  * b2-upload-gateway — Vakrayan Image CDN Worker v2
  *
  * Improvements over v1:
