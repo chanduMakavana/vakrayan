@@ -721,9 +721,25 @@ function Checkout() {
     }, 450);
 
     try {
-      const orderNumber = generateOrderNumber();
-      const discountedAmount = Math.round(cartTotalAmount - discountAmount);
-      const baseShipping = cartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
+      // 0. Recalculate and verify subtotal against actual catalog product prices to prevent price tampering
+      let verifiedSubtotal = 0;
+      const verifiedCartItems = cartItems.map(item => {
+        const catalogProduct = products.find(p => p.$id === item.product_id || p.id === item.product_id);
+        const actualPrice = catalogProduct
+          ? Number(catalogProduct.sale_price || catalogProduct.price || item.price)
+          : Number(item.price);
+        const qty = Math.max(1, Number(item.quantity || 1));
+        verifiedSubtotal += actualPrice * qty;
+        return {
+          ...item,
+          price: actualPrice,
+          quantity: qty
+        };
+      });
+
+      const actualSubtotal = Math.round(verifiedSubtotal);
+      const discountedAmount = Math.max(0, Math.round(actualSubtotal - discountAmount));
+      const baseShipping = verifiedCartItems.length === 0 ? 0 : (discountedAmount >= 999 ? 0 : 99);
       const currentCodFee = method === 'COD' ? 30 : 0;
       const isRemote = !isCodAvailableForPincode(formData.pincode, formData.state);
       const remoteSurcharge = isRemote ? 80 : 0;
@@ -742,7 +758,7 @@ function Checkout() {
           amount: calculatedFinalAmount,
           type: 'debit',
           title: `Payment for Order ${orderNumber}`,
-          referenceId: `wallet_order_${Date.now()}`
+          referenceId: `wallet_order_${orderNumber}`
         });
         if (!walletDebit) {
           throw new Error("Wallet balance debit failed. Please check your balance or try another payment method.");

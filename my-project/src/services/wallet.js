@@ -17,6 +17,26 @@ export class WalletService {
                 return null;
             }
 
+            if (referenceId) {
+                try {
+                    const existing = await this.databases.listDocuments(
+                        conf.firebaseDatabaseId,
+                        conf.firebaseWalletCollectionId,
+                        [
+                            Query.equal("userId", userId),
+                            Query.equal("referenceId", referenceId),
+                            Query.limit(1)
+                        ]
+                    );
+                    if (existing?.documents?.length > 0) {
+                        console.warn(`Wallet transaction with referenceId "${referenceId}" already exists. Skipping duplicate.`);
+                        return existing.documents[0];
+                    }
+                } catch (checkErr) {
+                    console.warn("Idempotency check warning:", checkErr.message);
+                }
+            }
+
             const payload = {
                 userId,
                 amount: Number(amount),

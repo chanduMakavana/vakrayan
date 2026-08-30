@@ -165,8 +165,8 @@ function Hero() {
   if (!slides || slides.length === 0) {
     return (
       <div 
-        className="w-full relative overflow-hidden select-none" 
-        style={{ height: 'clamp(300px, 70vh, 90vh)', background: 'linear-gradient(135deg, #0D1A14 0%, #071A10 100%)' }}
+        className="w-full relative overflow-hidden select-none min-h-[350px] h-[55vh] max-h-[580px] md:h-[70vh] md:max-h-none" 
+        style={{ background: 'linear-gradient(135deg, #0D1A14 0%, #071A10 100%)' }}
       >
         <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full animate-pulse" style={{ background: '#059669', filter: 'blur(80px)', opacity: 0.08 }} />
         <div className="absolute bottom-1/3 right-1/4 w-48 h-48 rounded-full animate-pulse" style={{ background: '#34D399', filter: 'blur(60px)', opacity: 0.06 }} />
@@ -207,8 +207,7 @@ function Hero() {
 
   return (
     <div 
-      className="w-full relative overflow-hidden select-none touch-pan-y bg-neutral-950" 
-      style={{ height: 'clamp(300px, 70vh, 90vh)' }}
+      className="w-full relative overflow-hidden select-none touch-pan-y bg-neutral-950 min-h-[350px] h-[55vh] max-h-[580px] md:h-[70vh] md:max-h-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleMouseDown}
@@ -233,7 +232,7 @@ function Hero() {
               fetchPriority="high"
               width={isMobile ? 800 : 1600}
               height={isMobile ? 600 : 900}
-              className="w-full h-full object-cover select-none pointer-events-none"
+              className="w-full h-full object-cover object-top md:object-center select-none pointer-events-none"
               draggable={false}
             />
             {/* Gradient overlay - bottom to top */}
