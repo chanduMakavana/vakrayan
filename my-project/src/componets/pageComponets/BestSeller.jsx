@@ -233,7 +233,7 @@ function BestSellers() {
     <section id="drops" className="scroll-mt-20 selection:bg-[var(--color-accent)] selection:text-white"
       style={{ background: 'var(--color-bg)', padding: '48px 0 24px 0', borderTop: '1px solid var(--color-border)' }}
     >
-      <div className="max-w-[1728px] mx-auto px-2 sm:px-4 md:px-12">
+      <div className="max-w-[1728px] mx-auto px-4 md:px-12">
 
         {/* Section Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -248,7 +248,7 @@ function BestSellers() {
 
         {/* Loading skeletons */}
         {showSkeletons && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-3.5 md:gap-3.5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
         )}
@@ -267,7 +267,7 @@ function BestSellers() {
         )}
 
         {/* Products Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-3.5 md:gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {!loading && displayedProducts.map((product) => (
             <BestSellerCard
               key={product.$id || product.id}

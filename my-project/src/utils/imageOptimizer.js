@@ -129,22 +129,3 @@ export function preloadProductBatch(products = [], limit = 6) {
     }
   });
 }
-
-/**
- * Global image load error handler for <img> elements.
- * Automatically retries loading raw URL without parameters or falls back to a safe placeholder.
- */
-export function handleImageError(e, fallbackUrl = 'https://placehold.co/600x800?text=Vakrayan+Apparel') {
-  const img = e?.currentTarget || e?.target;
-  if (!img) return;
-
-  if (img.dataset.hasFallback) return;
-  img.dataset.hasFallback = 'true';
-
-  const src = img.src || '';
-  if (src.includes('?')) {
-    img.src = src.split('?')[0];
-  } else {
-    img.src = fallbackUrl;
-  }
-}

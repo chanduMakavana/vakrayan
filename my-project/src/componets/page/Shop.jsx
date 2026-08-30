@@ -680,12 +680,12 @@ function Shop() {
     selectedColors.length > 0 || 
     inStockOnly
 
-  const gridClass = `grid grid-cols-2 gap-x-1.5 gap-y-3.5 sm:gap-x-4 sm:gap-y-8 ${
+  const gridClass = `grid grid-cols-2 gap-x-2 gap-y-4 sm:gap-x-4 sm:gap-y-8 ${
     cols === 2 
-      ? 'md:grid-cols-2 lg:grid-cols-2 md:gap-x-6 md:gap-y-10' 
+      ? 'md:grid-cols-2 lg:grid-cols-2 md:gap-x-12 md:gap-y-16' 
       : cols === 3 
-        ? 'md:grid-cols-3 lg:grid-cols-3 md:gap-x-4 md:gap-y-10' 
-        : 'md:grid-cols-4 lg:grid-cols-4 md:gap-x-3.5 md:gap-y-10'
+        ? 'md:grid-cols-3 lg:grid-cols-3 md:gap-x-10 md:gap-y-16' 
+        : 'md:grid-cols-4 lg:grid-cols-4 md:gap-x-8 md:gap-y-16'
   }`
 
   // Debounced search analytics — declared after filteredProducts so length is accessible
@@ -734,7 +734,7 @@ function Shop() {
     <>
       
       <div className="w-full min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] font-sans relative selection:bg-[var(--color-accent)] selection:text-white pb-16">
-        <div className="max-w-[1728px] mx-auto px-2 sm:px-4 md:px-12 py-3 md:py-10 relative z-20 space-y-3 md:space-y-8">
+        <div className="max-w-[1728px] mx-auto px-4 md:px-12 py-5 md:py-10 relative z-20 space-y-4 md:space-y-8">
           
           {/* Headline Title */}
           <div className="text-center md:text-left space-y-1 border-b border-[var(--color-border)] pb-3 md:pb-5">

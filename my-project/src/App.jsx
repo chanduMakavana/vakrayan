@@ -112,11 +112,26 @@ const isKnownRoute = (pathname) => {
   return KNOWN_ROUTES.some(r => r !== '/' && pathname.startsWith(r));
 }
 
+// Elegant Vertical Lift page transition variants
+const pageVariants = {
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } },
+  exit:    { opacity: 0, y: -12, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } },
+}
+
 function PageWrapper({ children }) {
   return (
-    <main id="main-content" className="flex-1 w-full" tabIndex="-1">
-      {children}
-    </main>
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      style={{ width: '100%' }}
+    >
+      <main id="main-content" className="flex-1 w-full" tabIndex="-1">
+        {children}
+      </main>
+    </motion.div>
   )
 }
 
@@ -138,40 +153,44 @@ function PageLoader() {
 }
 
 function AppRoutes() {
+  const location = useLocation()
+
   return (
     <Suspense fallback={<PageLoader />}>
-      <Routes>
-        {/* Public routes */}
-        <Route path='/signup'              element={<PageWrapper><SignUp /></PageWrapper>} />
-        <Route path='/login'               element={<PageWrapper><Login /></PageWrapper>} />
-        <Route path='/reset-password'      element={<PageWrapper><ResetPassword /></PageWrapper>} />
-        <Route path='/'                    element={<PageWrapper><Home /></PageWrapper>} />
-        <Route path='/product/:idOrSlug'   element={<PageWrapper><ProductDetail /></PageWrapper>} />
-        <Route path='/product/:idOrSlug/reviews' element={<PageWrapper><ProductReviews /></PageWrapper>} />
-        <Route path='/shop'                element={<PageWrapper><Shop /></PageWrapper>} />
-        <Route path='/category/:category'  element={<PageWrapper><Shop /></PageWrapper>} />
-        <Route path='/cart'                element={<PageWrapper><AddToCartPage /></PageWrapper>} />
-        <Route path='/terms'               element={<PageWrapper><LegalPage /></PageWrapper>} />
-        <Route path='/privacy'             element={<PageWrapper><LegalPage /></PageWrapper>} />
-        <Route path='/privacy-policy'      element={<PageWrapper><LegalPage /></PageWrapper>} />
-        <Route path='/*'                   element={<PageWrapper><NotFound /></PageWrapper>} />
+      <AnimatePresence mode="wait" initial={false}>
+        <Routes location={location} key={location.pathname}>
+          {/* Public routes */}
+          <Route path='/signup'              element={<PageWrapper><SignUp /></PageWrapper>} />
+          <Route path='/login'               element={<PageWrapper><Login /></PageWrapper>} />
+          <Route path='/reset-password'      element={<PageWrapper><ResetPassword /></PageWrapper>} />
+          <Route path='/'                    element={<PageWrapper><Home /></PageWrapper>} />
+          <Route path='/product/:idOrSlug'   element={<PageWrapper><ProductDetail /></PageWrapper>} />
+          <Route path='/product/:idOrSlug/reviews' element={<PageWrapper><ProductReviews /></PageWrapper>} />
+          <Route path='/shop'                element={<PageWrapper><Shop /></PageWrapper>} />
+          <Route path='/category/:category'  element={<PageWrapper><Shop /></PageWrapper>} />
+          <Route path='/cart'                element={<PageWrapper><AddToCartPage /></PageWrapper>} />
+          <Route path='/terms'               element={<PageWrapper><LegalPage /></PageWrapper>} />
+          <Route path='/privacy'             element={<PageWrapper><LegalPage /></PageWrapper>} />
+          <Route path='/privacy-policy'      element={<PageWrapper><LegalPage /></PageWrapper>} />
+          <Route path='/*'                   element={<PageWrapper><NotFound /></PageWrapper>} />
 
-        {/* Protected routes */}
-        <Route path='/checkout' element={
-          <ProtectedRoute><PageWrapper><Checkout /></PageWrapper></ProtectedRoute>
-        } />
-        <Route path='/profile' element={
-          <ProtectedRoute><PageWrapper><UserProfile /></PageWrapper></ProtectedRoute>
-        } />
-        <Route path='/order/:id' element={
-          <ProtectedRoute><PageWrapper><OrderDetail /></PageWrapper></ProtectedRoute>
-        } />
+          {/* Protected routes */}
+          <Route path='/checkout' element={
+            <ProtectedRoute><PageWrapper><Checkout /></PageWrapper></ProtectedRoute>
+          } />
+          <Route path='/profile' element={
+            <ProtectedRoute><PageWrapper><UserProfile /></PageWrapper></ProtectedRoute>
+          } />
+          <Route path='/order/:id' element={
+            <ProtectedRoute><PageWrapper><OrderDetail /></PageWrapper></ProtectedRoute>
+          } />
 
-        {/* Admin-only route */}
-        <Route path='/admin' element={
-          <AdminRoute><PageWrapper><AdminPanel /></PageWrapper></AdminRoute>
-        } />
-      </Routes>
+          {/* Admin-only route */}
+          <Route path='/admin' element={
+            <AdminRoute><PageWrapper><AdminPanel /></PageWrapper></AdminRoute>
+          } />
+        </Routes>
+      </AnimatePresence>
     </Suspense>
   )
 }

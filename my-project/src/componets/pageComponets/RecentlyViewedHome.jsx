@@ -72,7 +72,7 @@ function RecentlyViewedHome() {
     <section
       style={{ background: 'var(--color-bg)', padding: '36px 0 40px 0', borderTop: '1px solid var(--color-border)' }}
     >
-      <div className="max-w-[1728px] mx-auto px-2 sm:px-4 md:px-12">
+      <div className="max-w-[1728px] mx-auto px-4 md:px-12">
         {/* Header */}
         <div className="mb-6">
           <div className="accent-line mb-3" />
@@ -84,7 +84,7 @@ function RecentlyViewedHome() {
         </div>
 
         {/* Products grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-3.5 md:gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {viewedProducts.map((product) => {
             const parentId = product.$id || product.id;
             const frontView = product.front_image_link || product.image_url || product.image || 'https://placehold.co/400x500?text=No+Image';

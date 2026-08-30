@@ -1,4 +1,4 @@
-/**
+﻿/**
  * b2-upload-gateway — Vakrayan Image CDN Worker v2
  *
  * Improvements over v1:
@@ -20,23 +20,15 @@ let _authExpiry = 0;
 async function getB2Auth(env) {
   if (_cachedAuth && Date.now() < _authExpiry) return _cachedAuth;
 
-  try {
-    const res = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
-      headers: { 'Authorization': 'Basic ' + btoa(env.B2_KEY_ID + ':' + env.B2_APPLICATION_KEY) }
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      _cachedAuth = null;
-      throw new Error('B2 Auth Failed: ' + (data.message || ''));
-    }
+  const res = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
+    headers: { 'Authorization': 'Basic ' + btoa(env.B2_KEY_ID + ':' + env.B2_APPLICATION_KEY) }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error('B2 Auth Failed: ' + (data.message || ''));
 
-    _cachedAuth = data;
-    _authExpiry = Date.now() + 23 * 60 * 60 * 1000; // Cache 23 hours (token valid 24h)
-    return _cachedAuth;
-  } catch (err) {
-    _cachedAuth = null;
-    throw err;
-  }
+  _cachedAuth = data;
+  _authExpiry = Date.now() + 23 * 60 * 60 * 1000; // Cache 23 hours (token valid 24h)
+  return _cachedAuth;
 }
 
 // ── Generates a signed B2 URL that wsrv.nl can access ────────────────────────
@@ -54,7 +46,7 @@ async function getSignedUrl(auth, env, fileName) {
     }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error('B2 Download Auth Failed: ' + (data.message || ''));
+  if (!res.ok) throw new Error('B2 Download Auth Failed');
 
   // This URL is publicly accessible for 7 days — safe to pass to wsrv.nl
   return `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}?Authorization=${data.authorizationToken}`;
@@ -130,68 +122,55 @@ export default {
       }
 
       try {
-        let auth = await getB2Auth(env);
+        const auth = await getB2Auth(env);
         let response;
 
-        const fetchRawFromB2 = async (authObj) => {
-          return fetch(
-            `${authObj.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}`,
-            {
-              headers: { 'Authorization': authObj.authorizationToken },
-              cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
-            }
-          );
-        };
-
         if (needsTransform) {
-          try {
-            const signedUrl  = await getSignedUrl(auth, env, fileName);
-            const wsrvParams = new URLSearchParams({
-              url   : signedUrl,
-              q     : String(quality),
-              output: rawFmt,    // webp / avif / jpeg
-              fit   : rawFit,
-              we    : '1',       // Without enlargement
-              il    : '1',       // Interlace / progressive JPEG
-              n     : '-1',      // Strip EXIF metadata
-            });
-            if (width)  wsrvParams.set('w', String(width));
-            if (height) wsrvParams.set('h', String(height));
+          // ── Route through wsrv.nl with signed B2 URL ─────────────────────
+          // wsrv.nl fetches the private B2 file using the signed URL,
+          // resizes it, converts to WebP, and returns the optimised image.
+          const signedUrl  = await getSignedUrl(auth, env, fileName);
+          const wsrvParams = new URLSearchParams({
+            url   : signedUrl,
+            q     : String(quality),
+            output: rawFmt,    // webp / avif / jpeg
+            fit   : rawFit,
+            we    : '1',       // Without enlargement
+            il    : '1',       // Interlace / progressive JPEG
+            n     : '-1',      // Strip EXIF metadata
+          });
+          if (width)  wsrvParams.set('w', String(width));
+          if (height) wsrvParams.set('h', String(height));
 
-            response = await fetch(`https://wsrv.nl/?${wsrvParams}`, {
-              headers: {
-                'Accept'    : request.headers.get('Accept') || 'image/webp,image/avif,image/*,*/*;q=0.8',
-                'User-Agent': 'VakrayanCDN/2.0',
-              },
-              cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
-            });
-          } catch (transformErr) {
-            console.warn('wsrv.nl transform error:', transformErr.message);
-          }
+          response = await fetch(`https://wsrv.nl/?${wsrvParams}`, {
+            headers: {
+              'Accept'    : request.headers.get('Accept') || 'image/webp,image/avif,image/*,*/*;q=0.8',
+              'User-Agent': 'VakrayanCDN/2.0',
+            },
+            cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
+          });
 
-          // Fallback: if wsrv.nl failed or returned non-200, serve raw file from B2
-          if (!response || !response.ok) {
-            response = await fetchRawFromB2(auth);
-            if (response.status === 401 || response.status === 403) {
-              _cachedAuth = null;
-              auth = await getB2Auth(env);
-              response = await fetchRawFromB2(auth);
-            }
+          // Fallback: if wsrv.nl fails, serve raw file from B2
+          if (!response.ok) {
+            response = await fetch(
+              `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}`,
+              { headers: { 'Authorization': auth.authorizationToken } }
+            );
           }
         } else {
           // ── No transform — direct B2 passthrough ─────────────────────────
-          response = await fetchRawFromB2(auth);
-          if (response.status === 401 || response.status === 403) {
-            _cachedAuth = null;
-            auth = await getB2Auth(env);
-            response = await fetchRawFromB2(auth);
-          }
+          response = await fetch(
+            `${auth.downloadUrl}/file/${env.B2_BUCKET_NAME}/${encodeURIComponent(fileName)}`,
+            {
+              headers: { 'Authorization': auth.authorizationToken },
+              cf: { cacheTtl: CACHE_TTL, cacheEverything: true },
+            }
+          );
         }
 
         if (!response.ok) {
-          return new Response('File not found or access error', {
-            status: response.status === 401 || response.status === 403 ? 404 : response.status,
-            headers: corsHeaders,
+          return new Response('File not found or access denied', {
+            status: response.status, headers: corsHeaders,
           });
         }
 
@@ -201,6 +180,7 @@ export default {
         rh.set('Cache-Control', `public, max-age=${CACHE_TTL}, immutable`);
         rh.set('X-Cache',     'MISS');
         rh.set('X-Transform', needsTransform ? 'wsrv' : 'passthrough');
+        // Strip internal Backblaze headers
         ['x-bz-content-sha1','x-bz-file-id','x-bz-file-name',
          'x-bz-info-src_last_modified_millis','x-bz-upload-timestamp']
           .forEach(h => rh.delete(h));
@@ -210,8 +190,7 @@ export default {
         return final;
 
       } catch (err) {
-        _cachedAuth = null; // Clear cached auth on any exception so next request re-authenticates
-        return new Response(err.message || 'CDN Error', { status: 500, headers: corsHeaders });
+        return new Response(err.message, { status: 500, headers: corsHeaders });
       }
     }
 
